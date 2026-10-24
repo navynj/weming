@@ -32,9 +32,24 @@ const headers = {
 };
 
 const started = Date.now();
+let told = false;
 while (Date.now() - started < WAIT_MS) {
   try {
     const response = await fetch(url, { headers });
+    // Once, which credential this run reads GitHub with — never the token
+    // itself: GitHub's limit is 5000 an hour for a token, 60 without.
+    if (!told) {
+      told = true;
+      console.log(
+        `→ GitHub API ${env.GITHUB_TOKEN ? 'with GITHUB_TOKEN' : 'anonymous'}: rate limit ${response.headers.get('x-ratelimit-limit') ?? '?'} an hour.`,
+      );
+    }
+    if (response.status === 401) {
+      console.log(
+        '✖ GitHub refused GITHUB_TOKEN (401): production build skipped. Replace the token in Vercel.',
+      );
+      process.exit(0);
+    }
     if (response.ok) {
       const run = (await response.json()).workflow_runs?.[0];
       if (run?.status === 'completed') {

@@ -8,6 +8,7 @@ import { todayIn } from '@/lib/time';
 import { poolScopeOf } from '@/features/pool/compose-scope';
 import { PoolEditScope } from '@/features/pool/edit-scope';
 import { signPoolPhotos } from '@/lib/avatars';
+import { PhotoRetryToast } from '@/features/pool/photo-retry';
 
 /**
  * A pool's home (H23). RLS decides whether it exists for this viewer at all:
@@ -49,6 +50,8 @@ export async function PoolScreen({ id, top }: { id: string; top?: string }) {
           topParam={top ?? null}
         />
       </PoolEditScope>
+      {/* A new pool's photo that did not upload, offered again (review). */}
+      <PhotoRetryToast poolId={view.pool.id} />
     </main>
   );
 }

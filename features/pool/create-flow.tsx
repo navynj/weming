@@ -17,6 +17,7 @@ import {
   type Directions,
   type Links,
 } from './match';
+import { holdFailedPhoto } from './photo-retry';
 import { PoolPhotoField, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
 import { PrimaryButton, StepPage } from './step-page';
 
@@ -75,9 +76,12 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
       return;
     }
     // The photo needs the pool's id, so it follows the pool (0024). A photo
-    // that will not save leaves the pool as it is: settings can add it.
+    // that will not save is held for the new pool's toast to try again.
     const photoFailed = await savePoolPhoto(made.id, photo);
-    if (photoFailed) console.error(`[during] pool photo not saved: ${photoFailed}`);
+    if (photoFailed) {
+      console.error(`[during] pool photo not saved: ${photoFailed}`);
+      holdFailedPhoto(made.id, photo);
+    }
     router.replace(`/pool/${made.id}`);
   };
 

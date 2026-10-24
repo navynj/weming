@@ -116,13 +116,25 @@ export function PoolPhotoField({
  * Saves a pool's photo change (0024), creator only: the bytes go up from the
  * browser to the pool's one file, then the row names the new version; a
  * removal deletes the file and clears the row. Returns null when done, else
- * why not.
+ * why not — never throws.
  */
 export async function savePoolPhoto(
   poolId: string,
   change: PoolPhotoChange,
 ): Promise<string | null> {
   if (change.kind === 'keep') return null;
+  try {
+    return await uploadPoolPhoto(poolId, change);
+  } catch (error) {
+    // A dropped connection throws rather than returning an error.
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function uploadPoolPhoto(
+  poolId: string,
+  change: Exclude<PoolPhotoChange, { kind: 'keep' }>,
+): Promise<string | null> {
   const storage = createClient().storage.from(POOL_PHOTO_BUCKET);
   if (change.kind === 'remove') {
     const { error } = await storage.remove([poolId]);
