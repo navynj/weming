@@ -1,6 +1,7 @@
 'use client';
 
-export type HomeView = 'lane' | 'date' | 'board';
+export type { HomeView } from './scope';
+import type { HomeView } from './scope';
 
 /** The views in the toggle's order; re-tapping Home walks them (review). */
 export const HOME_VIEW_ORDER: readonly HomeView[] = ['board', 'lane', 'date'];
@@ -27,7 +28,7 @@ export function ViewToggle({
 
 // Calendar | Lane | List (review): the values are the remembered keys and
 // the tests' names, the labels what the hand reads.
-const HOME_VIEWS = [
+export const HOME_VIEWS = [
   { value: 'board', label: 'Calendar' },
   { value: 'lane', label: 'Lane' },
   { value: 'date', label: 'List' },

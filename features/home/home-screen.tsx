@@ -12,7 +12,7 @@ import {
   type GridColumn,
 } from '@/features/home/grid';
 import { HomeGround } from '@/features/home/home-ground';
-import { scopedMonth } from '@/features/home/scope';
+import { homeViewParam, scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import {
@@ -42,10 +42,13 @@ export async function HomeScreen({
   m,
   top,
   manage,
+  view,
 }: {
   m?: string;
   top?: string;
   manage?: string;
+  /** `?view=`: the view to open on, from a lane page's tabs (review); else the Calendar. */
+  view?: string;
 }) {
   const supabase = await createClient();
   const profile = await getMyProfile(supabase);
@@ -276,6 +279,7 @@ export async function HomeScreen({
         scrollToMonth={month}
         topParam={top ?? null}
         manageLanes={manage === 'lanes'}
+        initialView={homeViewParam(view)}
         poolColumns={poolColumns}
       />
     </main>

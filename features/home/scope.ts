@@ -12,6 +12,18 @@ export function scopedMonth(param: string | string[] | undefined, today: IsoDate
   return candidate && MONTH.test(candidate) ? candidate : monthKey(today);
 }
 
+/** Home's three views (round 3; Calendar first). */
+export type HomeView = 'lane' | 'date' | 'board';
+
+/**
+ * `?view=`: a lane page's tabs send Home back on that view (review);
+ * anything else, the Calendar. Here, not beside the toggle, so the server
+ * may call it: the toggle's module is the client's.
+ */
+export function homeViewParam(value: string | undefined): HomeView {
+  return value === 'lane' || value === 'date' ? value : 'board';
+}
+
 /** The link that scopes the ground to a month. */
 export function monthHref(month: string): string {
   return `/?m=${month}`;

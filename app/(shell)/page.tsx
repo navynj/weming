@@ -5,5 +5,12 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const params = await searchParams;
   const one = (value: string | string[] | undefined): string | undefined =>
     Array.isArray(value) ? value[0] : value;
-  return <HomeScreen m={one(params.m)} top={one(params.top)} manage={one(params.manage)} />;
+  return (
+    <HomeScreen
+      m={one(params.m)}
+      top={one(params.top)}
+      manage={one(params.manage)}
+      view={one(params.view)}
+    />
+  );
 }

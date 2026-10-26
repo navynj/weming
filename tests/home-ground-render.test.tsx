@@ -1143,3 +1143,23 @@ describe('a post just dropped from a pool (review)', () => {
     expect(mark!.textContent).toContain('🎲');
   });
 });
+
+describe('?view= (review)', () => {
+  it('opens Home on the view a lane page’s tab named, else the Calendar', async () => {
+    const { homeViewParam } = await import('@/features/home/scope');
+    const { poolViewParam } = await import('@/features/pool/pool-views');
+    expect([
+      homeViewParam('lane'),
+      homeViewParam('date'),
+      homeViewParam('board'),
+      homeViewParam(undefined),
+      homeViewParam('x'),
+    ]).toEqual(['lane', 'date', 'board', 'board', 'board']);
+    expect([
+      poolViewParam('swimmers'),
+      poolViewParam('lane'),
+      poolViewParam('date'),
+      poolViewParam(undefined),
+    ]).toEqual(['swimmers', 'lane', 'date', 'board']);
+  });
+});

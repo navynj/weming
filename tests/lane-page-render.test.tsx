@@ -3,9 +3,14 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const pushed: string[] = [];
 vi.mock('next/navigation', () => ({
   usePathname: () => '/lane/c-food',
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
+  useRouter: () => ({
+    push: (to: string) => pushed.push(to),
+    replace: () => {},
+    refresh: () => {},
+  }),
 }));
 const saved: unknown[] = [];
 vi.mock('@/features/splash/actions', () => ({
@@ -108,6 +113,62 @@ const CARDS = [
   .map((s) => placeCard(s, '', TZ))
   .sort(byNewest);
 
+describe('the views’ tabs on a lane’s page (review)', () => {
+  it('keep Calendar | Lane | List at the top, Lane chosen, each back to Home on that view', () => {
+    pushed.length = 0;
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
+    const tabs = container.querySelector('[data-lane-tabs]')!;
+    expect([...tabs.querySelectorAll('[data-view-option]')].map((o) => o.textContent)).toEqual([
+      'Calendar',
+      'Lane',
+      'List',
+    ]);
+    expect(tabs.querySelector('[data-view-option="lane"]')!.getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    fireEvent.click(tabs.querySelector('[data-view-option="board"]')!);
+    fireEvent.click(tabs.querySelector('[data-view-option="date"]')!);
+    expect(pushed).toEqual(['/?view=board', '/?view=date']);
+    expect(tabs.querySelector('[data-home-settings]')).not.toBeNull();
+  });
+
+  it('keep a pool’s four tabs on its lane’s page, each back to the pool on that view', () => {
+    pushed.length = 0;
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage
+          lane={{ id: 'l-word', name: 'Word', icon: '📖' }}
+          cards={CARDS}
+          pool={{ poolId: 'p-ours', poolName: 'Sarang', lanes: [] }}
+        />
+      </InputSheetProvider>,
+    );
+    const tabs = container.querySelector('[data-lane-tabs]')!;
+    expect([...tabs.querySelectorAll('[data-view-option]')].map((o) => o.textContent)).toEqual([
+      'Calendar',
+      'Swimmers',
+      'Lane',
+      'List',
+    ]);
+    fireEvent.click(tabs.querySelector('[data-view-option="swimmers"]')!);
+    expect(pushed).toEqual(['/pool/p-ours?view=swimmers']);
+  });
+
+  it('keep the ground’s two thirds and one third on a wide screen', () => {
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
+    expect(container.querySelector('[data-grid-column]')!.className).toContain('lg:flex-[2]');
+    expect(container.querySelector('[data-board-column]')!.className).toContain('lg:flex-1');
+  });
+});
+
 describe('a lane’s page (round 3)', () => {
   it('reads Home / the lane, the emoji large over the name, and its posts newest first by month', () => {
     const { container } = render(
@@ -135,7 +196,7 @@ describe('a lane’s page (round 3)', () => {
     expect(rail!.getAttribute('data-day-row')).toBe('2026-10-03');
     expect(rail!.textContent).toBe('3SAT');
     expect(container.querySelector('[data-lane-post="ramen"]')!.textContent).not.toContain('Oct');
-    expect(container.querySelector('a[href="/?manage=lanes"]')!.textContent).toBe('Manage lanes');
+    expect(container.querySelector('[data-manage-lanes-link]')!.textContent).toBe('Manage lanes');
   });
 
   it('sets the lane\u2019s card stack at the foot: the top card\u2019s row at full white, the rest quiet, no pill', async () => {

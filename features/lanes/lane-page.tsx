@@ -3,11 +3,15 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Settings } from 'lucide-react';
 
 import { withEdits, type Card } from '@/features/home/grid';
 import { DAY_LIST_TEMPLATE, DateDay } from '@/features/home/date-day';
 import { GroundFoot } from '@/features/home/ground-foot';
+import { LaneIcon } from '@/features/home/lane-icon';
+import { HOME_VIEWS, SegmentedToggle } from '@/features/home/view-toggle';
+import { ProfileSheet } from '@/features/people/profile-sheet';
+import { POOL_VIEWS } from '@/features/pool/pool-views';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PostRow } from '@/features/home/post-row';
 import { StairBoard } from '@/features/home/stair-board';
@@ -65,6 +69,7 @@ export function LanePage({
   const { openSheet, pendingEdits, dropMessage } = useInputSheet();
   const saved = useOptimisticAction({ name: lane.name, icon: lane.icon ?? '' });
   const [editing, setEditing] = useState(false);
+  const [profile, setProfile] = useState(false);
   const [name, setName] = useState(lane.name);
   const [icon, setIcon] = useState(lane.icon ?? '');
 
@@ -138,8 +143,49 @@ export function LanePage({
     >
       <div
         data-grid-column
-        className="no-scrollbar min-h-0 flex-1 overflow-y-auto pt-4 pb-6 lg:min-w-0"
+        // Two thirds, as every view on the left (review); the stack one third.
+        className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-6 lg:min-w-0 lg:flex-[2]"
       >
+        {/* The views' tabs stay as they were (review), Lane chosen — this is
+            a lane — each tab back to the ground on that view. Placed as on
+            the ground's header, so they do not move between the two. */}
+        <header data-lane-tabs className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
+          <Link
+            href={pool ? `/pool/${pool.poolId}` : '/?manage=lanes'}
+            aria-label={pool ? 'Pool lanes' : 'Lanes'}
+            className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
+          >
+            <LaneIcon size={20} />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <SegmentedToggle
+              view="lane"
+              options={pool ? POOL_VIEWS : HOME_VIEWS}
+              onChange={(view) =>
+                router.push(pool ? `/pool/${pool.poolId}?view=${view}` : `/?view=${view}`)
+              }
+            />
+          </div>
+          {pool ? (
+            <Link
+              href={`/pool/${pool.poolId}/settings`}
+              aria-label="Pool settings"
+              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
+            >
+              <Settings aria-hidden size={20} />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              aria-label="Profile"
+              data-home-settings
+              onClick={() => setProfile(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
+            >
+              <Settings aria-hidden size={20} />
+            </button>
+          )}
+        </header>
         {/* No side padding on the scroller itself: the day list's rail is
             sticky to its left edge, and padding there pushed it over the
             rows (review). The parts above and below carry their own. */}
@@ -302,6 +348,7 @@ export function LanePage({
         onPool={pool ? () => router.push(`/pool/${pool.poolId}`) : undefined}
         onCompose={() => openSheet(pool ?? null)}
       />
+      {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
     </div>
   );
 }

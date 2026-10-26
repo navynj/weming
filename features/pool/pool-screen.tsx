@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 
 import { PoolGround } from '@/features/pool/pool-ground';
+import { poolViewParam } from '@/features/pool/pool-views';
 import { getMyProfile } from '@/lib/queries/profile';
 import { getPoolView } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
@@ -15,7 +16,16 @@ import { PhotoRetryToast } from '@/features/pool/photo-retry';
  * a pool I am not in now — never joined, or left — is not found.
  * `?top=<id>` opens with that post on top, where its page sends it back to.
  */
-export async function PoolScreen({ id, top }: { id: string; top?: string }) {
+export async function PoolScreen({
+  id,
+  top,
+  view: opensOn,
+}: {
+  id: string;
+  top?: string;
+  /** `?view=`: the view to open on, from a pool lane page's tabs (review); else the Calendar. */
+  view?: string;
+}) {
   const supabase = await createClient();
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
@@ -50,6 +60,7 @@ export async function PoolScreen({ id, top }: { id: string; top?: string }) {
           today={todayIn(profile.timezone)}
           timeZone={profile.timezone}
           topParam={top ?? null}
+          initialView={poolViewParam(opensOn)}
         />
       </PoolEditScope>
       {/* A new pool's photo that did not upload, offered again (review). */}

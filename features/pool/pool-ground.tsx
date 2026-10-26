@@ -39,15 +39,7 @@ function nextView(view: PoolViewKind): PoolViewKind {
   return VIEWS[(at + 1) % VIEWS.length].value;
 }
 
-// Calendar | Swimmers | Lane | List (review): the calendar first, then its
-// people; re-tapping Pool walks them in this order. The values are the
-// remembered keys and the tests' names, the labels what the hand reads.
-const VIEWS = [
-  { value: 'board', label: 'Calendar' },
-  { value: 'swimmers', label: 'Swimmers' },
-  { value: 'lane', label: 'Lane' },
-  { value: 'date', label: 'List' },
-] as const satisfies readonly { value: PoolViewKind; label: string }[];
+import { POOL_VIEWS as VIEWS } from './pool-views';
 
 /** What a view is called, for the foot's label. */
 function viewName(view: PoolViewKind): string {
