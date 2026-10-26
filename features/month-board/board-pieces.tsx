@@ -103,6 +103,14 @@ function FaceStack({
 const SEPARATOR = ' ';
 
 /**
+ * The first line's indent (a corner sticker's room) is inherited: an
+ * inline box in the words would indent its own content by it — a pool's
+ * monogram pushed right inside its tile (review). Every inline box in the
+ * words resets it.
+ */
+const NO_INDENT = 'indent-0';
+
+/**
  * A joint splash's writers, stacked after its caption, whatever the label's
  * style: who wrote on it, else (where the card carries no list) its
  * branches' authors, else me. On Home a pool's splash shows its pool's
@@ -116,7 +124,10 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
     return (
       <>
         {SEPARATOR}
-        <span data-board-pool className="inline-flex h-[13px] items-center align-top">
+        <span
+          data-board-pool
+          className={`inline-flex h-[13px] items-center align-top ${NO_INDENT}`}
+        >
           <Monogram name={pool} size="face" photo={card.poolPhoto ?? null} />
         </span>
       </>
@@ -140,7 +151,7 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
   return (
     <>
       {SEPARATOR}
-      <span data-board-faces className="inline-flex h-[13px] items-center align-top">
+      <span data-board-faces className={`inline-flex h-[13px] items-center align-top ${NO_INDENT}`}>
         <FaceStack faces={faces} ring={ring} />
       </span>
     </>
@@ -375,7 +386,7 @@ export function BoardPieceView({
               <span
                 aria-hidden
                 data-board-icon
-                className="mr-1 inline-block h-[13px] align-top leading-[13px]"
+                className={`mr-1 inline-block h-[13px] align-top leading-[13px] ${NO_INDENT}`}
               >
                 {icon}
               </span>
