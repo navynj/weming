@@ -15,7 +15,7 @@ import type { SignedMedia } from '@/lib/media';
 
 import {
   captionOf,
-  STICKER_LARGE,
+  type Box,
   type BoardMetrics,
   type BoardPiece,
   type BoardTape,
@@ -33,8 +33,8 @@ type Shared = {
   /** Brings the post's card to the top of the stack, as a mark does in the Lane view. */
   onPick: (id: string) => void;
   /**
-   * The stack is heading to this post (review): it bobs on its water, which
-   * swells, once per value — the ring's counterpart on the board.
+   * The stack is heading to this post (review): it bobs on the water, once
+   * per value — the ring's counterpart on the calendar.
    */
   ripple: number | null;
 };
@@ -46,11 +46,11 @@ function motionOf(ripple: number | null, plunge: boolean): string {
   return '';
 }
 
-function placed(box: { x: number; y: number; w: number; h: number }): CSSProperties {
+function placed(box: Box): CSSProperties {
   return { left: box.x, top: box.y, width: box.w, height: box.h };
 }
 
-/** The words' colour and the fill beneath them. */
+/** The words' colour and the fill beneath them: none, unless the splash is joint (review). */
 const LABEL_CLASS: Record<LabelStyle, string> = {
   none: 'text-white',
   white: 'bg-white text-main-900',
@@ -62,7 +62,7 @@ const FACE_RING: Record<LabelStyle, string> = {
   white: 'ring-white',
   ink: 'ring-ink',
 };
-/** Faces as the board draws them: 16px at 12px initials, so they hold the 10px floor. */
+/** Faces as the calendar draws them: 16px at 12px initials, so they hold the 10px floor. */
 const FACE_CLASS =
   'text-main-900/60 flex h-4 w-4 items-center justify-center rounded-full bg-[#8283EE] text-xs ring-1';
 
@@ -123,11 +123,11 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 }
 
 /**
- * An open joint splash's empty slot (meaning is shape): a small tilted tape
- * piece with a dashed white outline, to the label's right, holding the
- * faded faces of the current members who have not written. When I am one of them it reads "Add your side" — on a phone's
- * narrow column, the words are its label only — and opens the splash to
- * write my ripple; once everyone has written, the slot is gone.
+ * An open joint splash's empty slot (meaning is shape): a dashed white
+ * outline under its label, in its own lane, holding the faded faces of the
+ * current members who have not written. When I am one of them it reads
+ * "Add your side" — on a phone's narrow lane, the faces say it — and opens
+ * the splash to write my ripple; once everyone has written, it is gone.
  */
 function OpenSlot({
   piece,
@@ -141,22 +141,17 @@ function OpenSlot({
   const { me } = usePeople();
   const awaiting = piece.card.awaiting ?? [];
   const mine = me !== null && awaiting.some((face) => face.authorId === me);
-  const height = narrow ? 20 : 24;
-  const style: CSSProperties = {
-    left: piece.labelBox.x + piece.labelBox.w + 4,
-    top: piece.labelBox.y + piece.labelBox.h - height,
-    height,
-  };
   const body = (
     <>
       <FaceStack faces={awaiting} ring="ring-main-900" faded max={narrow ? 2 : 4} />
       {mine && !narrow ? (
-        <span className="font-medium whitespace-nowrap">Add your side</span>
+        <span className="truncate font-medium whitespace-nowrap">Add your side</span>
       ) : null}
     </>
   );
   const className =
-    'absolute flex items-center gap-1.5 rounded-md border border-dashed border-white px-1.5 text-xs text-white';
+    'absolute flex items-center gap-1.5 overflow-hidden border border-dashed border-white px-1.5 text-xs text-white';
+  const style = placed(piece.slotBox!);
   return mine ? (
     <button
       type="button"
@@ -177,28 +172,31 @@ function OpenSlot({
 }
 
 /**
- * One photo card: the lane wide and square, no frame, the image cropped to
- * fill it; standing on the photo area's bottom edge, a card behind peeking
- * above the one in front.
+ * One photo card: square, no frame, the image cropped to fill it; standing
+ * on the photo area's bottom edge, a card behind peeking above the one in
+ * front.
  */
 function PhotoCardView({
   photo,
   url,
-  areaH,
+  area,
   more,
-  size,
 }: {
   photo: PhotoCard;
   url: string | null | undefined;
-  areaH: number;
+  area: Box;
   more: number;
-  size: number;
 }) {
   return (
     <span
       data-board-photo-card
       className="absolute block"
-      style={{ left: 0, top: areaH - photo.dy - size, width: size, height: size }}
+      style={{
+        left: 0,
+        top: area.h - photo.dy - Math.round(area.w),
+        width: area.w,
+        height: Math.round(area.w),
+      }}
     >
       {url ? (
         // A signed URL for a few minutes: next/image would cache it past its life.
@@ -226,12 +224,12 @@ function PhotoCardView({
 }
 
 /**
- * A post on its day (Calendar view, the first mockup): a label the lane
- * wide, square and straight, flush at the lane's line or offset into it
- * and over the next, white or ink. With photos, up to three square cards
- * sit above it, the caption directly under with no fill, the icon small
- * before the words; without, the icon is a large sticker centred on a top
- * corner of the label, or small before the words.
+ * A post on its day (Calendar view; readable first, review): a square
+ * label from its offset to the lane's right line — past it, by the same
+ * offset, only into an empty band of the next lane — its sticker hanging
+ * off the top-left corner in a padding of its own, the words after it,
+ * never under anything. With photos, square cards from the offset to the
+ * line, the caption directly under with its icon small before the words.
  */
 export function BoardPieceView({
   piece,
@@ -246,7 +244,7 @@ export function BoardPieceView({
   piece: BoardPiece;
   photos: SignedMedia;
   onWrite: (card: Card) => void;
-  /** Just dropped: it plunges in, its water splashing. */
+  /** Just dropped: it plunges in. */
   plunge: boolean;
 }) {
   const { card } = piece;
@@ -255,22 +253,6 @@ export function BoardPieceView({
   const pictured = piece.variant === 'photo';
   const top = piece.fan.length - 1;
   const label = piece.labelBox;
-  const filled = piece.label !== 'none';
-  const motion = motionOf(ripple, plunge);
-  // A large sticker is centred on the label's top corner: half over the
-  // label, half over whatever is above and beside it.
-  const large = piece.sticker?.size === 'large' ? piece.sticker : null;
-  const stickerPx = Math.round(label.h * STICKER_LARGE);
-  const stickerStyle: CSSProperties = large
-    ? {
-        left: (large.corner === 'tl' ? label.x : label.x + label.w) - stickerPx / 2,
-        top: label.y - stickerPx / 2,
-        width: stickerPx,
-        height: stickerPx,
-        fontSize: stickerPx,
-      }
-    : {};
-  const inlineIcon = pictured || piece.sticker?.size === 'small';
   return (
     <div
       // Remounted per ring, so the motion plays again for the same post.
@@ -279,15 +261,14 @@ export function BoardPieceView({
       data-board-day={piece.day}
       data-variant={piece.variant}
       data-label={piece.label}
-      data-placement={piece.placement}
-      data-sticker={piece.sticker?.size}
+      data-step={piece.step}
+      data-overhang={piece.overhang ? '' : undefined}
       data-heading={ripple !== null ? '' : undefined}
       data-dropped={plunge ? '' : undefined}
-      // An offset piece overhangs the next lane: above its separator and its items (review).
-      className={`absolute ${piece.placement === 'offset' ? 'z-10' : ''} ${motion}`}
-      style={placed(piece)}
+      className={`absolute ${motionOf(ripple, plunge)}`}
+      style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }}
     >
-      {/* The piece is the tap that brings its card up; the slot beside it is a tap of its own. */}
+      {/* The piece is the tap that brings its card up; the slot under it is a tap of its own. */}
       <button
         type="button"
         onClick={() => onPick(card.splash.id)}
@@ -296,24 +277,14 @@ export function BoardPieceView({
         className="absolute inset-0 block text-left"
       >
         {piece.photoBox ? (
-          <span
-            data-board-photos
-            className="absolute block"
-            style={{
-              left: piece.photoBox.x,
-              top: piece.photoBox.y,
-              width: piece.photoBox.w,
-              height: piece.photoBox.h,
-            }}
-          >
+          <span data-board-photos className="absolute block" style={placed(piece.photoBox)}>
             {piece.fan.map((photo, at) => (
               <PhotoCardView
                 key={photo.path}
                 photo={photo}
                 url={photos[photo.path]}
-                areaH={piece.photoBox!.h}
+                area={piece.photoBox!}
                 more={at === top ? piece.morePhotos : 0}
-                size={piece.photoBox!.w}
               />
             ))}
           </span>
@@ -322,20 +293,28 @@ export function BoardPieceView({
           data-board-label
           className={`absolute block ${LABEL_CLASS[piece.label]}`}
           style={{
-            left: label.x,
-            top: label.y,
-            width: label.w,
-            height: label.h,
-            paddingTop: metrics.labelPadY,
-            paddingLeft: filled ? metrics.labelPadX : 4,
-            paddingRight: filled ? metrics.labelPadX : 4,
+            ...placed(label),
+            paddingTop: piece.pad.top,
+            paddingRight: piece.pad.right,
+            paddingBottom: piece.pad.bottom,
+            paddingLeft: piece.pad.left,
           }}
         >
           <span
-            className="line-clamp-3 block font-medium break-words"
-            style={{ fontSize: metrics.caption.size, lineHeight: `${metrics.caption.line}px` }}
+            data-board-text
+            // Clamped to the lines its box was sized for (three at most), so the words never
+            // spill into the padding a sticker hangs in (review: text is never covered).
+            className="block overflow-hidden font-medium break-words"
+            style={{
+              fontSize: metrics.caption.size,
+              lineHeight: `${metrics.caption.line}px`,
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: piece.captionLines,
+              maxHeight: piece.captionLines * metrics.caption.line,
+            }}
           >
-            {inlineIcon && icon ? (
+            {pictured && icon ? (
               <span aria-hidden data-board-icon className="mr-1">
                 {icon}
               </span>
@@ -344,27 +323,26 @@ export function BoardPieceView({
             {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
           </span>
         </span>
-        {large && icon ? (
+        {piece.stickerBox && icon ? (
           <span
             aria-hidden
             data-board-sticker
-            data-corner={large.corner}
-            // Above every label, its own and the next lane's: a sticker is never covered (review).
-            className="absolute z-20 flex items-center justify-center leading-none"
-            style={stickerStyle}
+            className="absolute flex items-center justify-center leading-none"
+            style={{ ...placed(piece.stickerBox), fontSize: piece.stickerBox.w }}
           >
             {icon}
           </span>
         ) : null}
       </button>
-      {piece.slot ? <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} /> : null}
+      {piece.slotBox ? <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} /> : null}
     </div>
   );
 }
 
 /**
- * A ranged post's band across its days in one row (review): translucent
- * white, the full width of its lanes, square.
+ * A ranged post's band across its days in one row (review): the full width
+ * of its lanes, translucent white with a thin white outline, so it reads
+ * as a band, at the top of the row above the items.
  */
 export function BoardTapeView({
   tape,
@@ -376,7 +354,6 @@ export function BoardTapeView({
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
-  const motion = motionOf(ripple, false);
   return (
     <div
       key={ripple ?? 'still'}
@@ -385,7 +362,7 @@ export function BoardTapeView({
       data-starts-here={tape.startsHere ? '' : undefined}
       data-ends-here={tape.endsHere ? '' : undefined}
       data-heading={ripple !== null ? '' : undefined}
-      className={`absolute ${motion}`}
+      className={`absolute ${motionOf(ripple, false)}`}
       style={placed(tape)}
     >
       <button
@@ -394,7 +371,7 @@ export function BoardTapeView({
         aria-label={caption}
         data-board-pick={tape.id}
         data-board-band
-        className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
+        className="absolute inset-0 flex items-center gap-1 border border-white/50 bg-white/20 px-2 text-left font-medium text-white"
         style={{ fontSize: metrics.caption.size }}
       >
         {icon ? <span aria-hidden>{icon}</span> : null}

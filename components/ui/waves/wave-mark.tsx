@@ -1,3 +1,4 @@
+import { WaveGlyph } from './wave-glyph';
 import { impressionLineCount, WAVE_GAP } from './wave-math';
 import { WaveLine, WAVE_WIDTH } from './wave-line';
 
@@ -37,8 +38,9 @@ export function WaveMark({
         ['--wave-ink' as string]: tone === 'blue' ? '#ffffff' : 'var(--color-main-900)',
       }}
     >
+      {/* The pill's glyph (review): the one path the calendar's days draw too. */}
       {Array.from({ length: lines }, (_, index) => (
-        <WaveLine key={index} width={MARK_WAVE} />
+        <WaveGlyph key={index} width={MARK_WAVE} />
       ))}
     </span>
   );

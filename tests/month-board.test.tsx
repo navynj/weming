@@ -18,15 +18,19 @@ vi.mock('@/lib/media', () => ({
 
 import { placeCard, type Card, type CardPhoto } from '@/features/home/grid';
 import type { Ring } from '@/features/home/lane-grid';
-import { WaveMark } from '@/components/ui/waves';
+import { WaveMark, WAVE_GLYPH_PATH } from '@/components/ui/waves';
 import {
   COLUMNS,
   HEADER_PX,
+  intersects,
+  LABEL_MIN_PX,
   layoutMonthBoard,
   layoutWeekBoard,
-  STICKER_LARGE,
+  OFFSET_STEPS,
+  onBoard,
   weekTitle,
   type BoardLayout,
+  type Box,
 } from '@/features/month-board/layout';
 import { MonthBoard } from '@/features/month-board/month-board';
 import { PeopleProvider } from '@/features/people/people-provider';
@@ -139,10 +143,18 @@ type Props = {
   dropped?: string | null;
   month?: string;
   onMonth?: (month: string) => void;
+  fills?: boolean;
 };
 function tree(
   cards: Card[],
-  { onPick = () => {}, ring = null, dropped = null, month = '2026-10', onMonth = () => {} }: Props,
+  {
+    onPick = () => {},
+    ring = null,
+    dropped = null,
+    month = '2026-10',
+    onMonth = () => {},
+    fills = false,
+  }: Props,
 ) {
   return (
     <PeopleProvider
@@ -159,6 +171,7 @@ function tree(
         today={TODAY}
         ring={ring}
         dropped={dropped}
+        fills={fills}
         onPick={onPick}
         lanes={LANES}
       />
@@ -170,37 +183,72 @@ function board(cards: Card[] = OCTOBER, props: Props = {}) {
 }
 
 /**
- * Every piece at its lane's line, its label the lane wide — flush, or
- * offset into the lane and over the next (the last lane's ends at the
- * board's edge) — under the header, within its row.
+ * The hard rules (review), on a whole layout: every piece at its lane's
+ * line, its label from its offset to the lane's right line (or past it by
+ * the offset, into an empty band), at least 32px tall; no two items'
+ * boxes intersect; no sticker touches any words; under the header.
  */
-function laned(layout: BoardLayout): void {
+function readable(layout: BoardLayout): void {
   const { column } = layout.metrics;
+  const boxes: { id: string; box: Box }[] = [];
+  const words: { id: string; box: Box }[] = [];
+  const stickers: { id: string; box: Box }[] = [];
   for (const piece of layout.pieces) {
     const week = layout.weeks[piece.week];
     const cell = week.cells[piece.col];
     expect(cell.day).toBe(piece.day);
     expect(piece.x).toBe(cell.x);
     const label = piece.labelBox;
-    if (piece.placement === 'flush') {
-      expect(label.x).toBe(0);
-      expect(label.w).toBe(column);
-    } else {
-      expect(label.x).toBeGreaterThanOrEqual(column * 0.25 - 1);
-      expect(label.x).toBeLessThanOrEqual(column * 0.4 + 1);
-      if (piece.col < COLUMNS - 1) {
-        expect(label.w).toBe(column);
-        // Over the right separator, onto the next lane.
-        expect(label.x + label.w).toBeGreaterThan(column);
-      } else {
-        expect(label.x + label.w).toBe(column);
-      }
-    }
-    expect(piece.w).toBe(label.x + label.w);
+    expect(label.h).toBeGreaterThanOrEqual(LABEL_MIN_PX);
+    expect(label.x + label.w).toBe(piece.overhang ? column + label.x : column);
     expect(piece.y).toBeGreaterThanOrEqual(week.y);
     expect(piece.y + piece.h).toBeLessThanOrEqual(week.y + week.h);
+    for (const box of [piece.labelBox, piece.photoBox, piece.slotBox]) {
+      if (box) boxes.push({ id: piece.id, box: onBoard(piece, box) });
+    }
+    words.push({ id: piece.id, box: onBoard(piece, piece.textBox) });
+    if (piece.stickerBox) stickers.push({ id: piece.id, box: onBoard(piece, piece.stickerBox) });
+  }
+  for (const tape of layout.tapes) {
+    boxes.push({ id: tape.key, box: tape });
+    words.push({ id: tape.key, box: tape });
+  }
+  for (let a = 0; a < boxes.length; a += 1) {
+    for (let b = a + 1; b < boxes.length; b += 1) {
+      if (boxes[a].id === boxes[b].id) continue;
+      expect(intersects(boxes[a].box, boxes[b].box), `${boxes[a].id} × ${boxes[b].id}`).toBe(false);
+    }
+  }
+  for (const sticker of stickers) {
+    for (const text of words) {
+      expect(intersects(sticker.box, text.box), `${sticker.id} sticker × ${text.id} words`).toBe(
+        false,
+      );
+    }
   }
 }
+
+/** A busy fortnight: several posts a day, long and short titles, photos, joint ones, ranges. */
+const BUSY: Card[] = [
+  ...Array.from({ length: 30 }, (_, at) => {
+    const day = `2026-10-${String(1 + (at % 10)).padStart(2, '0')}`;
+    const title = [
+      'Hoppers',
+      'Lynn Canyon - Twin Falls Trail',
+      'coffee went cold while I read the whole thing',
+      'call from mom, halfway through',
+      'x',
+    ][at % 5];
+    const c = card(`b${String(at).padStart(2, '0')}`, title, day, { photos: at % 7 === 3 ? 2 : 0 });
+    return at % 4 === 1 ? { ...c, joint: true } : c;
+  }),
+  card('span1', 'A long weekend', '2026-10-02', {
+    over: { declared_start: '2026-10-02', declared_end: '2026-10-06' },
+  }),
+  card('span2', 'Conference', '2026-10-05', {
+    over: { declared_start: '2026-10-05', declared_end: '2026-10-08' },
+  }),
+];
 
 describe('the week board (the default)', () => {
   const layout = layoutWeekBoard(WEEK, TODAY, { width: 358 });
@@ -237,27 +285,8 @@ describe('the week board (the default)', () => {
     expect(layout.width).toBe(358);
     expect(layout.metrics.column * COLUMNS).toBe(358);
     expect(layout.metrics.narrow).toBe(true);
-    laned(layout);
-    laned(layoutWeekBoard(WEEK, TODAY, { width: 728 }));
-  });
-
-  it('stacks a day’s items with no gap, directly under the header, one breath only after a photo card', () => {
-    const tue = layout.pieces.filter((p) => p.day === '2026-10-20');
-    expect(tue[0].y).toBe(HEADER_PX + layout.tapes.length * 26);
-    expect(tue[1].y).toBe(tue[0].y + tue[0].h);
-    expect(tue[2].y).toBe(tue[1].y + tue[1].h);
-    // The same day with nothing ranged, and a post after the photo (ids order the ties).
-    const noTapes = layoutWeekBoard(
-      [WEEK[0], WEEK[1], WEEK[2], card('zz-after', 'After the photo', '2026-10-20')],
-      TODAY,
-      { width: 358 },
-    );
-    const [a, b, photo, after] = noTapes.pieces;
-    expect(a.y).toBe(HEADER_PX);
-    expect(b.y).toBe(a.y + a.h);
-    expect(photo.variant).toBe('photo');
-    expect(after.id).toBe('zz-after');
-    expect(after.y).toBe(photo.y + photo.h + 6);
+    readable(layout);
+    readable(layoutWeekBoard(WEEK, TODAY, { width: 728 }));
   });
 
   it('keeps every title at 10px', () => {
@@ -342,8 +371,8 @@ describe('the month board', () => {
       ['trip', 4, false, true],
     ]);
     expect(layout.title).toBe('2026 OCT');
-    laned(layout);
-    laned(layoutMonthBoard(OCTOBER, '2026-10', { width: 358 }));
+    readable(layout);
+    readable(layoutMonthBoard(OCTOBER, '2026-10', { width: 358 }));
   });
 
   it('grows a week row to its tallest lane, the rest at the base height', () => {
@@ -394,168 +423,182 @@ describe('the month board', () => {
   });
 });
 
-describe('a day’s plan: rhythm, not meaning', () => {
-  const MONTH = Array.from({ length: 60 }, (_, at) =>
-    card(`p${at}`, `Post ${at}`, `2026-10-${String((at % 28) + 1).padStart(2, '0')}`, {
-      photos: at % 9 === 0 ? 1 : 0,
-    }),
-  );
-  const layout = layoutMonthBoard(MONTH, '2026-10', { width: 728 });
-  const byDay = new Map<string, typeof layout.pieces>();
-  for (const piece of layout.pieces) byDay.set(piece.day, [...(byDay.get(piece.day) ?? []), piece]);
-
-  it('alternates flush and offset within a day, both used over a month', () => {
-    expect(layout.pieces.some((p) => p.placement === 'flush')).toBe(true);
-    expect(layout.pieces.some((p) => p.placement === 'offset')).toBe(true);
-    for (const pieces of byDay.values()) {
-      for (let at = 1; at < pieces.length; at += 1) {
-        expect(pieces[at].placement).not.toBe(pieces[at - 1].placement);
+describe('readable first: the hard rules (review)', () => {
+  it('holds on a busy fortnight, week and month, at a phone’s width and a desktop’s', () => {
+    for (const width of [358, 728, 980]) {
+      for (const day of ['2026-10-01', '2026-10-06']) {
+        readable(layoutWeekBoard(BUSY, day, { width, fills: true }));
       }
+      readable(layoutMonthBoard(BUSY, '2026-10', { width, fills: true }));
     }
   });
 
-  it('alternates white and ink within a day; none is a photo caption’s alone', () => {
-    for (const pieces of byDay.values()) {
-      const labelled = pieces.filter((p) => p.variant !== 'photo');
-      for (let at = 1; at < labelled.length; at += 1) {
-        expect(labelled[at].label).not.toBe(labelled[at - 1].label);
-      }
-      for (const piece of pieces) {
-        if (piece.variant === 'photo') expect(piece.label).toBe('none');
-        else expect(['white', 'ink']).toContain(piece.label);
-      }
-    }
-  });
-
-  it('gives a day of two or more items at least one large sticker, never the first item', () => {
-    for (const pieces of byDay.values()) {
-      expect(pieces[0].sticker?.size).not.toBe('large');
-      if (pieces.length >= 2 && pieces.some((p, i) => i > 0 && p.variant !== 'photo')) {
-        expect(pieces.some((p) => p.sticker?.size === 'large')).toBe(true);
+  it('overhangs only into an empty band of the next lane, never over its items', () => {
+    const layout = layoutWeekBoard(BUSY, '2026-10-06', { width: 728 });
+    const overhung = layout.pieces.filter((p) => p.overhang);
+    expect(overhung.length).toBeGreaterThan(0);
+    for (const piece of overhung) {
+      const label = onBoard(piece, piece.labelBox);
+      const reach = {
+        x: piece.x + layout.metrics.column,
+        y: label.y,
+        w: piece.labelBox.x,
+        h: label.h,
+      };
+      for (const next of layout.pieces.filter((p) => p.col === piece.col + 1)) {
+        expect(intersects(reach, { x: next.x, y: next.y, w: next.w, h: next.h })).toBe(false);
       }
     }
-  });
-
-  it('draws the same board every time', () => {
-    const again = layoutMonthBoard([...MONTH].reverse(), '2026-10', { width: 728 });
-    expect(again.pieces.map((p) => [p.label, p.placement, p.sticker, p.x, p.y])).toEqual(
-      layout.pieces.map((p) => [p.label, p.placement, p.sticker, p.x, p.y]),
+    // And where the next lane is busy at that height, a label keeps to its line.
+    const kept = layout.pieces.filter(
+      (p) => !p.overhang && p.labelBox.x > 0 && p.col < COLUMNS - 1,
     );
+    expect(kept.length).toBeGreaterThan(0);
+  });
+
+  it('steps the start offset through 0, 12, 24 and 36%, never the same twice in a row within a day', () => {
+    const layout = layoutMonthBoard(BUSY, '2026-10', { width: 728 });
+    const byDay = new Map<string, number[]>();
+    for (const p of layout.pieces) byDay.set(p.day, [...(byDay.get(p.day) ?? []), p.step]);
+    expect(new Set(layout.pieces.map((p) => p.step)).size).toBe(OFFSET_STEPS.length);
+    for (const steps of byDay.values()) {
+      for (let at = 1; at < steps.length; at += 1) expect(steps[at]).not.toBe(steps[at - 1]);
+    }
+  });
+
+  it('stacks a day’s items in time order with no gap, directly under the header', () => {
+    // A row with no bands: they would sit above the items, pushing them down.
+    const days = BUSY.filter((c) => !c.splash.range || c.splash.range.start === c.splash.range.end);
+    const layout = layoutWeekBoard(days, '2026-10-01', { width: 358 });
+    const thu = layout.pieces.filter((p) => p.day === '2026-10-01');
+    expect(thu.length).toBeGreaterThan(2);
+    expect(thu[0].y).toBe(HEADER_PX);
+    for (let at = 1; at < thu.length; at += 1)
+      expect(thu[at].y).toBe(thu[at - 1].y + thu[at - 1].h);
+  });
+
+  it('hangs a sticker off the label’s top-left corner, half outside, its inner half in a padding of its own', () => {
+    const layout = layoutWeekBoard(WEEK, TODAY, { width: 728 });
+    const s = layout.metrics.sticker;
+    expect(s).toBe(Math.round(layout.metrics.caption.line * 1.4));
+    for (const piece of layout.pieces.filter((p) => p.variant === 'sticker')) {
+      const sticker = piece.stickerBox!;
+      expect(sticker.x + s / 2).toBe(piece.labelBox.x);
+      expect(sticker.y + s / 2).toBe(piece.labelBox.y);
+      expect(piece.textBox.x).toBeGreaterThanOrEqual(sticker.x + s);
+      // Never across the lane's line into the day before.
+      expect(sticker.x).toBeGreaterThanOrEqual(0);
+    }
   });
 });
 
-describe('labels, stickers, photo cards and bands (the mockup)', () => {
-  it('draws every label the lane wide, square and straight; an offset one above the next lane', () => {
-    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
-      configurable: true,
-      get: () => 728,
-    });
-    try {
-      const { container } = board();
-      const column = 728 / 7;
-      for (const piece of container.querySelectorAll<HTMLElement>('[data-board-piece]')) {
-        expect(piece.style.transform).toBe('');
-        const label = piece.querySelector<HTMLElement>('[data-board-label]')!;
-        expect(parseFloat(label.style.width)).toBeCloseTo(column, 5);
-        expect(label.style.borderRadius).toBe('');
-        expect(label.className).not.toMatch(/rounded/);
-        const offset = piece.getAttribute('data-placement') === 'offset';
-        expect(piece.className.includes('z-10')).toBe(offset);
-        if (offset) expect(parseFloat(label.style.left)).toBeGreaterThan(0);
-      }
-      const tue = [
-        ...container.querySelectorAll('[data-board-piece][data-board-day="2026-10-20"]'),
-      ];
-      expect(tue.map((p) => p.getAttribute('data-placement'))).toHaveLength(3);
-      expect(tue[0].getAttribute('data-placement')).not.toBe(tue[1].getAttribute('data-placement'));
-      expect(tue[1].getAttribute('data-placement')).not.toBe(tue[2].getAttribute('data-placement'));
-    } finally {
-      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+describe('fills: what is shared (review)', () => {
+  const MINE = {
+    ...card('mine', 'Just mine', '2026-10-21'),
+    splash: { ...card('mine', 'Just mine', '2026-10-21').splash, ownPoolId: 'p-a' },
+  };
+  const JOINTS = ['j1', 'j2', 'j3'].map((id) => ({
+    ...card(id, `Joint ${id}`, '2026-10-21'),
+    joint: true,
+  }));
+
+  it('never fills a splash that is not joint — Just mine, shared, photo captions — and always fills a joint one', () => {
+    const layout = layoutWeekBoard([MINE, ...JOINTS, WEEK[2]], TODAY, { width: 728, fills: true });
+    expect(layout.pieces.find((p) => p.id === 'mine')!.label).toBe('none');
+    expect(layout.pieces.find((p) => p.id === 'soup')!.label).toBe('none');
+    const joint = layout.pieces.filter((p) => p.card.joint);
+    for (const p of joint) expect(['white', 'ink']).toContain(p.label);
+    for (let at = 1; at < joint.length; at += 1)
+      expect(joint[at].label).not.toBe(joint[at - 1].label);
+    const { container } = board([MINE, ...JOINTS], { fills: true });
+    expect(
+      container.querySelector('[data-board-piece="mine"] [data-board-label]')!.className,
+    ).not.toMatch(/bg-/);
+    expect(
+      container.querySelector('[data-board-piece="j1"] [data-board-label]')!.className,
+    ).toMatch(/bg-(white|ink)/);
+  });
+
+  it('draws no fills at all on Home, or in a pool of one', () => {
+    const layout = layoutWeekBoard([MINE, ...JOINTS], TODAY, { width: 728 });
+    for (const p of layout.pieces) expect(p.label).toBe('none');
+  });
+});
+
+describe('labels, photos and bands, drawn', () => {
+  it('draws every label square and straight, its padding as laid out', () => {
+    const { container } = board();
+    for (const piece of container.querySelectorAll<HTMLElement>('[data-board-piece]')) {
+      expect(piece.style.transform).toBe('');
+      const label = piece.querySelector<HTMLElement>('[data-board-label]')!;
+      expect(label.className).not.toMatch(/rounded/);
+      expect(parseFloat(label.style.height)).toBeGreaterThanOrEqual(LABEL_MIN_PX);
+      const text = piece.querySelector<HTMLElement>('[data-board-text]')!;
+      const lines = Number(
+        text.style.webkitLineClamp || text.style.getPropertyValue('-webkit-line-clamp'),
+      );
+      expect(lines).toBeGreaterThanOrEqual(1);
+      expect(lines).toBeLessThanOrEqual(3);
+      expect(parseFloat(text.style.maxHeight)).toBe(lines * 13);
     }
   });
 
-  it('centres a large sticker on the label’s top corner, 1.8 label heights, above everything', () => {
+  it('gives a photo card the lane from its offset, square, no frame, the caption directly under with a small icon', () => {
+    const layout = layoutWeekBoard(WEEK, TODAY, { width: 728 });
+    for (const piece of layout.pieces.filter((p) => p.variant === 'photo')) {
+      expect(piece.photoBox!.x).toBe(piece.labelBox.x);
+      expect(piece.photoBox!.w).toBe(layout.metrics.column - piece.labelBox.x);
+      expect(piece.labelBox.y).toBe(piece.photoBox!.h);
+      expect(piece.stickerBox).toBeNull();
+      expect(piece.label).toBe('none');
+    }
     const { container } = board();
-    const large = container.querySelector<HTMLElement>('[data-board-piece][data-sticker="large"]')!;
-    expect(large).not.toBeNull();
-    const sticker = large.querySelector<HTMLElement>('[data-board-sticker]')!;
-    const label = large.querySelector<HTMLElement>('[data-board-label]')!;
-    const labelH = parseFloat(label.style.height);
-    const size = parseFloat(sticker.style.width);
-    expect(size).toBe(Math.round(labelH * STICKER_LARGE));
-    expect(parseFloat(sticker.style.top)).toBe(parseFloat(label.style.top) - size / 2);
-    const labelX = parseFloat(label.style.left);
-    const labelW = parseFloat(label.style.width);
-    expect([labelX - size / 2, labelX + labelW - size / 2]).toContain(
-      parseFloat(sticker.style.left),
-    );
-    expect(sticker.className).toContain('z-20');
-    expect(large.querySelector('[data-board-icon]')).toBeNull();
-    const small = container.querySelector<HTMLElement>('[data-board-piece][data-sticker="small"]')!;
-    expect(small.querySelector('[data-board-icon]')).not.toBeNull();
-    expect(small.querySelector('[data-board-sticker]')).toBeNull();
-  });
-
-  it('draws photo cards seven to eight and a half tenths of the lane, square, left or right, no frame, the caption directly under; one, two and three, the last with "+1"', () => {
-    const { container } = board();
-    const cards = (id: string) =>
-      container.querySelectorAll<HTMLElement>(`[data-board-piece="${id}"] [data-board-photo-card]`);
-    expect(cards('soup')).toHaveLength(1);
-    expect(cards('two')).toHaveLength(2);
-    expect(cards('four')).toHaveLength(3);
+    const one = container.querySelector<HTMLElement>(
+      '[data-board-piece="soup"] [data-board-photo-card]',
+    )!;
+    expect(one.style.width).toBe(one.style.height);
+    expect(one.className).not.toMatch(/rounded|bg-white|shadow/);
+    expect(container.querySelector('[data-board-piece="soup"] [data-board-icon]')).not.toBeNull();
+    expect(container.querySelector('[data-board-piece="soup"] [data-board-sticker]')).toBeNull();
+    expect(
+      container.querySelectorAll('[data-board-piece="four"] [data-board-photo-card]'),
+    ).toHaveLength(3);
     expect(
       container.querySelector('[data-board-piece="four"] [data-board-more-photos]')!.textContent,
     ).toBe('+1');
-    const column = 728 / 7;
-    for (const id of ['soup', 'two', 'four']) {
-      const laid = layoutWeekBoard(WEEK, TODAY, { width: 728 }).pieces.find((p) => p.id === id)!;
-      expect(laid.photoBox!.w).toBeGreaterThanOrEqual(column * 0.7 - 1);
-      expect(laid.photoBox!.w).toBeLessThanOrEqual(column * 0.85 + 1);
-      expect([0, column - laid.photoBox!.w]).toContain(laid.photoBox!.x);
-      expect(laid.labelBox.y).toBe(laid.photoBox!.h);
-      expect(laid.label).toBe('none');
-    }
-    const one = cards('soup')[0];
-    expect(one.style.width).toBe(one.style.height);
-    expect(one.className).not.toMatch(/rounded|bg-white|shadow/);
   });
 
-  it('runs a range band the full width of its lanes, square', () => {
+  it('runs a range band the full width of its lanes, translucent, outlined, square', () => {
     const { container } = board();
     const band = container.querySelector<HTMLElement>(
       '[data-board-tape="trip"] [data-board-band]',
     )!;
+    expect(band.className).toContain('border-white/50');
+    expect(band.className).toContain('bg-white/20');
     expect(band.className).not.toMatch(/rounded/);
     const laid = layoutWeekBoard(WEEK, TODAY, { width: 728 }).tapes[0];
     expect(laid.x).toBe(2 * (728 / 7));
     expect(laid.w).toBe(5 * (728 / 7));
   });
 
-  it('gives every record a label, and its icon once: small before the words, or large on a corner', () => {
-    const { container } = board();
-    for (const piece of container.querySelectorAll('[data-board-piece]')) {
-      expect(piece.querySelector('[data-board-label]')!.textContent).toContain(
-        piece.querySelector('[data-board-pick]')!.getAttribute('aria-label')!,
-      );
-      const inline = piece.querySelector('[data-board-icon]') !== null;
-      const large = piece.querySelector('[data-board-sticker]') !== null;
-      expect(inline !== large).toBe(true);
-    }
-  });
-
-  it('draws the day’s waves with the pill’s own glyph, scaled to 24px, one per record, three at most', () => {
+  it('draws the day’s waves with the pill’s own glyph — the given path — at 24px, one per record, three at most', () => {
     const { container } = board();
     const header = container.querySelector('[data-board-header="2026-10-20"]')!;
-    const waves = header.querySelectorAll('[data-board-wave]');
-    expect(waves).toHaveLength(3);
-    const pill = render(<WaveMark count={1} />).container.querySelector('svg path')!;
-    for (const wave of waves) expect(wave.getAttribute('d')).toBe(pill.getAttribute('d'));
-    const svg = waves[0].closest('svg')!;
-    expect(svg.getAttribute('width')).toBe('24');
-    expect(svg.getAttribute('viewBox')).toBe(`0 0 14 4`);
-    expect(waves[0].getAttribute('stroke-width')).toBe('2');
-    expect(waves[0].getAttribute('stroke-opacity')).toBe('0.6');
-    expect(header.querySelector('[data-board-waves]')!.className).toContain('gap-1');
+    const glyphs = header.querySelectorAll('[data-wave-glyph]');
+    expect(glyphs).toHaveLength(3);
+    const pill = render(<WaveMark count={1} />).container.querySelector('[data-wave-glyph] path')!;
+    expect(pill.getAttribute('d')).toBe('M1 6 C4 6 5 2 8 2 S12 6 15 6 S19 2 23 2');
+    for (const glyph of glyphs) {
+      expect(glyph.querySelector('path')!.getAttribute('d')).toBe(pill.getAttribute('d'));
+      expect(glyph.getAttribute('width')).toBe('24');
+      expect(glyph.getAttribute('viewBox')).toBe('0 0 24 8');
+    }
+    const path = glyphs[0].querySelector('path')!;
+    expect(path.getAttribute('d')).toBe(WAVE_GLYPH_PATH);
+    expect(path.getAttribute('stroke-width')).toBe('2');
+    expect(path.getAttribute('stroke-linecap')).toBe('round');
+    expect(path.getAttribute('stroke-opacity')).toBe('0.6');
+    expect(path.getAttribute('fill')).toBe('none');
   });
 });
 
@@ -629,7 +672,7 @@ describe('an open joint splash (meaning is shape)', () => {
     awaiting,
   });
 
-  it('carries an empty slot to the label’s right, with the faded faces of who has not written', () => {
+  it('carries an empty slot under its label, with the faded faces of who has not written', () => {
     const { container } = board([joint([{ authorId: 'u-jo', initials: 'JO' }])]);
     const slot = container.querySelector<HTMLElement>('[data-board-slot="jam"]')!;
     expect(slot.className).toContain('border-dashed');
@@ -639,8 +682,15 @@ describe('an open joint splash (meaning is shape)', () => {
     const laid = layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, {
       width: 980,
     }).pieces[0];
-    expect(laid.slot).toBe(true);
-    expect(parseFloat(slot.style.left)).toBeGreaterThanOrEqual(laid.labelBox.w);
+    // Under its label, in its own lane: never over the next lane's words.
+    // Its own lane from the label's start, even when the label overhangs the next.
+    expect(laid.slotBox).toEqual({
+      x: laid.labelBox.x,
+      y: laid.labelBox.y + laid.labelBox.h,
+      w: 980 / 7 - laid.labelBox.x,
+      h: 22,
+    });
+    expect(parseFloat(slot.style.top)).toBe(laid.labelBox.y + laid.labelBox.h);
   });
 
   it('reads "Add your side" when I am missing, and opens the splash to write', () => {

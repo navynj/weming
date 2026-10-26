@@ -4,6 +4,7 @@ export { WaveBundle } from './wave-bundle';
 export type { WaveBundleProps } from './wave-bundle';
 export { CommitRing } from './commit-ring';
 export { WaveMark, WaveStack } from './wave-mark';
+export { WaveGlyph, WAVE_GLYPH_PATH, WAVE_GLYPH_W, WAVE_GLYPH_H } from './wave-glyph';
 export type { CommitRingProps } from './commit-ring';
 export {
   bundleLineCount,
