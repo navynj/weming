@@ -214,9 +214,8 @@ export function PoolGround({
       >
         <div
           data-grid-column
-          // Wide, the Board takes two thirds and the stack one (review); the
-          // Lane and Date views split the room in half.
-          className={`flex min-h-0 flex-1 flex-col lg:min-w-0 ${boardView ? 'lg:flex-[2]' : 'lg:flex-1'}`}
+          // Wide, every view on the left takes two thirds and the stack one (review).
+          className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
           <header data-pool-header className="flex shrink-0 items-center gap-2 px-4 pt-4">
             {/* The pool's photo or monogram, then its name (0024); going to

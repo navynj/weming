@@ -289,9 +289,8 @@ export function HomeGround({
       >
         <div
           data-grid-column
-          // Wide, the Board takes two thirds and the stack one (review); the
-          // Lane and Date views split the room in half.
-          className={`flex min-h-0 flex-1 flex-col lg:min-w-0 ${boardView ? 'lg:flex-[2]' : 'lg:flex-1'}`}
+          // Wide, every view on the left takes two thirds and the stack one (review).
+          className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
           {/* The header (round 3): lane management at the left, the view
               toggle at the centre. No settings page exists, so no gear. */}
