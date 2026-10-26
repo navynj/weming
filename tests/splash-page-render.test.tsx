@@ -279,6 +279,11 @@ describe('writing on the page, in place', () => {
     expect(router.refresh).toHaveBeenCalled();
   });
 
+  it('opens with the next block’s editor up when opened to write (Board: "Add your side")', () => {
+    const { container } = page({ writing: true });
+    expect(container.querySelector('[data-block-editor="new"]')).not.toBeNull();
+  });
+
   it('starts a new block from the add slot at the post’s declared lane and date (H21f)', async () => {
     const { container, getByText, getByLabelText } = page();
     fireEvent.click(getByText('Drop your words here'));

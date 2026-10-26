@@ -1,10 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { useState, type CSSProperties, type MouseEvent } from 'react';
 
-import { postIcon, laneOfCard, type Card, type GridColumn } from '@/features/home/grid';
-import { splashHref } from '@/features/home/scope';
+import {
+  postIcon,
+  laneOfCard,
+  type Card,
+  type CardFace,
+  type GridColumn,
+} from '@/features/home/grid';
 import { Avatar } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 import type { SignedMedia } from '@/lib/media';
@@ -17,6 +21,7 @@ import {
   PHOTO_H_PX,
   PHOTO_PAD_PX,
   PHOTO_W_PX,
+  SLOT_PX,
   STICKER_PX,
   type BoardPiece,
   type PhotoCard,
@@ -26,10 +31,12 @@ import {
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 
-/** What a piece needs besides its place: the lanes its icon falls back to, and the guard a pan sets. */
+/** What a piece needs besides its place: the lanes its icon falls back to, and what a tap does. */
 type Shared = {
   lanes: Lanes;
-  /** Swallows the click that ends a pan or a pinch, so moving the board never opens a post. */
+  /** Brings the post's card to the top of the stack, as a mark does in the Lane view. */
+  onPick: (id: string) => void;
+  /** Swallows the click that ends a pan or a pinch, so moving the board never picks a post. */
   onClickCapture: (event: MouseEvent) => void;
 };
 
@@ -49,42 +56,115 @@ function placed(box: {
   };
 }
 
-/** The post's own sheet over the board: its page in the pool, or its page from Home. */
-function hrefOf(card: Card): string {
-  return card.href ?? splashHref(card.splash.id);
-}
-
 const LABEL_CLASS: Record<LabelStyle, string> = {
+  none: 'text-white',
+  white: 'bg-white text-main-900 rounded-md',
   ink: 'bg-ink text-white rounded-md',
-  blue: 'bg-main-900 text-white rounded-md',
-  plain: 'text-main-900',
 };
+/** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {
+  none: 'ring-main-900',
+  white: 'ring-white',
   ink: 'ring-ink',
-  blue: 'ring-main-900',
-  plain: 'ring-white',
 };
 const CAPTION_CLASS = 'line-clamp-2 text-xs/[15px] font-medium break-words';
 
-/** A joint splash's authors, stacked after its caption; on Home, the one author I can see is me. */
-function Faces({ card, ring }: { card: Card; ring: string }) {
-  const { me } = usePeople();
-  const ids = card.branches
-    ? [...new Map(card.branches.map((b) => [b.authorId ?? b.initials, b] as const)).values()]
-    : me
-      ? [{ authorId: me, initials: '' }]
-      : [];
-  if (ids.length === 0) return null;
+/** Faces as the board draws them: 16px at 12px initials, so they hold the 10px floor zoomed out. */
+const FACE_CLASS =
+  'text-main-900/60 flex h-4 w-4 items-center justify-center rounded-full bg-[#8283EE] text-xs ring-1';
+
+function FaceStack({
+  faces,
+  ring,
+  faded = false,
+}: {
+  faces: CardFace[];
+  ring: string;
+  faded?: boolean;
+}) {
   return (
-    <span data-board-faces className="ml-1 inline-flex translate-y-0.5 items-center align-baseline">
-      {ids.slice(0, 4).map((writer, at) => (
+    <span className={`inline-flex items-center ${faded ? 'opacity-50' : ''}`}>
+      {faces.slice(0, 4).map((face, at) => (
         <Avatar
-          key={writer.authorId ?? writer.initials}
-          id={writer.authorId}
-          initials={writer.initials}
-          className={`text-main-900/60 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#8283EE] text-[10px] ring-1 ${ring} ${at > 0 ? '-ml-1' : ''}`}
+          key={face.authorId}
+          id={face.authorId}
+          initials={face.initials}
+          className={`${FACE_CLASS} ${ring} ${at > 0 ? '-ml-1' : ''}`}
         />
       ))}
+    </span>
+  );
+}
+
+/**
+ * A joint splash's writers, stacked after its caption, whatever the label's
+ * style: who wrote on it, else (where the card carries no list) its
+ * branches' authors, else me — on Home the one author always known.
+ */
+function Faces({ card, ring }: { card: Card; ring: string }) {
+  const { me } = usePeople();
+  const faces: CardFace[] =
+    card.writers ??
+    (card.branches
+      ? [
+          ...new Map(
+            card.branches.map((b) => [
+              b.authorId ?? b.initials,
+              { authorId: b.authorId ?? b.initials, initials: b.initials },
+            ]),
+          ).values(),
+        ]
+      : me
+        ? [{ authorId: me, initials: '' }]
+        : []);
+  if (faces.length === 0) return null;
+  return (
+    <span data-board-faces className="ml-1 inline-flex translate-y-0.5 align-baseline">
+      <FaceStack faces={faces} ring={ring} />
+    </span>
+  );
+}
+
+/**
+ * An open joint splash's empty slot (meaning is shape): a small tilted tape
+ * piece with a dashed white outline under the label, holding the faded faces
+ * of the current members who have not written. When I am one of them it reads
+ * "Add your side" and opens the splash to write my ripple; once everyone has
+ * written, the card carries no one awaiting and the slot is gone.
+ */
+function OpenSlot({ piece, onWrite }: { piece: BoardPiece; onWrite: (card: Card) => void }) {
+  const { me } = usePeople();
+  const awaiting = piece.card.awaiting ?? [];
+  const mine = me !== null && awaiting.some((face) => face.authorId === me);
+  const style: CSSProperties = {
+    top: piece.slotY!,
+    left: piece.labelBox.x + 6,
+    height: SLOT_PX,
+    transform: `rotate(${-piece.rotate / 2 - 1.5}deg)`,
+  };
+  const body = (
+    <>
+      <FaceStack faces={awaiting} ring="ring-main-900" faded />
+      {mine ? <span className="font-medium whitespace-nowrap">Add your side</span> : null}
+    </>
+  );
+  const className =
+    'absolute flex items-center gap-1.5 rounded-sm border border-dashed border-white px-1.5 text-xs text-white';
+  return mine ? (
+    <button
+      type="button"
+      data-board-slot={piece.id}
+      data-board-slot-mine
+      aria-label={`Add your side to ${captionOf(piece.card)}`}
+      onClick={() => onWrite(piece.card)}
+      className={className}
+      style={style}
+    >
+      {body}
+    </button>
+  ) : (
+    <span data-board-slot={piece.id} className={className} style={style}>
+      {body}
     </span>
   );
 }
@@ -155,7 +235,7 @@ function PhotoCardView({
       {more > 0 ? (
         <span
           data-board-more-photos
-          className="bg-ink absolute -top-1.5 -right-1.5 rounded-full px-1.5 text-[10px]/4 font-medium text-white"
+          className="bg-ink absolute -top-2 -right-2 rounded-full px-1.5 text-xs/4 font-medium text-white"
         >
           +{more}
         </span>
@@ -174,8 +254,10 @@ export function BoardPieceView({
   piece,
   photos,
   lanes,
+  onPick,
+  onWrite,
   onClickCapture,
-}: Shared & { piece: BoardPiece; photos: SignedMedia }) {
+}: Shared & { piece: BoardPiece; photos: SignedMedia; onWrite: (card: Card) => void }) {
   const { card } = piece;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
@@ -183,12 +265,7 @@ export function BoardPieceView({
   const left = piece.corner === 'left';
   const top = piece.fan.length - 1;
   return (
-    <Link
-      href={hrefOf(card)}
-      scroll={false}
-      draggable={false}
-      onClickCapture={onClickCapture}
-      aria-label={caption}
+    <div
       data-board-piece={piece.id}
       data-board-day={piece.day}
       data-variant={piece.variant}
@@ -197,78 +274,95 @@ export function BoardPieceView({
       className="absolute"
       style={placed(piece)}
     >
-      {piece.fan.map((photo, at) => (
-        <PhotoCardView
-          key={photo.path}
-          photo={photo}
-          url={photos[photo.path]}
-          areaH={piece.labelBox.y + (piece.label === 'plain' ? 0 : LABEL_OVERLAP_PX)}
-          more={at === top ? piece.morePhotos : 0}
-        />
-      ))}
-      <span
-        data-board-label
-        className={`absolute block ${LABEL_CLASS[piece.label]}`}
-        style={{
-          top: piece.labelBox.y,
-          left: piece.labelBox.x,
-          width: piece.labelBox.w,
-          paddingTop: pictured ? LABEL_PAD_BOTTOM_PX : LABEL_PAD_TOP_PX,
-          paddingBottom: LABEL_PAD_BOTTOM_PX,
-          paddingLeft: piece.label === 'plain' ? 2 : 10,
-          paddingRight: piece.label === 'plain' ? 2 : 10,
-        }}
+      {/* The piece is the tap that brings its card up; the slot beside it is a tap of its own. */}
+      <button
+        type="button"
+        onClick={() => onPick(card.splash.id)}
+        onClickCapture={onClickCapture}
+        aria-label={caption}
+        data-board-pick={piece.id}
+        className="absolute inset-0 block text-left"
       >
-        <span className={CAPTION_CLASS}>
-          {pictured && icon ? (
-            <span aria-hidden data-board-icon className="mr-1">
-              {icon}
-            </span>
-          ) : null}
-          {caption}
-          {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
-        </span>
-      </span>
-      {!pictured && icon ? (
+        {piece.fan.map((photo, at) => (
+          <PhotoCardView
+            key={photo.path}
+            photo={photo}
+            url={photos[photo.path]}
+            areaH={piece.labelBox.y + (piece.label === 'none' ? 0 : LABEL_OVERLAP_PX)}
+            more={at === top ? piece.morePhotos : 0}
+          />
+        ))}
         <span
-          aria-hidden
-          data-board-sticker
-          className="absolute flex items-center justify-center leading-none"
+          data-board-label
+          className={`absolute block ${LABEL_CLASS[piece.label]}`}
           style={{
-            top: 0,
-            [left ? 'left' : 'right']: 0,
-            width: STICKER_PX,
-            height: STICKER_PX,
-            fontSize: STICKER_PX,
+            top: piece.labelBox.y,
+            left: piece.labelBox.x,
+            width: piece.labelBox.w,
+            paddingTop: pictured ? LABEL_PAD_BOTTOM_PX : LABEL_PAD_TOP_PX,
+            paddingBottom: LABEL_PAD_BOTTOM_PX,
+            paddingLeft: piece.label === 'none' ? 2 : 10,
+            paddingRight: piece.label === 'none' ? 2 : 10,
           }}
         >
-          {icon}
+          <span className={CAPTION_CLASS}>
+            {pictured && icon ? (
+              <span aria-hidden data-board-icon className="mr-1">
+                {icon}
+              </span>
+            ) : null}
+            {caption}
+            {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
+          </span>
         </span>
-      ) : null}
-    </Link>
+        {!pictured && icon ? (
+          <span
+            aria-hidden
+            data-board-sticker
+            className="absolute flex items-center justify-center leading-none"
+            style={{
+              top: 0,
+              [left ? 'left' : 'right']: 0,
+              width: STICKER_PX,
+              height: STICKER_PX,
+              fontSize: STICKER_PX,
+            }}
+          >
+            {icon}
+          </span>
+        ) : null}
+      </button>
+      {piece.slotY !== null ? <OpenSlot piece={piece} onWrite={onWrite} /> : null}
+    </div>
   );
 }
 
 /** A ranged post's strip across its days in one week row, its caption on the tape. */
-export function BoardTapeView({ tape, lanes, onClickCapture }: Shared & { tape: BoardTape }) {
+export function BoardTapeView({
+  tape,
+  lanes,
+  onPick,
+  onClickCapture,
+}: Shared & { tape: BoardTape }) {
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
   return (
-    <Link
-      href={hrefOf(card)}
-      scroll={false}
-      draggable={false}
+    <button
+      type="button"
+      onClick={() => onPick(card.splash.id)}
       onClickCapture={onClickCapture}
       aria-label={caption}
       data-board-tape={tape.id}
       data-board-week={tape.week}
-      className="bg-main-100/80 text-main-900 absolute flex items-center gap-1 px-2 text-xs font-medium"
+      // White at 20% over the water: translucent tape, white words.
+      className="absolute flex items-center gap-1 bg-white/20 px-2 text-left text-xs font-medium text-white"
       style={placed(tape)}
     >
       {icon ? <span aria-hidden>{icon}</span> : null}
       <span className="min-w-0 truncate">{caption}</span>
-      {card.joint ? <Faces card={card} ring="ring-main-100" /> : null}
-    </Link>
+      {/* The tape over the water reads as JOINT_SURFACE: the faces' ring takes it. */}
+      {card.joint ? <Faces card={card} ring="ring-[#3739D4]" /> : null}
+    </button>
   );
 }

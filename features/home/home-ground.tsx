@@ -23,7 +23,7 @@ import { PinnedCards } from './pinned-cards';
 import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
 import { nextHomeView, useHomeView, ViewToggle } from './view-toggle';
-import { MonthBoard } from '@/features/month-board/month-board';
+import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { monthKey } from '@/features/splash/summary';
 
 /**
@@ -287,7 +287,12 @@ export function HomeGround({
         className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-7xl lg:flex-row lg:gap-8"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div data-grid-column className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
+        <div
+          data-grid-column
+          // Wide, the Board takes two thirds and the stack one (review); the
+          // Lane and Date views split the room in half.
+          className={`flex min-h-0 flex-1 flex-col lg:min-w-0 ${boardView ? 'lg:flex-[2]' : 'lg:flex-1'}`}
+        >
           {/* The header (round 3): lane management at the left, the view
               toggle at the centre. No settings page exists, so no gear. */}
           <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
@@ -312,12 +317,21 @@ export function HomeGround({
             </p>
           ) : null}
 
+          {pinnedStrip('phone')}
           {boardView ? (
-            // The board takes the whole content area: no pinned strip, no stack.
-            <MonthBoard cards={shown} month={boardMonth} onMonth={setBoardMonth} lanes={columns} />
+            // In the grid's place, the stack beside or beneath it as in the
+            // Lane view: a tap brings the post's card to the top.
+            <BoardFrame>
+              <MonthBoard
+                cards={shown}
+                month={boardMonth}
+                onMonth={setBoardMonth}
+                onPick={goTo}
+                lanes={columns}
+              />
+            </BoardFrame>
           ) : (
             <>
-              {pinnedStrip('phone')}
               <LaneGrid
                 ref={grid}
                 view={view}
@@ -338,10 +352,10 @@ export function HomeGround({
 
         <div
           data-board-column
-          className={`flex shrink-0 flex-col ${boardView ? '' : 'lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10'}`}
+          className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
         >
-          {boardView ? null : pinnedStrip('wide')}
-          {boardView ? null : board === 'stair' ? (
+          {pinnedStrip('wide')}
+          {board === 'stair' ? (
             <StairBoard
               cards={shown}
               flip={flip}

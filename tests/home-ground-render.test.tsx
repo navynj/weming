@@ -960,9 +960,10 @@ describe('the Home button at the foot', () => {
         o.getAttribute('data-view-option'),
       ),
     ).toEqual(['board', 'lane', 'date']);
-    // Nothing remembered yet: Home opens on the Board, the stack hidden.
+    // Nothing remembered yet: Home opens on the Board.
     expect(container.querySelector('[data-month-board]')).not.toBeNull();
-    expect(container.querySelector('[data-stack-card]')).toBeNull();
+    // The stack stays beside or beneath it, as in the Lane view.
+    expect(container.querySelector('[data-stack-card]')).not.toBeNull();
     // Home is my face, first on the strip, ringed: I am here.
     const home = container.querySelector('[data-home-foot] [data-home-tab]')!;
     expect(home.getAttribute('aria-current')).toBe('page');

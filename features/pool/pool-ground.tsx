@@ -21,7 +21,7 @@ import type { PoolView } from '@/lib/queries/pools';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
-import { MonthBoard } from '@/features/month-board/month-board';
+import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { monthKey } from '@/features/splash/summary';
 
 import { poolScopeOf } from './compose-scope';
@@ -212,7 +212,12 @@ export function PoolGround({
         className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-7xl lg:flex-row lg:gap-8"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div data-grid-column className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
+        <div
+          data-grid-column
+          // Wide, the Board takes two thirds and the stack one (review); the
+          // Lane and Date views split the room in half.
+          className={`flex min-h-0 flex-1 flex-col lg:min-w-0 ${boardView ? 'lg:flex-[2]' : 'lg:flex-1'}`}
+        >
           <header data-pool-header className="flex shrink-0 items-center gap-2 px-4 pt-4">
             {/* The pool's photo or monogram, then its name (0024); going to
                 another pool is the strip's (review). */}
@@ -285,7 +290,7 @@ export function PoolGround({
             </p>
           ) : null}
 
-          {boardView ? null : pinnedStrip('phone')}
+          {pinnedStrip('phone')}
 
           {shown.length === 0 && !boardView ? (
             <p data-pool-empty className="px-6 pt-6 text-sm/relaxed text-white/80">
@@ -295,12 +300,15 @@ export function PoolGround({
           ) : null}
 
           {boardView ? (
-            <MonthBoard
-              cards={shown}
-              month={boardMonth}
-              onMonth={setBoardMonth}
-              lanes={laneNames}
-            />
+            <BoardFrame>
+              <MonthBoard
+                cards={shown}
+                month={boardMonth}
+                onMonth={setBoardMonth}
+                onPick={bringForward}
+                lanes={laneNames}
+              />
+            </BoardFrame>
           ) : (
             <LaneGrid
               view={kind === 'date' ? 'date' : 'lane'}
@@ -320,21 +328,19 @@ export function PoolGround({
 
         <div
           data-board-column
-          className={`flex shrink-0 flex-col ${boardView ? '' : 'lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10'}`}
+          className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
         >
-          {boardView ? null : pinnedStrip('wide')}
-          {boardView ? null : (
-            <StairBoard
-              cards={shown}
-              flip={flip}
-              categories={laneNames}
-              initials=""
-              pinnedIds={pinnedIds}
-              onPin={pin}
-              onDelete={remove}
-              hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
-            />
-          )}
+          {pinnedStrip('wide')}
+          <StairBoard
+            cards={shown}
+            flip={flip}
+            categories={laneNames}
+            initials=""
+            pinnedIds={pinnedIds}
+            onPin={pin}
+            onDelete={remove}
+            hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
+          />
           <GroundFoot
             here="pool"
             poolId={poolId}

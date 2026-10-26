@@ -84,6 +84,7 @@ export function SplashPage({
   audience = null,
   poolTags = [],
   pool = null,
+  writing = false,
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -101,6 +102,8 @@ export function SplashPage({
   poolTags?: string[];
   /** Read inside a pool (review). */
   pool?: PoolContext | null;
+  /** Opened to write: the next block's editor is up from the start (Board view's "Add your side"). */
+  writing?: boolean;
 }) {
   // Mine to edit: everything off a pool; in one, my own ripples only.
   const editable = (block: RippleWithCategory): boolean => !pool || block.author_id === pool.me;
@@ -113,7 +116,9 @@ export function SplashPage({
   const editScope = usePoolEditScope();
   // Inside the splash sheet (review): a delete closes it over the screen beneath.
   const closeSheet = useCloseSplash();
-  const [editor, setEditor] = useState<EditorTarget | null>(null);
+  const [editor, setEditor] = useState<EditorTarget | null>(() =>
+    writing && !splash.orphan ? { kind: 'add', splashId: splash.id } : null,
+  );
   const {
     value: page,
     run,
