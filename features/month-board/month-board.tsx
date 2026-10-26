@@ -47,12 +47,11 @@ function rowWater(index: number): string {
 }
 
 /**
- * A day's waves (review, the reference): the pill's own glyph — the same
- * path — 32px wide on a desktop and 26 on a phone, a 3px round pen, white
- * at 80%; one per record, three at most, 5px apart.
+ * A day's waves (review): the pill's own glyph — the exported SVG, its pen
+ * scaling with it — 32px wide on a desktop and 26 on a phone, white at
+ * 80%; one per record, three at most, 5px apart.
  */
 const DAY_WAVE_W = { wide: 32, narrow: 26 } as const;
-const DAY_WAVE_STROKE = 3;
 
 function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
   const lines = Math.min(DAY_WAVES_MAX, count);
@@ -70,7 +69,6 @@ function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
           width={narrow ? DAY_WAVE_W.narrow : DAY_WAVE_W.wide}
           stroke="#ffffff"
           opacity={0.8}
-          strokeWidth={DAY_WAVE_STROKE}
         />
       ))}
     </span>
