@@ -33,6 +33,24 @@ const TABLES = [
   'splash_placements',
   'pool_invites',
   'sessions',
+  'board_layouts',
+];
+
+/**
+ * Functions a stranger must not be able to call (0025, 0026): each with
+ * arguments of the right shape, so a refusal is the grant's and not a
+ * missing overload's (PGRST202 would only say the call was malformed).
+ */
+const NIL = '00000000-0000-0000-0000-000000000000';
+const FUNCTIONS = [
+  ['set_board_layout', { p_splash: NIL, p_pool: null, p_patch: {}, p_clear: [] }],
+  ['splash_in_pool', { sid: NIL, pid: NIL }],
+  ['board_layout_valid', { l: {} }],
+  ['_layout_group', { g: {}, kind: 'label' }],
+  ['_layout_number', { v: 1, lo: 0, hi: 2 }],
+  ['_board_layout_merge', { base: {}, patch: {} }],
+  ['_board_layout_clear', { l: {}, paths: [] }],
+  ['_board_layout_prune', { l: {}, media: [] }],
 ];
 
 /** Env first, then .env.local, so this runs against whatever is linked. */
@@ -83,6 +101,24 @@ for (const table of TABLES) {
     console.log(`  ✓ ${table} — empty`);
   } else {
     console.error(`  ✖ ${table} — RETURNED ${rows.length ?? '?'} ROW(S) TO A STRANGER`);
+    leaked += 1;
+  }
+}
+
+for (const [fn, args] of FUNCTIONS) {
+  const response = await fetch(`${url}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok && body?.code === '42501') {
+    console.log(`  ✓ ${fn}() — refused (${response.status})`);
+  } else if (!response.ok && body?.code === 'PGRST202') {
+    console.error(`  ✖ ${fn}() — not found as called: the probe's arguments are wrong`);
+    leaked += 1;
+  } else {
+    console.error(`  ✖ ${fn}() — ANSWERED A STRANGER (${response.status})`);
     leaked += 1;
   }
 }
