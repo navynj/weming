@@ -341,8 +341,8 @@ export function BoardPieceView({
 
 /**
  * A ranged post's band across its days in one row (review): the full width
- * of its lanes, translucent white with a thin white outline, so it reads
- * as a band, at the top of the row above the items.
+ * of its lanes, translucent white with no outline (review), at the top of
+ * the row above the items.
  */
 export function BoardTapeView({
   tape,
@@ -371,7 +371,7 @@ export function BoardTapeView({
         aria-label={caption}
         data-board-pick={tape.id}
         data-board-band
-        className="absolute inset-0 flex items-center gap-1 border border-white/50 bg-white/20 px-2 text-left font-medium text-white"
+        className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
         style={{ fontSize: metrics.caption.size }}
       >
         {icon ? <span aria-hidden>{icon}</span> : null}
