@@ -2,18 +2,15 @@
 
 import { useSyncExternalStore } from 'react';
 
-import type { PoolViewKind } from './pool-cards';
-
 /**
- * Per device (H23): the pool I looked at last, when I last visited each
- * pool (for the switcher's "new since my last visit" dot), and the view the
- * pool shows. Browser storage only — a convenience, never a record — so
+ * Per device (H23): the pool I looked at last, and when I last visited each
+ * pool (for the switcher's "new since my last visit" dot). The view a pool
+ * shows is no longer kept: every visit opens on the Calendar (review).
+ * Browser storage only — a convenience, never a record — so
  * every read and write survives storage being unavailable.
  */
 const LAST_POOL = 'weming.last-pool';
 const VISITS = 'weming.pool-visits';
-const VIEW = 'weming.pool-view';
-const EVENT = 'weming:pool-view';
 const VISIT_EVENT = 'weming:pool-visit';
 
 function read(key: string): string | null {
@@ -88,28 +85,4 @@ export function isNewSince(poolId: string, latestActivity: string | null): boole
   if (!latestActivity) return false;
   const seen = visits()[poolId];
   return !seen || latestActivity > seen;
-}
-
-function subscribe(onChange: () => void): () => void {
-  window.addEventListener('storage', onChange);
-  window.addEventListener(EVENT, onChange);
-  return () => {
-    window.removeEventListener('storage', onChange);
-    window.removeEventListener(EVENT, onChange);
-  };
-}
-
-function readView(): PoolViewKind {
-  const value = read(VIEW);
-  return value === 'date' || value === 'lane' || value === 'swimmers' ? value : 'board';
-}
-
-/** The view every pool shows, kept when switching pools (H23); Board first (review). */
-export function usePoolView(): [PoolViewKind, (view: PoolViewKind) => void] {
-  const view = useSyncExternalStore(subscribe, readView, () => 'board' as const);
-  const set = (next: PoolViewKind): void => {
-    write(VIEW, next);
-    window.dispatchEvent(new Event(EVENT));
-  };
-  return [view, set];
 }

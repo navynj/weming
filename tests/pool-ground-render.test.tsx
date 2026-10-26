@@ -28,6 +28,7 @@ vi.mock('@/features/pool/actions', () => ({
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolActivityProvider } from '@/features/pool/activity';
+import type { PoolViewKind } from '@/features/pool/pool-cards';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { PoolIndex } from '@/features/pool/pool-index';
 import { lastPool, rememberVisit } from '@/features/pool/remembered';
@@ -186,20 +187,22 @@ function ground(view: PoolView) {
   return render(
     <PoolActivityProvider activity={ACTIVITY} pools={POOLS}>
       <InputSheetProvider>
-        <PoolGround view={view} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={view} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>
     </PoolActivityProvider>,
   );
 }
 
+/** The view a test's pool opens on: a visit opens on the Calendar (review); these choose. */
+let startView: PoolViewKind = 'swimmers';
 function setView(view: 'lane' | 'date' | 'swimmers'): void {
-  window.localStorage.setItem('weming.pool-view', view);
+  startView = view;
 }
 
 beforeEach(() => {
   window.localStorage.clear();
-  // Board is the first view (review); these read Swimmers unless they choose.
-  window.localStorage.setItem('weming.pool-view', 'swimmers');
+  // A visit opens on the Calendar (review); these read Swimmers unless they choose.
+  startView = 'swimmers';
   window.sessionStorage.clear();
   Element.prototype.scrollTo = function scrollTo() {} as Element['scrollTo'];
   Object.defineProperty(window, 'matchMedia', {
@@ -504,9 +507,16 @@ describe('Just mine in the pool (0014)', () => {
 });
 
 describe('re-tapping Pool (review)', () => {
-  it('opens on Board, then cycles Swimmers → Lane → Date → Board, the toggle following, and keeps the last per device', () => {
-    window.localStorage.removeItem('weming.pool-view');
-    const { container } = ground(A);
+  it('opens every visit on the Calendar, whatever was viewed before, then cycles Swimmers → Lane → List → Calendar', () => {
+    // A view chosen on an earlier visit, as the old build kept it: no longer read.
+    window.localStorage.setItem('weming.pool-view', 'swimmers');
+    const { container } = render(
+      <PoolActivityProvider activity={ACTIVITY} pools={POOLS}>
+        <InputSheetProvider>
+          <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
+        </InputSheetProvider>
+      </PoolActivityProvider>,
+    );
     const tab = container.querySelector('[data-home-foot="phone"] [data-pool-tab]') as HTMLElement;
     const selected = (): string | null =>
       container
@@ -517,7 +527,7 @@ describe('re-tapping Pool (review)', () => {
         o.getAttribute('data-view-option'),
       ),
     ).toEqual(['board', 'swimmers', 'lane', 'date']);
-    // Nothing remembered yet: a pool opens on its board (review).
+    // Every visit opens on the Calendar (review).
     expect(selected()).toBe('board');
     expect(container.querySelector('[data-month-board]')).not.toBeNull();
     // The stack stays beside or beneath it, as in the Lane view.
@@ -528,7 +538,8 @@ describe('re-tapping Pool (review)', () => {
     expect(selected()).toBe('lane');
     fireEvent.click(tab);
     expect(selected()).toBe('date');
-    expect(window.localStorage.getItem('weming.pool-view')).toBe('date');
+    // Not kept on the device: the next visit opens on the Calendar again.
+    expect(window.localStorage.getItem('weming.pool-view')).toBe('swimmers');
     fireEvent.click(tab);
     expect(selected()).toBe('board');
     // The desktop rail cycles too.
@@ -569,7 +580,13 @@ describe('faces (0018)', () => {
     render(
       <PeopleProvider me={ME} people={PEOPLE}>
         <InputSheetProvider>
-          <PoolGround view={view} me={ME} today="2026-10-23" timeZone={TZ} />
+          <PoolGround
+            view={view}
+            me={ME}
+            today="2026-10-23"
+            timeZone={TZ}
+            initialView={startView}
+          />
         </InputSheetProvider>
       </PeopleProvider>,
     );
@@ -630,7 +647,7 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
     render(
       <InputSheetProvider>
         <Mover id="s-joint" to={to} />
-        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
 
@@ -647,7 +664,7 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
     rerender(
       <InputSheetProvider>
         <Mover id="s-joint" to={null} />
-        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).not.toBeNull();
@@ -681,7 +698,7 @@ describe('a conversion shows at once (0022)', () => {
     const { container } = render(
       <InputSheetProvider>
         <Convert id="s-mine" kind="joint" />
-        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-joint-band="s-mine"]')).not.toBeNull();
@@ -692,7 +709,7 @@ describe('a conversion shows at once (0022)', () => {
     const { container } = render(
       <InputSheetProvider>
         <Convert id="s-joint" kind="own" />
-        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-joint-band="s-joint"]')).toBeNull();

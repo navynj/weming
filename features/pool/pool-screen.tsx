@@ -43,6 +43,8 @@ export async function PoolScreen({ id, top }: { id: string; top?: string }) {
       {/* Editing from here edits with this pool's lanes (0022). */}
       <PoolEditScope scope={poolScopeOf(view)}>
         <PoolGround
+          // Another pool is another visit: it opens on the Calendar again.
+          key={view.pool.id}
           view={view}
           me={profile.id}
           today={todayIn(profile.timezone)}

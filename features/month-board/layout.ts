@@ -107,7 +107,11 @@ export type BoardMetrics = {
   column: number;
   /** A phone's lanes (under 80px): side padding halved, so words keep some room. */
   narrow: boolean;
-  /** A month row's least height; a busy day grows its whole row. A week row has none. */
+  /**
+   * A month row's least height: a week with no records keeps its day
+   * numbers and their padding, nothing more (review). A busy day grows its
+   * whole row; a week row has none.
+   */
   rowBase: number;
   /** The caption's type: every title 10px (review). */
   caption: { size: number; line: number };
@@ -142,7 +146,7 @@ export function boardMetrics(width: number): BoardMetrics {
     width: w,
     column,
     narrow,
-    rowBase: narrow ? 96 : 132,
+    rowBase: narrow ? 40 : 48,
     caption: { size, line },
     stickers: {
       small: Math.round(line * 1.6),
@@ -953,21 +957,66 @@ function layoutBoard(
   return { weeks, pieces, tapes, height: y + FOOT_PX };
 }
 
+/**
+ * A month fitted to the screen (review): when its rows' natural heights fit
+ * the room under the weekday header, the room left over is shared among
+ * them in proportion to those heights — the month fills the screen with no
+ * scroll, and busy weeks get the most air; when they do not fit, every row
+ * keeps its natural height and the board scrolls. A row is never shorter
+ * than its content; its items stay where they were within it.
+ */
+function fillRows(
+  laid: Pick<BoardLayout, 'weeks' | 'pieces' | 'tapes' | 'height'>,
+  room: number,
+): Pick<BoardLayout, 'weeks' | 'pieces' | 'tapes' | 'height'> {
+  const total = laid.weeks.reduce((sum, w) => sum + w.h, 0);
+  if (laid.weeks.length === 0 || total >= room) return laid;
+  const spare = room - total;
+  let given = 0;
+  let shift = 0;
+  const moved = new Map<number, number>();
+  const weeks = laid.weeks.map((week, at) => {
+    // Whole pixels; the last row takes what rounding left, so the rows meet the bottom exactly.
+    const more =
+      at === laid.weeks.length - 1 ? spare - given : Math.floor((spare * week.h) / total);
+    given += more;
+    moved.set(week.index, shift);
+    const next = { ...week, y: week.y + shift, h: week.h + more };
+    shift += more;
+    return next;
+  });
+  return {
+    weeks,
+    pieces: laid.pieces.map((p) => ({ ...p, y: p.y + (moved.get(p.week) ?? 0) })),
+    tapes: laid.tapes.map((t) => ({ ...t, y: t.y + (moved.get(t.week) ?? 0) })),
+    // Exactly the room: no foot to scroll to.
+    height: weeks[weeks.length - 1].y + weeks[weeks.length - 1].h,
+  };
+}
+
 /** One month: weekday headers, rows of weeks, days outside the month muted and empty. */
 export function layoutMonthBoard(
   cards: Card[],
   month: string,
   {
     width,
+    fill,
     weekStart = WEEK_START,
     measured = {},
-  }: { width: number; weekStart?: number; measured?: Measured },
+  }: {
+    width: number;
+    /** The board's visible height, header included: a month that fits fills it, with no scroll. */
+    fill?: number;
+    weekStart?: number;
+    measured?: Measured;
+  },
 ): BoardLayout {
   const m = boardMetrics(width);
   const rows = monthDays(month, weekStart);
   const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
-  const laid = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month', measured);
   // The grid is exactly the weeks holding a day of the month, from the week of the 1st.
+  const natural = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month', measured);
+  const laid = fill === undefined ? natural : fillRows(natural, fill - MONTH_HEADER_PX);
   return {
     span: 'month',
     metrics: m,
