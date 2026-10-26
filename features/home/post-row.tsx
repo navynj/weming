@@ -93,7 +93,7 @@ export function PostRow({
       </span>
       {(card.pools ?? []).map((pool) => (
         // Shared to a pool (H23), as on the mark and the card.
-        <Monogram key={pool} name={pool} size="chip" />
+        <Monogram key={pool} name={pool} size="chip" photo={card.poolPhoto ?? null} />
       ))}
       {card.author ? (
         // In a pool's Date view each row says whose it is (H23).

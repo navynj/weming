@@ -9,6 +9,7 @@ import {
   type CardFace,
   type GridColumn,
 } from '@/features/home/grid';
+import { Monogram } from '@/components/ui/monogram';
 import { Avatar } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 import type { SignedMedia } from '@/lib/media';
@@ -96,10 +97,20 @@ function FaceStack({
 /**
  * A joint splash's writers, stacked after its caption, whatever the label's
  * style: who wrote on it, else (where the card carries no list) its
- * branches' authors, else me — on Home the one author always known.
+ * branches' authors, else me. On Home a pool's splash shows its pool's
+ * monogram — its photo when set — in the faces' place instead (review):
+ * Home says where a post lives; a pool says who wrote it.
  */
 function Faces({ card, ring }: { card: Card; ring: string }) {
   const { me } = usePeople();
+  const pool = card.pools?.[0];
+  if (pool !== undefined) {
+    return (
+      <span data-board-pool className="ml-1 inline-flex align-middle">
+        <Monogram name={pool} size="face" photo={card.poolPhoto ?? null} />
+      </span>
+    );
+  }
   const faces: CardFace[] =
     card.writers ??
     (card.branches
@@ -123,12 +134,14 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 }
 
 /**
- * An open joint splash's empty slot (meaning is shape): a dashed white
- * outline inline after the words, wrapping under them only when the line
- * is full, holding the faded faces of the current members who have not
- * written. When I am one of them it reads "Add your side" — on a phone's
- * narrow lane, the faces say it — and opens the splash to write my
- * ripple; once everyone has written, it is gone.
+ * An open joint splash's slot (review): a note stuck on the label after the
+ * fact — a small rounded rectangle, dashed 1.5px white outline, no fill,
+ * white at 80% — holding the faded faces of the current members who have
+ * not written and "Add your side" ("Add" on a phone). It hangs from the
+ * label's bottom-right corner (bottom-left where the next lane is taken),
+ * tilted down about that corner, never over any words. When I am one of
+ * the missing it opens the splash to write my ripple; for anyone else it
+ * is only a mark.
  */
 function OpenSlot({
   piece,
@@ -145,25 +158,37 @@ function OpenSlot({
   const body = (
     <>
       <FaceStack faces={awaiting} ring="ring-main-900" faded max={narrow ? 2 : 4} />
-      {mine && !narrow ? <span className="whitespace-nowrap">Add your side</span> : null}
+      <span className="whitespace-nowrap">{narrow ? 'Add' : 'Add your side'}</span>
     </>
   );
-  // The words' own line: never taller, so the box the layout sized still holds them.
+  const box = piece.slotBox!;
+  const style: CSSProperties = {
+    ...placed(box),
+    transform: `rotate(${piece.slotRotate}deg)`,
+    transformOrigin: piece.slotAt === 'right' ? 'top left' : 'top right',
+  };
   const className =
-    'ml-1 inline-flex h-[13px] items-center gap-1 border border-dashed border-current px-1 align-middle text-[10px] leading-none';
+    'absolute flex items-center gap-1 overflow-hidden border-[1.5px] border-dashed border-white/80 px-1 text-[10px] leading-none text-white/80';
   return mine ? (
     <button
       type="button"
       data-board-slot={piece.id}
       data-board-slot-mine
+      data-slot-at={piece.slotAt}
       aria-label={`Add your side to ${captionOf(piece.card)}`}
       onClick={() => onWrite(piece.card)}
       className={`pointer-events-auto ${className}`}
+      style={style}
     >
       {body}
     </button>
   ) : (
-    <span data-board-slot={piece.id} className={className}>
+    <span
+      data-board-slot={piece.id}
+      data-slot-at={piece.slotAt}
+      className={className}
+      style={style}
+    >
       {body}
     </span>
   );
@@ -262,7 +287,9 @@ export function BoardPieceView({
       data-overhang={piece.overhang ? '' : undefined}
       data-heading={ripple !== null ? '' : undefined}
       data-dropped={plunge ? '' : undefined}
-      className={`absolute ${motionOf(ripple, plunge)}`}
+      data-muted={piece.muted ? '' : undefined}
+      // A day of the month before or after: at half strength (review).
+      className={`absolute ${piece.muted ? 'opacity-50' : ''} ${motionOf(ripple, plunge)}`}
       style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }}
     >
       {/* The tap that brings its card up, under the drawing; the slot is a tap of its own. */}
@@ -303,9 +330,12 @@ export function BoardPieceView({
             // Clamped to the lines its box was sized for (three at most), so the words never
             // spill into the padding a sticker hangs in (review: text is never covered).
             className={`block overflow-hidden font-medium break-words ${piece.center ? 'text-center' : ''}`}
+            data-lines={piece.captionLines}
             style={{
               fontSize: metrics.caption.size,
               lineHeight: `${metrics.caption.line}px`,
+              // A corner sticker's room, on the first line only (review).
+              textIndent: piece.indent || undefined,
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
               WebkitLineClamp: piece.captionLines,
@@ -319,15 +349,14 @@ export function BoardPieceView({
             ) : null}
             {caption}
             {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
-            {piece.slot ? (
-              <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} />
-            ) : null}
           </span>
         </span>
         {piece.stickerBox && icon ? (
           <span
             aria-hidden
             data-board-sticker
+            data-size={piece.stickerSize ?? undefined}
+            data-at={piece.stickerAt ?? undefined}
             className="absolute flex items-center justify-center leading-none"
             style={{ ...placed(piece.stickerBox), fontSize: piece.stickerBox.w }}
           >
@@ -335,6 +364,8 @@ export function BoardPieceView({
           </span>
         ) : null}
       </div>
+      {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
+      {piece.slotBox ? <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} /> : null}
     </div>
   );
 }
@@ -362,7 +393,8 @@ export function BoardTapeView({
       data-starts-here={tape.startsHere ? '' : undefined}
       data-ends-here={tape.endsHere ? '' : undefined}
       data-heading={ripple !== null ? '' : undefined}
-      className={`absolute ${motionOf(ripple, false)}`}
+      data-muted={tape.muted ? '' : undefined}
+      className={`absolute ${tape.muted ? 'opacity-50' : ''} ${motionOf(ripple, false)}`}
       style={placed(tape)}
     >
       <button

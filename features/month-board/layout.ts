@@ -37,14 +37,20 @@ export const WEEK_START = 0;
 export const HEADER_PX = 96;
 /** A month's column header carries only the weekday names. */
 export const MONTH_HEADER_PX = 28;
-/** A month cell's day number and waves, at the top of the cell: nothing is placed over it. */
-export const DAY_NUMBER_PX = 70;
+/** A month cell's day number, at the top of the cell (no waves in a month, review): nothing is placed over it. */
+export const DAY_NUMBER_PX = 28;
 /** How many waves a day shows at most. */
 export const DAY_WAVES_MAX = 3;
 const FOOT_PX = 24;
 
 /** The three recipes. */
 export type Recipe = 'A' | 'B' | 'C';
+/** B's sticker sizes: never the same twice in a row within a day; big once a day at most, in a day of two or more. */
+export type StickerSize = 'small' | 'medium' | 'big';
+/** Where B's sticker sits: on the label's top-left corner (a filled label), or left of its first line. */
+export type StickerAt = 'corner' | 'left';
+/** On a phone a label may run across this many empty lanes to its right (review). */
+const PHONE_SPAN_MAX = 2;
 /** A's start, as a share of the lane: overhanging, or its fallback, ending at the line. */
 const A_START_MIN = 0.35;
 const A_START_MAX = 0.45;
@@ -57,9 +63,16 @@ export const C_TUCK_PX = 10;
 const CAPTION_LINES = 3;
 /** About how wide one 10px Poppins character is, for the line estimate: generous, so words never outgrow their box. */
 const CHAR_EM = 0.62;
-/** An open joint splash's slot, inline after its words: the room it takes, in characters. */
-const SLOT_FACE_CHARS = 2;
-const SLOT_WORDS_CHARS = 14;
+/** An open joint splash's slot: its height, how much of it lies on the label, its tilt, and its widths. */
+export const SLOT_PX = 16;
+const SLOT_ON_LABEL = 0.25;
+const SLOT_TILT_MIN = 3;
+const SLOT_TILT_MAX = 6;
+/** Faces 12px, overlapping by 4; then "Add your side" (desktop) or "Add" (phone) at 10px. */
+const SLOT_FACE_PX = 12;
+const SLOT_FACE_STEP = 8;
+const SLOT_WORDS_PX = { wide: 66, narrow: 18 } as const;
+const SLOT_INNER_PX = 4 + 4 + 4;
 
 /** A range band's height, the gap between bands, and the lanes bands pack into. */
 export const TAPE_PX = 24;
@@ -91,17 +104,21 @@ export type BoardMetrics = {
   rowBase: number;
   /** The caption's type: every title 10px (review). */
   caption: { size: number; line: number };
+  /** B's stickers, by size (review): 1.6, 2.2 and 3 line heights. */
+  stickers: Record<StickerSize, number>;
   /**
-   * B's sticker: about twice the line, held to twice the bottom padding so
-   * its upper half lands on the item above's padding and never its words.
+   * A label's padding (review): a filled label 8 top, 12 sides, 12 bottom;
+   * one with no fill — no visible box — 4 top and bottom, so its padding
+   * makes no gaps. The left side is 6 on a phone. The right never drops
+   * under 12: a sticker from the next lane overhangs the line by at most
+   * that much, onto padding only.
    */
-  sticker: number;
-  /**
-   * A label's padding: 8 top, 12 sides (6 on the left on a phone), 12
-   * bottom (review). The right side never drops under half a sticker: the
-   * next lane's B sticker hangs that far over the line, onto padding only.
-   */
-  pad: { top: number; side: number; right: number; bottom: number };
+  pad: {
+    side: number;
+    right: number;
+    filled: { top: number; bottom: number };
+    none: { top: number; bottom: number };
+  };
   /** Each photo card behind the top one peeks this much above the one before. */
   fanMin: number;
   fanMax: number;
@@ -121,12 +138,16 @@ export function boardMetrics(width: number): BoardMetrics {
     narrow,
     rowBase: narrow ? 96 : 132,
     caption: { size, line },
-    sticker: Math.min(line * 2, bottom * 2),
+    stickers: {
+      small: Math.round(line * 1.6),
+      medium: Math.round(line * 2.2),
+      big: Math.round(line * 3),
+    },
     pad: {
-      top: 8,
       side: narrow ? 6 : 12,
-      right: Math.max(narrow ? 6 : 12, Math.ceil(Math.min(line * 2, bottom * 2) / 2)),
-      bottom,
+      right: 12,
+      filled: { top: 8, bottom },
+      none: { top: 4, bottom: 4 },
     },
     fanMin: narrow ? 3 : 4,
     fanMax: narrow ? 5 : 8,
@@ -152,21 +173,40 @@ export type BoardPiece = {
   /** Photos (C), else a label (A or B). */
   variant: 'photo' | 'sticker';
   label: LabelStyle;
-  /** A's label runs past the lane's right line, into an empty band of the next lane. */
+  /** A day of the month before or after, shown in a month's first or last row: drawn at half strength. */
+  muted: boolean;
+  /** The label runs past the lane's right line, into empty bands of the lanes beside it. */
   overhang: boolean;
+  /** How many whole lanes past its own the label reaches (a phone's labels, up to two). */
+  span: number;
+  /** B's sticker: its size, and where it sits. */
+  stickerSize: StickerSize | null;
+  stickerAt: StickerAt | null;
+  /** A corner sticker's room on the first line only: the words start this far in there (text-indent). */
+  indent: number;
   /** C tucks up into the item above's bottom padding. */
   tuck: number;
   /** The photo cards, back to front: the newest of the shown ones on top. */
   fan: PhotoCard[];
   /** Photos beyond those shown: the top card's "+N". */
   morePhotos: number;
-  /** Within the piece: the label, its words, the photo area, B's sticker. */
+  /** Within the piece: the label, its words (the first line apart when it is indented), the photo area, B's sticker. */
   labelBox: Box;
-  textBox: Box;
+  textBoxes: Box[];
   photoBox: Box | null;
   stickerBox: Box | null;
-  /** An open joint splash: its slot sits inline after the words, wrapping under only when the line is full. */
+  /**
+   * An open joint splash's slot (review): a dashed note stuck on the
+   * label's bottom-right corner — or bottom-left, where the next lane is
+   * taken — overlapping the label's bottom padding only, tilted on the
+   * corner it hangs from so it never rises into the words. `slotBox` is
+   * its box before the tilt, `slotBounds` all it covers after.
+   */
   slot: boolean;
+  slotBox: Box | null;
+  slotBounds: Box | null;
+  slotAt: 'right' | 'left' | null;
+  slotRotate: number;
   /** The label's padding, as drawn; `center` for C's caption. */
   pad: { top: number; right: number; bottom: number; left: number };
   center: boolean;
@@ -199,6 +239,8 @@ export type BoardTape = Box & {
   startsHere: boolean;
   /** The range ends in this row. Else it runs on into the next. */
   endsHere: boolean;
+  /** Only over days of the month before or after: drawn at half strength. */
+  muted: boolean;
 };
 
 export type BoardLayout = {
@@ -313,21 +355,23 @@ export function intersects(a: Box, b: Box): boolean {
 
 /** Everything a piece draws on the board: its label, its photos, its sticker. */
 export function extentOf(piece: BoardPiece): Box[] {
-  return [piece.labelBox, piece.photoBox, piece.stickerBox]
+  return [piece.labelBox, piece.photoBox, piece.stickerBox, piece.slotBounds]
     .filter((box): box is Box => box !== null)
     .map((box) => onBoard(piece, box));
 }
 
 /** What a day decides for each of its items before they are shaped. */
-type Plan = { recipe: Recipe; label: LabelStyle };
+type Plan = { recipe: Recipe; label: LabelStyle; size: StickerSize | null };
 
 /**
  * A day's plan (review): photos take C; the rest A or B by the id, never
  * the same as the item above's (two photos in a row are both C, there
  * being no other way to draw them); a day of two or more items has a B —
- * an A turned, which can sit by no B, A never following A. A joint splash
- * alternates white and ink with the day's other joint ones; everything
- * else takes no fill.
+ * an A turned, which can sit by no B, A never following A. B's stickers
+ * take a size by the id, never the size of the day's B before, big at
+ * most once and only in a day of two or more. A joint splash alternates
+ * white and ink with the day's other joint ones; everything else takes no
+ * fill.
  */
 function planDay(cards: Card[]): Plan[] {
   let fill: LabelStyle | null = null;
@@ -345,6 +389,8 @@ function planDay(cards: Card[]): Plan[] {
     const at = recipes.indexOf('A');
     if (at >= 0) recipes[at] = 'B';
   }
+  let lastSize: StickerSize | null = null;
+  let bigUsed = false;
   return cards.map((card, at) => {
     let label: LabelStyle = 'none';
     if (card.joint) {
@@ -352,79 +398,212 @@ function planDay(cards: Card[]): Plan[] {
       fill = drawnFill === fill ? (fill === 'white' ? 'ink' : 'white') : drawnFill;
       label = fill;
     }
-    return { recipe: recipes[at], label };
+    let size: StickerSize | null = null;
+    if (recipes[at] === 'B') {
+      const sizes = (['small', 'medium', 'big'] as const).filter(
+        (s) => s !== lastSize && (s !== 'big' || (!bigUsed && cards.length >= 2)),
+      );
+      size = sizes[draw(card.splash.id, 'size', sizes.length)];
+      if (size === 'big') bigUsed = true;
+      lastSize = size;
+    }
+    return { recipe: recipes[at], label, size };
   });
 }
 
-/** How many lines the words take in a label `w` wide with these side paddings. */
-function linesIn(
-  card: Card,
-  w: number,
-  left: number,
-  right: number,
-  icon: boolean,
-  m: BoardMetrics,
-): number {
-  const slot = isOpenJoint(card);
-  const slotChars = slot
-    ? Math.min(card.awaiting!.length, m.narrow ? 2 : 4) * SLOT_FACE_CHARS +
-      (m.narrow ? 0 : SLOT_WORDS_CHARS) +
-      2
-    : 0;
-  const chars = Math.max(2, Math.floor((w - left - right) / (m.caption.size * CHAR_EM)));
+/** The words' measured lines, by piece, the room they had and the first line's indent: the browser's own wrapping. */
+export type Measured = Record<string, number>;
+
+/** The key a measured line count is kept under. */
+export function measureKey(id: string, textW: number, indent: number): string {
+  return `${id}:${Math.round(textW)}:${Math.round(indent)}`;
+}
+
+/** Everything a shape needs to know about where it is going. */
+type Context = {
+  col: number;
+  m: BoardMetrics;
+  /** The item above in the lane, when there is one. */
+  above: BoardPiece | undefined;
+  /** True when the lanes to the right are empty over this band (relative to the lane's left line and the piece's top). */
+  room: (band: Box) => boolean;
+  measured: Measured;
+};
+
+/**
+ * How many lines the words take in `textW` of room, the first line `indent`
+ * shorter: as the browser measured them when it has, else an estimate
+ * generous enough that words never outgrow their box.
+ */
+function linesIn(card: Card, textW: number, indent: number, icon: boolean, ctx: Context): number {
+  const { m } = ctx;
+  const known = ctx.measured[measureKey(card.splash.id, textW, indent)];
+  if (known) return Math.min(CAPTION_LINES, Math.max(1, known));
+  const charW = m.caption.size * CHAR_EM;
+  const chars = Math.max(2, Math.floor(textW / charW));
   const length =
     [...captionOf(card)].length +
     (card.joint ? FACES_CHARS : 0) +
     (icon ? ICON_CHARS : 0) +
-    slotChars;
+    Math.ceil(indent / charW);
   return Math.min(CAPTION_LINES, Math.max(1, Math.ceil(length / chars)));
 }
 
-/** A label's words: inside its padding, as many lines as they take. */
-function textOf(label: Box, pad: BoardPiece['pad'], lines: number, m: BoardMetrics): Box {
-  return {
-    x: label.x + pad.left,
-    y: label.y + pad.top,
-    w: label.w - pad.left - pad.right,
-    h: lines * m.caption.line,
-  };
+/** A label's words: inside its padding, the first line apart when it is indented. */
+function textOf(
+  label: Box,
+  pad: BoardPiece['pad'],
+  indent: number,
+  lines: number,
+  m: BoardMetrics,
+): Box[] {
+  const x = label.x + pad.left;
+  const y = label.y + pad.top;
+  const w = label.w - pad.left - pad.right;
+  if (indent <= 0) return [{ x, y, w, h: lines * m.caption.line }];
+  const first = { x: x + indent, y, w: w - indent, h: m.caption.line };
+  return lines > 1
+    ? [first, { x, y: y + m.caption.line, w, h: (lines - 1) * m.caption.line }]
+    : [first];
 }
 
-type Shape = Omit<BoardPiece, 'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'x' | 'y'>;
+type Shape = Omit<
+  BoardPiece,
+  'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'muted' | 'x' | 'y'
+>;
 
-/** A label box hugging its words: the padding and the lines, nothing more. */
-function hug(lines: number, m: BoardMetrics): number {
-  return m.pad.top + lines * m.caption.line + m.pad.bottom;
+/** A label's vertical padding: shallow with no fill, where it would only make gaps. */
+function padY(label: LabelStyle, m: BoardMetrics): { top: number; bottom: number } {
+  return label === 'none' ? m.pad.none : m.pad.filled;
 }
 
 /**
- * A (Hoppers): the icon inline; the label from 35–45% into the lane, the
- * lane's width, overhanging the next — when `room` says the next lane is
- * empty at the height it would take — else from 15% to the line.
+ * A label's width, on a phone reaching across up to two empty lanes to its
+ * right so short words read in a line or two, not fragments (review): the
+ * widest the lanes allow, from two lanes down to none.
  */
-function shapeA(card: Card, col: number, m: BoardMetrics, room: (band: Box) => boolean): Shape {
-  const pad = { top: m.pad.top, right: m.pad.right, bottom: m.pad.bottom, left: m.pad.side };
-  const wide = (): Shape | null => {
-    if (col === COLUMNS - 1) return null;
-    const x = Math.round(
-      m.column * (A_START_MIN + unit(card.splash.id, 'shift') * (A_START_MAX - A_START_MIN)),
-    );
-    const lines = linesIn(card, m.column, pad.left, pad.right, true, m);
-    const labelBox = { x, y: 0, w: m.column, h: hug(lines, m) };
-    return room({ x: m.column, y: 0, w: x, h: labelBox.h }) ? label(labelBox, lines, true) : null;
+function spanLabel(
+  x: number,
+  pad: { top: number; bottom: number; left: number; right: number },
+  heightFor: (w: number) => { lines: number; h: number },
+  ctx: Context,
+): { w: number; span: number; lines: number; h: number } {
+  const { m, col } = ctx;
+  const own = m.column - x;
+  const most = m.narrow ? Math.min(PHONE_SPAN_MAX, COLUMNS - 1 - col) : 0;
+  for (let k = most; k > 0; k -= 1) {
+    const w = own + k * m.column;
+    const fit = heightFor(w);
+    if (ctx.room({ x: m.column, y: 0, w: k * m.column, h: fit.h })) return { w, span: k, ...fit };
+  }
+  return { w: own, span: 0, ...heightFor(own) };
+}
+
+function base(
+  card: Card,
+): Pick<
+  Shape,
+  | 'fan'
+  | 'morePhotos'
+  | 'photoBox'
+  | 'slot'
+  | 'slotBox'
+  | 'slotBounds'
+  | 'slotAt'
+  | 'slotRotate'
+  | 'tuck'
+> {
+  return {
+    fan: [],
+    morePhotos: 0,
+    photoBox: null,
+    slot: isOpenJoint(card),
+    slotBox: null,
+    slotBounds: null,
+    slotAt: null,
+    slotRotate: 0,
+    tuck: 0,
   };
-  const label = (labelBox: Box, lines: number, overhang: boolean): Shape => ({
+}
+
+/** A box turned by `deg` about one of its top corners: the box it then covers. */
+function tilted(box: Box, deg: number, pivot: 'left' | 'right'): Box {
+  const t = (Math.abs(deg) * Math.PI) / 180;
+  const w = box.w * Math.cos(t) + box.h * Math.sin(t);
+  const h = box.w * Math.sin(t) + box.h * Math.cos(t);
+  // Turned down about its top corner: the top edge never rises above the pivot.
+  return pivot === 'right'
+    ? { x: box.x + box.w - w, y: box.y, w, h }
+    : { x: box.x, y: box.y, w, h };
+}
+
+/**
+ * The open slot (review), stuck on the label's bottom-right corner with
+ * two fifths of it past the label, where the lanes to the right are empty
+ * there; else on the bottom-left corner, inside the lane. A quarter of its
+ * height lies on the label — within its bottom padding — and it tilts
+ * 3–6° about the corner it hangs from, downward, so it never reaches the
+ * words. The piece grows to hold what hangs below the label.
+ */
+function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
+  if (!shape.slot) return shape;
+  const { m } = ctx;
+  const faces = Math.min(card.awaiting!.length, m.narrow ? 2 : 4);
+  const w =
+    SLOT_INNER_PX +
+    SLOT_FACE_PX +
+    (faces - 1) * SLOT_FACE_STEP +
+    (m.narrow ? SLOT_WORDS_PX.narrow : SLOT_WORDS_PX.wide);
+  const label = shape.labelBox;
+  const on = Math.min(Math.round(SLOT_PX * SLOT_ON_LABEL), shape.pad.bottom);
+  const y = label.y + label.h - on;
+  const tilt = SLOT_TILT_MIN + unit(card.splash.id, 'slot') * (SLOT_TILT_MAX - SLOT_TILT_MIN);
+  const right: Box = { x: label.x + label.w - Math.round(w * 0.6), y, w, h: SLOT_PX };
+  const rightBounds = tilted(right, tilt, 'left');
+  const past = rightBounds.x + rightBounds.w - m.column;
+  const fits = past <= 0 || ctx.room({ x: m.column, y: rightBounds.y, w: past, h: rightBounds.h });
+  const [slotBox, slotBounds, slotAt, slotRotate] = fits
+    ? [right, rightBounds, 'right' as const, tilt]
+    : (() => {
+        const left: Box = { x: label.x + 2, y, w: Math.min(w, m.column - label.x - 2), h: SLOT_PX };
+        return [left, tilted(left, tilt, 'right'), 'left' as const, -tilt] as const;
+      })();
+  return {
+    ...shape,
+    slotBox,
+    slotBounds,
+    slotAt,
+    slotRotate,
+    w: Math.max(shape.w, slotBounds.x + slotBounds.w),
+    h: Math.max(shape.h, slotBounds.y + slotBounds.h),
+  };
+}
+
+/**
+ * A (Hoppers): the icon inline, at the words' height. On a desktop the
+ * label starts 35–45% into its lane at the lane's width, overhanging the
+ * next where that lane is empty at its height, else from 15% to the line;
+ * on a phone it starts at the line and reaches across empty lanes.
+ */
+function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
+  const { m, col } = ctx;
+  const pad = { ...padY(plan.label, m), left: m.pad.side, right: m.pad.right };
+  const fitFor = (w: number) => {
+    const lines = linesIn(card, w - pad.left - pad.right, 0, true, ctx);
+    return { lines, h: pad.top + lines * m.caption.line + pad.bottom };
+  };
+  const shape = (labelBox: Box, lines: number, overhang: boolean, span: number): Shape => ({
+    ...base(card),
     recipe: 'A',
     variant: 'sticker',
     overhang,
-    tuck: 0,
-    fan: [],
-    morePhotos: 0,
+    span,
+    stickerSize: null,
+    stickerAt: null,
+    indent: 0,
     labelBox,
-    textBox: textOf(labelBox, pad, lines, m),
-    photoBox: null,
+    textBoxes: textOf(labelBox, pad, 0, lines, m),
     stickerBox: null,
-    slot: isOpenJoint(card),
     pad,
     center: false,
     inlineIcon: true,
@@ -432,57 +611,102 @@ function shapeA(card: Card, col: number, m: BoardMetrics, room: (band: Box) => b
     w: labelBox.x + labelBox.w,
     h: labelBox.h,
   });
-  const over = wide();
-  if (over) return over;
+  if (m.narrow) {
+    const fit = spanLabel(0, pad, fitFor, ctx);
+    return shape({ x: 0, y: 0, w: fit.w, h: fit.h }, fit.lines, fit.span > 0, fit.span);
+  }
+  if (col < COLUMNS - 1) {
+    const x = Math.round(
+      m.column * (A_START_MIN + unit(card.splash.id, 'shift') * (A_START_MAX - A_START_MIN)),
+    );
+    const fit = fitFor(m.column);
+    if (ctx.room({ x: m.column, y: 0, w: x, h: fit.h })) {
+      return shape({ x, y: 0, w: m.column, h: fit.h }, fit.lines, true, 0);
+    }
+  }
   const x = Math.round(m.column * A_FALLBACK);
-  const lines = linesIn(card, m.column - x, pad.left, pad.right, true, m);
-  return label({ x, y: 0, w: m.column - x, h: hug(lines, m) }, lines, false);
+  const fit = fitFor(m.column - x);
+  return shape({ x, y: 0, w: m.column - x, h: fit.h }, fit.lines, false, 0);
 }
 
 /**
- * B (Lynn Canyon): the label the lane wide from its line, a large sticker
- * centred on its top-left corner — half outside, up and left — the words
- * starting past its inner half. In the first lane the label starts half a
- * sticker in, so the sticker stays on the board.
+ * B (Lynn Canyon): the label from its lane's line and a large sticker — on
+ * a filled label centred on its top-left corner, the first line indented
+ * past its inner half; with no fill, left of the first line, centred on
+ * it, the words starting after it. The sticker overhangs the line by at
+ * most the lane before's right padding, so a bigger one starts its label
+ * further in; in the first lane it stays on the board. Where it would
+ * touch the words above, it moves left of the line, then steps down a
+ * size; the label grows to hold a sticker hanging below its first line.
  */
-function shapeB(card: Card, col: number, m: BoardMetrics): Shape {
-  const half = m.sticker / 2;
-  const x = col === 0 ? half : 0;
-  const pad = {
-    top: m.pad.top,
-    right: m.pad.right,
-    bottom: m.pad.bottom,
-    left: Math.max(m.pad.side, half),
-  };
-  const lines = linesIn(card, m.column - x, pad.left, pad.right, false, m);
-  const labelBox = { x, y: 0, w: m.column - x, h: hug(lines, m) };
-  return {
-    recipe: 'B',
-    variant: 'sticker',
-    overhang: false,
-    tuck: 0,
-    fan: [],
-    morePhotos: 0,
-    labelBox,
-    textBox: textOf(labelBox, pad, lines, m),
-    photoBox: null,
-    stickerBox: { x: x - half, y: -half, w: m.sticker, h: m.sticker },
-    slot: isOpenJoint(card),
-    pad,
-    center: false,
-    inlineIcon: false,
-    captionLines: lines,
-    w: m.column,
-    h: labelBox.h,
-  };
+function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
+  const { m, col, above } = ctx;
+  const sizes = (['big', 'medium', 'small'] as const).filter(
+    (s, at, all) => at >= all.indexOf(plan.size ?? 'small'),
+  );
+  const places: StickerAt[] = plan.label === 'none' ? ['left'] : ['corner', 'left'];
+  const aboveWords = above ? above.textBoxes.map((b) => onBoard(above, b)) : [];
+  const top = above ? above.y + above.h : 0;
+  let fallback: Shape | null = null;
+  for (const size of sizes) {
+    for (const at of places) {
+      const s = m.stickers[size];
+      const half = s / 2;
+      const x = col === 0 ? half : Math.max(0, Math.ceil(half - m.pad.right));
+      const v = padY(plan.label, m);
+      const left = at === 'left' ? Math.ceil(half) + 4 : m.pad.side;
+      const indent = at === 'corner' ? Math.max(0, Math.ceil(half + 2 - left)) : 0;
+      const cy = at === 'corner' ? 0 : v.top + m.caption.line / 2;
+      const stickerBox = { x: x - half, y: cy - half, w: s, h: s };
+      const fitFor = (w: number) => {
+        const lines = linesIn(card, w - left - m.pad.right, indent, false, ctx);
+        // A sticker hanging below the words keeps its lower half on this label's padding.
+        const bottom = Math.max(
+          v.bottom,
+          Math.ceil(stickerBox.y + s - (v.top + lines * m.caption.line)) - 4,
+        );
+        return { lines, h: v.top + lines * m.caption.line + bottom, bottom };
+      };
+      const pad0 = { top: v.top, bottom: v.bottom, left, right: m.pad.right };
+      const fit = spanLabel(x, pad0, (w) => fitFor(w), ctx);
+      const bottom = fitFor(fit.w).bottom;
+      const pad = { ...pad0, bottom };
+      const labelBox = { x, y: 0, w: fit.w, h: fit.h };
+      const shape: Shape = {
+        ...base(card),
+        recipe: 'B',
+        variant: 'sticker',
+        overhang: fit.span > 0,
+        span: fit.span,
+        stickerSize: size,
+        stickerAt: at,
+        indent,
+        labelBox,
+        textBoxes: textOf(labelBox, pad, indent, fit.lines, m),
+        stickerBox,
+        pad,
+        center: false,
+        inlineIcon: false,
+        captionLines: fit.lines,
+        w: x + fit.w,
+        h: fit.h,
+      };
+      fallback = shape;
+      const onPage = { x: ctx.col * m.column + stickerBox.x, y: top + stickerBox.y, w: s, h: s };
+      if (aboveWords.every((w) => !intersects(onPage, w))) return shape;
+    }
+  }
+  return fallback!;
 }
 
 /**
  * C (Beef Short Rib): up to three square cards 55–70% of the lane, left or
- * right, the caption centred directly under them with its icon inline;
- * tucked up into the item above's bottom padding when there is one.
+ * right, the caption directly under with its icon inline — centred under
+ * the card, or on a phone reaching across empty lanes; tucked up into the
+ * item above's bottom padding, as far as that padding goes (10px at most).
  */
-function shapeC(card: Card, first: boolean, m: BoardMetrics): Shape {
+function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
+  const { m, above } = ctx;
   const id = card.splash.id;
   const photos = card.photos!;
   const size = Math.round(m.column * (C_MIN + unit(id, 'photo') * (C_MAX - C_MIN)));
@@ -498,28 +722,44 @@ function shapeC(card: Card, first: boolean, m: BoardMetrics): Shape {
   const spread = fan.length > 0 ? fan[fan.length - 1].dy : 0;
   const photoBox = { x, y: 0, w: size, h: size + spread };
   const side = Math.min(m.pad.side, Math.floor(size / 8));
+  const v = padY(plan.label, m);
   // Against the line, the caption keeps the right padding the next lane's sticker hangs on.
   const right = x + size >= m.column - 1 ? m.pad.right : side;
-  const pad = { top: m.pad.top, right, bottom: m.pad.bottom, left: side };
-  const lines = linesIn(card, size, pad.left, pad.right, true, m);
-  const labelBox = { x, y: photoBox.h, w: size, h: hug(lines, m) };
+  const pad = { ...v, right, left: side };
+  const fitFor = (w: number) => {
+    const lines = linesIn(card, w - pad.left - pad.right, 0, true, ctx);
+    return { lines, h: v.top + lines * m.caption.line + v.bottom };
+  };
+  let fit = { w: size, span: 0, ...fitFor(size) };
+  if (m.narrow) {
+    const wide = spanLabel(x, pad, fitFor, {
+      ...ctx,
+      room: (band) => ctx.room({ ...band, y: band.y + photoBox.h }),
+    });
+    if (wide.span > 0) fit = wide;
+  }
+  const labelBox = { x, y: photoBox.h, w: fit.w, h: fit.h };
   return {
+    ...base(card),
     recipe: 'C',
     variant: 'photo',
-    overhang: false,
-    tuck: first ? 0 : C_TUCK_PX,
+    overhang: fit.span > 0,
+    span: fit.span,
+    stickerSize: null,
+    stickerAt: null,
+    indent: 0,
+    tuck: above ? Math.min(C_TUCK_PX, above.pad.bottom) : 0,
     fan: fan.reverse(),
     morePhotos: photos.length - shown.length,
     labelBox,
-    textBox: textOf(labelBox, pad, lines, m),
+    textBoxes: textOf(labelBox, pad, 0, fit.lines, m),
     photoBox,
     stickerBox: null,
-    slot: isOpenJoint(card),
     pad,
-    center: true,
+    center: fit.span === 0,
     inlineIcon: true,
-    captionLines: lines,
-    w: m.column,
+    captionLines: fit.lines,
+    w: Math.max(m.column, x + fit.w),
     h: labelBox.y + labelBox.h,
   };
 }
@@ -536,8 +776,14 @@ function layoutBoard(
   scope: { first: IsoDate; last: IsoDate },
   m: BoardMetrics,
   span: 'week' | 'month',
+  measured: Measured,
 ): Pick<BoardLayout, 'weeks' | 'pieces' | 'tapes' | 'height'> {
   const inScope = (day: IsoDate): boolean => day >= scope.first && day <= scope.last;
+  // Every day on the grid takes its posts — a month's first and last rows
+  // carry the days before and after it too, drawn at half strength.
+  const gridFirst = rows[0][0];
+  const gridLast = rows[rows.length - 1][COLUMNS - 1];
+  const onGrid = (day: IsoDate): boolean => day >= gridFirst && day <= gridLast;
 
   // A day's posts, oldest first; ranged posts set apart as bands.
   const byDay = new Map<IsoDate, Card[]>();
@@ -545,10 +791,10 @@ function layoutBoard(
   for (const card of cards) {
     const range = spanOf(card);
     if (range) {
-      if (range.start <= scope.last && range.end >= scope.first) ranged.push(card);
+      if (range.start <= gridLast && range.end >= gridFirst) ranged.push(card);
       continue;
     }
-    if (!inScope(card.day)) continue;
+    if (!onGrid(card.day)) continue;
     const list = byDay.get(card.day);
     if (list) list.push(card);
     else byDay.set(card.day, [card]);
@@ -585,7 +831,7 @@ function layoutBoard(
       inMonth: inScope(day),
       col,
       x: col * m.column,
-      count: inScope(day) ? countOf(day) : 0,
+      count: countOf(day),
     }));
 
     // Bands: the range's days within this row and this scope, packed into lanes.
@@ -594,7 +840,7 @@ function layoutBoard(
     const lanes: number[] = [];
     for (const card of ranged) {
       const range = spanOf(card)!;
-      const cols = cells.filter((c) => c.inMonth && c.day >= range.start && c.day <= range.end);
+      const cols = cells.filter((c) => c.day >= range.start && c.day <= range.end);
       if (cols.length === 0) continue;
       const startCol = cols[0].col;
       const endCol = cols[cols.length - 1].col;
@@ -613,6 +859,7 @@ function layoutBoard(
         endCol,
         startsHere: cols[0].day === range.start,
         endsHere: cols[cols.length - 1].day === range.end,
+        muted: cols.every((c) => !c.inMonth),
         // The full width of its lanes, edge to edge.
         x: startCol * m.column,
         w: (endCol - startCol + 1) * m.column,
@@ -621,36 +868,56 @@ function layoutBoard(
     }
     // Under the bands, room for a first sticker to hang into without touching their words.
     const tapeBlock =
-      ends.length > 0 ? ends.length * (TAPE_PX + TAPE_GAP_PX) + Math.ceil(m.sticker / 2) : 0;
+      ends.length > 0 ? ends.length * (TAPE_PX + TAPE_GAP_PX) + Math.ceil(m.stickers.big / 2) : 0;
     rowTapes.forEach((tape, at) => {
       tapes.push({ ...tape, y: y + numberBand + lanes[at] * (TAPE_PX + TAPE_GAP_PX) });
     });
 
-    // Pieces: right to left, each lane stacked in time order with no gap.
+    // Pieces: right to left, so each lane decides its reach against lanes
+    // already final; each lane stacked in time order with no gap.
     const byCol = new Map<number, BoardPiece[]>();
     let tallest = span === 'month' ? m.rowBase : 0;
     for (const cell of [...cells].reverse()) {
-      const list = cell.inMonth ? (byDay.get(cell.day) ?? []) : [];
-      const next = byCol.get(cell.col + 1) ?? [];
-      // The next lane is empty at a band when nothing of it — label, photo, sticker — is there.
+      const list = byDay.get(cell.day) ?? [];
+      const right = [...byCol.entries()].filter(([c]) => c > cell.col).flatMap(([, ps]) => ps);
+      // The lanes to the right are empty at a band when nothing of theirs — label, photo, sticker, slot — is there.
       const room =
         (top: number) =>
         (band: Box): boolean => {
           const reach = { x: cell.x + band.x, y: top + band.y, w: band.w, h: band.h };
-          return next.every((p) => extentOf(p).every((box) => !intersects(reach, box)));
+          return right.every((p) => extentOf(p).every((box) => !intersects(reach, box)));
         };
       let top = y + numberBand + tapeBlock;
       const plans = planDay(list);
       const lane: BoardPiece[] = [];
       list.forEach((card, at) => {
         const plan = plans[at];
-        const shape =
-          plan.recipe === 'C'
-            ? shapeC(card, at === 0, m)
+        const shapeAt = (y0: number): Shape => {
+          const ctx: Context = { col: cell.col, m, above: lane[at - 1], room: room(y0), measured };
+          return plan.recipe === 'C'
+            ? shapeC(card, plan, ctx)
             : plan.recipe === 'A'
-              ? shapeA(card, cell.col, m, room(top))
-              : shapeB(card, cell.col, m);
-        const pieceY = top - shape.tuck;
+              ? shapeA(card, plan, ctx)
+              : shapeB(card, plan, ctx);
+        };
+        let drawn = shapeAt(top);
+        // The lane's first item keeps its sticker in its row, off the header and
+        // the day's number: it starts as far down as the sticker hangs up, unless
+        // the bands above already left that room — and is shaped again there.
+        const hang =
+          at === 0 && tapeBlock === 0 && drawn.stickerBox
+            ? Math.max(0, Math.ceil(-drawn.stickerBox.y))
+            : 0;
+        if (hang > 0) drawn = shapeAt(top + hang);
+        const ctx: Context = {
+          col: cell.col,
+          m,
+          above: lane[at - 1],
+          room: room(top + hang - drawn.tuck),
+          measured,
+        };
+        const shape = withSlot(drawn, card, ctx);
+        const pieceY = top + hang - shape.tuck;
         lane.push({
           id: card.splash.id,
           card,
@@ -658,6 +925,7 @@ function layoutBoard(
           week: index,
           col: cell.col,
           label: plan.label,
+          muted: !cell.inMonth,
           ...shape,
           x: cell.x,
           y: pieceY,
@@ -679,12 +947,17 @@ function layoutBoard(
 export function layoutMonthBoard(
   cards: Card[],
   month: string,
-  { width, weekStart = WEEK_START }: { width: number; weekStart?: number },
+  {
+    width,
+    weekStart = WEEK_START,
+    measured = {},
+  }: { width: number; weekStart?: number; measured?: Measured },
 ): BoardLayout {
   const m = boardMetrics(width);
   const rows = monthDays(month, weekStart);
   const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
-  const laid = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month');
+  const laid = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month', measured);
+  // The grid is exactly the weeks holding a day of the month, from the week of the 1st.
   return {
     span: 'month',
     metrics: m,
@@ -704,12 +977,16 @@ export function layoutMonthBoard(
 export function layoutWeekBoard(
   cards: Card[],
   day: IsoDate,
-  { width, weekStart = WEEK_START }: { width: number; weekStart?: number },
+  {
+    width,
+    weekStart = WEEK_START,
+    measured = {},
+  }: { width: number; weekStart?: number; measured?: Measured },
 ): BoardLayout {
   const m = boardMetrics(width);
   const first = weekOf(day, weekStart);
   const days = Array.from({ length: COLUMNS }, (_, i) => addDays(first, i));
-  const laid = layoutBoard(cards, [days], { first, last: days[COLUMNS - 1] }, m, 'week');
+  const laid = layoutBoard(cards, [days], { first, last: days[COLUMNS - 1] }, m, 'week', measured);
   return {
     span: 'week',
     metrics: m,

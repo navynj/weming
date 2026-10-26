@@ -41,6 +41,8 @@ export type Card = {
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */
   pools?: string[];
+  /** On Home: the photo of the pool a joint splash belongs to (0024), drawn in its monogram's place. */
+  poolPhoto?: string | null;
   /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>", one per pool. */
   origins?: string[];
   /** Where the top card opens, when not the post's own page from Home. */

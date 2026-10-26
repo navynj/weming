@@ -7,6 +7,8 @@ const SIZES = {
   row: 'h-10 w-10 rounded-xl text-sm',
   // On a card or a mark on Home: which pool a post is shared to.
   chip: 'h-4 min-w-4 rounded px-0.5 text-[10px]',
+  // On the calendar on Home, in a joint splash's faces' place: a face's size.
+  face: 'h-3 min-w-3 overflow-hidden rounded-[3px] px-px text-[10px] leading-none',
   // A Home column of a pool's Just-mine splashes, where an emoji would be.
   head: 'h-7 w-7 rounded-lg text-[10px]',
   // A pool on the strip at the foot (review): a 40px rounded square, so a
