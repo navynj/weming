@@ -62,9 +62,9 @@ const FACE_RING: Record<LabelStyle, string> = {
   white: 'ring-white',
   ink: 'ring-ink',
 };
-/** Faces as the calendar draws them: 16px at 12px initials, so they hold the 10px floor. */
+/** Faces as the calendar draws them: within the words' 13px line, at the 10px floor. */
 const FACE_CLASS =
-  'text-main-900/60 flex h-4 w-4 items-center justify-center rounded-full bg-[#8283EE] text-xs ring-1';
+  'text-main-900/60 flex h-3 w-3 items-center justify-center overflow-hidden rounded-full bg-[#8283EE] text-[10px] leading-none ring-1';
 
 function FaceStack({
   faces,
@@ -116,7 +116,7 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
         : []);
   if (faces.length === 0) return null;
   return (
-    <span data-board-faces className="ml-1 inline-flex translate-y-0.5 align-baseline">
+    <span data-board-faces className="ml-1 inline-flex align-middle">
       <FaceStack faces={faces} ring={ring} />
     </span>
   );
@@ -124,10 +124,11 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 
 /**
  * An open joint splash's empty slot (meaning is shape): a dashed white
- * outline under its label, in its own lane, holding the faded faces of the
- * current members who have not written. When I am one of them it reads
- * "Add your side" — on a phone's narrow lane, the faces say it — and opens
- * the splash to write my ripple; once everyone has written, it is gone.
+ * outline inline after the words, wrapping under them only when the line
+ * is full, holding the faded faces of the current members who have not
+ * written. When I am one of them it reads "Add your side" — on a phone's
+ * narrow lane, the faces say it — and opens the splash to write my
+ * ripple; once everyone has written, it is gone.
  */
 function OpenSlot({
   piece,
@@ -144,14 +145,12 @@ function OpenSlot({
   const body = (
     <>
       <FaceStack faces={awaiting} ring="ring-main-900" faded max={narrow ? 2 : 4} />
-      {mine && !narrow ? (
-        <span className="truncate font-medium whitespace-nowrap">Add your side</span>
-      ) : null}
+      {mine && !narrow ? <span className="whitespace-nowrap">Add your side</span> : null}
     </>
   );
+  // The words' own line: never taller, so the box the layout sized still holds them.
   const className =
-    'absolute flex items-center gap-1.5 overflow-hidden border border-dashed border-white px-1.5 text-xs text-white';
-  const style = placed(piece.slotBox!);
+    'ml-1 inline-flex h-[13px] items-center gap-1 border border-dashed border-current px-1 align-middle text-[10px] leading-none';
   return mine ? (
     <button
       type="button"
@@ -159,13 +158,12 @@ function OpenSlot({
       data-board-slot-mine
       aria-label={`Add your side to ${captionOf(piece.card)}`}
       onClick={() => onWrite(piece.card)}
-      className={className}
-      style={style}
+      className={`pointer-events-auto ${className}`}
     >
       {body}
     </button>
   ) : (
-    <span data-board-slot={piece.id} className={className} style={style}>
+    <span data-board-slot={piece.id} className={className}>
       {body}
     </span>
   );
@@ -268,14 +266,15 @@ export function BoardPieceView({
       className={`absolute ${motionOf(ripple, plunge)}`}
       style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }}
     >
-      {/* The piece is the tap that brings its card up; the slot under it is a tap of its own. */}
+      {/* The tap that brings its card up, under the drawing; the slot is a tap of its own. */}
       <button
         type="button"
         onClick={() => onPick(card.splash.id)}
         aria-label={caption}
         data-board-pick={piece.id}
-        className="absolute inset-0 block text-left"
-      >
+        className="absolute inset-0 block"
+      />
+      <div aria-hidden className="pointer-events-none absolute inset-0">
         {piece.photoBox ? (
           <span data-board-photos className="absolute block" style={placed(piece.photoBox)}>
             {piece.fan.map((photo, at) => (
@@ -321,6 +320,9 @@ export function BoardPieceView({
             ) : null}
             {caption}
             {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
+            {piece.slot ? (
+              <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} />
+            ) : null}
           </span>
         </span>
         {piece.stickerBox && icon ? (
@@ -333,8 +335,7 @@ export function BoardPieceView({
             {icon}
           </span>
         ) : null}
-      </button>
-      {piece.slotBox ? <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} /> : null}
+      </div>
     </div>
   );
 }

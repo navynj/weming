@@ -50,7 +50,7 @@ function rowWater(index: number): string {
  * A day's waves (review): the pill's own glyph — the exported SVG, its pen
  * scaling with it — 26px wide on a desktop and 22 on a phone, a touch
  * finer than the export's pen, white at 80%; one per record, three at
- * most, 5px apart.
+ * most, stacked with no gap (review).
  */
 const DAY_WAVE_W = { wide: 26, narrow: 22 } as const;
 const DAY_WAVE_STROKE = 1.2;
@@ -59,12 +59,7 @@ function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
   const lines = Math.min(DAY_WAVES_MAX, count);
   if (lines === 0) return null;
   return (
-    <span
-      aria-hidden
-      data-board-waves
-      data-lines={lines}
-      className="flex flex-col items-center gap-[5px]"
-    >
+    <span aria-hidden data-board-waves data-lines={lines} className="flex flex-col items-center">
       {Array.from({ length: lines }, (_, at) => (
         <WaveGlyph
           key={at}
@@ -108,7 +103,6 @@ export function MonthBoard({
   today,
   ring = null,
   dropped = null,
-  fills = false,
   onPick,
   lanes,
 }: {
@@ -121,12 +115,6 @@ export function MonthBoard({
   ring?: Ring | null;
   /** The post just dropped (review): it plunges into its water rather than bobbing on it. */
   dropped?: string | null;
-  /**
-   * Joint splashes take a fill, white or ink (review): only where the
-   * calendar is shared — a pool of two or more. Home and a pool of one draw
-   * every label with none.
-   */
-  fills?: boolean;
   /** Brings a post's card to the top of the stack. */
   onPick: (id: string) => void;
   /** What a post's icon falls back to: its lane's emoji. */
@@ -148,9 +136,9 @@ export function MonthBoard({
   const layout = useMemo(
     () =>
       span === 'week'
-        ? layoutWeekBoard(cards, week, { width: room ?? 980, fills })
-        : layoutMonthBoard(cards, month, { width: room ?? 980, fills }),
-    [cards, span, week, month, room, fills],
+        ? layoutWeekBoard(cards, week, { width: room ?? 980 })
+        : layoutMonthBoard(cards, month, { width: room ?? 980 }),
+    [cards, span, week, month, room],
   );
   const { metrics } = layout;
   const photos = useBoardPhotos(layout.pieces);
