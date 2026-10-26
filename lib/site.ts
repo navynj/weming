@@ -8,10 +8,27 @@
  * keeps the sent URL and the allowlisted URL identical.
  */
 export function siteUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL;
-  if (configured) return configured.replace(/\/$/, '');
+  const configured = resolveSiteUrl(process.env);
+  if (configured) return configured;
   if (typeof window !== 'undefined') return window.location.origin;
   throw new Error('NEXT_PUBLIC_SITE_URL is not set');
+}
+
+/**
+ * The origin a deployment is configured with (review): NEXT_PUBLIC_SITE_URL
+ * when set; else, on a Vercel preview, its branch's own URL — so every
+ * preview has an origin without a value set per branch. Production has no
+ * fallback: without NEXT_PUBLIC_SITE_URL there is no origin, and
+ * next.config fails the build. `next.config` bakes the answer into the
+ * build as NEXT_PUBLIC_SITE_URL, so the browser reads the same origin.
+ */
+export function resolveSiteUrl(env: Record<string, string | undefined>): string | null {
+  const configured = env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  if (env.VERCEL_ENV === 'preview' && env.VERCEL_BRANCH_URL) {
+    return `https://${env.VERCEL_BRANCH_URL.replace(/\/$/, '')}`;
+  }
+  return null;
 }
 
 /** The exact URL registered in supabase/config.toml. Never add a query here. */

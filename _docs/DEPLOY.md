@@ -187,14 +187,23 @@ Import the repo (`navynj/during`). Framework preset: Next.js.
 deploy runs ESLint, the design-token guard, and the test suite minus the
 files that need a live Postgres (`vitest.ci.config.ts` names them).
 
-### Environment variables — all four, Production and Preview
+### Environment variables — Production and Preview
 
 | Name | Value | Reaches |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<ref>.supabase.co` | browser and server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the project's anon key | browser and server |
-| `NEXT_PUBLIC_SITE_URL` | `https://during.today` | browser and server |
+| `NEXT_PUBLIC_SITE_URL` | `https://during.today` — **Production only** | browser and server |
 | `SUPABASE_SERVICE_ROLE_KEY` | the project's service role key | **server only** |
+
+**Previews set no `NEXT_PUBLIC_SITE_URL`, per branch or otherwise.** When it is
+unset on a Vercel preview, `lib/site.ts` uses `https://${VERCEL_BRANCH_URL}` —
+the branch's own preview URL — and `next.config.ts` bakes that into the build
+as `NEXT_PUBLIC_SITE_URL`, so the browser and the server agree. A production
+build without `NEXT_PUBLIC_SITE_URL` fails in `next.config.ts`. Signing in on
+a preview still needs its URL in Supabase Auth's redirect allowlist (a pattern
+such as `https://weming-git-*-navynjs-projects.vercel.app/**` covers every
+branch).
 
 The three `NEXT_PUBLIC_` values reach the browser by design — the anon key is
 a public identifier, and RLS is what protects the data.
