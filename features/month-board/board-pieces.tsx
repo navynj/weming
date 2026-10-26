@@ -40,6 +40,105 @@ type Shared = {
   ripple: number | null;
 };
 
+/**
+ * A part's offset and tilt set by hand (review), as a transform: X a share
+ * of the lane, Y in line heights; nothing when nothing is set.
+ */
+function moveOf(
+  set: { x?: number; y?: number; tilt?: number } | undefined,
+  column: number,
+  line: number,
+): string | undefined {
+  if (!set || (set.x === undefined && set.y === undefined && set.tilt === undefined))
+    return undefined;
+  const parts = [`translate(${(set.x ?? 0) * column}px, ${(set.y ?? 0) * line}px)`];
+  if (set.tilt) parts.push(`rotate(${set.tilt}deg)`);
+  return parts.join(' ');
+}
+
+/** The wave's defaults: a small calm wave, the label's width. */
+export const WAVE_DEFAULTS = { amp: 2, length: 16, weight: 2, span: 1 } as const;
+
+/**
+ * The same symmetric wave as the header glyph (review), repeated: half
+ * waves as cubics with their controls at a third and two thirds, offset
+ * 4/3 of the amplitude, so each crest reaches the amplitude exactly; a
+ * whole number of half waves, so both ends sit on the midline.
+ */
+export function wavePath(width: number, amp: number, wavelength: number, pad: number): string {
+  const half = wavelength / 2;
+  const count = Math.max(1, Math.round(width / half));
+  const step = width / count;
+  const mid = pad + amp;
+  const k = (amp * 4) / 3;
+  const f = (v: number): string => String(Number(v.toFixed(3)));
+  let d = `M${f(0)} ${f(mid)}`;
+  for (let i = 0; i < count; i += 1) {
+    const x = i * step;
+    const cy = mid + (i % 2 === 0 ? k : -k);
+    d += `C${f(x + step / 3)} ${f(cy)} ${f(x + (2 * step) / 3)} ${f(cy)} ${f(x + step)} ${f(mid)}`;
+  }
+  return d;
+}
+
+/**
+ * A wave under the label (review), off unless switched on: white at 80%,
+ * round caps, its height, wavelength, weight and length the person's, set
+ * from the label's bottom-left and moved and tilted like any part.
+ */
+function WaveDecoration({
+  label,
+  wave,
+  column,
+  line,
+}: {
+  label: Box;
+  wave: {
+    amp?: number;
+    length?: number;
+    weight?: number;
+    span?: number;
+    x?: number;
+    y?: number;
+    tilt?: number;
+  };
+  column: number;
+  line: number;
+}) {
+  const amp = wave.amp ?? WAVE_DEFAULTS.amp;
+  const wavelength = wave.length ?? WAVE_DEFAULTS.length;
+  const weight = wave.weight ?? WAVE_DEFAULTS.weight;
+  const width = Math.max(4, label.w * (wave.span ?? WAVE_DEFAULTS.span));
+  const pad = weight;
+  const height = amp * 2 + pad * 2;
+  return (
+    <svg
+      aria-hidden
+      data-board-wave
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      fill="none"
+      className="absolute overflow-visible"
+      style={{
+        left: label.x,
+        top: label.y + label.h - height / 2,
+        transform: moveOf(wave, column, line),
+        transformOrigin: 'left center',
+      }}
+    >
+      <path
+        d={wavePath(width, amp, wavelength, pad)}
+        stroke="#ffffff"
+        strokeOpacity={0.8}
+        strokeWidth={weight}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** The motion a piece plays: a bob for the heading, a plunge for a drop. */
 function motionOf(ripple: number | null, plunge: boolean): string {
   if (plunge) return 'board-plunge';
@@ -65,7 +164,7 @@ const FACE_RING: Record<LabelStyle, string> = {
 };
 /** Faces as the calendar draws them: within the words' 13px line, at the 10px floor. */
 const FACE_CLASS =
-  'text-main-900/60 flex h-3 w-3 items-center justify-center overflow-hidden rounded-full bg-[#8283EE] text-[10px] leading-none ring-1';
+  'text-main-900/60 flex h-[calc(var(--line,13px)-1px)] w-[calc(var(--line,13px)-1px)] items-center justify-center overflow-hidden rounded-full bg-[#8283EE] text-[10px] leading-none ring-1';
 
 function FaceStack({
   faces,
@@ -127,9 +226,15 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
         {SEPARATOR}
         <span
           data-board-pool
-          className={`inline-flex h-[13px] items-center align-top ${NO_INDENT}`}
+          className={`inline-flex h-[var(--line,13px)] items-center align-top ${NO_INDENT}`}
         >
-          <Monogram name={pool} size="face" photo={card.poolPhoto ?? null} />
+          <Monogram
+            name={pool}
+            size="face"
+            photo={card.poolPhoto ?? null}
+            // A face's size at the words' own line (review: they scale with the text).
+            className="!h-[calc(var(--line,13px)-1px)] !min-w-[calc(var(--line,13px)-1px)]"
+          />
         </span>
       </>
     );
@@ -152,7 +257,10 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
   return (
     <>
       {SEPARATOR}
-      <span data-board-faces className={`inline-flex h-[13px] items-center align-top ${NO_INDENT}`}>
+      <span
+        data-board-faces
+        className={`inline-flex h-[var(--line,13px)] items-center align-top ${NO_INDENT}`}
+      >
         <FaceStack faces={faces} ring={ring} />
       </span>
     </>
@@ -246,21 +354,26 @@ function PhotoCardView({
   url,
   area,
   more,
+  moved,
 }: {
   photo: PhotoCard;
   url: string | null | undefined;
   area: Box;
   more: number;
+  /** Its offset and tilt set by hand, drawn without moving anything else (review). */
+  moved: string | undefined;
 }) {
   return (
     <span
       data-board-photo-card
+      data-size={photo.size}
       className="absolute block"
       style={{
         left: 0,
-        top: area.h - photo.dy - Math.round(area.w),
-        width: area.w,
-        height: Math.round(area.w),
+        top: area.h - photo.dy - photo.size,
+        width: photo.size,
+        height: photo.size,
+        transform: moved,
       }}
     >
       {url ? (
@@ -318,6 +431,10 @@ export function BoardPieceView({
   const top = piece.fan.length - 1;
   const label = piece.labelBox;
   const fade = piece.muted ? 'opacity-50' : '';
+  // Set by hand (review): offsets and tilts move only this piece's drawing,
+  // never the stack; X is a share of the lane, Y in line heights.
+  const layout = card.layout ?? {};
+  const line = piece.type.line;
   return (
     <div
       // Remounted per ring, so the motion plays again for the same post.
@@ -360,15 +477,20 @@ export function BoardPieceView({
                 url={photos[photo.path]}
                 area={piece.photoBox!}
                 more={at === top ? piece.morePhotos : 0}
+                moved={moveOf(layout.photos?.[photo.path], metrics.column, line)}
               />
             ))}
           </span>
+        ) : null}
+        {layout.wave?.on ? (
+          <WaveDecoration label={label} wave={layout.wave} column={metrics.column} line={line} />
         ) : null}
         <span
           data-board-label
           className={`absolute z-[1] block ${LABEL_CLASS[piece.label]} ${fade}`}
           style={{
             ...placed(label),
+            transform: moveOf(layout.label, metrics.column, line),
             paddingTop: piece.pad.top,
             paddingRight: piece.pad.right,
             paddingBottom: piece.pad.bottom,
@@ -382,14 +504,16 @@ export function BoardPieceView({
             className={`block overflow-hidden font-medium break-words ${piece.center ? 'text-center' : ''}`}
             data-lines={piece.captionLines}
             style={{
-              fontSize: metrics.caption.size,
-              lineHeight: `${metrics.caption.line}px`,
+              fontSize: piece.type.size,
+              lineHeight: `${line}px`,
+              // The icon and the faces take the words' own line (review: they scale with the text).
+              ['--line' as string]: `${line}px`,
               // A corner sticker's room, on the first line only (review).
               textIndent: piece.indent || undefined,
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
               WebkitLineClamp: piece.captionLines,
-              maxHeight: piece.captionLines * metrics.caption.line,
+              maxHeight: piece.captionLines * line,
             }}
           >
             {piece.inlineIcon && icon ? (
@@ -397,7 +521,7 @@ export function BoardPieceView({
               <span
                 aria-hidden
                 data-board-icon
-                className={`mr-1 inline-block h-[13px] align-top leading-[13px] ${NO_INDENT}`}
+                className={`mr-1 inline-block h-[var(--line)] align-top leading-[var(--line)] ${NO_INDENT}`}
               >
                 {icon}
               </span>
@@ -414,7 +538,11 @@ export function BoardPieceView({
             data-at={piece.stickerAt ?? undefined}
             // Over its own label and any other (review).
             className={`absolute z-[2] flex items-center justify-center leading-none ${fade}`}
-            style={{ ...placed(piece.stickerBox), fontSize: piece.stickerBox.w }}
+            style={{
+              ...placed(piece.stickerBox),
+              fontSize: piece.stickerBox.w,
+              transform: moveOf(layout.icon, metrics.column, line),
+            }}
           >
             {icon}
           </span>

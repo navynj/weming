@@ -34,6 +34,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      board_layouts: {
+        Row: {
+          id: string
+          layout: Json
+          pool_id: string | null
+          scope: string
+          splash_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          layout?: Json
+          pool_id?: string | null
+          scope: string
+          splash_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          layout?: Json
+          pool_id?: string | null
+          scope?: string
+          splash_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_layouts_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_layouts_splash_id_fkey"
+            columns: ["splash_id"]
+            isOneToOne: false
+            referencedRelation: "splashes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_layouts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_layouts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lane_mappings: {
         Row: {
           created_at: string
@@ -856,7 +918,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _board_layout_clear: { Args: { l: Json; paths: string[] }; Returns: Json }
+      _board_layout_merge: { Args: { base: Json; patch: Json }; Returns: Json }
+      _board_layout_prune: { Args: { l: Json; media: string[] }; Returns: Json }
       _invite_pool: { Args: { p_token: string }; Returns: string }
+      _layout_group: { Args: { g: Json; kind: string }; Returns: boolean }
+      _layout_number: {
+        Args: { hi: number; lo: number; v: Json }
+        Returns: boolean
+      }
       _place_history: { Args: { pid: string; uid: string }; Returns: undefined }
       _place_on: {
         Args: { cid: string; plid: string; sid: string; uid: string }
@@ -877,6 +947,7 @@ export type Database = {
         Returns: undefined
       }
       _splash_lane: { Args: { sid: string }; Returns: string }
+      board_layout_valid: { Args: { l: Json }; Returns: boolean }
       can_see_ripple: { Args: { rid: string }; Returns: boolean }
       create_invite: {
         Args: { p_pool: string }
@@ -972,6 +1043,15 @@ export type Database = {
         Args: { ended: string; started: string }
         Returns: unknown
       }
+      set_board_layout: {
+        Args: {
+          p_clear?: string[]
+          p_patch: Json
+          p_pool: string
+          p_splash: string
+        }
+        Returns: Json
+      }
       set_lane_links: {
         Args: { p_links: Json; p_pool: string }
         Returns: undefined
@@ -986,6 +1066,7 @@ export type Database = {
       }
       shares_pool: { Args: { other: string }; Returns: boolean }
       splash_in_my_pools: { Args: { sid: string }; Returns: boolean }
+      splash_in_pool: { Args: { pid: string; sid: string }; Returns: boolean }
       splash_owner: { Args: { sid: string }; Returns: string }
       splash_to_joint: {
         Args: { p_pool_lane: string; p_splash: string }

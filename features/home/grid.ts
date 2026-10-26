@@ -1,4 +1,5 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
+import type { BoardLayoutJson, LayoutSource } from '@/features/month-board/board-layout';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -43,6 +44,14 @@ export type Card = {
   pools?: string[];
   /** On Home: the photo of the pool a joint splash belongs to (0024), drawn in its monogram's place. */
   poolPhoto?: string | null;
+  /**
+   * Its calendar layout, set by hand (0025): only the fields someone set,
+   * drawn over the automatic recipe; where it comes from ('pool' or 'home');
+   * and on Home, its pool's layout, which "Use pool layout" goes back to.
+   */
+  layout?: BoardLayoutJson;
+  layoutSource?: LayoutSource;
+  poolLayout?: BoardLayoutJson | null;
   /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>", one per pool. */
   origins?: string[];
   /** Where the top card opens, when not the post's own page from Home. */

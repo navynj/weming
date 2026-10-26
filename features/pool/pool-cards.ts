@@ -139,7 +139,14 @@ export function poolCards(
       editable: mine,
     });
   }
-  return cards.sort(byNewest);
+  // The calendar's layouts its members set (0025): the pool's, for every splash in it.
+  const layouts = view.layouts ?? {};
+  return cards
+    .map((card) => {
+      const layout = layouts[card.splash.id];
+      return layout ? { ...card, layout, layoutSource: 'pool' as const } : card;
+    })
+    .sort(byNewest);
 }
 
 /**

@@ -61,6 +61,12 @@ const C_MAX = 0.7;
 export const C_TUCK_PX = 10;
 /** Words wrap to three lines at most. */
 const CAPTION_LINES = 3;
+/** At a hand-set size this large or larger, words wrap to a fourth line before the ellipsis (review). */
+const FOUR_LINES_FROM_PX = 14;
+/** The board's base type on a phone and on a desktop: a hand-set size is scaled by their ratio on a phone. */
+const BASE_PX = { narrow: 10, wide: 10 } as const;
+/** No hand-set size draws under the app's floor (CLAUDE.md: the smallest type is 10px). */
+const FLOOR_PX = 10;
 /** About how wide one 10px Poppins character is, for the line estimate: generous, so words never outgrow their box. */
 const CHAR_EM = 0.62;
 /**
@@ -114,7 +120,7 @@ export type BoardMetrics = {
    */
   rowBase: number;
   /** The caption's type: every title 10px (review). */
-  caption: { size: number; line: number };
+  caption: { size: number; line: number; lines: number };
   /** B's stickers, by size (review): 1.6, 2.2 and 3 line heights. */
   stickers: Record<StickerSize, number>;
   /**
@@ -147,7 +153,7 @@ export function boardMetrics(width: number): BoardMetrics {
     column,
     narrow,
     rowBase: narrow ? 40 : 48,
-    caption: { size, line },
+    caption: { size, line, lines: CAPTION_LINES },
     stickers: {
       small: Math.round(line * 1.6),
       medium: Math.round(line * 2.2),
@@ -185,6 +191,8 @@ export type BoardPiece = {
   label: LabelStyle;
   /** A day of the month before or after, shown in a month's first or last row: drawn at half strength. */
   muted: boolean;
+  /** Its words' type: the board's, or the size a person set (review). */
+  type: { size: number; line: number; lines: number };
   /** The label runs past the lane's right line, into empty bands of the lanes beside it. */
   overhang: boolean;
   /** How many whole lanes past its own the label reaches (a phone's labels, up to two). */
@@ -233,6 +241,8 @@ export type BoardPiece = {
 export type PhotoCard = {
   path: string;
   rippleId: string;
+  /** Its side: the recipe's, or a share of the lane set by hand (review). */
+  size: number;
   /** Upward from the area's bottom: a card behind peeks above the one in front. */
   dy: number;
 };
@@ -370,6 +380,27 @@ export function extentOf(piece: BoardPiece): Box[] {
     .map((box) => onBoard(piece, box));
 }
 
+/**
+ * A piece's own metrics: the board's, with the type a person set for its
+ * label (review) — 10–18px, scaled on a phone by the board's base ratio,
+ * never under 10 — its line, its stickers and how many lines it wraps to.
+ */
+function metricsFor(m: BoardMetrics, fontSize: number | undefined): BoardMetrics {
+  if (fontSize === undefined) return m;
+  const ratio = m.narrow ? BASE_PX.narrow / BASE_PX.wide : 1;
+  const size = Math.max(FLOOR_PX, Math.round(fontSize * ratio));
+  const line = size + 3;
+  return {
+    ...m,
+    caption: { size, line, lines: size >= FOUR_LINES_FROM_PX ? 4 : CAPTION_LINES },
+    stickers: {
+      small: Math.round(line * 1.6),
+      medium: Math.round(line * 2.2),
+      big: Math.round(line * 3),
+    },
+  };
+}
+
 /** What a day decides for each of its items before they are shaped. */
 type Plan = { recipe: Recipe; label: LabelStyle; size: StickerSize | null };
 
@@ -391,12 +422,20 @@ function planDay(cards: Card[]): Plan[] {
       recipes.push('C');
       return;
     }
+    // Set by hand (review): Inline is A's icon, off is B's sticker; the rules step aside.
+    const inline = card.layout?.icon?.inline;
+    if (inline !== undefined) {
+      recipes.push(inline ? 'A' : 'B');
+      return;
+    }
     const drawn: Recipe = draw(card.splash.id, 'recipe', 2) === 0 ? 'A' : 'B';
     const above = recipes[at - 1];
     recipes.push(drawn === above ? (drawn === 'A' ? 'B' : 'A') : drawn);
   });
   if (cards.length >= 2 && !recipes.includes('B')) {
-    const at = recipes.indexOf('A');
+    const at = recipes.findIndex(
+      (r, i) => r === 'A' && cards[i].layout?.icon?.inline === undefined,
+    );
     if (at >= 0) recipes[at] = 'B';
   }
   let lastSize: StickerSize | null = null;
@@ -425,8 +464,8 @@ function planDay(cards: Card[]): Plan[] {
 export type Measured = Record<string, number>;
 
 /** The key a measured line count is kept under. */
-export function measureKey(id: string, textW: number, indent: number): string {
-  return `${id}:${Math.round(textW)}:${Math.round(indent)}`;
+export function measureKey(id: string, textW: number, indent: number, size = 10): string {
+  return `${id}:${Math.round(textW)}:${Math.round(indent)}:${size}`;
 }
 
 /** Everything a shape needs to know about where it is going. */
@@ -447,8 +486,8 @@ type Context = {
  */
 function linesIn(card: Card, textW: number, indent: number, icon: boolean, ctx: Context): number {
   const { m } = ctx;
-  const known = ctx.measured[measureKey(card.splash.id, textW, indent)];
-  if (known) return Math.min(CAPTION_LINES, Math.max(1, known));
+  const known = ctx.measured[measureKey(card.splash.id, textW, indent, m.caption.size)];
+  if (known) return Math.min(m.caption.lines, Math.max(1, known));
   const charW = m.caption.size * CHAR_EM;
   const chars = Math.max(2, Math.floor(textW / charW));
   const length =
@@ -456,7 +495,7 @@ function linesIn(card: Card, textW: number, indent: number, icon: boolean, ctx: 
     (card.joint ? FACES_CHARS : 0) +
     (icon ? ICON_CHARS : 0) +
     Math.ceil(indent / charW);
-  return Math.min(CAPTION_LINES, Math.max(1, Math.ceil(length / chars)));
+  return Math.min(m.caption.lines, Math.max(1, Math.ceil(length / chars)));
 }
 
 /** A label's words: inside its padding, the first line apart when it is indented. */
@@ -479,7 +518,7 @@ function textOf(
 
 type Shape = Omit<
   BoardPiece,
-  'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'muted' | 'x' | 'y'
+  'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'muted' | 'type' | 'x' | 'y'
 >;
 
 /** A label's vertical padding: shallow with no fill, where it would only make gaps. */
@@ -655,16 +694,20 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
  */
 function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
   const { m, col, above } = ctx;
-  const sizes = (['big', 'medium', 'small'] as const).filter(
-    (s, at, all) => at >= all.indexOf(plan.size ?? 'small'),
-  );
+  // A size set by hand is drawn as set: no stepping down, no moving (review).
+  const handSize = card.layout?.icon?.size;
+  const sizes = handSize
+    ? [plan.size ?? 'small']
+    : (['big', 'medium', 'small'] as const).filter(
+        (s, at, all) => at >= all.indexOf(plan.size ?? 'small'),
+      );
   const places: StickerAt[] = plan.label === 'none' ? ['left'] : ['corner', 'left'];
   const aboveWords = above ? above.textBoxes.map((b) => onBoard(above, b)) : [];
   const top = above ? above.y + above.h : 0;
   let fallback: Shape | null = null;
   for (const size of sizes) {
     for (const at of places) {
-      const s = m.stickers[size];
+      const s = handSize ? Math.round(handSize * m.caption.line) : m.stickers[size];
       const half = s / 2;
       const x = col === 0 ? half : Math.max(0, Math.ceil(half - m.pad.right));
       const v = padY(plan.label, m);
@@ -707,7 +750,7 @@ function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
       };
       fallback = shape;
       const onPage = { x: ctx.col * m.column + stickerBox.x, y: top + stickerBox.y, w: s, h: s };
-      if (aboveWords.every((w) => !intersects(onPage, w))) return shape;
+      if (handSize || aboveWords.every((w) => !intersects(onPage, w))) return shape;
     }
   }
   return fallback!;
@@ -723,14 +766,20 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
   const { m, above } = ctx;
   const id = card.splash.id;
   const photos = card.photos!;
-  const size = Math.round(m.column * (C_MIN + unit(id, 'photo') * (C_MAX - C_MIN)));
-  const x = draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - size);
+  const auto = Math.round(m.column * (C_MIN + unit(id, 'photo') * (C_MAX - C_MIN)));
   const shown = photos.slice(0, PHOTOS_SHOWN);
+  // A photo's size set by hand, as a share of the lane (review); else the recipe's.
+  const sizeOf = (path: string): number => {
+    const set = card.layout?.photos?.[path]?.size;
+    return set ? Math.round(m.column * set) : auto;
+  };
+  const size = Math.max(...shown.map((p) => sizeOf(p.path)));
+  const x = draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - size);
   let dy = 0;
   const fan: PhotoCard[] = [];
   // Back to front: the last shown — the newest — is drawn last, on top.
   for (let at = shown.length - 1; at >= 0; at -= 1) {
-    fan.push({ ...shown[at], dy });
+    fan.push({ ...shown[at], size: sizeOf(shown[at].path), dy });
     dy += m.fanMin + draw(id, `fan:${at}`, m.fanMax - m.fanMin + 1);
   }
   const spread = fan.length > 0 ? fan[fan.length - 1].dy : 0;
@@ -906,8 +955,16 @@ function layoutBoard(
       const lane: BoardPiece[] = [];
       list.forEach((card, at) => {
         const plan = plans[at];
+        // Its own type, when a person set one for its label (review).
+        const pm = metricsFor(m, card.layout?.label?.fontSize);
         const shapeAt = (y0: number): Shape => {
-          const ctx: Context = { col: cell.col, m, above: lane[at - 1], room: room(y0), measured };
+          const ctx: Context = {
+            col: cell.col,
+            m: pm,
+            above: lane[at - 1],
+            room: room(y0),
+            measured,
+          };
           return plan.recipe === 'C'
             ? shapeC(card, plan, ctx)
             : plan.recipe === 'A'
@@ -925,7 +982,7 @@ function layoutBoard(
         if (hang > 0) drawn = shapeAt(top + hang);
         const ctx: Context = {
           col: cell.col,
-          m,
+          m: pm,
           above: lane[at - 1],
           room: room(top + hang - drawn.tuck),
           measured,
@@ -939,6 +996,7 @@ function layoutBoard(
           week: index,
           col: cell.col,
           label: plan.label,
+          type: pm.caption,
           muted: !cell.inMonth,
           ...shape,
           x: cell.x,

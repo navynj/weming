@@ -155,11 +155,15 @@ export function MonthBoard({
         `[data-board-piece="${piece.id}"] [data-board-text]`,
       );
       if (!text || text.scrollHeight === 0) continue;
-      const lines = Math.min(3, Math.max(1, Math.round(text.scrollHeight / metrics.caption.line)));
+      const lines = Math.min(
+        piece.type.lines,
+        Math.max(1, Math.round(text.scrollHeight / piece.type.line)),
+      );
       const key = measureKey(
         piece.id,
         piece.labelBox.w - piece.pad.left - piece.pad.right,
         piece.indent,
+        piece.type.size,
       );
       if (lines !== piece.captionLines && measured[key] !== lines) found[key] = lines;
     }
@@ -167,7 +171,7 @@ export function MonthBoard({
     // Next frame: the measurement is the browser's, read after it has drawn.
     const frame = requestAnimationFrame(() => setMeasured((current) => ({ ...current, ...found })));
     return () => cancelAnimationFrame(frame);
-  }, [layout, measured, metrics.caption.line]);
+  }, [layout, measured]);
   const photos = useBoardPhotos(layout.pieces);
   const scroller = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
