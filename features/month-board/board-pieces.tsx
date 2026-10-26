@@ -106,7 +106,7 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
   const pool = card.pools?.[0];
   if (pool !== undefined) {
     return (
-      <span data-board-pool className="ml-1 inline-flex align-middle">
+      <span data-board-pool className="ml-1 inline-flex h-[13px] items-center align-top">
         <Monogram name={pool} size="face" photo={card.poolPhoto ?? null} />
       </span>
     );
@@ -127,7 +127,7 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
         : []);
   if (faces.length === 0) return null;
   return (
-    <span data-board-faces className="ml-1 inline-flex align-middle">
+    <span data-board-faces className="ml-1 inline-flex h-[13px] items-center align-top">
       <FaceStack faces={faces} ring={ring} />
     </span>
   );
@@ -157,18 +157,32 @@ function OpenSlot({
   const mine = me !== null && awaiting.some((face) => face.authorId === me);
   const body = (
     <>
-      <FaceStack faces={awaiting} ring="ring-main-900" faded max={narrow ? 2 : 4} />
-      <span className="whitespace-nowrap">{narrow ? 'Add' : 'Add your side'}</span>
+      {/* Faces first, 16px, overlapping by 4; then the words, never under a face. */}
+      <span data-board-slot-faces className="flex shrink-0 items-center opacity-50">
+        {awaiting.slice(0, narrow ? 2 : 4).map((face, at) => (
+          <Avatar
+            key={face.authorId}
+            id={face.authorId}
+            initials={face.initials}
+            className={`text-main-900/60 ring-main-900 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#8283EE] text-[10px] leading-none ring-1 ${at > 0 ? '-ml-1' : ''}`}
+          />
+        ))}
+      </span>
+      <span data-board-slot-words className="whitespace-nowrap">
+        {narrow ? 'Add' : 'Add your side'}
+      </span>
     </>
   );
   const box = piece.slotBox!;
+  // Its content's own width: placed at its corner, as tall as its row.
   const style: CSSProperties = {
-    ...placed(box),
+    left: box.x,
+    top: box.y,
     transform: `rotate(${piece.slotRotate}deg)`,
     transformOrigin: piece.slotAt === 'right' ? 'top left' : 'top right',
   };
   const className =
-    'absolute flex items-center gap-1 overflow-hidden border-[1.5px] border-dashed border-white/80 px-1 text-[10px] leading-none text-white/80';
+    'absolute flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80';
   return mine ? (
     <button
       type="button"
@@ -343,7 +357,12 @@ export function BoardPieceView({
             }}
           >
             {piece.inlineIcon && icon ? (
-              <span aria-hidden data-board-icon className="mr-1">
+              // Held to the words' line, so it never stretches it (review).
+              <span
+                aria-hidden
+                data-board-icon
+                className="mr-1 inline-block h-[13px] align-top leading-[13px]"
+              >
                 {icon}
               </span>
             ) : null}
