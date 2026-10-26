@@ -167,6 +167,50 @@ body {
 }
 
 /*
+ * The Layout panel's sliders (review: no border on the bar): drawn by hand,
+ * since a native range draws its own bordered track. White up to the thumb
+ * (--fill, set by the slider), faint white after it; a white round thumb.
+ */
+.layout-range {
+  appearance: none;
+  height: 6px;
+  border: 0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    #fff var(--fill, 50%),
+    rgb(255 255 255 / 0.25) var(--fill, 50%)
+  );
+  cursor: pointer;
+}
+.layout-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 0;
+  background: transparent;
+}
+.layout-range::-moz-range-track {
+  height: 6px;
+  border: 0;
+  background: transparent;
+}
+.layout-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
+}
+.layout-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
+}
+
+/*
  * A live session surface: solid #0507C9 with white water in it (H15).
  * One class, so the dogfood fallback to a light band is a single edit here
  * rather than a rewrite of the components that sit on it.

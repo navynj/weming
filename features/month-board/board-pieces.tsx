@@ -522,6 +522,10 @@ export function BoardPieceView({
                 aria-hidden
                 data-board-icon
                 className={`mr-1 inline-block h-[var(--line)] align-top leading-[var(--line)] ${NO_INDENT}`}
+                // Inline it only turns, in its place on the line (review: icon tilt).
+                style={
+                  layout.icon?.tilt ? { transform: `rotate(${layout.icon.tilt}deg)` } : undefined
+                }
               >
                 {icon}
               </span>

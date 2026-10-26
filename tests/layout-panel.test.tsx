@@ -156,6 +156,17 @@ describe('the Layout panel (review)', () => {
     }
   });
 
+  it('stays open as another label is picked on the calendar', () => {
+    media(true);
+    const { container } = home([...ONE, card('s2', 'Lynn Canyon', '2026-10-22')]);
+    const panel = () => container.querySelector('[data-layout-panel]')!;
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const other = panel().getAttribute('data-layout-panel') === 's1' ? 's2' : 's1';
+    fireEvent.click(container.querySelector(`[data-board-pick="${other}"]`)!);
+    expect(panel().getAttribute('data-layout-panel')).toBe(other);
+    expect(panel().querySelector('[data-layout-body]')).not.toBeNull();
+  });
+
   it('is absent at a phone’s width, the layouts still drawn there', () => {
     media(false);
     const laid = [
@@ -204,6 +215,62 @@ describe('the Layout panel (review)', () => {
     fireEvent.click(container.querySelector('[data-layout-use-pool]')!);
     expect(reverted).toEqual(['j1']);
     expect(container.querySelector('[data-layout-source]')!.textContent).toBe('Using pool layout');
+  });
+});
+
+describe('a label’s width and style in the panel (review)', () => {
+  it('widens the label as Width moves, and swaps a joint label’s fill as Style is picked; Auto hands it back', async () => {
+    vi.useFakeTimers();
+    media(true);
+    const { container } = home([{ ...ONE[0], joint: true, layoutSource: 'pool' }]);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const label = () =>
+      container.querySelector<HTMLElement>('[data-board-piece="s1"] [data-board-label]')!;
+    const before = parseFloat(label().style.width);
+    fireEvent.change(container.querySelector('input[aria-label="Width"]')!, {
+      target: { value: '1.5' },
+    });
+    expect(parseFloat(label().style.width)).toBeGreaterThan(before);
+    const auto = label().className.includes('bg-ink') ? 'ink' : 'white';
+    const other = auto === 'ink' ? 'white' : 'ink';
+    fireEvent.click(container.querySelector(`[data-layout-choice="${other}"]`)!);
+    expect(label().className).toContain(other === 'ink' ? 'bg-ink' : 'bg-white');
+    await act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+    expect(saved.at(-1)!.patch).toEqual({ label: { width: 1.5, style: other } });
+    fireEvent.click(container.querySelector('[data-layout-control="Style"] button')!);
+    expect(label().className).toContain(auto === 'ink' ? 'bg-ink' : 'bg-white');
+  });
+
+  it('offers no Style for a label with no fill', () => {
+    media(true);
+    const { container } = home(ONE);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    expect(container.querySelector('[data-layout-control="Style"]')).toBeNull();
+  });
+
+  it('turns the icon by Icon tilt, inline or a sticker', () => {
+    media(true);
+    const { container } = home(ONE);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    fireEvent.change(container.querySelector('input[aria-label="Icon tilt"]')!, {
+      target: { value: '9' },
+    });
+    const icon = container.querySelector<HTMLElement>(
+      '[data-board-piece="s1"] [data-board-icon], [data-board-piece="s1"] [data-board-sticker]',
+    )!;
+    expect(icon.style.transform).toContain('rotate(9deg)');
+  });
+
+  it('has no border on a slider’s bar', () => {
+    media(true);
+    const { container } = home(ONE);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const range = container.querySelector<HTMLInputElement>('input[aria-label="Width"]')!;
+    expect(range.className).toContain('layout-range');
+    expect(range.style.getPropertyValue('--fill')).toMatch(/%$/);
   });
 });
 
@@ -261,6 +328,27 @@ describe('hand-set layouts on the calendar (review)', () => {
       layoutWeekBoard([{ ...ONE[0], layout: { label: { fontSize: 10 } } }], TODAY, { width: 358 })
         .pieces[0].type.size,
     ).toBeGreaterThanOrEqual(10);
+  });
+
+  it('draws a hand-set width as set, across the next lane when wider than its own, for every recipe', () => {
+    for (const layout of [
+      { label: { width: 1.5 } },
+      { label: { width: 1.5 }, icon: { inline: false } },
+      { label: { width: 0.5 }, icon: { inline: true } },
+    ] satisfies BoardLayoutJson[]) {
+      const piece = layoutWeekBoard([{ ...ONE[0], layout }], TODAY, { width: 980 }).pieces[0];
+      const column = 980 / 7;
+      expect(piece.labelBox.w).toBeCloseTo(layout.label.width * column, -1);
+    }
+  });
+
+  it('draws a joint label’s hand-set fill; a label with no fill stays so', () => {
+    for (const style of ['white', 'ink'] as const) {
+      const joint = { ...ONE[0], joint: true, layout: { label: { style } } };
+      expect(layoutWeekBoard([joint], TODAY, { width: 980 }).pieces[0].label).toBe(style);
+    }
+    const plain = { ...ONE[0], layout: { label: { style: 'ink' as const } } };
+    expect(layoutWeekBoard([plain], TODAY, { width: 980 }).pieces[0].label).toBe('none');
   });
 
   it('lets Inline pick the recipe and a hand-set size fix the sticker', () => {

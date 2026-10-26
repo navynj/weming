@@ -12,11 +12,20 @@ const y = z.number().min(-6).max(6);
 const tilt = z.number().min(-15).max(15);
 
 export const IconLayout = z
-  .object({ inline: z.boolean(), size: z.number().min(0.8).max(4), x, y })
+  .object({ inline: z.boolean(), size: z.number().min(0.8).max(4), x, y, tilt })
   .partial()
   .strict();
 export const LabelLayout = z
-  .object({ x, y, tilt, fontSize: z.number().int().min(10).max(18) })
+  .object({
+    x,
+    y,
+    tilt,
+    fontSize: z.number().int().min(10).max(18),
+    // A share of the lane, like X: narrower than it, or across the next (0027).
+    width: z.number().min(0.3).max(2),
+    // A filled label's fill (0027): white or ink. No fill is another kind of label, never a choice.
+    style: z.enum(['white', 'ink']),
+  })
   .partial()
   .strict();
 export const PhotoLayout = z

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronDown, RotateCcw } from 'lucide-react';
 
 import type { Card } from '@/features/home/grid';
@@ -53,7 +53,10 @@ function Slider({
         step={step}
         value={value ?? fallback}
         onChange={(event) => onChange(Number(event.currentTarget.value))}
-        className="min-w-0 flex-1 accent-white"
+        style={
+          { '--fill': `${(((value ?? fallback) - min) / (max - min)) * 100}%` } as CSSProperties
+        }
+        className="layout-range min-w-0 flex-1"
       />
       <span
         className={`w-16 shrink-0 text-right tabular-nums ${set ? 'text-white' : 'text-white/50'}`}
@@ -104,6 +107,64 @@ function Switch({
     </button>
   );
 }
+
+/**
+ * A few named choices for one field (review: the label's style), the set
+ * one white; Auto hands the field back to the recipe.
+ */
+function Choice<T extends string>({
+  name,
+  value,
+  options,
+  onChange,
+  onReset,
+}: {
+  name: string;
+  value: T | undefined;
+  options: readonly { value: T; label: string }[];
+  onChange: (v: T) => void;
+  onReset: () => void;
+}) {
+  const chip = (on: boolean) =>
+    `rounded-full px-2.5 py-0.5 ${on ? 'text-main-900 bg-white' : 'bg-white/15 text-white/80'}`;
+  return (
+    <div
+      data-layout-control={name}
+      role="group"
+      aria-label={name}
+      className="flex items-center gap-2 text-xs"
+    >
+      <span className="w-20 shrink-0 text-white/80">{name}</span>
+      <div className="flex flex-wrap gap-1">
+        <button
+          type="button"
+          aria-pressed={value === undefined}
+          onClick={onReset}
+          className={chip(value === undefined)}
+        >
+          Auto
+        </button>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={value === option.value}
+            data-layout-choice={option.value}
+            onClick={() => onChange(option.value)}
+            className={chip(value === option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const LABEL_STYLE_CHOICES = [
+  { value: 'white', label: 'White' },
+  { value: 'ink', label: 'Ink' },
+] as const;
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -236,9 +297,42 @@ export function LayoutPanel({
                 />
               </>
             ) : null}
+            {/* Inline or a sticker, it turns. */}
+            <Slider
+              name="Icon tilt"
+              value={icon.tilt}
+              fallback={0}
+              min={-15}
+              max={15}
+              step={1}
+              unit={degrees}
+              onChange={(v) => onEdit({ icon: { tilt: v } })}
+              onReset={() => onEdit({}, ['icon.tilt'])}
+            />
           </Group>
 
           <Group title="Label">
+            {/* Only a filled label — a joint splash's — has a fill to choose. */}
+            {card.joint ? (
+              <Choice
+                name="Style"
+                value={label.style}
+                options={LABEL_STYLE_CHOICES}
+                onChange={(v) => onEdit({ label: { style: v } })}
+                onReset={() => onEdit({}, ['label.style'])}
+              />
+            ) : null}
+            <Slider
+              name="Width"
+              value={label.width}
+              fallback={1}
+              min={0.3}
+              max={2}
+              step={0.05}
+              unit={lanes}
+              onChange={(v) => onEdit({ label: { width: v } })}
+              onReset={() => onEdit({}, ['label.width'])}
+            />
             <Slider
               name="Text size"
               value={label.fontSize}

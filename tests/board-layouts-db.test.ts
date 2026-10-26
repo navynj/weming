@@ -191,6 +191,14 @@ describe('a pool layout', () => {
       { colour: 'red' },
       { label: { colour: 'red' } },
       { icon: { inline: 'yes' } },
+      { label: { width: 0.2 } },
+      { label: { width: 2.5 } },
+      { label: { style: 'blue' } },
+      { label: { style: 'none' } },
+      { label: { style: 1 } },
+      { icon: { width: 1 } },
+      { icon: { tilt: 16 } },
+      { wave: { style: 'ink' } },
     ]) {
       const refused = await set(ana, bad);
       expect(refused.error, JSON.stringify(bad)).not.toBeNull();
@@ -203,6 +211,18 @@ describe('a pool layout', () => {
         })
       ).error,
     ).toBeNull();
+  });
+
+  it('takes a label’s width and style and an icon’s tilt (0027), and clears them by path', async () => {
+    expect((await set(ana, { icon: { tilt: -8 } })).error).toBeNull();
+    await set(ana, {}, { clear: ['icon.tilt'] });
+    expect((await read(ana, 'pool'))[0].layout.icon).toBeUndefined();
+    expect((await set(ana, { label: { width: 1.5, style: 'ink' } })).error).toBeNull();
+    expect((await read(ana, 'pool'))[0].layout.label).toMatchObject({ width: 1.5, style: 'ink' });
+    await set(ana, {}, { clear: ['label.width', 'label.style'] });
+    const label = (await read(ana, 'pool'))[0].layout.label;
+    expect(label.width).toBeUndefined();
+    expect(label.style).toBeUndefined();
   });
 });
 

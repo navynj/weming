@@ -356,10 +356,9 @@ export function PoolGround({
             low={boardView}
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
-          {/* Desktop only (review): the top card's layout, the pool's, under the stack. */}
+          {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
           {boardView && wide && topCard ? (
             <LayoutPanel
-              key={topCard.splash.id}
               card={topCard}
               layout={drafts.shown(topCard.splash.id).layout}
               source={drafts.shown(topCard.splash.id).source}
