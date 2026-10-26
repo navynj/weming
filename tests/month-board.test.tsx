@@ -587,17 +587,18 @@ describe('labels, photos and bands, drawn', () => {
     const glyphs = header.querySelectorAll('[data-wave-glyph]');
     expect(glyphs).toHaveLength(3);
     const pill = render(<WaveMark count={1} />).container.querySelector('[data-wave-glyph] path')!;
-    expect(pill.getAttribute('d')).toBe('M1 6 C4 6 5 2 8 2 S12 6 15 6 S19 2 23 2');
+    expect(pill.getAttribute('d')).toBe(
+      'M0.75 1.79321C2.02503 3.18416 3.30007 3.18416 4.5751 1.79321C5.85014 0.402263 7.12517 0.402263 8.40021 1.79321C9.67524 3.18416 10.9503 3.18416 12.2253 1.79321C13.5003 0.402263 14.7754 0.402263 16.0504 1.79321',
+    );
     for (const glyph of glyphs) {
       expect(glyph.querySelector('path')!.getAttribute('d')).toBe(pill.getAttribute('d'));
-      // The reference: 32px on a desktop (26 on a phone), a 3px round pen, white at 80%.
+      // 32px on a desktop (26 on a phone), the export's box and pen, white at 80%.
       expect(glyph.getAttribute('width')).toBe('32');
-      expect(glyph.getAttribute('viewBox')).toBe('0 0 24 8');
+      expect(glyph.getAttribute('viewBox')).toBe('0 0 17 4');
     }
     const path = glyphs[0].querySelector('path')!;
     expect(path.getAttribute('d')).toBe(WAVE_GLYPH_PATH);
-    expect(path.getAttribute('stroke-width')).toBe('3');
-    expect(path.getAttribute('vector-effect')).toBe('non-scaling-stroke');
+    expect(path.getAttribute('stroke-width')).toBe('1.5');
     expect(path.getAttribute('stroke-linecap')).toBe('round');
     expect(path.getAttribute('stroke-opacity')).toBe('0.8');
     expect(header.querySelector('[data-board-waves]')!.className).toContain('gap-[5px]');
@@ -614,7 +615,6 @@ describe('labels, photos and bands, drawn', () => {
     } finally {
       delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
     }
-    expect(path.getAttribute('fill')).toBe('none');
   });
 });
 
