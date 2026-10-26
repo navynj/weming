@@ -803,7 +803,7 @@ function Mark({
         {card.pools && card.pools.length > 0 ? (
           // Shared to a pool (H23): its monogram on the disc's shoulder.
           <span className="absolute -top-1.5 -right-2.5" data-mark-pool>
-            <Monogram name={card.pools[0]} size="chip" />
+            <Monogram name={card.pools[0]} size="chip" photo={card.poolPhoto ?? null} />
           </span>
         ) : null}
       </button>

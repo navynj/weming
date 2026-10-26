@@ -133,7 +133,7 @@ export function CardFace({
         <span className="flex shrink-0 items-center gap-1">
           {/* Where the post is shared (H23): one monogram per pool. */}
           {(card.pools ?? []).map((pool) => (
-            <Monogram key={pool} name={pool} size="chip" />
+            <Monogram key={pool} name={pool} size="chip" photo={card.poolPhoto ?? null} />
           ))}
           {lane ? <OutlineChip icon={lane.icon} name={lane.name} /> : null}
         </span>

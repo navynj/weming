@@ -30,7 +30,9 @@ import {
   HEADER_PX,
   layoutMonthBoard,
   layoutWeekBoard,
+  measureKey,
   MONTH_HEADER_PX,
+  type Measured,
   shiftMonth,
   weekOf,
 } from './layout';
@@ -132,15 +134,45 @@ export function MonthBoard({
     setWeek(weekOf(monthKey(today) === month ? today : `${month}-01`));
   }
   const [room, setRoom] = useState<number | null>(null);
+  // The words' lines as the browser wrapped them, fed back so every label hugs them (review).
+  const [measured, setMeasured] = useState<Measured>({});
   // Same data, same width, same page, same board: laid out once per each.
   const layout = useMemo(
     () =>
       span === 'week'
-        ? layoutWeekBoard(cards, week, { width: room ?? 980 })
-        : layoutMonthBoard(cards, month, { width: room ?? 980 }),
-    [cards, span, week, month, room],
+        ? layoutWeekBoard(cards, week, { width: room ?? 980, measured })
+        : layoutMonthBoard(cards, month, { width: room ?? 980, measured }),
+    [cards, span, week, month, room, measured],
   );
   const { metrics } = layout;
+
+  // Measure each title's lines as drawn — unclamped, its full height — and
+  // keep any the estimate got wrong, by piece, room and indent; the next
+  // layout uses them. Settles in a pass or two: a width, once measured,
+  // keeps its count.
+  const canvas = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = canvas.current;
+    if (!el) return;
+    const found: Measured = {};
+    for (const piece of layout.pieces) {
+      const text = el.querySelector<HTMLElement>(
+        `[data-board-piece="${piece.id}"] [data-board-text]`,
+      );
+      if (!text || text.scrollHeight === 0) continue;
+      const lines = Math.min(3, Math.max(1, Math.round(text.scrollHeight / metrics.caption.line)));
+      const key = measureKey(
+        piece.id,
+        piece.labelBox.w - piece.pad.left - piece.pad.right,
+        piece.indent,
+      );
+      if (lines !== piece.captionLines && measured[key] !== lines) found[key] = lines;
+    }
+    if (Object.keys(found).length === 0) return;
+    // Next frame: the measurement is the browser's, read after it has drawn.
+    const frame = requestAnimationFrame(() => setMeasured((current) => ({ ...current, ...found })));
+    return () => cancelAnimationFrame(frame);
+  }, [layout, measured, metrics.caption.line]);
   const photos = useBoardPhotos(layout.pieces);
   const scroller = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
@@ -243,6 +275,8 @@ export function MonthBoard({
   };
 
   const empty = layout.pieces.length === 0 && layout.tapes.length === 0;
+  const lastRow = layout.weeks[layout.weeks.length - 1];
+  const gridBottom = lastRow ? lastRow.y + lastRow.h : layout.height;
   const ripple = (id: string): number | null =>
     ring && ring.id === id && !reducedMotion ? ring.seq : null;
   const plunge = (id: string): boolean => dropped === id && !reducedMotion;
@@ -311,6 +345,9 @@ export function MonthBoard({
         style={{ touchAction: 'pan-y' }}
       >
         <div
+          // One grid per page: a new week or month is a new grid, the last one gone with it.
+          key={`${span}:${layout.key}`}
+          ref={canvas}
           data-board-canvas
           className="relative min-h-full text-white select-none"
           style={{
@@ -319,16 +356,6 @@ export function MonthBoard({
             visibility: room === null ? 'hidden' : undefined,
           }}
         >
-          {/* Thin column rules only, the lanes; a month's rows are read from the day numbers. */}
-          {Array.from({ length: COLUMNS - 1 }, (_, at) => (
-            <span
-              key={at}
-              aria-hidden
-              className="absolute inset-y-0 w-px bg-white/20"
-              style={{ left: (at + 1) * metrics.column }}
-            />
-          ))}
-
           {layout.headers.map((header, col) => (
             <span
               key={header.day}
@@ -391,15 +418,25 @@ export function MonthBoard({
                       className={`absolute inset-x-0 flex flex-col items-center justify-start pt-1 text-sm/5 font-medium tabular-nums ${cell.inMonth ? '' : 'text-white/40'}`}
                       style={{ top: 0, height: DAY_NUMBER_PX }}
                     >
+                      {/* No waves under a month's numbers (review). */}
                       <span className="h-5">{Number(cell.day.slice(8))}</span>
-                      <span className="flex items-start pt-1.5">
-                        <DayWaves count={cell.count} narrow={metrics.narrow} />
-                      </span>
                     </button>
                   ) : null}
                 </div>
               ))}
             </div>
+          ))}
+
+          {/* The lane lines, once for the whole grid, from the header to its bottom edge:
+              over the rows' water, under every item, so an overhang lies across them. */}
+          {Array.from({ length: COLUMNS - 1 }, (_, at) => (
+            <span
+              key={at}
+              aria-hidden
+              data-board-rule={at + 1}
+              className="absolute top-0 w-px bg-white/20"
+              style={{ left: (at + 1) * metrics.column, height: gridBottom }}
+            />
           ))}
 
           {empty ? (
@@ -412,28 +449,44 @@ export function MonthBoard({
             </p>
           ) : null}
 
-          {layout.tapes.map((tape) => (
-            <BoardTapeView
-              key={tape.key}
-              tape={tape}
-              lanes={lanes}
-              metrics={metrics}
-              onPick={onPick}
-              ripple={ripple(tape.id)}
-            />
-          ))}
-          {layout.pieces.map((piece) => (
-            <BoardPieceView
-              key={piece.id}
-              piece={piece}
-              photos={photos}
-              lanes={lanes}
-              metrics={metrics}
-              onPick={onPick}
-              onWrite={onWrite}
-              ripple={ripple(piece.id)}
-              plunge={plunge(piece.id)}
-            />
+          {/* Each row's items and bands, clipped to the row: nothing leaves its week. */}
+          {layout.weeks.map((week) => (
+            <div
+              key={week.index}
+              data-board-row-items={week.index}
+              className="absolute inset-x-0 overflow-hidden"
+              style={{ top: week.y, height: week.h }}
+            >
+              <div className="absolute inset-x-0" style={{ top: -week.y, height: layout.height }}>
+                {layout.tapes
+                  .filter((tape) => tape.week === week.index)
+                  .map((tape) => (
+                    <BoardTapeView
+                      key={tape.key}
+                      tape={tape}
+                      lanes={lanes}
+                      metrics={metrics}
+                      onPick={onPick}
+                      ripple={ripple(tape.id)}
+                    />
+                  ))}
+                {layout.pieces
+                  .filter((piece) => piece.week === week.index)
+                  .map((piece) => (
+                    <BoardPieceView
+                      key={piece.id}
+                      piece={piece}
+                      photos={photos}
+                      lanes={lanes}
+                      metrics={metrics}
+                      onPick={onPick}
+                      onWrite={onWrite}
+                      ripple={ripple(piece.id)}
+                      plunge={plunge(piece.id)}
+                    />
+                  ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

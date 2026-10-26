@@ -8,6 +8,8 @@ export type JointOnHome = {
   poolId: string;
   /** Null once I cannot read the pool (I left it). */
   poolName: string | null;
+  /** Its photo (0024), while I am in it. */
+  poolPhoto?: string | null;
   /** The lane of my most recent ripple on it; null when that ripple has none (0016). */
   latestLane: string | null;
   /** Its pool lane, while I can read it. */
@@ -29,6 +31,7 @@ export function withPoolBadge(card: Card, joint: JointOnHome | undefined): Card 
   return {
     ...card,
     pools: name ? [name] : [],
+    poolPhoto: name ? (joint.poolPhoto ?? null) : null,
     joint: true,
     href: poolSplashHref(joint.poolId, card.splash.id),
     menu: { pin: false, delete: false },

@@ -172,10 +172,12 @@ export async function HomeScreen({
     }
   }
   // A pool I am in shows its photo (0024); one I left keeps the neutral tile.
+  // A joint splash's pool shows its photo on Home too, where its mark is (review).
+  const jointPools = new Set(jointPool.values());
   const columnPhotos = await signPoolPhotos(
     supabase,
     pools
-      .filter((p) => ownPools.includes(p.id))
+      .filter((p) => ownPools.includes(p.id) || jointPools.has(p.id))
       .map((p) => ({ id: p.id, version: p.photoVersion })),
   );
   const poolColumns: GridColumn[] = ownPools.map((id) => {
@@ -241,6 +243,7 @@ export async function HomeScreen({
           ? {
               poolId: pool,
               poolName: poolName.get(pool) ?? null,
+              poolPhoto: columnPhotos[pool] ?? null,
               latestLane: latestLane.get(summary.id) ?? null,
               poolLane: jointLane.get(summary.id) ?? null,
             }

@@ -26,6 +26,7 @@ import {
   HEADER_PX,
   intersects,
   layoutMonthBoard,
+  measureKey,
   layoutWeekBoard,
   onBoard,
   weekTitle,
@@ -189,11 +190,16 @@ function readable(layout: BoardLayout): void {
     expect(piece.x).toBe(cell.x);
     const label = piece.labelBox;
     expect(label.h).toBe(piece.pad.top + piece.captionLines * caption.line + piece.pad.bottom);
-    if (piece.recipe === 'A') {
-      expect(label.x + label.w).toBe(piece.overhang ? column + label.x : column);
-    }
-    if (piece.recipe === 'B') expect(label.x + label.w).toBe(column);
-    if (piece.recipe === 'C') expect(label.x + label.w).toBeLessThanOrEqual(column);
+    // A label ends at its lane's line, or past it into empty lanes (A's shift, a phone's span).
+    const end = label.x + label.w;
+    if (piece.span > 0) expect(end).toBeCloseTo(column * (1 + piece.span), 5);
+    else if (piece.recipe === 'A' && piece.overhang) expect(end).toBe(column + label.x);
+    else if (piece.recipe === 'C') expect(end).toBeLessThanOrEqual(column + 0.01);
+    else expect(end).toBeCloseTo(column, 5);
+    // No fill, no box: 4px above and below; a filled one 8 and 12 (a sticker hanging low may deepen it).
+    const v = piece.label === 'none' ? { top: 4, bottom: 4 } : { top: 8, bottom: 12 };
+    expect(piece.pad.top).toBe(v.top);
+    expect(piece.pad.bottom).toBeGreaterThanOrEqual(v.bottom);
     expect(piece.y + piece.h).toBeLessThanOrEqual(week.y + week.h);
   }
   const elements: { id: string; kind: string; box: Box }[] = [];
@@ -203,14 +209,17 @@ function readable(layout: BoardLayout): void {
       elements.push({ id: piece.id, kind: 'photo', box: onBoard(piece, piece.photoBox) });
     if (piece.stickerBox)
       elements.push({ id: piece.id, kind: 'sticker', box: onBoard(piece, piece.stickerBox) });
+    if (piece.slotBounds)
+      elements.push({ id: piece.id, kind: 'slot', box: onBoard(piece, piece.slotBounds) });
   }
   for (const tape of layout.tapes) elements.push({ id: tape.key, kind: 'band', box: tape });
   for (const piece of layout.pieces) {
-    const words = onBoard(piece, piece.textBox);
-    for (const el of elements) {
-      // A label holds its own words, and its own sticker sits beside them.
-      if (el.id === piece.id && el.kind === 'label') continue;
-      expect(intersects(words, el.box), `${piece.id} words × ${el.id} ${el.kind}`).toBe(false);
+    for (const words of piece.textBoxes.map((b) => onBoard(piece, b))) {
+      for (const el of elements) {
+        // A label holds its own words; its own sticker and slot sit beside them, never on them.
+        if (el.id === piece.id && el.kind === 'label') continue;
+        expect(intersects(words, el.box), `${piece.id} words × ${el.id} ${el.kind}`).toBe(false);
+      }
     }
   }
   const labels = elements.filter((e) => e.kind === 'label');
@@ -222,12 +231,7 @@ function readable(layout: BoardLayout): void {
     }
   }
   for (const piece of layout.pieces.filter((p) => p.tuck > 0)) {
-    expect(piece.tuck).toBe(C_TUCK_PX);
-    expect(C_TUCK_PX).toBeLessThan(layout.metrics.pad.bottom);
-  }
-  if (layout.pieces.some((p) => p.stickerBox)) {
-    expect(layout.metrics.sticker / 2).toBeLessThanOrEqual(layout.metrics.pad.bottom);
-    expect(layout.metrics.sticker / 2).toBeLessThanOrEqual(layout.metrics.pad.right);
+    expect(piece.tuck).toBeLessThanOrEqual(C_TUCK_PX);
   }
 }
 
@@ -402,11 +406,8 @@ describe('the month board', () => {
     const outside = container.querySelector('[data-board-cell="2026-09-27"]')!;
     expect(outside.hasAttribute('data-in-month')).toBe(false);
     expect(outside.querySelector('[data-board-day]')!.className).toContain('text-white/40');
-    expect(
-      container
-        .querySelector('[data-board-day="2026-10-20"] [data-board-waves]')!
-        .getAttribute('data-lines'),
-    ).toBe('3');
+    // No waves under a month's numbers (review).
+    expect(container.querySelector('[data-board-day] [data-board-waves]')).toBeNull();
     fireEvent.click(container.querySelector('[data-board-day="2026-10-07"]')!);
     expect(container.querySelector('[data-month-board]')!.getAttribute('data-board-span')).toBe(
       'week',
@@ -471,16 +472,102 @@ describe('three recipes, always readable (review)', () => {
     }
   });
 
-  it('centres B’s sticker on the label’s top-left corner, the words past its inner half', () => {
+  it('hangs B’s sticker on a filled label’s top-left corner, or left of a bare label’s first line, never on words', () => {
     const layout = layoutMonthBoard(BUSY, '2026-10', { width: 728 });
-    const s = layout.metrics.sticker;
-    for (const piece of layout.pieces.filter((p) => p.recipe === 'B')) {
+    const bs = layout.pieces.filter((p) => p.recipe === 'B');
+    expect(bs.some((p) => p.stickerAt === 'left')).toBe(true);
+    for (const piece of bs) {
+      const s = layout.metrics.stickers[piece.stickerSize!];
       const sticker = piece.stickerBox!;
+      expect(sticker.w).toBe(s);
       expect(sticker.x + s / 2).toBe(piece.labelBox.x);
-      expect(sticker.y + s / 2).toBe(piece.labelBox.y);
-      expect(piece.textBox.x).toBeGreaterThanOrEqual(sticker.x + s);
-      expect(piece.x + sticker.x).toBeGreaterThanOrEqual(0);
+      if (piece.stickerAt === 'corner') {
+        expect(piece.label).not.toBe('none');
+        expect(sticker.y + s / 2).toBe(piece.labelBox.y);
+        // Room on the first line only: the words beyond it start at the padding.
+        expect(piece.indent).toBeGreaterThan(0);
+      } else {
+        expect(sticker.y + s / 2).toBe(
+          piece.labelBox.y + piece.pad.top + layout.metrics.caption.line / 2,
+        );
+        expect(piece.textBoxes[0].x).toBeGreaterThanOrEqual(sticker.x + s);
+      }
+      // The sticker stays on the board, and over the lane before by at most its right padding.
+      expect(piece.x + sticker.x).toBeGreaterThanOrEqual(piece.col === 0 ? 0 : -12);
     }
+  });
+
+  it('sizes B’s stickers 1.6, 2.2 or 3 lines, never the same twice in a row in a day, big once at most', () => {
+    const layout = layoutMonthBoard(BUSY, '2026-10', { width: 728 });
+    expect(layout.metrics.stickers).toEqual({ small: 21, medium: 29, big: 39 });
+    const byDay = new Map<string, typeof layout.pieces>();
+    for (const p of layout.pieces) byDay.set(p.day, [...(byDay.get(p.day) ?? []), p]);
+    for (const pieces of byDay.values()) {
+      const sizes = pieces.filter((p) => p.recipe === 'B').map((p) => p.stickerSize);
+      for (let at = 1; at < sizes.length; at += 1) expect(sizes[at]).not.toBe(sizes[at - 1]);
+      expect(sizes.filter((s) => s === 'big').length).toBeLessThanOrEqual(
+        pieces.length >= 2 ? 1 : 0,
+      );
+    }
+    expect(new Set(layout.pieces.map((p) => p.stickerSize).filter(Boolean)).size).toBeGreaterThan(
+      1,
+    );
+  });
+
+  it('gives a bare label 4px above and below, a filled one 8 and 12', () => {
+    const layout = layoutWeekBoard(WEEK, TODAY, { width: 728 });
+    const bare = layout.pieces.find((p) => p.label === 'none' && p.recipe === 'A');
+    if (bare) expect([bare.pad.top, bare.pad.bottom]).toEqual([4, 4]);
+    const joint = layoutWeekBoard([{ ...WEEK[0], joint: true }], TODAY, { width: 728 }).pieces[0];
+    expect(joint.pad.top).toBe(8);
+    expect(joint.pad.bottom).toBeGreaterThanOrEqual(12);
+  });
+
+  it('on a phone, reaches a label across empty lanes beside it, up to two, so short words read whole', () => {
+    // Sunday alone, Monday and Tuesday empty.
+    const lone = layoutWeekBoard(
+      [card('alone', 'Lynn Canyon - Twin Falls Trail', '2026-10-18')],
+      TODAY,
+      {
+        width: 358,
+      },
+    );
+    const piece = lone.pieces[0];
+    expect(piece.span).toBe(2);
+    expect(piece.labelBox.x + piece.labelBox.w).toBeGreaterThan(lone.metrics.column);
+    readable(lone);
+    // Beside a busy lane it stops at its own line.
+    const crowded = layoutWeekBoard(
+      [
+        card('left', 'Lynn Canyon - Twin Falls Trail', '2026-10-18'),
+        card('right', 'Hoppers', '2026-10-19'),
+      ],
+      TODAY,
+      { width: 358 },
+    );
+    expect(crowded.pieces.find((p) => p.id === 'left')!.span).toBe(0);
+    // An A label starts at its line on a phone.
+    for (const p of layoutWeekBoard(BUSY, '2026-10-01', { width: 358 }).pieces.filter(
+      (p) => p.recipe === 'A',
+    )) {
+      expect(p.labelBox.x).toBe(0);
+    }
+  });
+
+  it('hugs a title exactly as the browser wraps it: a measured line count replaces the estimate', () => {
+    const before = layoutWeekBoard(WEEK, TODAY, { width: 728 }).pieces.find(
+      (p) => p.id === 'lynn',
+    )!;
+    const key = measureKey(
+      'lynn',
+      before.labelBox.w - before.pad.left - before.pad.right,
+      before.indent,
+    );
+    const after = layoutWeekBoard(WEEK, TODAY, { width: 728, measured: { [key]: 1 } }).pieces.find(
+      (p) => p.id === 'lynn',
+    )!;
+    expect(after.captionLines).toBe(1);
+    expect(after.labelBox.h).toBe(after.pad.top + 13 + after.pad.bottom);
   });
 
   it('sizes C’s card at 55–70% of the lane, left or right, tucked 10px into the padding above, caption centred', () => {
@@ -503,7 +590,7 @@ describe('three recipes, always readable (review)', () => {
           p.y + p.h === piece.y + piece.tuck &&
           p !== piece,
       );
-      expect(piece.tuck).toBe(above ? C_TUCK_PX : 0);
+      expect(piece.tuck).toBe(above ? Math.min(C_TUCK_PX, above.pad.bottom) : 0);
     }
   });
 
@@ -512,7 +599,9 @@ describe('three recipes, always readable (review)', () => {
     const layout = layoutWeekBoard(days, '2026-10-01', { width: 358 });
     const thu = layout.pieces.filter((p) => p.day === '2026-10-01');
     expect(thu.length).toBeGreaterThan(2);
-    expect(thu[0].y).toBe(HEADER_PX);
+    // Directly under the header — or as far below it as a first sticker hangs up, so it stays in its row.
+    const hang = thu[0].stickerBox ? Math.ceil(-thu[0].stickerBox.y) : 0;
+    expect(thu[0].y).toBe(HEADER_PX + Math.max(0, hang));
     for (let at = 1; at < thu.length; at += 1) {
       expect(thu[at].y).toBe(thu[at - 1].y + thu[at - 1].h - thu[at].tuck);
     }
@@ -726,24 +815,44 @@ describe('an open joint splash (meaning is shape)', () => {
     awaiting,
   });
 
-  it('carries an empty slot inline after its words, with the faded faces of who has not written', () => {
+  it('sticks a dashed note on the label’s corner, outside its words, the label no taller for it', () => {
     const { container } = board([joint([{ authorId: 'u-jo', initials: 'JO' }])]);
     const slot = container.querySelector<HTMLElement>('[data-board-slot="jam"]')!;
     expect(slot.className).toContain('border-dashed');
-    expect(slot.textContent).toBe('JO');
+    expect(slot.className).toContain('border-[1.5px]');
+    expect(slot.className).not.toMatch(/rounded/);
+    expect(slot.textContent).toBe('JOAdd your side');
     expect(slot.querySelector('.opacity-50')).not.toBeNull();
+    // Someone else's to fill: a mark, not a button.
     expect(slot.tagName).toBe('SPAN');
-    // Inline after the words, in the same line box: it wraps under only when the line is full.
-    expect(slot.closest('[data-board-text]')).not.toBeNull();
-    expect(slot.className).toContain('inline-flex');
-    expect(slot.className).toContain('h-[13px]');
-    const laid = layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, {
+    expect(slot.closest('[data-board-label]')).toBeNull();
+    expect(slot.style.transform).toMatch(/rotate\((-?[3-6](\.\d+)?)deg\)/);
+    const open = layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, {
       width: 980,
     }).pieces[0];
-    expect(laid.slot).toBe(true);
-    // Its room is counted: the label is sized for the words and the slot together.
     const closed = layoutWeekBoard([joint([])], TODAY, { width: 980 }).pieces[0];
-    expect(laid.captionLines).toBeGreaterThanOrEqual(closed.captionLines);
+    expect(open.labelBox.h).toBe(closed.labelBox.h);
+    for (const words of open.textBoxes) expect(intersects(words, open.slotBounds!)).toBe(false);
+    expect(open.slotBounds!.y).toBeGreaterThanOrEqual(
+      open.labelBox.y + open.labelBox.h - open.pad.bottom,
+    );
+    // Stuck on the bottom-right corner where the lanes to the right are empty.
+    expect(open.slotAt).toBe('right');
+    // Beside a lane taken at its height, on the bottom-left instead.
+    const NEXT_DOOR = ['n1', 'n2', 'n3'].map((id) =>
+      card(id, 'Next door, all afternoon', '2026-10-22'),
+    );
+    const beside = layoutWeekBoard(
+      [joint([{ authorId: 'u-jo', initials: 'JO' }]), ...NEXT_DOOR],
+      TODAY,
+      { width: 358 },
+    ).pieces.find((p) => p.id === 'jam')!;
+    expect(beside.slotAt).toBe('left');
+    readable(
+      layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }]), ...NEXT_DOOR], TODAY, {
+        width: 358,
+      }),
+    );
   });
 
   it('reads "Add your side" when I am missing, and opens the splash to write', () => {
@@ -758,5 +867,93 @@ describe('an open joint splash (meaning is shape)', () => {
     const { container } = board([joint([])]);
     expect(container.querySelector('[data-board-slot]')).toBeNull();
     expect(container.querySelector('[data-board-piece="jam"] [data-board-faces]')).not.toBeNull();
+  });
+});
+
+describe('the month grid (review)', () => {
+  it('has exactly the weeks holding a day of September 2026, from the week of the 1st, the days around muted', () => {
+    const layout = layoutMonthBoard(BUSY, '2026-09', { width: 728 });
+    expect(layout.weeks).toHaveLength(5);
+    expect(layout.weeks[0].cells.some((c) => c.day === '2026-09-01')).toBe(true);
+    // The last row carries Oct 1–3 (busy in BUSY): their items at half strength.
+    const october = layout.pieces.filter((p) => p.day.startsWith('2026-10'));
+    expect(october.length).toBeGreaterThan(0);
+    for (const p of october) expect(p.muted).toBe(true);
+    for (const p of layout.pieces.filter((p) => p.day.startsWith('2026-09')))
+      expect(p.muted).toBe(false);
+    readable(layout);
+  });
+
+  it('draws nothing above the grid’s top, clips every row, and keeps one grid through two month turns', () => {
+    window.localStorage.setItem('weming.board-span', 'month');
+    let month = '2026-10';
+    const view = board(BUSY, { month, onMonth: (m) => (month = m) });
+    const grid = () => view.container.querySelectorAll('[data-board-canvas]');
+    for (const next of ['2026-09', '2026-08']) {
+      view.rerender(tree(BUSY, { month: next }));
+      expect(grid()).toHaveLength(1);
+    }
+    const rows = [...view.container.querySelectorAll<HTMLElement>('[data-board-row-items]')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.className).toContain('overflow-hidden');
+      expect(parseFloat(row.style.top)).toBeGreaterThanOrEqual(28);
+    }
+  });
+
+  it('draws each lane line once, continuous from the header to the grid’s bottom edge', () => {
+    for (const span of ['month', 'week']) {
+      cleanup();
+      window.localStorage.setItem('weming.board-span', span);
+      const { container } = board(BUSY, { month: '2026-10' });
+      const rules = container.querySelectorAll<HTMLElement>('[data-board-rule]');
+      expect(rules).toHaveLength(6);
+      const rows = [...container.querySelectorAll<HTMLElement>('[data-board-week-row]')];
+      const last = rows[rows.length - 1];
+      const bottom = parseFloat(last.style.top) + parseFloat(last.style.height);
+      for (const rule of rules) {
+        expect(parseFloat(rule.style.top || '0')).toBe(0);
+        expect(parseFloat(rule.style.height)).toBe(bottom);
+      }
+      // Over the rows' water, under the items.
+      const canvas = container.querySelector('[data-board-canvas]')!;
+      const order = [...canvas.children];
+      expect(order.indexOf(rules[0])).toBeGreaterThan(order.indexOf(rows[rows.length - 1]));
+      expect(order.indexOf(rules[0])).toBeLessThan(
+        order.indexOf(container.querySelector('[data-board-row-items]')!),
+      );
+    }
+  });
+});
+
+describe('a pool’s splash on Home (review)', () => {
+  const joint: Card = {
+    ...card('ours', 'Ours', '2026-10-21'),
+    joint: true,
+    writers: [{ authorId: 'u-mk', initials: 'MK' }],
+  };
+
+  it('shows its pool’s monogram on Home where its faces would be, and no face', () => {
+    const { container } = board([{ ...joint, pools: ['Our Pool'], poolPhoto: null }]);
+    const piece = container.querySelector('[data-board-piece="ours"]')!;
+    expect(piece.querySelector('[data-board-pool]')!.textContent).toBe('OU');
+    expect(piece.querySelector('[data-board-faces]')).toBeNull();
+    expect(piece.querySelector('[data-avatar-photo]')).toBeNull();
+  });
+
+  it('draws its photo there when the pool has one', () => {
+    const { container } = board([
+      { ...joint, pools: ['Our Pool'], poolPhoto: 'https://signed/pool.webp' },
+    ]);
+    expect(container.querySelector<HTMLImageElement>('[data-board-pool] img')!.src).toBe(
+      'https://signed/pool.webp',
+    );
+  });
+
+  it('shows its faces inside the pool', () => {
+    const { container } = board([joint]);
+    const piece = container.querySelector('[data-board-piece="ours"]')!;
+    expect(piece.querySelector('[data-board-faces]')).not.toBeNull();
+    expect(piece.querySelector('[data-board-pool]')).toBeNull();
   });
 });
