@@ -17,15 +17,9 @@ vi.mock('@/lib/media', () => ({
 }));
 
 import { placeCard, type Card, type CardPhoto } from '@/features/home/grid';
-import {
-  CELL_PAD_PX,
-  COLUMN_PX,
-  DAY_NUMBER_PX,
-  layoutMonthBoard,
-  ROW_BASE_PX,
-  type BoardLayout,
-} from '@/features/month-board/layout';
+import { DAY_NUMBER_PX, layoutMonthBoard, type BoardLayout } from '@/features/month-board/layout';
 import { MonthBoard } from '@/features/month-board/month-board';
+import { splashShape } from '@/features/month-board/splash-shape';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { summarizeSplash, type Splash, type SplashBlock } from '@/features/splash/summary';
 import { written } from './written-on';
@@ -144,7 +138,7 @@ describe('the month board’s layout', () => {
         piece.x,
         piece.y,
       ]);
-      expect(Math.abs(piece.rotate)).toBeLessThanOrEqual(4);
+      expect(Math.abs(piece.rotate)).toBeLessThanOrEqual(2);
     }
   });
 
@@ -181,8 +175,9 @@ function within(layout: BoardLayout): void {
     const week = layout.weeks[piece.week];
     const cell = week.cells[piece.col];
     expect(cell.day).toBe(piece.day);
-    expect(piece.x).toBeGreaterThanOrEqual(cell.x + CELL_PAD_PX);
-    expect(piece.x + piece.w).toBeLessThanOrEqual(cell.x + COLUMN_PX - CELL_PAD_PX);
+    const { pad, column } = layout.metrics;
+    expect(piece.x).toBeGreaterThanOrEqual(cell.x + pad);
+    expect(piece.x + piece.w).toBeLessThanOrEqual(cell.x + column - pad);
     // Never over the day number, never past the row's foot.
     expect(piece.y).toBeGreaterThanOrEqual(week.y + DAY_NUMBER_PX);
     expect(piece.y + piece.h).toBeLessThanOrEqual(week.y + week.h);
@@ -201,13 +196,13 @@ describe('a day with overflow', () => {
     for (const week of layout.weeks) {
       const bottoms = layout.pieces
         .filter((p) => p.week === week.index)
-        .map((p) => p.y + p.h - week.y + CELL_PAD_PX);
-      expect(week.h).toBe(Math.max(ROW_BASE_PX, ...bottoms));
+        .map((p) => p.y + p.h - week.y + layout.metrics.pad);
+      expect(week.h).toBe(Math.max(layout.metrics.rowBase, ...bottoms));
     }
     const busyRow = layout.weeks.find((w) => w.cells.some((c) => c.day === '2026-10-07'))!;
-    expect(busyRow.h).toBeGreaterThan(ROW_BASE_PX);
+    expect(busyRow.h).toBeGreaterThan(layout.metrics.rowBase);
     const quietRow = layout.weeks.find((w) => w.cells.some((c) => c.day === '2026-10-28'))!;
-    expect(quietRow.h).toBe(ROW_BASE_PX);
+    expect(quietRow.h).toBe(layout.metrics.rowBase);
   });
 
   it('stacks a day’s pieces by time, each overlapping the last by at most 12px', () => {
@@ -405,8 +400,16 @@ describe('an open joint splash (meaning is shape)', () => {
   });
 });
 
-describe('the 10px floor', () => {
-  it('never scales the board so far that its least type renders under 10px', () => {
+describe('fitting the width, with nothing to pan (review)', () => {
+  it('keeps every piece inside its cell at a phone’s width and at a wide one', () => {
+    for (const width of [358, 500, 728, 980]) {
+      const layout = layoutMonthBoard([...OCTOBER, ...BUSY], '2026-10', { width });
+      expect(layout.width).toBe(width);
+      within(layout);
+    }
+  });
+
+  it('lays the board out at the room’s own width, at 1x: its 12px type renders at 12px', () => {
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
       configurable: true,
       get: () => 358,
@@ -414,10 +417,132 @@ describe('the 10px floor', () => {
     try {
       const { container } = board();
       const canvas = container.querySelector<HTMLElement>('[data-board-canvas]')!;
-      const scale = Number(/scale\(([\d.]+)\)/.exec(canvas.style.transform)![1]);
-      expect(12 * scale).toBeGreaterThanOrEqual(10);
+      expect(canvas.style.width).toBe('358px');
+      expect(canvas.style.transform).toBe('scale(1)');
     } finally {
       delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+
+  it('scales up past 980px rather than widening the layout', () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 1225,
+    });
+    try {
+      const { container } = board();
+      const canvas = container.querySelector<HTMLElement>('[data-board-canvas]')!;
+      expect(canvas.style.width).toBe('980px');
+      expect(canvas.style.transform).toBe('scale(1.25)');
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+});
+
+describe('masking tape (review)', () => {
+  it('rounds a tape only where its range starts and ends, square where it runs on', () => {
+    const { container } = board();
+    const tapes = [...container.querySelectorAll('[data-board-tape="trip"]')];
+    expect(
+      tapes.map((t) => [t.hasAttribute('data-starts-here'), t.hasAttribute('data-ends-here')]),
+    ).toEqual([
+      [true, false],
+      [false, false],
+      [false, true],
+    ]);
+    expect(tapes[0].className).toContain('rounded-l-full');
+    expect(tapes[0].className).not.toContain('rounded-r-full');
+    expect(tapes[1].className).not.toMatch(/rounded-[lr]-full/);
+    expect(tapes[2].className).toContain('rounded-r-full');
+  });
+});
+
+describe('labels as splashes (review)', () => {
+  const withRipples = (c: Card, count: number): Card => ({ ...c, splash: { ...c.splash, count } });
+  // One day, a label of 1, 2, 3 and 5 ripples, and a photo card.
+  const DAY = [
+    withRipples(card('one', 'One ripple', '2026-10-15'), 1),
+    withRipples(card('two-r', 'Two ripples', '2026-10-15'), 2),
+    withRipples(card('three', 'Three ripples', '2026-10-15'), 3),
+    withRipples(card('five', 'Five ripples', '2026-10-15'), 5),
+    withRipples(card('pic', 'A photo', '2026-10-16', { photos: 2 }), 2),
+  ];
+
+  it('outlines a white or ink label with a wobbling blob, and a label with no fill not at all', () => {
+    const { container } = board(DAY);
+    for (const piece of container.querySelectorAll('[data-board-piece]')) {
+      const id = piece.getAttribute('data-board-piece')!;
+      const blob = piece.querySelector(`[data-board-splash="${id}"] [data-board-blob]`);
+      expect(blob !== null).toBe(piece.getAttribute('data-label') !== 'none');
+    }
+    // Every style shows up on this day.
+    expect(
+      new Set(
+        [...container.querySelectorAll('[data-board-piece]')].map((p) =>
+          p.getAttribute('data-label'),
+        ),
+      ).size,
+    ).toBeGreaterThan(1);
+  });
+
+  it('draws one ring per ripple, three at most, and no shadow', () => {
+    const { container } = board(DAY);
+    const rings = (id: string) =>
+      container.querySelectorAll(`[data-board-splash="${id}"] [data-board-ring]`).length;
+    expect([rings('one'), rings('two-r'), rings('three'), rings('five')]).toEqual([1, 2, 3, 3]);
+    for (const el of container.querySelectorAll<HTMLElement>('[data-board-piece] *')) {
+      expect(el.className.toString()).not.toMatch(/shadow-(?!\[0_1px_4px)/);
+    }
+  });
+
+  it('throws two or three drops of 3 to 6px just off the edge', () => {
+    const { container } = board(DAY);
+    for (const splash of container.querySelectorAll('[data-board-splash]')) {
+      const drops = splash.querySelectorAll('[data-board-droplet]');
+      expect(drops.length).toBeGreaterThanOrEqual(2);
+      expect(drops.length).toBeLessThanOrEqual(3);
+      for (const drop of drops) {
+        const r = Number(drop.getAttribute('r'));
+        expect(r * 2).toBeGreaterThanOrEqual(3);
+        expect(r * 2).toBeLessThanOrEqual(6);
+      }
+    }
+  });
+
+  it('gives a photo card its rings and drops, without an outline', () => {
+    const { container } = board(DAY);
+    const photos = container.querySelector('[data-board-splash="pic:photos"]')!;
+    expect(photos.querySelectorAll('[data-board-ring]')).toHaveLength(2);
+    expect(photos.querySelectorAll('[data-board-droplet]').length).toBeGreaterThanOrEqual(2);
+    expect(photos.querySelector('[data-board-blob]')).toBeNull();
+  });
+
+  it('makes the same splash for the same id every time, and another for another id', () => {
+    const a = splashShape('same', 100, 40, { filled: true, ripples: 2 });
+    expect(splashShape('same', 100, 40, { filled: true, ripples: 2 })).toBe(a);
+    const fresh = board(DAY).container.querySelector('[data-board-splash="one"] [data-board-blob]');
+    const d = fresh?.getAttribute('d') ?? null;
+    cleanup();
+    const again = board(DAY).container.querySelector('[data-board-splash="one"] [data-board-blob]');
+    expect(again?.getAttribute('d') ?? null).toBe(d);
+    expect(splashShape('other', 100, 40, { filled: true, ripples: 2 }).blob).not.toBe(a.blob);
+  });
+
+  it('wobbles the edge by 2 to 3px and no more', () => {
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      const { blob } = splashShape(id, 100, 40, { filled: true, ripples: 1 });
+      const points = [...blob!.matchAll(/(-?[\d.]+) (-?[\d.]+)(?=C|Z)/g)].map(([, x, y]) => [
+        Number(x),
+        Number(y),
+      ]);
+      for (const [x, y] of points) {
+        // Outside the box, by at most twice the amplitude (the wobble rides outward).
+        expect(x).toBeGreaterThanOrEqual(-6.1);
+        expect(x).toBeLessThanOrEqual(106.1);
+        expect(y).toBeGreaterThanOrEqual(-6.1);
+        expect(y).toBeLessThanOrEqual(46.1);
+      }
     }
   });
 });

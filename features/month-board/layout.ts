@@ -2,32 +2,33 @@ import type { Card } from '@/features/home/grid';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
+import { seedOf } from './layout-seed';
+
 /**
- * The month board's geometry (Board view, phase 1), in logical pixels at a
- * fixed width the frame scales to fit: the board is one composed artifact,
- * so it never reflows — a phone zooms into it instead.
+ * The month board's geometry (Board view), in logical pixels. A room wider
+ * than 980px lays the month out at 980 and scales it up to fit; a narrower
+ * one lays it out at exactly its own width (review: no panning, fit the
+ * width), so the board's 12px words render at 12px and never under the
+ * app's 10px floor. The type stays its size at every width; the room around
+ * it (columns, pieces, stickers, fans) shrinks with the width. One width,
+ * one board: the same data at the same width always lays out the same.
  */
 export const BOARD_PX = 980;
+/** Narrower than any phone's content width: below it the clamp, not the room, decides. */
+export const BOARD_MIN_PX = 280;
 export const COLUMNS = 7;
-export const COLUMN_PX = BOARD_PX / COLUMNS;
 /** The first column's weekday: 0 is Sunday. */
 export const WEEK_START = 0;
 
-/** The title band and the weekday headers above the first week row. */
-export const TITLE_PX = 104;
+/** The weekday headers above the first week row, under the title band (see `BoardMetrics.title`). */
 export const WEEKDAY_PX = 32;
-export const HEAD_PX = TITLE_PX + WEEKDAY_PX;
-/** A week row's least height; a busy day grows its whole row. */
-export const ROW_BASE_PX = 120;
 /** The day number's band at the top of a cell: nothing is placed over it. */
 export const DAY_NUMBER_PX = 30;
-/** A cell's inner margin, wide enough that a piece's rotation stays inside. */
-export const CELL_PAD_PX = 10;
 const FOOT_PX = 32;
 
 export const TAPE_PX = 26;
 const TAPE_GAP_PX = 4;
-const TAPE_INSET_PX = 6;
+const TAPE_INSET_PX = 4;
 
 /** Most a piece slips under the one above it. */
 export const OVERLAP_MAX_PX = 12;
@@ -36,34 +37,86 @@ const OVERLAP_MIN_PX = 4;
 /** A caption: 12px words on a 15px line, two lines at most. */
 export const CAPTION_LINE_PX = 15;
 const CAPTION_LINES = 2;
+/** About how wide one 12px Poppins character is, for the line estimate. */
+const CHAR_PX = 6.6;
 
-/**
- * A photo card's frame: at most this wide and this tall, its aspect clamped
- * between 4:5 and 5:4 once the image says what it is. Smaller than the spec's
- * ~160px long side, which is wider than a 140px column can hold with a fan.
- */
-export const PHOTO_W_PX = 96;
-export const PHOTO_H_PX = 116;
 export const PHOTO_PAD_PX = 4;
 /** At most this many photo cards; past it the top card carries "+N". */
 export const PHOTOS_SHOWN = 3;
-/** Each card behind the top one sits this much further up and right. */
-const FAN_MIN_PX = 6;
-const FAN_MAX_PX = 10;
 /** How far the label rides up over the photos' bottom edge. */
 export const LABEL_OVERLAP_PX = 14;
-/** The sticker is the icon at 2.5x the caption's size, overhanging a corner of its label. */
-export const STICKER_PX = 30;
-export const STICKER_OVERHANG_PX = 12;
-export const LABEL_PX = 108;
 export const LABEL_PAD_TOP_PX = 12;
 export const LABEL_PAD_BOTTOM_PX = 6;
-/** How many caption characters one line holds, for the height estimate. */
-const LABEL_CHARS = 13;
 /** With photos the small icon leads the label's words. */
 const ICON_CHARS = 2;
 /** Room the joint faces take after a caption, in characters. */
 const FACES_CHARS = 4;
+
+/** The sizes that follow the board's width; everything else above is fixed. */
+export type BoardMetrics = {
+  width: number;
+  /** The title band: lower on a narrow board, which gives its height to the days (review). */
+  title: number;
+  /** Where the first week row begins: the title band and the weekday headers. */
+  head: number;
+  column: number;
+  /** A cell's inner margin, wide enough that a piece's rotation stays inside. */
+  pad: number;
+  /** A week row's least height; a busy day grows its whole row. */
+  rowBase: number;
+  pieceW: number;
+  labelW: number;
+  /** A pill's side padding: the words clear its round ends. */
+  labelPadX: number;
+  labelChars: number;
+  /** The sticker is the icon large, overhanging a corner of its label. */
+  sticker: number;
+  stickerOverhang: number;
+  /**
+   * A photo card's frame at most: its aspect clamped between 4:5 and 5:4 once
+   * the image says what it is. Smaller than the spec's ~160px long side,
+   * which is wider than a column can hold with a fan.
+   */
+  photoW: number;
+  photoH: number;
+  /** Each card behind the top one sits this much further up and right. */
+  fanMin: number;
+  fanMax: number;
+};
+
+/** The metrics at a width, clamped to 280–980. */
+export function boardMetrics(width: number = BOARD_PX): BoardMetrics {
+  const w = Math.round(Math.min(BOARD_PX, Math.max(BOARD_MIN_PX, width)));
+  const k = w / BOARD_PX;
+  const column = w / COLUMNS;
+  const pad = Math.max(3, Math.round(10 * k));
+  const room = Math.max(0, Math.round(4 * k));
+  const pieceW = Math.floor(column - pad * 2 - room);
+  const labelW = pieceW - Math.max(4, Math.round(8 * k));
+  const labelPadX = Math.max(7, Math.round(12 * k));
+  const fanMax = Math.max(4, Math.round(10 * k));
+  const photoW = pieceW - fanMax * 2;
+  const sticker = Math.max(22, Math.round(30 * k));
+  const title = w < 600 ? 64 : 104;
+  return {
+    width: w,
+    title,
+    head: title + WEEKDAY_PX,
+    column,
+    pad,
+    rowBase: Math.max(96, Math.round(120 * k)),
+    pieceW,
+    labelW,
+    labelPadX,
+    labelChars: Math.max(4, Math.floor((labelW - labelPadX * 2) / CHAR_PX)),
+    sticker,
+    stickerOverhang: Math.round(sticker * 0.4),
+    photoW,
+    photoH: Math.round(photoW * 1.2),
+    fanMin: Math.max(3, Math.round(6 * k)),
+    fanMax,
+  };
+}
 
 /** A label's background: none (white words on the water), a white fill, or an ink fill. */
 export type LabelStyle = 'none' | 'white' | 'ink';
@@ -90,7 +143,9 @@ export type BoardPiece = {
   /** Photos beyond those shown: the top card's "+N". */
   morePhotos: number;
   /** The label's box within the piece. */
-  labelBox: { x: number; y: number; w: number };
+  labelBox: { x: number; y: number; w: number; h: number };
+  /** With photos, the photo area's box within the piece: the fan sits on its bottom edge. */
+  photoBox: { x: number; y: number; w: number; h: number } | null;
   /** An open joint splash: the slot's top within the piece, under the label; null when complete or not joint. */
   slotY: number | null;
   corner: StickerCorner;
@@ -120,6 +175,10 @@ export type BoardTape = {
   week: number;
   startCol: number;
   endCol: number;
+  /** The range begins in this row: the tape's start is rounded. Else it runs in from the row before. */
+  startsHere: boolean;
+  /** The range ends in this row: the tape's end is rounded. Else it runs on into the next. */
+  endsHere: boolean;
   rotate: number;
   x: number;
   y: number;
@@ -128,6 +187,7 @@ export type BoardTape = {
 };
 
 export type BoardLayout = {
+  metrics: BoardMetrics;
   month: string;
   title: string;
   weekdays: string[];
@@ -138,24 +198,16 @@ export type BoardLayout = {
   tapes: BoardTape[];
 };
 
-/** FNV-1a: the stable seed every hand-placed choice comes from. */
-export function seedOf(id: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < id.length; i += 1) {
-    hash ^= id.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
+export { seedOf };
 
 /** A second, independent draw from the same id. */
 function draw(id: string, salt: string, buckets: number): number {
   return seedOf(`${salt}:${id}`) % buckets;
 }
 
-/** -4 to 4 degrees, in tenths: hand-placed, and the same on every render. */
+/** -2 to 2 degrees, in tenths: hand-placed, and the same on every render. */
 export function rotationOf(id: string): number {
-  return (draw(id, 'rotate', 81) - 40) / 10;
+  return (draw(id, 'rotate', 41) - 20) / 10;
 }
 
 /**
@@ -241,7 +293,7 @@ function boardDays(month: string, weekStart: number): IsoDate[][] {
 
 type Shape = Pick<
   BoardPiece,
-  'w' | 'h' | 'captionLines' | 'fan' | 'morePhotos' | 'labelBox' | 'slotY'
+  'w' | 'h' | 'captionLines' | 'fan' | 'morePhotos' | 'labelBox' | 'photoBox' | 'slotY'
 >;
 
 /** Room for the open slot, under the label, when the splash is waiting on someone. */
@@ -250,24 +302,27 @@ function withSlot(card: Card, shape: Omit<Shape, 'slotY'>): Shape {
   return { ...shape, slotY: shape.h + SLOT_GAP_PX, h: shape.h + SLOT_GAP_PX + SLOT_PX };
 }
 
-const PIECE_W_PX = LABEL_PX + STICKER_OVERHANG_PX - 4;
-
 /**
  * A piece's shape. With photos: up to three cards fanned up and to the right
  * from the bottom-left of a photo area tall enough for a portrait card, the
  * label riding over their bottom edge; without: the label, its sticker
  * overhanging a top corner.
  */
-function pieceShape(card: Card, corner: StickerCorner, label: LabelStyle): Shape {
-  return withSlot(card, bareShape(card, corner, label));
+function pieceShape(card: Card, corner: StickerCorner, label: LabelStyle, m: BoardMetrics): Shape {
+  return withSlot(card, bareShape(card, corner, label, m));
 }
 
-function bareShape(card: Card, corner: StickerCorner, label: LabelStyle): Omit<Shape, 'slotY'> {
+function bareShape(
+  card: Card,
+  corner: StickerCorner,
+  label: LabelStyle,
+  m: BoardMetrics,
+): Omit<Shape, 'slotY'> {
   const id = card.splash.id;
   const photos = card.photos ?? [];
   const caption = captionOf(card) + (card.joint ? ' '.repeat(FACES_CHARS) : '');
   if (photos.length > 0) {
-    const lines = linesFor(caption + ' '.repeat(ICON_CHARS), LABEL_CHARS);
+    const lines = linesFor(caption + ' '.repeat(ICON_CHARS), m.labelChars);
     const shown = photos.slice(0, PHOTOS_SHOWN);
     let dx = 0;
     let dy = 0;
@@ -275,39 +330,43 @@ function bareShape(card: Card, corner: StickerCorner, label: LabelStyle): Omit<S
     // Back to front: the last shown — the newest — is drawn last, on top.
     for (let at = shown.length - 1; at >= 0; at -= 1) {
       fan.push({ ...shown[at], rotate: rotationOf(`${id}:photo:${at}`), dx, dy });
-      const step = FAN_MIN_PX + draw(id, `fan:${at}`, FAN_MAX_PX - FAN_MIN_PX + 1);
+      const step = m.fanMin + draw(id, `fan:${at}`, m.fanMax - m.fanMin + 1);
       dx += step;
       dy += step;
     }
     // `fan` is front to back; the deepest card's offset is the area's extra room.
     const spread = fan.length > 0 ? fan[fan.length - 1].dx : 0;
     // The frame includes its padding; the fan's spread is room above it.
-    const area = PHOTO_H_PX + spread;
+    const area = m.photoH + spread;
     const labelH = LABEL_PAD_BOTTOM_PX * 2 + lines * CAPTION_LINE_PX;
     // A filled label rides over the photos' bottom edge; words with no fill
     // would be lost on a photo, so they sit just under it, as a caption.
     const labelY = label === 'none' ? area : area - LABEL_OVERLAP_PX;
     return {
-      w: PIECE_W_PX,
+      w: m.pieceW,
       h: labelY + labelH,
       captionLines: lines,
       fan: fan.reverse(),
       morePhotos: photos.length - shown.length,
-      labelBox: { x: (PIECE_W_PX - LABEL_PX) / 2, y: labelY, w: LABEL_PX },
+      labelBox: { x: (m.pieceW - m.labelW) / 2, y: labelY, w: m.labelW, h: labelH },
+      photoBox: { x: 0, y: 0, w: m.photoW + spread, h: area },
     };
   }
-  const lines = linesFor(caption, LABEL_CHARS);
+  const lines = linesFor(caption, m.labelChars);
+  const labelH = LABEL_PAD_TOP_PX + lines * CAPTION_LINE_PX + LABEL_PAD_BOTTOM_PX;
   return {
-    w: PIECE_W_PX,
-    h: STICKER_OVERHANG_PX + LABEL_PAD_TOP_PX + lines * CAPTION_LINE_PX + LABEL_PAD_BOTTOM_PX,
+    w: m.pieceW,
+    h: m.stickerOverhang + labelH,
     captionLines: lines,
     fan: [],
     morePhotos: 0,
     labelBox: {
-      x: corner === 'left' ? PIECE_W_PX - LABEL_PX : 0,
-      y: STICKER_OVERHANG_PX,
-      w: LABEL_PX,
+      x: corner === 'left' ? m.pieceW - m.labelW : 0,
+      y: m.stickerOverhang,
+      w: m.labelW,
+      h: labelH,
     },
+    photoBox: null,
   };
 }
 
@@ -323,8 +382,9 @@ function bareShape(card: Card, corner: StickerCorner, label: LabelStyle): Omit<S
 export function layoutMonthBoard(
   cards: Card[],
   month: string,
-  weekStart: number = WEEK_START,
+  { width = BOARD_PX, weekStart = WEEK_START }: { width?: number; weekStart?: number } = {},
 ): BoardLayout {
+  const m = boardMetrics(width);
   const weeks = boardDays(month, weekStart);
   const inMonth = (day: IsoDate): boolean => monthKey(day) === month;
   const firstDay = `${month}-01`;
@@ -362,14 +422,14 @@ export function layoutMonthBoard(
   const pieces: BoardPiece[] = [];
   const tapes: BoardTape[] = [];
   const rows: BoardWeek[] = [];
-  let y = HEAD_PX;
+  let y = m.head;
 
   weeks.forEach((days, index) => {
     const cells: BoardCell[] = days.map((day, col) => ({
       day,
       inMonth: inMonth(day),
       col,
-      x: col * COLUMN_PX,
+      x: col * m.column,
     }));
 
     // Tapes: the range's days within this row and this month, packed into lanes.
@@ -395,10 +455,12 @@ export function layoutMonthBoard(
         week: index,
         startCol,
         endCol,
+        startsHere: cols[0].day === (span.start < firstDay ? firstDay : span.start),
+        endsHere: cols[cols.length - 1].day === (span.end > lastDay ? lastDay : span.end),
         // Tapes lie flatter than pieces: a long strip at 4° would leave its row.
         rotate: rotationOf(`${card.splash.id}:${index}`) / 4,
-        x: startCol * COLUMN_PX + TAPE_INSET_PX,
-        w: (endCol - startCol + 1) * COLUMN_PX - TAPE_INSET_PX * 2,
+        x: startCol * m.column + TAPE_INSET_PX,
+        w: (endCol - startCol + 1) * m.column - TAPE_INSET_PX * 2,
         h: TAPE_PX,
       });
     }
@@ -408,7 +470,7 @@ export function layoutMonthBoard(
     });
 
     // Pieces: down their own cell, each slipping a little under the last.
-    let tallest = ROW_BASE_PX;
+    let tallest = m.rowBase;
     for (const cell of cells) {
       const list = cell.inMonth ? (byDay.get(cell.day) ?? []) : [];
       let top = y + DAY_NUMBER_PX + tapeBlock;
@@ -421,9 +483,9 @@ export function layoutMonthBoard(
         const drawn = labelStyleOf(id);
         const label = drawn === above ? nextLabelStyle(drawn) : drawn;
         above = label;
-        const shape = pieceShape(card, corner, label);
+        const shape = pieceShape(card, corner, label, m);
         const { w, h } = shape;
-        const room = COLUMN_PX - CELL_PAD_PX * 2 - w;
+        const room = m.column - m.pad * 2 - w;
         const overlap =
           at === 0 ? 0 : OVERLAP_MIN_PX + draw(id, 'overlap', OVERLAP_MAX_PX - OVERLAP_MIN_PX + 1);
         const nudge = at === 0 ? draw(id, 'nudge', 5) : 0;
@@ -439,14 +501,14 @@ export function layoutMonthBoard(
           corner,
           rotate: rotationOf(id),
           ...shape,
-          x: cell.x + CELL_PAD_PX + (room > 0 ? draw(id, 'offset', room + 1) : 0),
+          x: cell.x + m.pad + (room > 0 ? draw(id, 'offset', Math.floor(room) + 1) : 0),
           y: pieceY,
           w,
           h,
         });
         top = pieceY + h;
       });
-      tallest = Math.max(tallest, top - y + CELL_PAD_PX, DAY_NUMBER_PX + tapeBlock + CELL_PAD_PX);
+      tallest = Math.max(tallest, top - y + m.pad, DAY_NUMBER_PX + tapeBlock + m.pad);
     }
     rows.push({ index, y, h: tallest, cells });
     y += tallest;
@@ -454,10 +516,11 @@ export function layoutMonthBoard(
 
   const weekdays = Array.from({ length: COLUMNS }, (_, i) => WEEKDAYS[(i + weekStart) % 7]);
   return {
+    metrics: m,
     month,
     title: boardTitle(month),
     weekdays,
-    width: BOARD_PX,
+    width: m.width,
     height: y + FOOT_PX,
     weeks: rows,
     pieces,

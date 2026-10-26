@@ -289,7 +289,8 @@ export function PoolGround({
             </p>
           ) : null}
 
-          {pinnedStrip('phone')}
+          {/* On a phone the Board takes the pinned strip's height (review). */}
+          {boardView ? null : pinnedStrip('phone')}
 
           {shown.length === 0 && !boardView ? (
             <p data-pool-empty className="px-6 pt-6 text-sm/relaxed text-white/80">
@@ -338,6 +339,7 @@ export function PoolGround({
             pinnedIds={pinnedIds}
             onPin={pin}
             onDelete={remove}
+            low={boardView}
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
           <GroundFoot

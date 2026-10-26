@@ -13,16 +13,16 @@ import { Avatar } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 import type { SignedMedia } from '@/lib/media';
 
+import { splashShape } from './splash-shape';
+
 import {
   captionOf,
   LABEL_OVERLAP_PX,
   LABEL_PAD_BOTTOM_PX,
   LABEL_PAD_TOP_PX,
-  PHOTO_H_PX,
   PHOTO_PAD_PX,
-  PHOTO_W_PX,
   SLOT_PX,
-  STICKER_PX,
+  type BoardMetrics,
   type BoardPiece,
   type PhotoCard,
   type BoardTape,
@@ -34,6 +34,8 @@ type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 /** What a piece needs besides its place: the lanes its icon falls back to, and what a tap does. */
 type Shared = {
   lanes: Lanes;
+  /** The sizes that follow the board's width. */
+  metrics: BoardMetrics;
   /** Brings the post's card to the top of the stack, as a mark does in the Lane view. */
   onPick: (id: string) => void;
   /** Swallows the click that ends a pan or a pinch, so moving the board never picks a post. */
@@ -56,11 +58,81 @@ function placed(box: {
   };
 }
 
+/** The words' colour; the fill is the splash drawn beneath them (`SplashLayer`). */
 const LABEL_CLASS: Record<LabelStyle, string> = {
   none: 'text-white',
-  white: 'bg-white text-main-900 rounded-md',
-  ink: 'bg-ink text-white rounded-md',
+  white: 'text-main-900',
+  ink: 'text-white',
 };
+/** The splash's fill, and its drops': the label's own colour, white drops for a label with none. */
+const FILL_CLASS: Record<LabelStyle, string> = {
+  none: 'fill-white',
+  white: 'fill-white',
+  ink: 'fill-ink',
+};
+
+type Box = { x: number; y: number; w: number; h: number };
+
+/**
+ * The splash a label or a photo fan sits in (review): thin rings beneath it,
+ * one per ripple (three at most), white at 25%; two or three drops just
+ * outside its edge; and for a filled label, the wobbling outline that is its
+ * fill. Paths come from `splashShape`, once per splash. No shadow.
+ */
+function SplashLayer({
+  id,
+  box,
+  style,
+  ripples,
+  outline,
+}: {
+  id: string;
+  box: Box;
+  style: LabelStyle;
+  ripples: number;
+  /** The label draws its blob; a photo fan only its rings and drops. */
+  outline: boolean;
+}) {
+  const shape = splashShape(id, box.w, box.h, {
+    filled: outline && style !== 'none',
+    ripples,
+  });
+  return (
+    <svg
+      aria-hidden
+      data-board-splash={id}
+      width={box.w}
+      height={box.h}
+      viewBox={`0 0 ${box.w} ${box.h}`}
+      className="pointer-events-none absolute overflow-visible"
+      style={{ left: box.x, top: box.y }}
+    >
+      {shape.rings.map((ring, at) => (
+        <ellipse
+          key={at}
+          data-board-ring
+          cx={ring.cx}
+          cy={ring.cy}
+          rx={ring.rx}
+          ry={ring.ry}
+          className="fill-none stroke-white/25"
+          strokeWidth={1}
+        />
+      ))}
+      {shape.blob ? <path data-board-blob d={shape.blob} className={FILL_CLASS[style]} /> : null}
+      {shape.droplets.map((drop, at) => (
+        <circle
+          key={at}
+          data-board-droplet
+          cx={drop.cx}
+          cy={drop.cy}
+          r={drop.r}
+          className={FILL_CLASS[style]}
+        />
+      ))}
+    </svg>
+  );
+}
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {
   none: 'ring-main-900',
@@ -183,15 +255,17 @@ function PhotoCardView({
   url,
   areaH,
   more,
+  metrics,
 }: {
   photo: PhotoCard;
   url: string | null | undefined;
   areaH: number;
   more: number;
+  metrics: BoardMetrics;
 }) {
   const [ratio, setRatio] = useState(1);
-  const innerW = PHOTO_W_PX - PHOTO_PAD_PX * 2;
-  const innerH = PHOTO_H_PX - PHOTO_PAD_PX * 2;
+  const innerW = metrics.photoW - PHOTO_PAD_PX * 2;
+  const innerH = metrics.photoH - PHOTO_PAD_PX * 2;
   const w = ratio >= 1 ? innerW : Math.min(innerW, innerH * ratio);
   const h = ratio >= 1 ? innerW / ratio : innerH;
   return (
@@ -254,6 +328,7 @@ export function BoardPieceView({
   piece,
   photos,
   lanes,
+  metrics,
   onPick,
   onWrite,
   onClickCapture,
@@ -283,6 +358,15 @@ export function BoardPieceView({
         data-board-pick={piece.id}
         className="absolute inset-0 block text-left"
       >
+        {piece.photoBox ? (
+          <SplashLayer
+            id={`${piece.id}:photos`}
+            box={piece.photoBox}
+            style={piece.label}
+            ripples={card.splash.count}
+            outline={false}
+          />
+        ) : null}
         {piece.fan.map((photo, at) => (
           <PhotoCardView
             key={photo.path}
@@ -290,8 +374,16 @@ export function BoardPieceView({
             url={photos[photo.path]}
             areaH={piece.labelBox.y + (piece.label === 'none' ? 0 : LABEL_OVERLAP_PX)}
             more={at === top ? piece.morePhotos : 0}
+            metrics={metrics}
           />
         ))}
+        <SplashLayer
+          id={piece.id}
+          box={piece.labelBox}
+          style={piece.label}
+          ripples={card.splash.count}
+          outline
+        />
         <span
           data-board-label
           className={`absolute block ${LABEL_CLASS[piece.label]}`}
@@ -301,8 +393,8 @@ export function BoardPieceView({
             width: piece.labelBox.w,
             paddingTop: pictured ? LABEL_PAD_BOTTOM_PX : LABEL_PAD_TOP_PX,
             paddingBottom: LABEL_PAD_BOTTOM_PX,
-            paddingLeft: piece.label === 'none' ? 2 : 10,
-            paddingRight: piece.label === 'none' ? 2 : 10,
+            paddingLeft: piece.label === 'none' ? 2 : metrics.labelPadX,
+            paddingRight: piece.label === 'none' ? 2 : metrics.labelPadX,
           }}
         >
           <span className={CAPTION_CLASS}>
@@ -323,9 +415,9 @@ export function BoardPieceView({
             style={{
               top: 0,
               [left ? 'left' : 'right']: 0,
-              width: STICKER_PX,
-              height: STICKER_PX,
-              fontSize: STICKER_PX,
+              width: metrics.sticker,
+              height: metrics.sticker,
+              fontSize: metrics.sticker,
             }}
           >
             {icon}
@@ -356,7 +448,13 @@ export function BoardTapeView({
       data-board-tape={tape.id}
       data-board-week={tape.week}
       // White at 20% over the water: translucent tape, white words.
-      className="absolute flex items-center gap-1 bg-white/20 px-2 text-left text-xs font-medium text-white"
+      data-starts-here={tape.startsHere ? '' : undefined}
+      data-ends-here={tape.endsHere ? '' : undefined}
+      // Masking tape: round only where the range truly starts and ends; a
+      // cut where it runs on into the next week row stays square.
+      className={`absolute flex items-center gap-1 bg-white/20 px-2.5 text-left text-xs font-medium text-white ${
+        tape.startsHere ? 'rounded-l-full' : ''
+      } ${tape.endsHere ? 'rounded-r-full' : ''}`}
       style={placed(tape)}
     >
       {icon ? <span aria-hidden>{icon}</span> : null}

@@ -316,7 +316,8 @@ export function HomeGround({
             </p>
           ) : null}
 
-          {pinnedStrip('phone')}
+          {/* On a phone the Board takes the pinned strip's height (review). */}
+          {boardView ? null : pinnedStrip('phone')}
           {boardView ? (
             // In the grid's place, the stack beside or beneath it as in the
             // Lane view: a tap brings the post's card to the top.
@@ -363,6 +364,7 @@ export function HomeGround({
               pinnedIds={pinnedIds}
               onPin={pin}
               onDelete={remove}
+              low={boardView}
             />
           ) : (
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
