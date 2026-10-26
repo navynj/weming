@@ -95,12 +95,13 @@ function FaceStack({
 }
 
 /**
- * What parts the words from the faces or the monogram after them: a space,
- * not a margin (review). A space where the line breaks is dropped, so the
- * mark starts a wrapped line flush at the padding; a margin stayed, and
- * pushed it in from the left.
+ * What parts the words from the faces or the monogram after them: an en
+ * space (half an em, 5px at 10px — review: "give some gap"), not a margin.
+ * The line may break after it, and then it hangs at the end of the line
+ * before, so the mark starts a wrapped line flush at the padding; a margin
+ * stayed, and pushed it in from the left.
  */
-const SEPARATOR = ' ';
+const SEPARATOR = '\u2002';
 
 /**
  * The first line's indent (a corner sticker's room) is inherited: an
