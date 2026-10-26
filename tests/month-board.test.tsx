@@ -143,18 +143,10 @@ type Props = {
   dropped?: string | null;
   month?: string;
   onMonth?: (month: string) => void;
-  fills?: boolean;
 };
 function tree(
   cards: Card[],
-  {
-    onPick = () => {},
-    ring = null,
-    dropped = null,
-    month = '2026-10',
-    onMonth = () => {},
-    fills = false,
-  }: Props,
+  { onPick = () => {}, ring = null, dropped = null, month = '2026-10', onMonth = () => {} }: Props,
 ) {
   return (
     <PeopleProvider
@@ -171,7 +163,6 @@ function tree(
         today={TODAY}
         ring={ring}
         dropped={dropped}
-        fills={fills}
         onPick={onPick}
         lanes={LANES}
       />
@@ -203,7 +194,7 @@ function readable(layout: BoardLayout): void {
     expect(label.x + label.w).toBe(piece.overhang ? column + label.x : column);
     expect(piece.y).toBeGreaterThanOrEqual(week.y);
     expect(piece.y + piece.h).toBeLessThanOrEqual(week.y + week.h);
-    for (const box of [piece.labelBox, piece.photoBox, piece.slotBox]) {
+    for (const box of [piece.labelBox, piece.photoBox]) {
       if (box) boxes.push({ id: piece.id, box: onBoard(piece, box) });
     }
     words.push({ id: piece.id, box: onBoard(piece, piece.textBox) });
@@ -427,9 +418,9 @@ describe('readable first: the hard rules (review)', () => {
   it('holds on a busy fortnight, week and month, at a phone’s width and a desktop’s', () => {
     for (const width of [358, 728, 980]) {
       for (const day of ['2026-10-01', '2026-10-06']) {
-        readable(layoutWeekBoard(BUSY, day, { width, fills: true }));
+        readable(layoutWeekBoard(BUSY, day, { width }));
       }
-      readable(layoutMonthBoard(BUSY, '2026-10', { width, fills: true }));
+      readable(layoutMonthBoard(BUSY, '2026-10', { width }));
     }
   });
 
@@ -492,7 +483,7 @@ describe('readable first: the hard rules (review)', () => {
   });
 });
 
-describe('fills: what is shared (review)', () => {
+describe('fills: what is the pool’s own (review)', () => {
   const MINE = {
     ...card('mine', 'Just mine', '2026-10-21'),
     splash: { ...card('mine', 'Just mine', '2026-10-21').splash, ownPoolId: 'p-a' },
@@ -503,14 +494,14 @@ describe('fills: what is shared (review)', () => {
   }));
 
   it('never fills a splash that is not joint — Just mine, shared, photo captions — and always fills a joint one', () => {
-    const layout = layoutWeekBoard([MINE, ...JOINTS, WEEK[2]], TODAY, { width: 728, fills: true });
+    const layout = layoutWeekBoard([MINE, ...JOINTS, WEEK[2]], TODAY, { width: 728 });
     expect(layout.pieces.find((p) => p.id === 'mine')!.label).toBe('none');
     expect(layout.pieces.find((p) => p.id === 'soup')!.label).toBe('none');
     const joint = layout.pieces.filter((p) => p.card.joint);
     for (const p of joint) expect(['white', 'ink']).toContain(p.label);
     for (let at = 1; at < joint.length; at += 1)
       expect(joint[at].label).not.toBe(joint[at - 1].label);
-    const { container } = board([MINE, ...JOINTS], { fills: true });
+    const { container } = board([MINE, ...JOINTS]);
     expect(
       container.querySelector('[data-board-piece="mine"] [data-board-label]')!.className,
     ).not.toMatch(/bg-/);
@@ -519,9 +510,21 @@ describe('fills: what is shared (review)', () => {
     ).toMatch(/bg-(white|ink)/);
   });
 
-  it('draws no fills at all on Home, or in a pool of one', () => {
-    const layout = layoutWeekBoard([MINE, ...JOINTS], TODAY, { width: 728 });
-    for (const p of layout.pieces) expect(p.label).toBe('none');
+  it('fills a joint splash with a single ripple, and one waiting on a member, wherever it is drawn (Home included)', () => {
+    // The pool's own, one ripple by someone else, me not yet written: Add your side.
+    const lone: Card = {
+      ...card('test', 'Test', '2026-10-19'),
+      joint: true,
+      href: '/pool/p-a/splash/test',
+      writers: [{ authorId: 'u-mk', initials: 'MK' }],
+      awaiting: [{ authorId: ME, initials: 'YL' }],
+    };
+    expect(lone.splash.count).toBe(1);
+    const { container } = board([lone]);
+    const piece = container.querySelector('[data-board-piece="test"]')!;
+    expect(['white', 'ink']).toContain(piece.getAttribute('data-label'));
+    expect(piece.querySelector('[data-board-label]')!.className).toMatch(/bg-(white|ink)/);
+    expect(piece.querySelector('[data-board-slot]')).not.toBeNull();
   });
 });
 
@@ -601,7 +604,8 @@ describe('labels, photos and bands, drawn', () => {
     expect(path.getAttribute('stroke-width')).toBe('1.2');
     expect(path.getAttribute('stroke-linecap')).toBe('round');
     expect(path.getAttribute('stroke-opacity')).toBe('0.8');
-    expect(header.querySelector('[data-board-waves]')!.className).toContain('gap-[5px]');
+    // Stacked with no gap (review).
+    expect(header.querySelector('[data-board-waves]')!.className).not.toMatch(/gap-/);
     cleanup();
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
       configurable: true,
@@ -688,25 +692,24 @@ describe('an open joint splash (meaning is shape)', () => {
     awaiting,
   });
 
-  it('carries an empty slot under its label, with the faded faces of who has not written', () => {
+  it('carries an empty slot inline after its words, with the faded faces of who has not written', () => {
     const { container } = board([joint([{ authorId: 'u-jo', initials: 'JO' }])]);
     const slot = container.querySelector<HTMLElement>('[data-board-slot="jam"]')!;
     expect(slot.className).toContain('border-dashed');
     expect(slot.textContent).toBe('JO');
     expect(slot.querySelector('.opacity-50')).not.toBeNull();
     expect(slot.tagName).toBe('SPAN');
+    // Inline after the words, in the same line box: it wraps under only when the line is full.
+    expect(slot.closest('[data-board-text]')).not.toBeNull();
+    expect(slot.className).toContain('inline-flex');
+    expect(slot.className).toContain('h-[13px]');
     const laid = layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, {
       width: 980,
     }).pieces[0];
-    // Under its label, in its own lane: never over the next lane's words.
-    // Its own lane from the label's start, even when the label overhangs the next.
-    expect(laid.slotBox).toEqual({
-      x: laid.labelBox.x,
-      y: laid.labelBox.y + laid.labelBox.h,
-      w: 980 / 7 - laid.labelBox.x,
-      h: 22,
-    });
-    expect(parseFloat(slot.style.top)).toBe(laid.labelBox.y + laid.labelBox.h);
+    expect(laid.slot).toBe(true);
+    // Its room is counted: the label is sized for the words and the slot together.
+    const closed = layoutWeekBoard([joint([])], TODAY, { width: 980 }).pieces[0];
+    expect(laid.captionLines).toBeGreaterThanOrEqual(closed.captionLines);
   });
 
   it('reads "Add your side" when I am missing, and opens the splash to write', () => {

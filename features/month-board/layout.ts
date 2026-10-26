@@ -47,8 +47,9 @@ const CAPTION_LINES = 3;
 const CHAR_EM = 0.62;
 /** The sticker is the icon at this many line heights, hanging off the label's top-left corner. */
 export const STICKER_LINES = 1.4;
-/** An open joint splash's slot, under its label. */
-export const SLOT_PX = 22;
+/** An open joint splash's slot, inline after its words: the room it takes, in characters. */
+const SLOT_FACE_CHARS = 2;
+const SLOT_WORDS_CHARS = 14;
 
 /** A range band's height, the gap between bands, and the lanes bands pack into. */
 export const TAPE_PX = 24;
@@ -63,9 +64,9 @@ const FACES_CHARS = 4;
 
 /**
  * A label's background (review): none — white words on the water — for
- * every splash but a joint one; a joint splash, where the calendar is
- * shared, white or ink, alternating within a day. Home and a pool of one
- * draw no fills at all.
+ * every splash but a joint one; a joint splash — the pool's own (owner
+ * none, a pool set), however many ripples or authors it has — white or
+ * ink, alternating within a day, wherever it is drawn.
  */
 export type LabelStyle = 'none' | 'white' | 'ink';
 export const LABEL_STYLES: readonly LabelStyle[] = ['none', 'white', 'ink'];
@@ -145,12 +146,13 @@ export type BoardPiece = {
   fan: PhotoCard[];
   /** Photos beyond those shown: the top card's "+N". */
   morePhotos: number;
-  /** Within the piece: the label, its words, the photo area, the sticker, the open slot. */
+  /** Within the piece: the label, its words, the photo area, the sticker. */
   labelBox: Box;
   textBox: Box;
   photoBox: Box | null;
   stickerBox: Box | null;
-  slotBox: Box | null;
+  /** An open joint splash: its slot sits inline after the words, wrapping under only when the line is full. */
+  slot: boolean;
   /** The label's padding, as drawn. */
   pad: { top: number; right: number; bottom: number; left: number };
   captionLines: number;
@@ -292,11 +294,10 @@ type Plan = { step: number; label: LabelStyle };
 
 /**
  * A day's plan (review): the start offset steps by the id, never the same
- * as the item above's; a joint splash, where fills are drawn, alternates
- * white and ink with the day's other joint ones; everything else takes no
- * fill.
+ * as the item above's; a joint splash alternates white and ink with the
+ * day's other joint ones; everything else takes no fill.
  */
-function planDay(cards: Card[], fills: boolean): Plan[] {
+function planDay(cards: Card[]): Plan[] {
   let step = -1;
   let fill: LabelStyle | null = null;
   return cards.map((card) => {
@@ -304,7 +305,7 @@ function planDay(cards: Card[], fills: boolean): Plan[] {
     const drawn = draw(id, 'offset', OFFSET_STEPS.length);
     step = drawn === step ? (drawn + 1) % OFFSET_STEPS.length : drawn;
     let label: LabelStyle = 'none';
-    if (fills && card.joint) {
+    if (card.joint) {
       const drawnFill: LabelStyle = draw(id, 'label', 2) === 0 ? 'white' : 'ink';
       fill = drawnFill === fill ? (fill === 'white' ? 'ink' : 'white') : drawnFill;
       label = fill;
@@ -321,7 +322,7 @@ function planDay(cards: Card[], fills: boolean): Plan[] {
  * words start past the sticker's inner half. With photos, up to three
  * square cards from the offset to the line, the caption directly under
  * with its icon small before the words. An open joint splash's slot sits
- * under its label.
+ * inline after the words, its room counted in the line estimate.
  */
 function pieceShape(
   card: Card,
@@ -344,10 +345,17 @@ function pieceShape(
     left: pictured ? m.pad.leftCaption : m.pad.left,
   };
   const labelW = m.column - offset;
+  const slot = isOpenJoint(card);
+  const slotChars = slot
+    ? Math.min(card.awaiting!.length, m.narrow ? 2 : 4) * SLOT_FACE_CHARS +
+      (m.narrow ? 0 : SLOT_WORDS_CHARS) +
+      2
+    : 0;
   const caption =
     captionOf(card) +
     (card.joint ? ' '.repeat(FACES_CHARS) : '') +
-    (pictured ? ' '.repeat(ICON_CHARS) : '');
+    (pictured ? ' '.repeat(ICON_CHARS) : '') +
+    ' '.repeat(slotChars);
   const chars = Math.max(
     2,
     Math.floor((labelW - pad.left - pad.right) / (m.caption.size * CHAR_EM)),
@@ -374,9 +382,6 @@ function pieceShape(
     morePhotos = photos.length - shown.length;
   }
   const labelBox: Box = { x: offset, y: photoBox ? photoBox.h : 0, w: labelW, h: labelH };
-  const slotBox: Box | null = isOpenJoint(card)
-    ? { x: offset, y: labelBox.y + labelBox.h, w: labelW, h: SLOT_PX }
-    : null;
   return {
     variant: pictured ? 'photo' : 'sticker',
     fan,
@@ -387,11 +392,11 @@ function pieceShape(
     stickerBox: pictured
       ? null
       : { x: offset - m.sticker / 2, y: labelBox.y - m.sticker / 2, w: m.sticker, h: m.sticker },
-    slotBox,
+    slot,
     pad,
     captionLines: lines,
     w: m.column,
-    h: slotBox ? slotBox.y + slotBox.h : labelBox.y + labelBox.h,
+    h: labelBox.y + labelBox.h,
   };
 }
 
@@ -424,7 +429,6 @@ function layoutBoard(
   scope: { first: IsoDate; last: IsoDate },
   m: BoardMetrics,
   span: 'week' | 'month',
-  fills: boolean,
 ): Pick<BoardLayout, 'weeks' | 'pieces' | 'tapes' | 'height'> {
   const inScope = (day: IsoDate): boolean => day >= scope.first && day <= scope.last;
 
@@ -521,7 +525,7 @@ function layoutBoard(
     for (const cell of cells) {
       const list = cell.inMonth ? (byDay.get(cell.day) ?? []) : [];
       let top = y + numberBand + tapeBlock;
-      const plans = planDay(list, fills);
+      const plans = planDay(list);
       list.forEach((card, at) => {
         const shape = pieceShape(card, plans[at], m);
         const piece: BoardPiece = {
@@ -573,16 +577,12 @@ function layoutBoard(
 export function layoutMonthBoard(
   cards: Card[],
   month: string,
-  {
-    width,
-    fills = false,
-    weekStart = WEEK_START,
-  }: { width: number; fills?: boolean; weekStart?: number },
+  { width, weekStart = WEEK_START }: { width: number; weekStart?: number },
 ): BoardLayout {
   const m = boardMetrics(width);
   const rows = monthDays(month, weekStart);
   const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
-  const laid = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month', fills);
+  const laid = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month');
   return {
     span: 'month',
     metrics: m,
@@ -602,16 +602,12 @@ export function layoutMonthBoard(
 export function layoutWeekBoard(
   cards: Card[],
   day: IsoDate,
-  {
-    width,
-    fills = false,
-    weekStart = WEEK_START,
-  }: { width: number; fills?: boolean; weekStart?: number },
+  { width, weekStart = WEEK_START }: { width: number; weekStart?: number },
 ): BoardLayout {
   const m = boardMetrics(width);
   const first = weekOf(day, weekStart);
   const days = Array.from({ length: COLUMNS }, (_, i) => addDays(first, i));
-  const laid = layoutBoard(cards, [days], { first, last: days[COLUMNS - 1] }, m, 'week', fills);
+  const laid = layoutBoard(cards, [days], { first, last: days[COLUMNS - 1] }, m, 'week');
   return {
     span: 'week',
     metrics: m,
