@@ -33,6 +33,7 @@ import {
   measureKey,
   MONTH_HEADER_PX,
   type Measured,
+  type Recipe,
   shiftMonth,
   weekOf,
 } from './layout';
@@ -100,6 +101,7 @@ export function MonthBoard({
   dropped = null,
   onPick,
   lanes,
+  onDrawn,
 }: {
   cards: Card[];
   /** `YYYY-MM`: the month shown, when Month is; the week shown is the board's own. */
@@ -114,6 +116,8 @@ export function MonthBoard({
   onPick: (id: string) => void;
   /** What a post's icon falls back to: its lane's emoji. */
   lanes: Pick<GridColumn, 'id' | 'icon' | 'name'>[];
+  /** The recipe each piece is drawn with, by splash, whenever it changes: the Layout panel shows it. */
+  onDrawn?: (recipes: Record<string, Recipe>) => void;
 }) {
   const [span, setSpan] = useBoardSpan();
   // The week shown: this one on open (review), unless the ground was opened on another month.
@@ -140,6 +144,17 @@ export function MonthBoard({
     [cards, span, week, month, room, tall, measured],
   );
   const { metrics } = layout;
+
+  // What was drawn, told once per change (review: Inline showed on for a sticker).
+  const told = useRef('');
+  useEffect(() => {
+    if (!onDrawn) return;
+    const recipes = Object.fromEntries(layout.pieces.map((p) => [p.id, p.recipe]));
+    const key = JSON.stringify(recipes);
+    if (key === told.current) return;
+    told.current = key;
+    onDrawn(recipes);
+  }, [layout, onDrawn]);
 
   // Measure each title's lines as drawn — unclamped, its full height — and
   // keep any the estimate got wrong, by piece, room and indent; the next
