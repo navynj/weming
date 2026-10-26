@@ -1,7 +1,5 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
-
 export type HomeView = 'lane' | 'date' | 'board';
 
 /** The views in the toggle's order; re-tapping Home walks them (review). */
@@ -10,42 +8,6 @@ export const HOME_VIEW_ORDER: readonly HomeView[] = ['board', 'lane', 'date'];
 /** The view after this one, in the toggle's order. */
 export function nextHomeView(view: HomeView): HomeView {
   return HOME_VIEW_ORDER[(HOME_VIEW_ORDER.indexOf(view) + 1) % HOME_VIEW_ORDER.length];
-}
-
-/** Remembered per device (round 3). */
-const KEY = 'weming.home-view';
-const EVENT = 'weming:home-view';
-
-function read(): HomeView {
-  try {
-    const stored = window.localStorage.getItem(KEY);
-    return stored === 'date' || stored === 'lane' ? stored : 'board';
-  } catch {
-    return 'board';
-  }
-}
-
-function subscribe(onChange: () => void): () => void {
-  window.addEventListener('storage', onChange);
-  window.addEventListener(EVENT, onChange);
-  return () => {
-    window.removeEventListener('storage', onChange);
-    window.removeEventListener(EVENT, onChange);
-  };
-}
-
-/** The view Home shows, the last one chosen on this device; the Board view first (review). */
-export function useHomeView(): [HomeView, (view: HomeView) => void] {
-  const view = useSyncExternalStore(subscribe, read, () => 'board' as const);
-  const set = (next: HomeView): void => {
-    try {
-      window.localStorage.setItem(KEY, next);
-    } catch {
-      // Not remembered, then; the switch still happens below.
-    }
-    window.dispatchEvent(new Event(EVENT));
-  };
-  return [view, set];
 }
 
 /**

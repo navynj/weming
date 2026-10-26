@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Settings } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -22,7 +23,7 @@ import { LaneIcon } from './lane-icon';
 import { PinnedCards } from './pinned-cards';
 import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
-import { homeViewName, nextHomeView, useHomeView, ViewToggle } from './view-toggle';
+import { homeViewName, nextHomeView, ViewToggle, type HomeView } from './view-toggle';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { monthKey } from '@/features/splash/summary';
 
@@ -71,6 +72,7 @@ export function HomeGround({
   manageLanes = false,
   poolColumns = [],
   board = BOARD,
+  initialView = 'board',
 }: {
   /** Newest first. */
   cards: Card[];
@@ -91,11 +93,15 @@ export function HomeGround({
    */
   poolColumns?: GridColumn[];
   board?: Board;
+  /** The view a visit opens on: the Calendar, always, outside a test (review). */
+  initialView?: HomeView;
 }) {
   const [newLane, setNewLane] = useState(false);
   const [profile, setProfile] = useState(false);
   const [editingLanes, setEditingLanes] = useState(manageLanes);
-  const [view, setView] = useHomeView();
+  // Every visit opens on the Calendar, not the view used last (review); a
+  // view chosen here holds while I stay.
+  const [view, setView] = useState<HomeView>(initialView);
   const {
     openSheet,
     pendingDrop,
@@ -293,7 +299,8 @@ export function HomeGround({
           className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
           {/* The header (round 3): lane management at the left, the view
-              toggle at the centre. No settings page exists, so no gear. */}
+              toggle at the centre, and a gear at the right for my profile
+              (review: no face floats on Home). */}
           <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
             <button
               type="button"
@@ -308,6 +315,15 @@ export function HomeGround({
             <div className="min-w-0 flex-1">
               <ViewToggle view={view} onChange={setView} />
             </div>
+            <button
+              type="button"
+              aria-label="Profile"
+              data-home-settings
+              onClick={() => setProfile(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
+            >
+              <Settings aria-hidden size={20} />
+            </button>
           </header>
 
           {dropMessage || lanes.message ? (
@@ -343,11 +359,11 @@ export function HomeGround({
                 today={today}
                 ring={ring}
                 waterIds={waterIds}
-                initials={initials}
+                // No face above the lanes on Home (review): my profile is the gear's.
+                initials={null}
                 scrollToMonth={scrollToMonth}
                 onPick={goTo}
                 onCreateLane={() => setNewLane(true)}
-                onAvatar={() => setProfile(true)}
               />
             </>
           )}

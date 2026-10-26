@@ -98,10 +98,10 @@ afterEach(cleanup);
 describe('desktop layout at 1280px', () => {
   for (const view of ['lane', 'date'] as const) {
     it(`Home, ${view} view`, () => {
-      window.localStorage.setItem('weming.home-view', view);
       const { container } = render(
         <InputSheetProvider>
           <HomeGround
+            initialView={view}
             cards={[]}
             pinned={[]}
             categories={[LANE]}

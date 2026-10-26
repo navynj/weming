@@ -77,7 +77,14 @@ function home(people: Record<string, Person>) {
   );
 }
 
-const avatar = (root: Element) => root.querySelector<HTMLElement>('[data-avatar]')!;
+/** My face on Home: the foot's Home place (no face floats above the lanes any more, review). */
+const avatar = (root: Element) =>
+  root.querySelector<HTMLElement>(
+    '[data-home-foot="phone"] [data-home-tab] [data-avatar-photo], [data-home-foot="phone"] [data-home-tab] span',
+  )!;
+/** My profile opens from the header's gear (review). */
+const openProfile = (root: Element) =>
+  fireEvent.click(root.querySelector<HTMLElement>('[data-home-settings]')!);
 const thread = (root: Element, id: string) =>
   root.querySelector<HTMLElement>(`[data-thread-entry="${id}"] [data-thread-avatar]`)!;
 
@@ -87,8 +94,6 @@ beforeEach(() => {
   drawn.length = 0;
   encodesWebp = true;
   window.localStorage.clear();
-  // Board is the first view (review); my avatar sits on the Lane view's grid.
-  window.localStorage.setItem('weming.home-view', 'lane');
   Element.prototype.scrollTo = function scrollTo() {} as Element['scrollTo'];
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -133,9 +138,9 @@ afterEach(() => {
 });
 
 describe('the profile editor (0018)', () => {
-  it('opens from my avatar on Home; Save waits for a change and a 1–40 character name', () => {
+  it('opens from the gear beside the views on Home; Save waits for a change and a 1–40 character name', () => {
     const { container, getByLabelText } = home({ [ME]: { name: 'Yoonji Lee', photo: null } });
-    fireEvent.click(avatar(container));
+    openProfile(container);
     const save = container.querySelector<HTMLButtonElement>('[data-profile-save]')!;
     expect(save.disabled).toBe(true);
     fireEvent.change(getByLabelText('Name'), { target: { value: '   ' } });
@@ -150,7 +155,7 @@ describe('the profile editor (0018)', () => {
     const { container, getByLabelText } = home({ [ME]: { name: 'Yoonji Lee', photo: null } });
     expect(avatar(container).textContent).toBe('YL');
     expect(thread(container, 'r-me').textContent).toBe('YL');
-    fireEvent.click(avatar(container));
+    openProfile(container);
     fireEvent.change(getByLabelText('Name'), { target: { value: '  Mina Park  ' } });
     fireEvent.click(container.querySelector('[data-profile-save]')!);
     await waitFor(() => expect(saves).toEqual([{ name: 'Mina Park', photo: 'keep' }]));
@@ -174,7 +179,7 @@ describe('the profile editor (0018)', () => {
       'https://signed/mina',
     );
 
-    fireEvent.click(avatar(container));
+    openProfile(container);
     fireEvent.click(container.querySelector('[data-avatar-remove]')!);
     fireEvent.click(container.querySelector('[data-profile-save]')!);
     await waitFor(() => expect(saves).toEqual([{ name: 'Yoonji Lee', photo: 'remove' }]));
@@ -189,7 +194,7 @@ describe('the profile editor (0018)', () => {
     vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(1200);
     vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(800);
     const { container } = home({ [ME]: { name: 'Yoonji Lee', photo: null } });
-    fireEvent.click(avatar(container));
+    openProfile(container);
     const input = container.querySelector<HTMLInputElement>('[data-avatar-input]')!;
     expect(input.accept).toContain('image/heic');
     await act(async () => {
@@ -211,7 +216,7 @@ describe('the profile editor (0018)', () => {
   it('says so when the browser cannot decode the photo (HEIC outside Safari)', async () => {
     HTMLImageElement.prototype.decode = () => Promise.reject(new Error('EncodingError'));
     const { container, findByRole } = home({ [ME]: { name: 'Yoonji Lee', photo: null } });
-    fireEvent.click(avatar(container));
+    openProfile(container);
     fireEvent.change(container.querySelector('[data-avatar-input]')!, {
       target: { files: [new File(['heic'], 'IMG_0002.HEIC', { type: 'image/heic' })] },
     });

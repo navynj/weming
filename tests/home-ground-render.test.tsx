@@ -46,6 +46,10 @@ const deletes: { id: string; resolve: (outcome: unknown) => void }[] = [];
 
 import { byNewest, placeCard, type Card } from '@/features/home/grid';
 import { HomeGround } from '@/features/home/home-ground';
+import type { HomeView } from '@/features/home/view-toggle';
+
+/** The view a test's Home opens on: a visit opens on the Calendar (review); these choose. */
+let homeView: HomeView = 'lane';
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import {
   summarizeSplash,
@@ -65,8 +69,8 @@ const scrolled: ScrollToOptions[] = [];
 beforeEach(() => {
   scrolled.length = 0;
   window.localStorage.clear();
-  // Board is the first view (review); these read the Lane view unless they choose.
-  window.localStorage.setItem('weming.home-view', 'lane');
+  // A visit opens on the Calendar (review); these read the Lane view unless they choose.
+  homeView = 'lane';
   window.sessionStorage.clear();
   Element.prototype.scrollTo = function scrollTo(
     this: Element,
@@ -213,6 +217,7 @@ function ground(
       {deleted ? <Deleter id={deleted} /> : null}
       <SheetProbe />
       <HomeGround
+        initialView={homeView}
         cards={cards(posts)}
         pinned={posts.filter((p) => p.pinnedAt)}
         categories={categories}
@@ -276,7 +281,9 @@ describe('the water ground (H22)', () => {
     for (const mark of container.querySelectorAll('[data-mark]')) {
       expect(mark.className).toContain('bg-white');
     }
-    expect(container.querySelector('[data-avatar]')!.textContent).toBe('YL');
+    // No face floats above the lanes on Home (review): the gear beside the views opens my profile.
+    expect(container.querySelector('[data-avatar-row]')).toBeNull();
+    expect(container.querySelector('[data-home-header] [data-home-settings]')).not.toBeNull();
   });
 });
 
@@ -772,21 +779,21 @@ describe('?m= as a scroll target', () => {
 });
 
 it('leaves the ring whole in the Date view: the day rail is not filled over it', () => {
-  window.localStorage.setItem('weming.home-view', 'date');
+  homeView = 'date';
   const { container } = ground(POSTS);
   const rail = container.querySelector<HTMLElement>('[data-day-row]')!;
   expect(rail.closest('[data-cell]') ?? rail).toBeTruthy();
   expect(rail.className).not.toMatch(/bg-|sticky|overflow-hidden/);
-  window.localStorage.removeItem('weming.home-view');
+  homeView = 'board';
 });
 
 it('leaves the ring whole in the Date view: the day rail is not filled over it', () => {
-  window.localStorage.setItem('weming.home-view', 'date');
+  homeView = 'date';
   const { container } = ground(POSTS);
   const rail = container.querySelector<HTMLElement>('[data-day-row]')!;
   expect(container.querySelector('[data-cell="date"]')).not.toBeNull();
   expect(rail.className).not.toMatch(/bg-|sticky|overflow-hidden/);
-  window.localStorage.removeItem('weming.home-view');
+  homeView = 'board';
 });
 
 describe('pinned posts as cards (round 3)', () => {
@@ -859,22 +866,43 @@ describe('the header and the Date view (round 3)', () => {
     expect(lanes.className).toContain('text-main-900');
   });
 
-  it('switches to the Date view and remembers it on this device', () => {
+  it('switches to the Date view, kept while I stay, not on the device', () => {
     const { container } = ground();
     fireEvent.click(container.querySelector('[data-view-option="date"]')!);
-    expect(window.localStorage.getItem('weming.home-view')).toBe('date');
+    expect(window.localStorage.getItem('weming.home-view')).toBeNull();
     expect(container.querySelector('[data-pill]')).not.toBeNull();
     expect(container.querySelector('[data-lane-header]')).toBeNull();
     cleanup();
+    // The next visit opens on the Calendar again (review).
+    homeView = 'board';
     const { container: again } = ground();
-    expect(again.querySelector('[data-view-option="date"]')!.getAttribute('aria-selected')).toBe(
+    expect(again.querySelector('[data-view-option="board"]')!.getAttribute('aria-selected')).toBe(
       'true',
     );
-    expect(again.querySelector('[data-mark]')).toBeNull();
+  });
+
+  it('opens a visit on the Calendar even where an earlier build kept another view', () => {
+    window.localStorage.setItem('weming.home-view', 'lane');
+    const { container } = render(
+      <InputSheetProvider>
+        <HomeGround
+          cards={[]}
+          pinned={[]}
+          categories={LANES}
+          today={TODAY}
+          timeZone={TZ}
+          initials="YL"
+          scrollToMonth={null}
+        />
+      </InputSheetProvider>,
+    );
+    expect(
+      container.querySelector('[data-view-option="board"]')!.getAttribute('aria-selected'),
+    ).toBe('true');
   });
 
   it('lists every post exactly once under its day, newest first, a pill per line', async () => {
-    window.localStorage.setItem('weming.home-view', 'date');
+    homeView = 'date';
     const { container } = ground();
     await grown(container);
     const pills = [...container.querySelectorAll('[data-pill]')].map((p) =>
@@ -891,7 +919,7 @@ describe('the header and the Date view (round 3)', () => {
   });
 
   it('spaces every day alike: no gap rows, the month on a line of its own', async () => {
-    window.localStorage.setItem('weming.home-view', 'date');
+    homeView = 'date';
     const { container } = ground();
     await grown(container);
     expect(container.querySelector('[data-day-row][data-gap]')).toBeNull();
@@ -903,7 +931,7 @@ describe('the header and the Date view (round 3)', () => {
   });
 
   it('rings the top card\u2019s pill, and a tapped pill comes to the top', async () => {
-    window.localStorage.setItem('weming.home-view', 'date');
+    homeView = 'date';
     const { container } = ground();
     await waitFor(() =>
       expect(container.querySelector('[data-pill="late"][data-ring]')).not.toBeNull(),
@@ -917,7 +945,7 @@ describe('the header and the Date view (round 3)', () => {
   });
 
   it('puts a dropped post\u2019s pill under today with the ring', async () => {
-    window.localStorage.setItem('weming.home-view', 'date');
+    homeView = 'date';
     const fresh = post('fresh', 'Just dropped', [block('f', '2026-09-25', 'c-place')]);
     const { container } = ground(POSTS, fresh);
     await waitFor(() =>
@@ -939,7 +967,7 @@ describe('a post\u2019s own icon (0008)', () => {
     expect(container.querySelector('[data-mark="soup"]')!.textContent).toBe('🍜');
     expect(topCard(container).querySelector('[data-card-title]')!.textContent).toContain('🎬');
     cleanup();
-    window.localStorage.setItem('weming.home-view', 'date');
+    homeView = 'date';
     const { container: list } = ground(withIcon);
     expect(list.querySelector('[data-pill="late"]')!.textContent).toContain('🎬');
   });
@@ -947,7 +975,7 @@ describe('a post\u2019s own icon (0008)', () => {
 
 describe('the Home button at the foot', () => {
   it('walks Board → Lane → Date on each tap, the header toggle following', () => {
-    window.localStorage.removeItem('weming.home-view');
+    homeView = 'board';
     const { container } = ground();
     expect(
       [...container.querySelectorAll('[data-view-option]')].map((o) =>
@@ -1025,6 +1053,7 @@ describe('Just mine on Home (0014)', () => {
     return render(
       <InputSheetProvider>
         <HomeGround
+          initialView={homeView}
           cards={cards([...POSTS, own])}
           pinned={[]}
           categories={LANES}
@@ -1096,6 +1125,7 @@ describe('a post just dropped from a pool (review)', () => {
       <InputSheetProvider>
         <PoolDropper splash={shell} />
         <HomeGround
+          initialView={homeView}
           cards={cards(POSTS)}
           pinned={[]}
           categories={LANES}
