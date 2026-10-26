@@ -173,10 +173,12 @@ function OpenSlot({
   piece,
   narrow,
   onWrite,
+  muted = false,
 }: {
   piece: BoardPiece;
   narrow: boolean;
   onWrite: (card: Card) => void;
+  muted?: boolean;
 }) {
   const { me } = usePeople();
   const awaiting = piece.card.awaiting ?? [];
@@ -207,8 +209,8 @@ function OpenSlot({
     transform: `rotate(${piece.slotRotate}deg)`,
     transformOrigin: piece.slotAt === 'right' ? 'top left' : 'top right',
   };
-  const className =
-    'absolute flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80';
+  // Under every label where they meet (review): the labels' z is 1.
+  const className = `absolute z-0 flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80 ${muted ? 'opacity-50' : ''}`;
   return mine ? (
     <button
       type="button"
@@ -315,6 +317,7 @@ export function BoardPieceView({
   const caption = captionOf(card);
   const top = piece.fan.length - 1;
   const label = piece.labelBox;
+  const fade = piece.muted ? 'opacity-50' : '';
   return (
     <div
       // Remounted per ring, so the motion plays again for the same post.
@@ -328,8 +331,11 @@ export function BoardPieceView({
       data-heading={ripple !== null ? '' : undefined}
       data-dropped={plunge ? '' : undefined}
       data-muted={piece.muted ? '' : undefined}
-      // A day of the month before or after: at half strength (review).
-      className={`absolute ${piece.muted ? 'opacity-50' : ''} ${motionOf(ripple, plunge)}`}
+      // No stacking context of its own (no opacity, no z-index): its parts
+      // stack with every other piece's in the row — the slot under the
+      // labels, the stickers over them (review). A muted day's half
+      // strength is on each part.
+      className={`absolute ${motionOf(ripple, plunge)}`}
       style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }}
     >
       {/* The tap that brings its card up, under the drawing; the slot is a tap of its own. */}
@@ -338,11 +344,15 @@ export function BoardPieceView({
         onClick={() => onPick(card.splash.id)}
         aria-label={caption}
         data-board-pick={piece.id}
-        className="absolute inset-0 block"
+        className="absolute inset-0 z-[1] block"
       />
       <div aria-hidden className="pointer-events-none absolute inset-0">
         {piece.photoBox ? (
-          <span data-board-photos className="absolute block" style={placed(piece.photoBox)}>
+          <span
+            data-board-photos
+            className={`absolute z-[1] block ${fade}`}
+            style={placed(piece.photoBox)}
+          >
             {piece.fan.map((photo, at) => (
               <PhotoCardView
                 key={photo.path}
@@ -356,7 +366,7 @@ export function BoardPieceView({
         ) : null}
         <span
           data-board-label
-          className={`absolute block ${LABEL_CLASS[piece.label]}`}
+          className={`absolute z-[1] block ${LABEL_CLASS[piece.label]} ${fade}`}
           style={{
             ...placed(label),
             paddingTop: piece.pad.top,
@@ -402,7 +412,8 @@ export function BoardPieceView({
             data-board-sticker
             data-size={piece.stickerSize ?? undefined}
             data-at={piece.stickerAt ?? undefined}
-            className="absolute flex items-center justify-center leading-none"
+            // Over its own label and any other (review).
+            className={`absolute z-[2] flex items-center justify-center leading-none ${fade}`}
             style={{ ...placed(piece.stickerBox), fontSize: piece.stickerBox.w }}
           >
             {icon}
@@ -410,7 +421,9 @@ export function BoardPieceView({
         ) : null}
       </div>
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
-      {piece.slotBox ? <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} /> : null}
+      {piece.slotBox ? (
+        <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} muted={piece.muted} />
+      ) : null}
     </div>
   );
 }

@@ -127,6 +127,8 @@ export function MonthBoard({
     setWeek(weekOf(monthKey(today) === month ? today : `${month}-01`));
   }
   const [room, setRoom] = useState<number | null>(null);
+  // The board's visible height: a month that fits fills it (review).
+  const [tall, setTall] = useState<number | null>(null);
   // The words' lines as the browser wrapped them, fed back so every label hugs them (review).
   const [measured, setMeasured] = useState<Measured>({});
   // Same data, same width, same page, same board: laid out once per each.
@@ -134,8 +136,8 @@ export function MonthBoard({
     () =>
       span === 'week'
         ? layoutWeekBoard(cards, week, { width: room ?? 980, measured })
-        : layoutMonthBoard(cards, month, { width: room ?? 980, measured }),
-    [cards, span, week, month, room, measured],
+        : layoutMonthBoard(cards, month, { width: room ?? 980, fill: tall ?? undefined, measured }),
+    [cards, span, week, month, room, tall, measured],
   );
   const { metrics } = layout;
 
@@ -174,7 +176,10 @@ export function MonthBoard({
     const el = scroller.current;
     if (!el) return;
     // The room's width: the board is laid out at it, so it always fits.
-    const measure = (): void => setRoom(el.clientWidth > 0 ? el.clientWidth : null);
+    const measure = (): void => {
+      setRoom(el.clientWidth > 0 ? el.clientWidth : null);
+      setTall(el.clientHeight > 0 ? el.clientHeight : null);
+    };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);

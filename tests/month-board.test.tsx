@@ -384,7 +384,8 @@ describe('the month board', () => {
 
   it('grows a week row to its tallest lane, the rest at the base height', () => {
     const busy = layout.weeks.find((w) => w.cells.some((c) => c.day === '2026-10-20'))!;
-    const quiet = layout.weeks.find((w) => w.cells.some((c) => c.day === '2026-10-28'))!;
+    // A week with no records and no band across it.
+    const quiet = layout.weeks.find((w) => w.cells.some((c) => c.day === '2026-10-07'))!;
     expect(busy.h).toBeGreaterThan(layout.metrics.rowBase);
     expect(quiet.h).toBe(layout.metrics.rowBase);
   });
@@ -1035,5 +1036,134 @@ describe('a pool’s splash on Home (review)', () => {
     const piece = container.querySelector('[data-board-piece="ours"]')!;
     expect(piece.querySelector('[data-board-faces]')).not.toBeNull();
     expect(piece.querySelector('[data-board-pool]')).toBeNull();
+  });
+});
+
+describe('a month fitted to the screen (review)', () => {
+  // One busy week (Oct 18–24) and the rest quiet.
+  const ONE_BUSY = WEEK;
+  // Far more than a screen: ten posts a day for the whole month.
+  const FULL = Array.from({ length: 300 }, (_, at) =>
+    card(
+      `f${at}`,
+      `Long day number ${at}, all of it`,
+      `2026-10-${String((at % 31) + 1).padStart(2, '0')}`,
+    ),
+  );
+
+  it('fills a 900px board with no scroll when its weeks fit, the busy week given the most air', () => {
+    const natural = layoutMonthBoard(ONE_BUSY, '2026-10', { width: 728 });
+    const fitted = layoutMonthBoard(ONE_BUSY, '2026-10', { width: 728, fill: 900 });
+    expect(fitted.height).toBe(900);
+    const last = fitted.weeks[fitted.weeks.length - 1];
+    expect(last.y + last.h).toBe(900);
+    natural.weeks.forEach((week, at) => {
+      expect(fitted.weeks[at].h).toBeGreaterThanOrEqual(week.h);
+    });
+    const busy = fitted.weeks.findIndex((w) => w.cells.some((c) => c.day === '2026-10-20'));
+    const gain = (at: number) => fitted.weeks[at].h - natural.weeks[at].h;
+    for (let at = 0; at < fitted.weeks.length; at += 1) {
+      if (at !== busy) expect(gain(busy)).toBeGreaterThanOrEqual(gain(at));
+    }
+    // Items keep their place within their row.
+    for (const p of fitted.pieces) {
+      const was = natural.pieces.find((q) => q.id === p.id)!;
+      expect(p.y - fitted.weeks[p.week].y).toBe(was.y - natural.weeks[was.week].y);
+    }
+    readable(fitted);
+  });
+
+  it('keeps every row at its natural height and scrolls when the month does not fit; empty weeks at the least', () => {
+    const fitted = layoutMonthBoard(FULL, '2026-10', { width: 728, fill: 900 });
+    const natural = layoutMonthBoard(FULL, '2026-10', { width: 728 });
+    expect(fitted.height).toBeGreaterThan(900);
+    expect(fitted.weeks.map((w) => w.h)).toEqual(natural.weeks.map((w) => w.h));
+    for (const piece of fitted.pieces) {
+      const week = fitted.weeks[piece.week];
+      expect(piece.y + piece.h).toBeLessThanOrEqual(week.y + week.h);
+    }
+    // A week with nothing in it, in a month that scrolls: the least height.
+    const sparse = layoutMonthBoard(
+      [...FULL.filter((c) => c.day >= '2026-10-04'), ...[]],
+      '2026-09',
+      {
+        width: 728,
+        fill: 400,
+      },
+    );
+    const empty = sparse.weeks.find((w) => w.cells.every((c) => c.day < '2026-09-27'));
+    if (sparse.height > 400 && empty) expect(empty.h).toBe(sparse.metrics.rowBase);
+    expect(layoutMonthBoard([], '2026-10', { width: 728 }).weeks[0].h).toBe(48);
+    expect(layoutMonthBoard([], '2026-10', { width: 358 }).weeks[0].h).toBe(40);
+  });
+
+  it('fits a six-week month the same way', () => {
+    // August 2026 spans six weeks (Jul 26 – Sep 5).
+    const fitted = layoutMonthBoard([], '2026-08', { width: 728, fill: 900 });
+    expect(fitted.weeks).toHaveLength(6);
+    expect(fitted.height).toBe(900);
+  });
+
+  it('measures the board’s height and lays the month out to it, with no foot to scroll to', () => {
+    window.localStorage.setItem('weming.board-span', 'month');
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => 900,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 728,
+    });
+    try {
+      const { container } = board(ONE_BUSY);
+      const canvas = container.querySelector<HTMLElement>('[data-board-canvas]')!;
+      expect(parseFloat(canvas.style.height)).toBe(900);
+    } finally {
+      delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight;
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
+  });
+});
+
+describe('the stacking order (review)', () => {
+  const joint = (awaiting: { authorId: string; initials: string }[]): Card => ({
+    ...card('jam', 'Jam session', '2026-10-21'),
+    joint: true,
+    href: '/pool/p-a/splash/jam',
+    writers: [{ authorId: 'u-mk', initials: 'MK' }],
+    awaiting,
+  });
+  const z = (el: Element): number => {
+    const m = /(?:^|\s)z-(?:\[(\d+)\]|(\d+))(?=\s|$)/.exec(el.className.toString());
+    return m ? Number(m[1] ?? m[2]) : NaN;
+  };
+
+  it('draws the slot under every label, labels and photos over it, stickers over all; a piece makes no layer of its own', () => {
+    const { container } = board([
+      joint([{ authorId: 'u-jo', initials: 'JO' }]),
+      card('below', 'Right under it', '2026-10-21'),
+      ...WEEK,
+    ]);
+    const slot = container.querySelector('[data-board-slot="jam"]')!;
+    expect(z(slot)).toBe(0);
+    for (const label of container.querySelectorAll('[data-board-label]')) expect(z(label)).toBe(1);
+    for (const photos of container.querySelectorAll('[data-board-photos]'))
+      expect(z(photos)).toBe(1);
+    for (const sticker of container.querySelectorAll('[data-board-sticker]'))
+      expect(z(sticker)).toBe(2);
+    // The label under the slot is later in the day: on top where they meet.
+    const below = container.querySelector('[data-board-piece="below"] [data-board-label]')!;
+    expect(z(below)).toBeGreaterThan(z(slot));
+    for (const piece of container.querySelectorAll<HTMLElement>('[data-board-piece]')) {
+      expect(piece.className).not.toMatch(/\bopacity-|\bz-/);
+    }
+  });
+
+  it('fades a muted day part by part, so its parts still stack with the rest', () => {
+    window.localStorage.setItem('weming.board-span', 'month');
+    const { container } = board(BUSY, { month: '2026-09' });
+    const muted = container.querySelector<HTMLElement>('[data-board-piece][data-muted]')!;
+    expect(muted.className).not.toContain('opacity-50');
+    expect(muted.querySelector('[data-board-label]')!.className).toContain('opacity-50');
   });
 });

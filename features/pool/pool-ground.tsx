@@ -30,7 +30,7 @@ import { InvitePanel } from './invite-panel';
 import { MembersSheet } from './members-sheet';
 import { poolCards, poolColumns, poolPinned, withPoolMoves, type PoolViewKind } from './pool-cards';
 import { PoolLanesSheet } from './pool-lanes-sheet';
-import { rememberVisit, usePoolView } from './remembered';
+import { rememberVisit } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
 
 /** The view after this one, in the toggle's order. */
@@ -76,16 +76,21 @@ export function PoolGround({
   today,
   timeZone,
   topParam = null,
+  initialView = 'board',
 }: {
   view: PoolView;
   me: string;
   today: IsoDate;
   timeZone: string;
   topParam?: string | null;
+  /** The view a visit opens on: the Calendar, always, outside a test. */
+  initialView?: PoolViewKind;
 }) {
   const router = useRouter();
   const poolId = view.pool.id;
-  const [kind, setKind] = usePoolView();
+  // Every visit opens on the Calendar, not Swimmers (review); a view chosen
+  // here holds while I stay.
+  const [kind, setKind] = useState<PoolViewKind>(initialView);
   const [sheet, setSheet] = useState<Sheet>(null);
   const {
     openSheet,
