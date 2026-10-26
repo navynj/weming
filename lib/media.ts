@@ -138,3 +138,53 @@ export async function signOwnMedia(paths: string[]): Promise<SignedMedia> {
     return unsigned;
   }
 }
+
+/**
+ * Signs the Board view's thumbnails in one round trip, keyed by path: each
+ * path with the Ripple it hangs on, on Home and in a pool.
+ *
+ * The same check as `signRippleMedia`, batched: the viewer's own session asks
+ * for the Ripples, so RLS answers which may be seen, and a path is signed only
+ * when a Ripple that came back carries it. Anything refused, missing or
+ * unsigned comes back `null`.
+ */
+export async function signBoardPhotos(
+  photos: { rippleId: string; path: string }[],
+): Promise<SignedMedia> {
+  const unsigned: SignedMedia = Object.fromEntries(photos.map((p) => [p.path, null]));
+  if (photos.length === 0) return unsigned;
+
+  try {
+    const supabase = await createClient();
+    const { data: rows } = await supabase
+      .from('ripples')
+      .select('id, media')
+      .in('id', [...new Set(photos.map((p) => p.rippleId))]);
+    const mediaOf = new Map((rows ?? []).map((row) => [row.id, row.media]));
+    const visible = [
+      ...new Set(
+        photos.flatMap((p) => (mediaOf.get(p.rippleId)?.includes(p.path) ? [p.path] : [])),
+      ),
+    ];
+    if (visible.length === 0) return unsigned;
+
+    const { data, error } = await serviceClient()
+      .storage.from(MEDIA_BUCKET)
+      .createSignedUrls(visible, SIGNED_URL_TTL_SECONDS);
+    if (error) {
+      reportSigningFailure(error);
+      return unsigned;
+    }
+    return {
+      ...unsigned,
+      ...Object.fromEntries(
+        data.flatMap((entry) =>
+          entry.signedUrl && entry.path ? [[entry.path, entry.signedUrl]] : [],
+        ),
+      ),
+    };
+  } catch (error) {
+    reportSigningFailure(error);
+    return unsigned;
+  }
+}

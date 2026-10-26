@@ -87,6 +87,8 @@ beforeEach(() => {
   drawn.length = 0;
   encodesWebp = true;
   window.localStorage.clear();
+  // Board is the first view (review); my avatar sits on the Lane view's grid.
+  window.localStorage.setItem('weming.home-view', 'lane');
   Element.prototype.scrollTo = function scrollTo() {} as Element['scrollTo'];
   Object.defineProperty(window, 'matchMedia', {
     writable: true,

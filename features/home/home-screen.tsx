@@ -5,6 +5,7 @@ import {
   initialsOf,
   placeCard,
   type Card,
+  type CardPhoto,
   type CardRipple,
   ownPoolColumn,
   type GridColumn,
@@ -161,15 +162,26 @@ export async function HomeScreen({
     if (list) list.push(entry);
     else threads.set(key, [entry]);
   }
+  // A card's photos, for the Board view: every image across its ripples, oldest first.
+  const photos = new Map<string, CardPhoto[]>();
+  for (const ripple of [...ripples].reverse()) {
+    if (ripple.media.length === 0) continue;
+    const key = ripple.splash_id ?? ripple.id;
+    const list = photos.get(key) ?? [];
+    list.push(...ripple.media.map((path) => ({ rippleId: ripple.id, path })));
+    photos.set(key, list);
+  }
   const cards: Card[] = summaries
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];
-      const card = placeCard(
+      const placed = placeCard(
         summary,
         thread.map((r) => r.note).join('\n\n'),
         profile.timezone,
         thread,
       );
+      const pictured = photos.get(summary.id);
+      const card = pictured ? { ...placed, photos: pictured } : placed;
       if (summary.ownPoolId) {
         // No badge: the column header says where it lives.
         return {

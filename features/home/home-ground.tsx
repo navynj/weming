@@ -22,7 +22,9 @@ import { LaneIcon } from './lane-icon';
 import { PinnedCards } from './pinned-cards';
 import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
-import { useHomeView, ViewToggle } from './view-toggle';
+import { nextHomeView, useHomeView, ViewToggle } from './view-toggle';
+import { MonthBoard } from '@/features/month-board/month-board';
+import { monthKey } from '@/features/splash/summary';
 
 /**
  * Which board Home shows (review, 2026-10-22): the **stair** — read cards
@@ -238,6 +240,20 @@ export function HomeGround({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToMonth]);
 
+  // The Board view's month: `?m=` when given, else the month of the post on
+  // top, else this month; its arrows move it from there.
+  const [boardMonth, setBoardMonth] = useState(() => {
+    const top = shown.find((card) => card.splash.id === initialTop);
+    return scrollToMonth ?? (top ? monthKey(top.day) : monthKey(today));
+  });
+  // A new `?m=` while open moves the board there, set as it renders.
+  const [boardParam, setBoardParam] = useState(scrollToMonth);
+  if (scrollToMonth !== boardParam) {
+    setBoardParam(scrollToMonth);
+    if (scrollToMonth) setBoardMonth(scrollToMonth);
+  }
+  const boardView = view === 'board';
+
   // Every mark but the one the stack is heading to reads translucent: the
   // one solid mark is the post being read.
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
@@ -296,30 +312,36 @@ export function HomeGround({
             </p>
           ) : null}
 
-          {pinnedStrip('phone')}
-
-          <LaneGrid
-            ref={grid}
-            view={view}
-            cards={shown}
-            categories={columns}
-            today={today}
-            ring={ring}
-            waterIds={waterIds}
-            initials={initials}
-            scrollToMonth={scrollToMonth}
-            onPick={goTo}
-            onCreateLane={() => setNewLane(true)}
-            onAvatar={() => setProfile(true)}
-          />
+          {boardView ? (
+            // The board takes the whole content area: no pinned strip, no stack.
+            <MonthBoard cards={shown} month={boardMonth} onMonth={setBoardMonth} lanes={columns} />
+          ) : (
+            <>
+              {pinnedStrip('phone')}
+              <LaneGrid
+                ref={grid}
+                view={view}
+                cards={shown}
+                categories={columns}
+                today={today}
+                ring={ring}
+                waterIds={waterIds}
+                initials={initials}
+                scrollToMonth={scrollToMonth}
+                onPick={goTo}
+                onCreateLane={() => setNewLane(true)}
+                onAvatar={() => setProfile(true)}
+              />
+            </>
+          )}
         </div>
 
         <div
           data-board-column
-          className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
+          className={`flex shrink-0 flex-col ${boardView ? '' : 'lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10'}`}
         >
-          {pinnedStrip('wide')}
-          {board === 'stair' ? (
+          {boardView ? null : pinnedStrip('wide')}
+          {boardView ? null : board === 'stair' ? (
             <StairBoard
               cards={shown}
               flip={flip}
@@ -337,8 +359,8 @@ export function HomeGround({
               Date and back (review) — then Pool, and compose at the right. */}
           <GroundFoot
             here="home"
-            homeLabel={`Home, showing the ${view} view; tap to switch`}
-            onHome={() => setView(view === 'lane' ? 'date' : 'lane')}
+            homeLabel={`Home, showing the ${view} view; tap for ${nextHomeView(view)}`}
+            onHome={() => setView(nextHomeView(view))}
             onCompose={() => openSheet()}
           />
         </div>
@@ -347,8 +369,8 @@ export function HomeGround({
         <GroundFoot
           slot="wide"
           here="home"
-          homeLabel={`Home, showing the ${view} view; tap to switch`}
-          onHome={() => setView(view === 'lane' ? 'date' : 'lane')}
+          homeLabel={`Home, showing the ${view} view; tap for ${nextHomeView(view)}`}
+          onHome={() => setView(nextHomeView(view))}
           onCompose={() => openSheet()}
         />
       </div>
