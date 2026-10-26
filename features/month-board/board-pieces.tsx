@@ -222,12 +222,12 @@ function PhotoCardView({
 }
 
 /**
- * A post on its day (Calendar view; readable first, review): a square
- * label from its offset to the lane's right line — past it, by the same
- * offset, only into an empty band of the next lane — its sticker hanging
- * off the top-left corner in a padding of its own, the words after it,
- * never under anything. With photos, square cards from the offset to the
- * line, the caption directly under with its icon small before the words.
+ * A post on its day (Calendar view, the mockup's three recipes): A, a
+ * label shifted into its lane — over the next, where that is empty — its
+ * icon small before the words; B, a label flush the lane wide, its large
+ * sticker on the top-left corner; C, photos with the caption centred under
+ * them, tucked into the padding above. Labels hug their words; nothing
+ * ever covers them.
  */
 export function BoardPieceView({
   piece,
@@ -248,7 +248,6 @@ export function BoardPieceView({
   const { card } = piece;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
-  const pictured = piece.variant === 'photo';
   const top = piece.fan.length - 1;
   const label = piece.labelBox;
   return (
@@ -259,7 +258,7 @@ export function BoardPieceView({
       data-board-day={piece.day}
       data-variant={piece.variant}
       data-label={piece.label}
-      data-step={piece.step}
+      data-recipe={piece.recipe}
       data-overhang={piece.overhang ? '' : undefined}
       data-heading={ripple !== null ? '' : undefined}
       data-dropped={plunge ? '' : undefined}
@@ -303,7 +302,7 @@ export function BoardPieceView({
             data-board-text
             // Clamped to the lines its box was sized for (three at most), so the words never
             // spill into the padding a sticker hangs in (review: text is never covered).
-            className="block overflow-hidden font-medium break-words"
+            className={`block overflow-hidden font-medium break-words ${piece.center ? 'text-center' : ''}`}
             style={{
               fontSize: metrics.caption.size,
               lineHeight: `${metrics.caption.line}px`,
@@ -313,7 +312,7 @@ export function BoardPieceView({
               maxHeight: piece.captionLines * metrics.caption.line,
             }}
           >
-            {pictured && icon ? (
+            {piece.inlineIcon && icon ? (
               <span aria-hidden data-board-icon className="mr-1">
                 {icon}
               </span>

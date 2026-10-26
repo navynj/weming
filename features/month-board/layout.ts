@@ -7,20 +7,25 @@ import { seedOf } from './layout-seed';
 export { seedOf };
 
 /**
- * The calendar's geometry (Calendar view), in logical pixels. It is laid
- * out at its room's own width, phone or desktop, and never scaled or
- * panned (review): seven lanes always fit.
+ * The calendar's geometry (Calendar view), in logical pixels, laid out at
+ * its room's own width and never scaled or panned (review): seven lanes
+ * always fit.
  *
- * Readable first (review). Hard rules, never broken:
- * - nothing covers a label's words: no sticker, no other label, no photo;
- * - items never overlap: a day's stack down its lane in time order, no gap;
- * - a label overhangs into the next lane only where that lane is empty at
- *   its height, and never over the next lane's items;
- * - a label is at least 32px tall and its words wrap to three lines.
- *
- * The one dynamic axis is where a label starts: 0, 12, 24 or 36% into its
- * lane, by the id, never the same as the item above. One width, one
- * calendar: the same data at the same width always lays out the same.
+ * Composed and lively, always readable (review, the mockup's Sat 3): every
+ * item is one of three recipes —
+ * - A, inside icon, shifted label (Hoppers): the icon small before the
+ *   words; the label starts 35–45% into its lane and keeps the lane's
+ *   width, overhanging into the next — only where that lane is empty at
+ *   its height, else it starts at 15% and ends at the line;
+ * - B, outside sticker, flush label (Lynn Canyon): the label the lane
+ *   wide from its line, a large sticker centred on its top-left corner;
+ * - C, photo (Beef Short Rib), whenever there are photos: a card 55–70% of
+ *   the lane, left or right, tucked 10px up into the item above's bottom
+ *   padding, the caption centred under it.
+ * A or B by the id, never the same twice in a row within a day, and a day
+ * of two or more items has a B. Items stack in time order with no gap; the
+ * only overlaps are B's sticker and C's tuck, both into padding or empty
+ * water, never words. Labels hug their content.
  */
 export const COLUMNS = 7;
 /** The first column's weekday: 0 is Sunday. */
@@ -38,15 +43,20 @@ export const DAY_NUMBER_PX = 70;
 export const DAY_WAVES_MAX = 3;
 const FOOT_PX = 24;
 
-/** The start offsets, as shares of the lane: the one axis that moves. */
-export const OFFSET_STEPS = [0, 0.12, 0.24, 0.36] as const;
-/** A label's least height, and how many lines its words wrap to. */
-export const LABEL_MIN_PX = 32;
+/** The three recipes. */
+export type Recipe = 'A' | 'B' | 'C';
+/** A's start, as a share of the lane: overhanging, or its fallback, ending at the line. */
+const A_START_MIN = 0.35;
+const A_START_MAX = 0.45;
+const A_FALLBACK = 0.15;
+/** C's card, as a share of the lane, and how far it tucks up into the item above. */
+const C_MIN = 0.55;
+const C_MAX = 0.7;
+export const C_TUCK_PX = 10;
+/** Words wrap to three lines at most. */
 const CAPTION_LINES = 3;
 /** About how wide one 10px Poppins character is, for the line estimate: generous, so words never outgrow their box. */
 const CHAR_EM = 0.62;
-/** The sticker is the icon at this many line heights, hanging off the label's top-left corner. */
-export const STICKER_LINES = 1.4;
 /** An open joint splash's slot, inline after its words: the room it takes, in characters. */
 const SLOT_FACE_CHARS = 2;
 const SLOT_WORDS_CHARS = 14;
@@ -57,7 +67,7 @@ const TAPE_GAP_PX = 2;
 
 /** At most this many photo cards; past it the top card carries "+N". */
 export const PHOTOS_SHOWN = 3;
-/** With photos the small icon leads the caption's words. */
+/** The small icon leads the words (A, C). */
 const ICON_CHARS = 2;
 /** Room the joint faces take after a caption, in characters. */
 const FACES_CHARS = 4;
@@ -75,16 +85,23 @@ export const LABEL_STYLES: readonly LabelStyle[] = ['none', 'white', 'ink'];
 export type BoardMetrics = {
   width: number;
   column: number;
-  /** A phone's lanes (under 80px): tighter padding. */
+  /** A phone's lanes (under 80px): side padding halved, so words keep some room. */
   narrow: boolean;
   /** A month row's least height; a busy day grows its whole row. A week row has none. */
   rowBase: number;
   /** The caption's type: every title 10px (review). */
   caption: { size: number; line: number };
-  /** The sticker's size: 1.4 line heights. */
+  /**
+   * B's sticker: about twice the line, held to twice the bottom padding so
+   * its upper half lands on the item above's padding and never its words.
+   */
   sticker: number;
-  /** A label's padding. The left one, beside a sticker, holds its inner half; the bottom one, the next item's. */
-  pad: { top: number; bottom: number; right: number; left: number; leftCaption: number };
+  /**
+   * A label's padding: 8 top, 12 sides (6 on the left on a phone), 12
+   * bottom (review). The right side never drops under half a sticker: the
+   * next lane's B sticker hangs that far over the line, onto padding only.
+   */
+  pad: { top: number; side: number; right: number; bottom: number };
   /** Each photo card behind the top one peeks this much above the one before. */
   fanMin: number;
   fanMax: number;
@@ -97,23 +114,19 @@ export function boardMetrics(width: number): BoardMetrics {
   const narrow = column < 80;
   const size = 10;
   const line = size + 3;
-  const sticker = Math.round(line * STICKER_LINES);
-  const half = Math.ceil(sticker / 2);
-  const right = narrow ? 4 : 8;
+  const bottom = 12;
   return {
     width: w,
     column,
     narrow,
     rowBase: narrow ? 96 : 132,
     caption: { size, line },
-    sticker,
+    sticker: Math.min(line * 2, bottom * 2),
     pad: {
-      top: 6,
-      // Room for the sticker hanging off the next item's top-left corner: it sits on this padding, never on words.
-      bottom: half + 2,
-      right,
-      left: half + 4,
-      leftCaption: right,
+      top: 8,
+      side: narrow ? 6 : 12,
+      right: Math.max(narrow ? 6 : 12, Math.ceil(Math.min(line * 2, bottom * 2) / 2)),
+      bottom,
     },
     fanMin: narrow ? 3 : 4,
     fanMax: narrow ? 5 : 8,
@@ -135,26 +148,30 @@ export type BoardPiece = {
   day: IsoDate;
   week: number;
   col: number;
-  /** Photos when the record has any (with a caption beneath), else a label with its sticker. */
+  recipe: Recipe;
+  /** Photos (C), else a label (A or B). */
   variant: 'photo' | 'sticker';
   label: LabelStyle;
-  /** Which start offset (an index into `OFFSET_STEPS`): never the item above's. */
-  step: number;
-  /** The label runs past the lane's right line by its offset, into an empty band of the next lane. */
+  /** A's label runs past the lane's right line, into an empty band of the next lane. */
   overhang: boolean;
+  /** C tucks up into the item above's bottom padding. */
+  tuck: number;
   /** The photo cards, back to front: the newest of the shown ones on top. */
   fan: PhotoCard[];
   /** Photos beyond those shown: the top card's "+N". */
   morePhotos: number;
-  /** Within the piece: the label, its words, the photo area, the sticker. */
+  /** Within the piece: the label, its words, the photo area, B's sticker. */
   labelBox: Box;
   textBox: Box;
   photoBox: Box | null;
   stickerBox: Box | null;
   /** An open joint splash: its slot sits inline after the words, wrapping under only when the line is full. */
   slot: boolean;
-  /** The label's padding, as drawn. */
+  /** The label's padding, as drawn; `center` for C's caption. */
   pad: { top: number; right: number; bottom: number; left: number };
+  center: boolean;
+  /** The small icon before the words (A, C), or B's sticker. */
+  inlineIcon: boolean;
   captionLines: number;
   x: number;
   y: number;
@@ -279,6 +296,11 @@ function monthDays(month: string, weekStart: number): IsoDate[][] {
   return weeks;
 }
 
+/** A draw in [0, 1). */
+function unit(id: string, salt: string): number {
+  return seedOf(`${salt}:${id}`) / 0x100000000;
+}
+
 /** A piece's box moved onto the board. */
 export function onBoard(piece: Pick<BoardPiece, 'x' | 'y'>, box: Box): Box {
   return { x: piece.x + box.x, y: piece.y + box.y, w: box.w, h: box.h };
@@ -289,124 +311,77 @@ export function intersects(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
+/** Everything a piece draws on the board: its label, its photos, its sticker. */
+export function extentOf(piece: BoardPiece): Box[] {
+  return [piece.labelBox, piece.photoBox, piece.stickerBox]
+    .filter((box): box is Box => box !== null)
+    .map((box) => onBoard(piece, box));
+}
+
 /** What a day decides for each of its items before they are shaped. */
-type Plan = { step: number; label: LabelStyle };
+type Plan = { recipe: Recipe; label: LabelStyle };
 
 /**
- * A day's plan (review): the start offset steps by the id, never the same
- * as the item above's; a joint splash alternates white and ink with the
- * day's other joint ones; everything else takes no fill.
+ * A day's plan (review): photos take C; the rest A or B by the id, never
+ * the same as the item above's (two photos in a row are both C, there
+ * being no other way to draw them); a day of two or more items has a B —
+ * an A turned, which can sit by no B, A never following A. A joint splash
+ * alternates white and ink with the day's other joint ones; everything
+ * else takes no fill.
  */
 function planDay(cards: Card[]): Plan[] {
-  let step = -1;
   let fill: LabelStyle | null = null;
-  return cards.map((card) => {
-    const id = card.splash.id;
-    const drawn = draw(id, 'offset', OFFSET_STEPS.length);
-    step = drawn === step ? (drawn + 1) % OFFSET_STEPS.length : drawn;
+  const recipes: Recipe[] = [];
+  cards.forEach((card, at) => {
+    if ((card.photos?.length ?? 0) > 0) {
+      recipes.push('C');
+      return;
+    }
+    const drawn: Recipe = draw(card.splash.id, 'recipe', 2) === 0 ? 'A' : 'B';
+    const above = recipes[at - 1];
+    recipes.push(drawn === above ? (drawn === 'A' ? 'B' : 'A') : drawn);
+  });
+  if (cards.length >= 2 && !recipes.includes('B')) {
+    const at = recipes.indexOf('A');
+    if (at >= 0) recipes[at] = 'B';
+  }
+  return cards.map((card, at) => {
     let label: LabelStyle = 'none';
     if (card.joint) {
-      const drawnFill: LabelStyle = draw(id, 'label', 2) === 0 ? 'white' : 'ink';
+      const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'ink';
       fill = drawnFill === fill ? (fill === 'white' ? 'ink' : 'white') : drawnFill;
       label = fill;
     }
-    return { step, label };
+    return { recipe: recipes[at], label };
   });
 }
 
-/**
- * A piece's shape, its label running from its offset to the lane's right
- * line (overhang is decided later, by the lane beside it). A label carries
- * its sticker off its top-left corner — the label starting at least half a
- * sticker in, so the sticker never crosses into the lane before — and its
- * words start past the sticker's inner half. With photos, up to three
- * square cards from the offset to the line, the caption directly under
- * with its icon small before the words. An open joint splash's slot sits
- * inline after the words, its room counted in the line estimate.
- */
-function pieceShape(
+/** How many lines the words take in a label `w` wide with these side paddings. */
+function linesIn(
   card: Card,
-  plan: Plan,
+  w: number,
+  left: number,
+  right: number,
+  icon: boolean,
   m: BoardMetrics,
-): Omit<
-  BoardPiece,
-  'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'step' | 'overhang' | 'x' | 'y'
-> {
-  const id = card.splash.id;
-  const photos = card.photos ?? [];
-  const pictured = photos.length > 0;
-  const half = Math.ceil(m.sticker / 2);
-  const share = Math.round(m.column * OFFSET_STEPS[plan.step]);
-  const offset = pictured ? share : Math.max(share, half);
-  const pad = {
-    top: m.pad.top,
-    right: m.pad.right,
-    bottom: m.pad.bottom,
-    left: pictured ? m.pad.leftCaption : m.pad.left,
-  };
-  const labelW = m.column - offset;
+): number {
   const slot = isOpenJoint(card);
   const slotChars = slot
     ? Math.min(card.awaiting!.length, m.narrow ? 2 : 4) * SLOT_FACE_CHARS +
       (m.narrow ? 0 : SLOT_WORDS_CHARS) +
       2
     : 0;
-  const caption =
-    captionOf(card) +
-    (card.joint ? ' '.repeat(FACES_CHARS) : '') +
-    (pictured ? ' '.repeat(ICON_CHARS) : '') +
-    ' '.repeat(slotChars);
-  const chars = Math.max(
-    2,
-    Math.floor((labelW - pad.left - pad.right) / (m.caption.size * CHAR_EM)),
-  );
-  const lines = Math.min(CAPTION_LINES, Math.max(1, Math.ceil([...caption].length / chars)));
-  const labelH = Math.max(LABEL_MIN_PX, pad.top + lines * m.caption.line + pad.bottom);
-
-  let photoBox: Box | null = null;
-  let fan: PhotoCard[] = [];
-  let morePhotos = 0;
-  if (pictured) {
-    const shown = photos.slice(0, PHOTOS_SHOWN);
-    let dy = 0;
-    // Back to front: the last shown — the newest — is drawn last, on top.
-    for (let at = shown.length - 1; at >= 0; at -= 1) {
-      fan.push({ ...shown[at], dy });
-      dy += m.fanMin + draw(id, `fan:${at}`, m.fanMax - m.fanMin + 1);
-    }
-    // `fan` is front to back; the deepest card's peek is the area's extra room.
-    const spread = fan.length > 0 ? fan[fan.length - 1].dy : 0;
-    // Whole pixels down the lane, so stacked boxes meet exactly and never creep into each other.
-    photoBox = { x: offset, y: 0, w: labelW, h: Math.round(labelW) + spread };
-    fan = fan.reverse();
-    morePhotos = photos.length - shown.length;
-  }
-  const labelBox: Box = { x: offset, y: photoBox ? photoBox.h : 0, w: labelW, h: labelH };
-  return {
-    variant: pictured ? 'photo' : 'sticker',
-    fan,
-    morePhotos,
-    labelBox,
-    textBox: textOf(labelBox, pad, lines, m),
-    photoBox,
-    stickerBox: pictured
-      ? null
-      : { x: offset - m.sticker / 2, y: labelBox.y - m.sticker / 2, w: m.sticker, h: m.sticker },
-    slot,
-    pad,
-    captionLines: lines,
-    w: m.column,
-    h: labelBox.y + labelBox.h,
-  };
+  const chars = Math.max(2, Math.floor((w - left - right) / (m.caption.size * CHAR_EM)));
+  const length =
+    [...captionOf(card)].length +
+    (card.joint ? FACES_CHARS : 0) +
+    (icon ? ICON_CHARS : 0) +
+    slotChars;
+  return Math.min(CAPTION_LINES, Math.max(1, Math.ceil(length / chars)));
 }
 
 /** A label's words: inside its padding, as many lines as they take. */
-function textOf(
-  label: Box,
-  pad: { top: number; right: number; left: number },
-  lines: number,
-  m: BoardMetrics,
-): Box {
+function textOf(label: Box, pad: BoardPiece['pad'], lines: number, m: BoardMetrics): Box {
   return {
     x: label.x + pad.left,
     y: label.y + pad.top,
@@ -415,13 +390,145 @@ function textOf(
   };
 }
 
+type Shape = Omit<BoardPiece, 'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'x' | 'y'>;
+
+/** A label box hugging its words: the padding and the lines, nothing more. */
+function hug(lines: number, m: BoardMetrics): number {
+  return m.pad.top + lines * m.caption.line + m.pad.bottom;
+}
+
+/**
+ * A (Hoppers): the icon inline; the label from 35–45% into the lane, the
+ * lane's width, overhanging the next — when `room` says the next lane is
+ * empty at the height it would take — else from 15% to the line.
+ */
+function shapeA(card: Card, col: number, m: BoardMetrics, room: (band: Box) => boolean): Shape {
+  const pad = { top: m.pad.top, right: m.pad.right, bottom: m.pad.bottom, left: m.pad.side };
+  const wide = (): Shape | null => {
+    if (col === COLUMNS - 1) return null;
+    const x = Math.round(
+      m.column * (A_START_MIN + unit(card.splash.id, 'shift') * (A_START_MAX - A_START_MIN)),
+    );
+    const lines = linesIn(card, m.column, pad.left, pad.right, true, m);
+    const labelBox = { x, y: 0, w: m.column, h: hug(lines, m) };
+    return room({ x: m.column, y: 0, w: x, h: labelBox.h }) ? label(labelBox, lines, true) : null;
+  };
+  const label = (labelBox: Box, lines: number, overhang: boolean): Shape => ({
+    recipe: 'A',
+    variant: 'sticker',
+    overhang,
+    tuck: 0,
+    fan: [],
+    morePhotos: 0,
+    labelBox,
+    textBox: textOf(labelBox, pad, lines, m),
+    photoBox: null,
+    stickerBox: null,
+    slot: isOpenJoint(card),
+    pad,
+    center: false,
+    inlineIcon: true,
+    captionLines: lines,
+    w: labelBox.x + labelBox.w,
+    h: labelBox.h,
+  });
+  const over = wide();
+  if (over) return over;
+  const x = Math.round(m.column * A_FALLBACK);
+  const lines = linesIn(card, m.column - x, pad.left, pad.right, true, m);
+  return label({ x, y: 0, w: m.column - x, h: hug(lines, m) }, lines, false);
+}
+
+/**
+ * B (Lynn Canyon): the label the lane wide from its line, a large sticker
+ * centred on its top-left corner — half outside, up and left — the words
+ * starting past its inner half. In the first lane the label starts half a
+ * sticker in, so the sticker stays on the board.
+ */
+function shapeB(card: Card, col: number, m: BoardMetrics): Shape {
+  const half = m.sticker / 2;
+  const x = col === 0 ? half : 0;
+  const pad = {
+    top: m.pad.top,
+    right: m.pad.right,
+    bottom: m.pad.bottom,
+    left: Math.max(m.pad.side, half),
+  };
+  const lines = linesIn(card, m.column - x, pad.left, pad.right, false, m);
+  const labelBox = { x, y: 0, w: m.column - x, h: hug(lines, m) };
+  return {
+    recipe: 'B',
+    variant: 'sticker',
+    overhang: false,
+    tuck: 0,
+    fan: [],
+    morePhotos: 0,
+    labelBox,
+    textBox: textOf(labelBox, pad, lines, m),
+    photoBox: null,
+    stickerBox: { x: x - half, y: -half, w: m.sticker, h: m.sticker },
+    slot: isOpenJoint(card),
+    pad,
+    center: false,
+    inlineIcon: false,
+    captionLines: lines,
+    w: m.column,
+    h: labelBox.h,
+  };
+}
+
+/**
+ * C (Beef Short Rib): up to three square cards 55–70% of the lane, left or
+ * right, the caption centred directly under them with its icon inline;
+ * tucked up into the item above's bottom padding when there is one.
+ */
+function shapeC(card: Card, first: boolean, m: BoardMetrics): Shape {
+  const id = card.splash.id;
+  const photos = card.photos!;
+  const size = Math.round(m.column * (C_MIN + unit(id, 'photo') * (C_MAX - C_MIN)));
+  const x = draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - size);
+  const shown = photos.slice(0, PHOTOS_SHOWN);
+  let dy = 0;
+  const fan: PhotoCard[] = [];
+  // Back to front: the last shown — the newest — is drawn last, on top.
+  for (let at = shown.length - 1; at >= 0; at -= 1) {
+    fan.push({ ...shown[at], dy });
+    dy += m.fanMin + draw(id, `fan:${at}`, m.fanMax - m.fanMin + 1);
+  }
+  const spread = fan.length > 0 ? fan[fan.length - 1].dy : 0;
+  const photoBox = { x, y: 0, w: size, h: size + spread };
+  const side = Math.min(m.pad.side, Math.floor(size / 8));
+  // Against the line, the caption keeps the right padding the next lane's sticker hangs on.
+  const right = x + size >= m.column - 1 ? m.pad.right : side;
+  const pad = { top: m.pad.top, right, bottom: m.pad.bottom, left: side };
+  const lines = linesIn(card, size, pad.left, pad.right, true, m);
+  const labelBox = { x, y: photoBox.h, w: size, h: hug(lines, m) };
+  return {
+    recipe: 'C',
+    variant: 'photo',
+    overhang: false,
+    tuck: first ? 0 : C_TUCK_PX,
+    fan: fan.reverse(),
+    morePhotos: photos.length - shown.length,
+    labelBox,
+    textBox: textOf(labelBox, pad, lines, m),
+    photoBox,
+    stickerBox: null,
+    slot: isOpenJoint(card),
+    pad,
+    center: true,
+    inlineIcon: true,
+    captionLines: lines,
+    w: m.column,
+    h: labelBox.y + labelBox.h,
+  };
+}
+
 /**
  * The board: lanes of days in rows, each post on its day, ranged posts as
- * bands along the top of each row they cross. A day's pieces stack down
- * its own lane in time order with no gap; a label overhangs the next lane
- * by its offset only where that lane is empty at its height; a row is as
- * tall as its tallest lane. Every choice comes from the post's id and its
- * place in its day (`planDay`).
+ * bands along the top of each row they cross. A row is laid out right to
+ * left, so an A label decides its overhang against a next lane already
+ * final; a row is as tall as its tallest lane.
  */
 function layoutBoard(
   cards: Card[],
@@ -519,53 +626,48 @@ function layoutBoard(
       tapes.push({ ...tape, y: y + numberBand + lanes[at] * (TAPE_PX + TAPE_GAP_PX) });
     });
 
-    // Pieces: down their own lane, in time order, flush against each other.
-    const rowPieces: BoardPiece[] = [];
+    // Pieces: right to left, each lane stacked in time order with no gap.
+    const byCol = new Map<number, BoardPiece[]>();
     let tallest = span === 'month' ? m.rowBase : 0;
-    for (const cell of cells) {
+    for (const cell of [...cells].reverse()) {
       const list = cell.inMonth ? (byDay.get(cell.day) ?? []) : [];
+      const next = byCol.get(cell.col + 1) ?? [];
+      // The next lane is empty at a band when nothing of it — label, photo, sticker — is there.
+      const room =
+        (top: number) =>
+        (band: Box): boolean => {
+          const reach = { x: cell.x + band.x, y: top + band.y, w: band.w, h: band.h };
+          return next.every((p) => extentOf(p).every((box) => !intersects(reach, box)));
+        };
       let top = y + numberBand + tapeBlock;
       const plans = planDay(list);
+      const lane: BoardPiece[] = [];
       list.forEach((card, at) => {
-        const shape = pieceShape(card, plans[at], m);
-        const piece: BoardPiece = {
+        const plan = plans[at];
+        const shape =
+          plan.recipe === 'C'
+            ? shapeC(card, at === 0, m)
+            : plan.recipe === 'A'
+              ? shapeA(card, cell.col, m, room(top))
+              : shapeB(card, cell.col, m);
+        const pieceY = top - shape.tuck;
+        lane.push({
           id: card.splash.id,
           card,
           day: cell.day,
           week: index,
           col: cell.col,
-          label: plans[at].label,
-          step: plans[at].step,
-          overhang: false,
+          label: plan.label,
           ...shape,
           x: cell.x,
-          y: top,
-        };
-        rowPieces.push(piece);
-        top += shape.h;
+          y: pieceY,
+        });
+        top = pieceY + shape.h;
       });
+      byCol.set(cell.col, lane);
       tallest = Math.max(tallest, top - y, numberBand + tapeBlock);
     }
-
-    // Overhang: a label with an offset reaches past its line by that offset
-    // only where the next lane holds nothing at its height (its pieces and
-    // their stickers, which hang above them).
-    for (const piece of rowPieces) {
-      if (piece.col === COLUMNS - 1 || piece.labelBox.x === 0) continue;
-      const label = onBoard(piece, piece.labelBox);
-      const reach: Box = { x: label.x + label.w, y: label.y, w: piece.labelBox.x, h: label.h };
-      const neighbours = rowPieces.filter((p) => p.col === piece.col + 1);
-      const clear = neighbours.every((p) => {
-        const top = p.stickerBox ? Math.min(0, p.stickerBox.y) : 0;
-        return !intersects(reach, { x: p.x, y: p.y + top, w: p.w, h: p.h - top });
-      });
-      if (!clear) continue;
-      piece.overhang = true;
-      piece.labelBox = { ...piece.labelBox, w: m.column };
-      piece.textBox = textOf(piece.labelBox, piece.pad, piece.captionLines, m);
-      piece.w = piece.labelBox.x + m.column;
-    }
-    pieces.push(...rowPieces);
+    for (const cell of cells) pieces.push(...(byCol.get(cell.col) ?? []));
     weeks.push({ index, y, h: tallest, cells });
     y += tallest;
   });
