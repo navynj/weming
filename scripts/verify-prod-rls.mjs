@@ -34,6 +34,8 @@ const TABLES = [
   'pool_invites',
   'sessions',
   'board_layouts',
+  'ripple_reactions',
+  'ripple_replies',
 ];
 
 /**
@@ -51,6 +53,18 @@ const FUNCTIONS = [
   ['_board_layout_merge', { base: {}, patch: {} }],
   ['_board_layout_clear', { l: {}, paths: [] }],
   ['_board_layout_prune', { l: {}, media: [] }],
+  ['can_respond', { rid: NIL }],
+  ['can_read_responses', { rid: NIL }],
+  ['_ripple_pools', { rid: NIL }],
+  ['responder_visible', { rid: NIL, uid: NIL }],
+  ['responder_former', { rid: NIL, uid: NIL }],
+  ['add_reply', { p_ripple: NIL, p_body: 'x', p_id: null }],
+  ['edit_reply', { p_reply: NIL, p_body: 'x' }],
+  ['delete_reply', { p_reply: NIL }],
+  ['hide_reply', { p_reply: NIL, p_hidden: true }],
+  ['ripple_replies_for', { p_ripples: [NIL] }],
+  ['splash_reaction_summary', { p_splashes: [NIL] }],
+  ['splash_reply_preview', { p_splashes: [NIL] }],
 ];
 
 /** Env first, then .env.local, so this runs against whatever is linked. */

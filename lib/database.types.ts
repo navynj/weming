@@ -540,6 +540,97 @@ export type Database = {
           },
         ]
       }
+      ripple_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          ripple_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          ripple_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          ripple_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ripple_reactions_ripple_id_fkey"
+            columns: ["ripple_id"]
+            isOneToOne: false
+            referencedRelation: "ripples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ripple_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ripple_replies: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          edited_at: string | null
+          hidden_at: string | null
+          hidden_by: string | null
+          id: string
+          ripple_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          edited_at?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          ripple_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          edited_at?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          ripple_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ripple_replies_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ripple_replies_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ripple_replies_ripple_id_fkey"
+            columns: ["ripple_id"]
+            isOneToOne: false
+            referencedRelation: "ripples"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ripple_views: {
         Row: {
           ripple_id: string
@@ -938,6 +1029,7 @@ export type Database = {
         Returns: undefined
       }
       _require_uid: { Args: never; Returns: string }
+      _ripple_pools: { Args: { rid: string }; Returns: string[] }
       _sending_lane: {
         Args: { cid: string; pid: string; uid: string }
         Returns: string
@@ -947,7 +1039,13 @@ export type Database = {
         Returns: undefined
       }
       _splash_lane: { Args: { sid: string }; Returns: string }
+      add_reply: {
+        Args: { p_body: string; p_id?: string; p_ripple: string }
+        Returns: string
+      }
       board_layout_valid: { Args: { l: Json }; Returns: boolean }
+      can_read_responses: { Args: { rid: string }; Returns: boolean }
+      can_respond: { Args: { rid: string }; Returns: boolean }
       can_see_ripple: { Args: { rid: string }; Returns: boolean }
       create_invite: {
         Args: { p_pool: string }
@@ -989,6 +1087,15 @@ export type Database = {
       }
       delete_joint_splash: { Args: { p_splash: string }; Returns: undefined }
       delete_pool: { Args: { p_pool: string }; Returns: undefined }
+      delete_reply: { Args: { p_reply: string }; Returns: undefined }
+      edit_reply: {
+        Args: { p_body: string; p_reply: string }
+        Returns: undefined
+      }
+      hide_reply: {
+        Args: { p_hidden?: boolean; p_reply: string }
+        Returns: undefined
+      }
       invite_lanes: {
         Args: { p_token: string }
         Returns: {
@@ -1035,10 +1142,28 @@ export type Database = {
         Args: { p_name: string; p_pool: string }
         Returns: undefined
       }
+      responder_former: { Args: { rid: string; uid: string }; Returns: boolean }
+      responder_visible: {
+        Args: { rid: string; uid: string }
+        Returns: boolean
+      }
       revoke_invite: { Args: { p_invite: string }; Returns: undefined }
       ripple_author: { Args: { rid: string }; Returns: string }
       ripple_in_my_pools: { Args: { rid: string }; Returns: boolean }
       ripple_is_locked: { Args: { rid: string }; Returns: boolean }
+      ripple_replies_for: {
+        Args: { p_ripples: string[] }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          edited_at: string
+          former: boolean
+          hidden: boolean
+          id: string
+          ripple_id: string
+        }[]
+      }
       ripple_span: {
         Args: { ended: string; started: string }
         Returns: unknown
@@ -1068,6 +1193,26 @@ export type Database = {
       splash_in_my_pools: { Args: { sid: string }; Returns: boolean }
       splash_in_pool: { Args: { pid: string; sid: string }; Returns: boolean }
       splash_owner: { Args: { sid: string }; Returns: string }
+      splash_reaction_summary: {
+        Args: { p_splashes: string[] }
+        Returns: {
+          emoji: string[]
+          splash_id: string
+          total: number
+        }[]
+      }
+      splash_reply_preview: {
+        Args: { p_splashes: string[] }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          reply_id: string
+          ripple_id: string
+          splash_id: string
+          total: number
+        }[]
+      }
       splash_to_joint: {
         Args: { p_pool_lane: string; p_splash: string }
         Returns: undefined

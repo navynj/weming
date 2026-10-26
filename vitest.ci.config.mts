@@ -44,6 +44,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/conversions-db.test.ts',
   'tests/pool-photo-db.test.ts',
   'tests/board-layouts-db.test.ts',
+  'tests/ripple-responses-db.test.ts',
 ];
 
 export default defineConfig({
