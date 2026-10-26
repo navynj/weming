@@ -39,14 +39,20 @@ function nextView(view: PoolViewKind): PoolViewKind {
   return VIEWS[(at + 1) % VIEWS.length].value;
 }
 
-// Board | Swimmers | Lane | Date (review): the month as a board first, then
-// its people; re-tapping Pool walks them in this order.
+// Calendar | Swimmers | Lane | List (review): the calendar first, then its
+// people; re-tapping Pool walks them in this order. The values are the
+// remembered keys and the tests' names, the labels what the hand reads.
 const VIEWS = [
-  { value: 'board', label: 'Board' },
+  { value: 'board', label: 'Calendar' },
   { value: 'swimmers', label: 'Swimmers' },
   { value: 'lane', label: 'Lane' },
-  { value: 'date', label: 'Date' },
+  { value: 'date', label: 'List' },
 ] as const satisfies readonly { value: PoolViewKind; label: string }[];
+
+/** What a view is called, for the foot's label. */
+function viewName(view: PoolViewKind): string {
+  return VIEWS.find((v) => v.value === view)?.label ?? view;
+}
 
 /** How many members' initials the header shows before the `+`. */
 const HEADER_AVATARS = 3;
@@ -305,6 +311,9 @@ export function PoolGround({
                 cards={shown}
                 month={boardMonth}
                 onMonth={setBoardMonth}
+                today={today}
+                ring={ring}
+                dropped={dropHere?.splash.id ?? null}
                 onPick={bringForward}
                 lanes={laneNames}
               />
@@ -346,7 +355,7 @@ export function PoolGround({
             here="pool"
             poolId={poolId}
             onPool={cycleView}
-            poolLabel={`Pool, showing ${kind}; tap for ${nextView(kind)}`}
+            poolLabel={`Pool, showing ${viewName(kind)}; tap for ${viewName(nextView(kind))}`}
             onCompose={composeHere}
           />
         </div>
@@ -357,7 +366,7 @@ export function PoolGround({
           here="pool"
           poolId={poolId}
           onPool={cycleView}
-          poolLabel={`Pool, showing ${kind}; tap for ${nextView(kind)}`}
+          poolLabel={`Pool, showing ${viewName(kind)}; tap for ${viewName(nextView(kind))}`}
           onCompose={composeHere}
         />
       </div>
