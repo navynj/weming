@@ -22,7 +22,7 @@ import { LaneIcon } from './lane-icon';
 import { PinnedCards } from './pinned-cards';
 import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
-import { nextHomeView, useHomeView, ViewToggle } from './view-toggle';
+import { homeViewName, nextHomeView, useHomeView, ViewToggle } from './view-toggle';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { monthKey } from '@/features/splash/summary';
 
@@ -243,7 +243,7 @@ export function HomeGround({
   // The Board view's month: `?m=` when given, else the month of the post on
   // top, else this month; its arrows move it from there.
   const [boardMonth, setBoardMonth] = useState(() => {
-    const top = shown.find((card) => card.splash.id === initialTop);
+    const top = topParam ? shown.find((card) => card.splash.id === initialTop) : undefined;
     return scrollToMonth ?? (top ? monthKey(top.day) : monthKey(today));
   });
   // A new `?m=` while open moves the board there, set as it renders.
@@ -326,6 +326,9 @@ export function HomeGround({
                 cards={shown}
                 month={boardMonth}
                 onMonth={setBoardMonth}
+                today={today}
+                ring={ring}
+                dropped={pendingDrop?.splash.id ?? null}
                 onPick={goTo}
                 lanes={columns}
               />
@@ -374,7 +377,7 @@ export function HomeGround({
               Date and back (review) — then Pool, and compose at the right. */}
           <GroundFoot
             here="home"
-            homeLabel={`Home, showing the ${view} view; tap for ${nextHomeView(view)}`}
+            homeLabel={`Home, showing ${homeViewName(view)}; tap for ${homeViewName(nextHomeView(view))}`}
             onHome={() => setView(nextHomeView(view))}
             onCompose={() => openSheet()}
           />
@@ -384,7 +387,7 @@ export function HomeGround({
         <GroundFoot
           slot="wide"
           here="home"
-          homeLabel={`Home, showing the ${view} view; tap for ${nextHomeView(view)}`}
+          homeLabel={`Home, showing ${homeViewName(view)}; tap for ${homeViewName(nextHomeView(view))}`}
           onHome={() => setView(nextHomeView(view))}
           onCompose={() => openSheet()}
         />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties, type MouseEvent } from 'react';
+import type { CSSProperties } from 'react';
 
 import {
   postIcon,
@@ -13,135 +13,56 @@ import { Avatar } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 import type { SignedMedia } from '@/lib/media';
 
-import { splashShape } from './splash-shape';
-
 import {
   captionOf,
-  LABEL_OVERLAP_PX,
-  LABEL_PAD_BOTTOM_PX,
-  LABEL_PAD_TOP_PX,
-  PHOTO_PAD_PX,
-  SLOT_PX,
+  STICKER_LARGE,
   type BoardMetrics,
   type BoardPiece,
-  type PhotoCard,
   type BoardTape,
   type LabelStyle,
+  type PhotoCard,
 } from './layout';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 
-/** What a piece needs besides its place: the lanes its icon falls back to, and what a tap does. */
+/** What a piece needs besides its place: the lanes its icon falls back to, the sizes, and what a tap does. */
 type Shared = {
   lanes: Lanes;
   /** The sizes that follow the board's width. */
   metrics: BoardMetrics;
   /** Brings the post's card to the top of the stack, as a mark does in the Lane view. */
   onPick: (id: string) => void;
-  /** Swallows the click that ends a pan or a pinch, so moving the board never picks a post. */
-  onClickCapture: (event: MouseEvent) => void;
+  /**
+   * The stack is heading to this post (review): it bobs on its water, which
+   * swells, once per value — the ring's counterpart on the board.
+   */
+  ripple: number | null;
 };
 
-function placed(box: {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotate: number;
-}): CSSProperties {
-  return {
-    left: box.x,
-    top: box.y,
-    width: box.w,
-    height: box.h,
-    transform: `rotate(${box.rotate}deg)`,
-  };
+/** The motion a piece plays: a bob for the heading, a plunge for a drop. */
+function motionOf(ripple: number | null, plunge: boolean): string {
+  if (plunge) return 'board-plunge';
+  if (ripple !== null) return 'board-bob';
+  return '';
 }
 
-/** The words' colour; the fill is the splash drawn beneath them (`SplashLayer`). */
+function placed(box: { x: number; y: number; w: number; h: number }): CSSProperties {
+  return { left: box.x, top: box.y, width: box.w, height: box.h };
+}
+
+/** The words' colour and the fill beneath them. */
 const LABEL_CLASS: Record<LabelStyle, string> = {
   none: 'text-white',
-  white: 'text-main-900',
-  ink: 'text-white',
+  white: 'bg-white text-main-900',
+  ink: 'bg-ink text-white',
 };
-/** The splash's fill, and its drops': the label's own colour, white drops for a label with none. */
-const FILL_CLASS: Record<LabelStyle, string> = {
-  none: 'fill-white',
-  white: 'fill-white',
-  ink: 'fill-ink',
-};
-
-type Box = { x: number; y: number; w: number; h: number };
-
-/**
- * The splash a label or a photo fan sits in (review): thin rings beneath it,
- * one per ripple (three at most), white at 25%; two or three drops just
- * outside its edge; and for a filled label, the wobbling outline that is its
- * fill. Paths come from `splashShape`, once per splash. No shadow.
- */
-function SplashLayer({
-  id,
-  box,
-  style,
-  ripples,
-  outline,
-}: {
-  id: string;
-  box: Box;
-  style: LabelStyle;
-  ripples: number;
-  /** The label draws its blob; a photo fan only its rings and drops. */
-  outline: boolean;
-}) {
-  const shape = splashShape(id, box.w, box.h, {
-    filled: outline && style !== 'none',
-    ripples,
-  });
-  return (
-    <svg
-      aria-hidden
-      data-board-splash={id}
-      width={box.w}
-      height={box.h}
-      viewBox={`0 0 ${box.w} ${box.h}`}
-      className="pointer-events-none absolute overflow-visible"
-      style={{ left: box.x, top: box.y }}
-    >
-      {shape.rings.map((ring, at) => (
-        <ellipse
-          key={at}
-          data-board-ring
-          cx={ring.cx}
-          cy={ring.cy}
-          rx={ring.rx}
-          ry={ring.ry}
-          className="fill-none stroke-white/25"
-          strokeWidth={1}
-        />
-      ))}
-      {shape.blob ? <path data-board-blob d={shape.blob} className={FILL_CLASS[style]} /> : null}
-      {shape.droplets.map((drop, at) => (
-        <circle
-          key={at}
-          data-board-droplet
-          cx={drop.cx}
-          cy={drop.cy}
-          r={drop.r}
-          className={FILL_CLASS[style]}
-        />
-      ))}
-    </svg>
-  );
-}
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {
   none: 'ring-main-900',
   white: 'ring-white',
   ink: 'ring-ink',
 };
-const CAPTION_CLASS = 'line-clamp-2 text-xs/[15px] font-medium break-words';
-
-/** Faces as the board draws them: 16px at 12px initials, so they hold the 10px floor zoomed out. */
+/** Faces as the board draws them: 16px at 12px initials, so they hold the 10px floor. */
 const FACE_CLASS =
   'text-main-900/60 flex h-4 w-4 items-center justify-center rounded-full bg-[#8283EE] text-xs ring-1';
 
@@ -149,14 +70,17 @@ function FaceStack({
   faces,
   ring,
   faded = false,
+  max = 4,
 }: {
   faces: CardFace[];
   ring: string;
   faded?: boolean;
+  max?: number;
 }) {
+  const more = faces.length - max;
   return (
     <span className={`inline-flex items-center ${faded ? 'opacity-50' : ''}`}>
-      {faces.slice(0, 4).map((face, at) => (
+      {faces.slice(0, max).map((face, at) => (
         <Avatar
           key={face.authorId}
           id={face.authorId}
@@ -164,6 +88,7 @@ function FaceStack({
           className={`${FACE_CLASS} ${ring} ${at > 0 ? '-ml-1' : ''}`}
         />
       ))}
+      {more > 0 ? <span className="ml-0.5 text-[10px] text-white/80">+{more}</span> : null}
     </span>
   );
 }
@@ -199,29 +124,39 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 
 /**
  * An open joint splash's empty slot (meaning is shape): a small tilted tape
- * piece with a dashed white outline under the label, holding the faded faces
- * of the current members who have not written. When I am one of them it reads
- * "Add your side" and opens the splash to write my ripple; once everyone has
- * written, the card carries no one awaiting and the slot is gone.
+ * piece with a dashed white outline, to the label's right, holding the
+ * faded faces of the current members who have not written. When I am one of them it reads "Add your side" — on a phone's
+ * narrow column, the words are its label only — and opens the splash to
+ * write my ripple; once everyone has written, the slot is gone.
  */
-function OpenSlot({ piece, onWrite }: { piece: BoardPiece; onWrite: (card: Card) => void }) {
+function OpenSlot({
+  piece,
+  narrow,
+  onWrite,
+}: {
+  piece: BoardPiece;
+  narrow: boolean;
+  onWrite: (card: Card) => void;
+}) {
   const { me } = usePeople();
   const awaiting = piece.card.awaiting ?? [];
   const mine = me !== null && awaiting.some((face) => face.authorId === me);
+  const height = narrow ? 20 : 24;
   const style: CSSProperties = {
-    top: piece.slotY!,
-    left: piece.labelBox.x + 6,
-    height: SLOT_PX,
-    transform: `rotate(${-piece.rotate / 2 - 1.5}deg)`,
+    left: piece.labelBox.x + piece.labelBox.w + 4,
+    top: piece.labelBox.y + piece.labelBox.h - height,
+    height,
   };
   const body = (
     <>
-      <FaceStack faces={awaiting} ring="ring-main-900" faded />
-      {mine ? <span className="font-medium whitespace-nowrap">Add your side</span> : null}
+      <FaceStack faces={awaiting} ring="ring-main-900" faded max={narrow ? 2 : 4} />
+      {mine && !narrow ? (
+        <span className="font-medium whitespace-nowrap">Add your side</span>
+      ) : null}
     </>
   );
   const className =
-    'absolute flex items-center gap-1.5 rounded-sm border border-dashed border-white px-1.5 text-xs text-white';
+    'absolute flex items-center gap-1.5 rounded-md border border-dashed border-white px-1.5 text-xs text-white';
   return mine ? (
     <button
       type="button"
@@ -241,43 +176,29 @@ function OpenSlot({ piece, onWrite }: { piece: BoardPiece; onWrite: (card: Card)
   );
 }
 
-/** The clamp on a photo's shape: never narrower than 4:5 nor wider than 5:4. */
-const RATIO_MIN = 4 / 5;
-const RATIO_MAX = 5 / 4;
-
 /**
- * One photo card: a white frame around its image, cropped to the image's own
- * aspect within 4:5 to 5:4 once it has loaded (square until then), standing
- * on the photo area's bottom edge.
+ * One photo card: the lane wide and square, no frame, the image cropped to
+ * fill it; standing on the photo area's bottom edge, a card behind peeking
+ * above the one in front.
  */
 function PhotoCardView({
   photo,
   url,
   areaH,
   more,
-  metrics,
+  size,
 }: {
   photo: PhotoCard;
   url: string | null | undefined;
   areaH: number;
   more: number;
-  metrics: BoardMetrics;
+  size: number;
 }) {
-  const [ratio, setRatio] = useState(1);
-  const innerW = metrics.photoW - PHOTO_PAD_PX * 2;
-  const innerH = metrics.photoH - PHOTO_PAD_PX * 2;
-  const w = ratio >= 1 ? innerW : Math.min(innerW, innerH * ratio);
-  const h = ratio >= 1 ? innerW / ratio : innerH;
   return (
     <span
       data-board-photo-card
-      className="absolute block rounded-md bg-white shadow-[0_1px_4px_rgba(22,22,33,0.22)]"
-      style={{
-        left: photo.dx,
-        top: areaH - photo.dy - h - PHOTO_PAD_PX * 2,
-        padding: PHOTO_PAD_PX,
-        transform: `rotate(${photo.rotate}deg)`,
-      }}
+      className="absolute block"
+      style={{ left: 0, top: areaH - photo.dy - size, width: size, height: size }}
     >
       {url ? (
         // A signed URL for a few minutes: next/image would cache it past its life.
@@ -287,29 +208,15 @@ function PhotoCardView({
           alt=""
           draggable={false}
           data-board-photo
-          onLoad={(event) => {
-            const img = event.currentTarget;
-            if (img.naturalWidth && img.naturalHeight) {
-              setRatio(
-                Math.min(RATIO_MAX, Math.max(RATIO_MIN, img.naturalWidth / img.naturalHeight)),
-              );
-            }
-          }}
-          className="block rounded-sm object-cover"
-          style={{ width: w, height: h }}
+          className="block h-full w-full object-cover"
         />
       ) : (
-        <span
-          aria-hidden
-          data-board-photo-pending
-          className="bg-pool-100 block rounded-sm"
-          style={{ width: w, height: h }}
-        />
+        <span aria-hidden data-board-photo-pending className="block h-full w-full bg-white/20" />
       )}
       {more > 0 ? (
         <span
           data-board-more-photos
-          className="bg-ink absolute -top-2 -right-2 rounded-full px-1.5 text-xs/4 font-medium text-white"
+          className="bg-ink absolute top-1 right-1 rounded-full px-1.5 text-xs/4 font-medium text-white"
         >
           +{more}
         </span>
@@ -319,10 +226,12 @@ function PhotoCardView({
 }
 
 /**
- * A post on its day (Board view): every one is a label with its title, in
- * one of three styles. With photos, up to three cards fan above the label,
- * which overlaps their bottom edge, and the icon is small before the words;
- * without, the icon is a large sticker overhanging a corner of the label.
+ * A post on its day (Calendar view, the first mockup): a label the lane
+ * wide, square and straight, flush at the lane's line or offset into it
+ * and over the next, white or ink. With photos, up to three square cards
+ * sit above it, the caption directly under with no fill, the icon small
+ * before the words; without, the icon is a large sticker centred on a top
+ * corner of the label, or small before the words.
  */
 export function BoardPieceView({
   piece,
@@ -331,74 +240,102 @@ export function BoardPieceView({
   metrics,
   onPick,
   onWrite,
-  onClickCapture,
-}: Shared & { piece: BoardPiece; photos: SignedMedia; onWrite: (card: Card) => void }) {
+  ripple,
+  plunge,
+}: Shared & {
+  piece: BoardPiece;
+  photos: SignedMedia;
+  onWrite: (card: Card) => void;
+  /** Just dropped: it plunges in, its water splashing. */
+  plunge: boolean;
+}) {
   const { card } = piece;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
   const pictured = piece.variant === 'photo';
-  const left = piece.corner === 'left';
   const top = piece.fan.length - 1;
+  const label = piece.labelBox;
+  const filled = piece.label !== 'none';
+  const motion = motionOf(ripple, plunge);
+  // A large sticker is centred on the label's top corner: half over the
+  // label, half over whatever is above and beside it.
+  const large = piece.sticker?.size === 'large' ? piece.sticker : null;
+  const stickerPx = Math.round(label.h * STICKER_LARGE);
+  const stickerStyle: CSSProperties = large
+    ? {
+        left: (large.corner === 'tl' ? label.x : label.x + label.w) - stickerPx / 2,
+        top: label.y - stickerPx / 2,
+        width: stickerPx,
+        height: stickerPx,
+        fontSize: stickerPx,
+      }
+    : {};
+  const inlineIcon = pictured || piece.sticker?.size === 'small';
   return (
     <div
+      // Remounted per ring, so the motion plays again for the same post.
+      key={`${ripple ?? 'still'}:${plunge ? 'drop' : ''}`}
       data-board-piece={piece.id}
       data-board-day={piece.day}
       data-variant={piece.variant}
       data-label={piece.label}
-      data-rotate={piece.rotate}
-      className="absolute"
+      data-placement={piece.placement}
+      data-sticker={piece.sticker?.size}
+      data-heading={ripple !== null ? '' : undefined}
+      data-dropped={plunge ? '' : undefined}
+      // An offset piece overhangs the next lane: above its separator and its items (review).
+      className={`absolute ${piece.placement === 'offset' ? 'z-10' : ''} ${motion}`}
       style={placed(piece)}
     >
       {/* The piece is the tap that brings its card up; the slot beside it is a tap of its own. */}
       <button
         type="button"
         onClick={() => onPick(card.splash.id)}
-        onClickCapture={onClickCapture}
         aria-label={caption}
         data-board-pick={piece.id}
         className="absolute inset-0 block text-left"
       >
         {piece.photoBox ? (
-          <SplashLayer
-            id={`${piece.id}:photos`}
-            box={piece.photoBox}
-            style={piece.label}
-            ripples={card.splash.count}
-            outline={false}
-          />
+          <span
+            data-board-photos
+            className="absolute block"
+            style={{
+              left: piece.photoBox.x,
+              top: piece.photoBox.y,
+              width: piece.photoBox.w,
+              height: piece.photoBox.h,
+            }}
+          >
+            {piece.fan.map((photo, at) => (
+              <PhotoCardView
+                key={photo.path}
+                photo={photo}
+                url={photos[photo.path]}
+                areaH={piece.photoBox!.h}
+                more={at === top ? piece.morePhotos : 0}
+                size={piece.photoBox!.w}
+              />
+            ))}
+          </span>
         ) : null}
-        {piece.fan.map((photo, at) => (
-          <PhotoCardView
-            key={photo.path}
-            photo={photo}
-            url={photos[photo.path]}
-            areaH={piece.labelBox.y + (piece.label === 'none' ? 0 : LABEL_OVERLAP_PX)}
-            more={at === top ? piece.morePhotos : 0}
-            metrics={metrics}
-          />
-        ))}
-        <SplashLayer
-          id={piece.id}
-          box={piece.labelBox}
-          style={piece.label}
-          ripples={card.splash.count}
-          outline
-        />
         <span
           data-board-label
           className={`absolute block ${LABEL_CLASS[piece.label]}`}
           style={{
-            top: piece.labelBox.y,
-            left: piece.labelBox.x,
-            width: piece.labelBox.w,
-            paddingTop: pictured ? LABEL_PAD_BOTTOM_PX : LABEL_PAD_TOP_PX,
-            paddingBottom: LABEL_PAD_BOTTOM_PX,
-            paddingLeft: piece.label === 'none' ? 2 : metrics.labelPadX,
-            paddingRight: piece.label === 'none' ? 2 : metrics.labelPadX,
+            left: label.x,
+            top: label.y,
+            width: label.w,
+            height: label.h,
+            paddingTop: metrics.labelPadY,
+            paddingLeft: filled ? metrics.labelPadX : 4,
+            paddingRight: filled ? metrics.labelPadX : 4,
           }}
         >
-          <span className={CAPTION_CLASS}>
-            {pictured && icon ? (
+          <span
+            className="line-clamp-3 block font-medium break-words"
+            style={{ fontSize: metrics.caption.size, lineHeight: `${metrics.caption.line}px` }}
+          >
+            {inlineIcon && icon ? (
               <span aria-hidden data-board-icon className="mr-1">
                 {icon}
               </span>
@@ -407,60 +344,64 @@ export function BoardPieceView({
             {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
           </span>
         </span>
-        {!pictured && icon ? (
+        {large && icon ? (
           <span
             aria-hidden
             data-board-sticker
-            className="absolute flex items-center justify-center leading-none"
-            style={{
-              top: 0,
-              [left ? 'left' : 'right']: 0,
-              width: metrics.sticker,
-              height: metrics.sticker,
-              fontSize: metrics.sticker,
-            }}
+            data-corner={large.corner}
+            // Above every label, its own and the next lane's: a sticker is never covered (review).
+            className="absolute z-20 flex items-center justify-center leading-none"
+            style={stickerStyle}
           >
             {icon}
           </span>
         ) : null}
       </button>
-      {piece.slotY !== null ? <OpenSlot piece={piece} onWrite={onWrite} /> : null}
+      {piece.slot ? <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} /> : null}
     </div>
   );
 }
 
-/** A ranged post's strip across its days in one week row, its caption on the tape. */
+/**
+ * A ranged post's band across its days in one row (review): translucent
+ * white, the full width of its lanes, square.
+ */
 export function BoardTapeView({
   tape,
   lanes,
+  metrics,
   onPick,
-  onClickCapture,
+  ripple,
 }: Shared & { tape: BoardTape }) {
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
+  const motion = motionOf(ripple, false);
   return (
-    <button
-      type="button"
-      onClick={() => onPick(card.splash.id)}
-      onClickCapture={onClickCapture}
-      aria-label={caption}
+    <div
+      key={ripple ?? 'still'}
       data-board-tape={tape.id}
       data-board-week={tape.week}
-      // White at 20% over the water: translucent tape, white words.
       data-starts-here={tape.startsHere ? '' : undefined}
       data-ends-here={tape.endsHere ? '' : undefined}
-      // Masking tape: round only where the range truly starts and ends; a
-      // cut where it runs on into the next week row stays square.
-      className={`absolute flex items-center gap-1 bg-white/20 px-2.5 text-left text-xs font-medium text-white ${
-        tape.startsHere ? 'rounded-l-full' : ''
-      } ${tape.endsHere ? 'rounded-r-full' : ''}`}
+      data-heading={ripple !== null ? '' : undefined}
+      className={`absolute ${motion}`}
       style={placed(tape)}
     >
-      {icon ? <span aria-hidden>{icon}</span> : null}
-      <span className="min-w-0 truncate">{caption}</span>
-      {/* The tape over the water reads as JOINT_SURFACE: the faces' ring takes it. */}
-      {card.joint ? <Faces card={card} ring="ring-[#3739D4]" /> : null}
-    </button>
+      <button
+        type="button"
+        onClick={() => onPick(card.splash.id)}
+        aria-label={caption}
+        data-board-pick={tape.id}
+        data-board-band
+        className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
+        style={{ fontSize: metrics.caption.size }}
+      >
+        {icon ? <span aria-hidden>{icon}</span> : null}
+        <span className="min-w-0 truncate">{caption}</span>
+        {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
+        {card.joint ? <Faces card={card} ring="ring-[#3739D4]" /> : null}
+      </button>
+    </div>
   );
 }

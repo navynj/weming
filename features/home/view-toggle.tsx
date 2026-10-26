@@ -49,7 +49,7 @@ export function useHomeView(): [HomeView, (view: HomeView) => void] {
 }
 
 /**
- * The header's segmented toggle, Board | Lane | Date (round 3; Board view first): the selected
+ * The header's segmented toggle, Calendar | Lane | List (round 3; Calendar first): the selected
  * segment white with blue words — on the water white carries what is
  * chosen (H21c) — the other quiet.
  */
@@ -63,11 +63,18 @@ export function ViewToggle({
   return <SegmentedToggle view={view} onChange={onChange} options={HOME_VIEWS} />;
 }
 
+// Calendar | Lane | List (review): the values are the remembered keys and
+// the tests' names, the labels what the hand reads.
 const HOME_VIEWS = [
-  { value: 'board', label: 'Board' },
+  { value: 'board', label: 'Calendar' },
   { value: 'lane', label: 'Lane' },
-  { value: 'date', label: 'Date' },
+  { value: 'date', label: 'List' },
 ] as const;
+
+/** What a view is called, for the foot's label. */
+export function homeViewName(view: HomeView): string {
+  return HOME_VIEWS.find((v) => v.value === view)?.label ?? view;
+}
 
 /** The same toggle with any segments: a pool's Lane | Date | Swimmers (H23). */
 export function SegmentedToggle<V extends string>({
