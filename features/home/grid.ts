@@ -52,7 +52,12 @@ export type Card = {
    * a pool I am in. Absent: no pencil.
    */
   editable?: boolean;
+  /** Every image across its ripples, oldest first, for the Board view: each with the ripple it is on. */
+  photos?: CardPhoto[];
 };
+
+/** One image of a post's, and the ripple it hangs on (whose visibility signs it). */
+export type CardPhoto = { rippleId: string; path: string };
 
 /** A ripple as a card reads it: its words, when it was written, and in a pool whose it is. */
 export type CardRipple = {

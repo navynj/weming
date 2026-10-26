@@ -65,6 +65,8 @@ const scrolled: ScrollToOptions[] = [];
 beforeEach(() => {
   scrolled.length = 0;
   window.localStorage.clear();
+  // Board is the first view (review); these read the Lane view unless they choose.
+  window.localStorage.setItem('weming.home-view', 'lane');
   window.sessionStorage.clear();
   Element.prototype.scrollTo = function scrollTo(
     this: Element,
@@ -950,11 +952,22 @@ describe('a post\u2019s own icon (0008)', () => {
 });
 
 describe('the Home button at the foot', () => {
-  it('switches the view on each tap, and the header toggle follows', () => {
+  it('walks Board → Lane → Date on each tap, the header toggle following', () => {
+    window.localStorage.removeItem('weming.home-view');
     const { container } = ground();
+    expect(
+      [...container.querySelectorAll('[data-view-option]')].map((o) =>
+        o.getAttribute('data-view-option'),
+      ),
+    ).toEqual(['board', 'lane', 'date']);
+    // Nothing remembered yet: Home opens on the Board, the stack hidden.
+    expect(container.querySelector('[data-month-board]')).not.toBeNull();
+    expect(container.querySelector('[data-stack-card]')).toBeNull();
     // Home is my face, first on the strip, ringed: I am here.
     const home = container.querySelector('[data-home-foot] [data-home-tab]')!;
     expect(home.getAttribute('aria-current')).toBe('page');
+    fireEvent.click(home);
+    expect(container.querySelector('[data-month-board]')).toBeNull();
     expect(container.querySelector('[data-mark]')).not.toBeNull();
     fireEvent.click(home);
     expect(container.querySelector('[data-pill]')).not.toBeNull();
@@ -962,9 +975,9 @@ describe('the Home button at the foot', () => {
       container.querySelector('[data-view-option="date"]')!.getAttribute('aria-selected'),
     ).toBe('true');
     fireEvent.click(home);
-    expect(container.querySelector('[data-mark]')).not.toBeNull();
+    expect(container.querySelector('[data-month-board]')).not.toBeNull();
     expect(
-      container.querySelector('[data-view-option="lane"]')!.getAttribute('aria-selected'),
+      container.querySelector('[data-view-option="board"]')!.getAttribute('aria-selected'),
     ).toBe('true');
   });
 });

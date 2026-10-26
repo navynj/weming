@@ -198,6 +198,8 @@ function setView(view: 'lane' | 'date' | 'swimmers'): void {
 
 beforeEach(() => {
   window.localStorage.clear();
+  // Board is the first view (review); these read Swimmers unless they choose.
+  window.localStorage.setItem('weming.pool-view', 'swimmers');
   window.sessionStorage.clear();
   Element.prototype.scrollTo = function scrollTo() {} as Element['scrollTo'];
   Object.defineProperty(window, 'matchMedia', {
@@ -502,7 +504,8 @@ describe('Just mine in the pool (0014)', () => {
 });
 
 describe('re-tapping Pool (review)', () => {
-  it('opens on Swimmers, then cycles Lane → Date → Swimmers, the toggle following, and keeps the last per device', () => {
+  it('opens on Board, then cycles Swimmers → Lane → Date → Board, the toggle following, and keeps the last per device', () => {
+    window.localStorage.removeItem('weming.pool-view');
     const { container } = ground(A);
     const tab = container.querySelector('[data-home-foot="phone"] [data-pool-tab]') as HTMLElement;
     const selected = (): string | null =>
@@ -513,8 +516,12 @@ describe('re-tapping Pool (review)', () => {
       [...container.querySelectorAll('[data-view-option]')].map((o) =>
         o.getAttribute('data-view-option'),
       ),
-    ).toEqual(['swimmers', 'lane', 'date']);
-    // Nothing remembered yet: a pool opens on its people (review).
+    ).toEqual(['board', 'swimmers', 'lane', 'date']);
+    // Nothing remembered yet: a pool opens on its board (review), the stack hidden.
+    expect(selected()).toBe('board');
+    expect(container.querySelector('[data-month-board]')).not.toBeNull();
+    expect(container.querySelector('[data-stack-card]')).toBeNull();
+    fireEvent.click(tab);
     expect(selected()).toBe('swimmers');
     fireEvent.click(tab);
     expect(selected()).toBe('lane');
@@ -522,10 +529,10 @@ describe('re-tapping Pool (review)', () => {
     expect(selected()).toBe('date');
     expect(window.localStorage.getItem('weming.pool-view')).toBe('date');
     fireEvent.click(tab);
-    expect(selected()).toBe('swimmers');
+    expect(selected()).toBe('board');
     // The desktop rail cycles too.
     fireEvent.click(container.querySelector('[data-home-foot="wide"] [data-pool-tab]')!);
-    expect(selected()).toBe('lane');
+    expect(selected()).toBe('swimmers');
   });
 });
 

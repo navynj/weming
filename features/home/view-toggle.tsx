@@ -2,7 +2,15 @@
 
 import { useSyncExternalStore } from 'react';
 
-export type HomeView = 'lane' | 'date';
+export type HomeView = 'lane' | 'date' | 'board';
+
+/** The views in the toggle's order; re-tapping Home walks them (review). */
+export const HOME_VIEW_ORDER: readonly HomeView[] = ['board', 'lane', 'date'];
+
+/** The view after this one, in the toggle's order. */
+export function nextHomeView(view: HomeView): HomeView {
+  return HOME_VIEW_ORDER[(HOME_VIEW_ORDER.indexOf(view) + 1) % HOME_VIEW_ORDER.length];
+}
 
 /** Remembered per device (round 3). */
 const KEY = 'weming.home-view';
@@ -10,9 +18,10 @@ const EVENT = 'weming:home-view';
 
 function read(): HomeView {
   try {
-    return window.localStorage.getItem(KEY) === 'date' ? 'date' : 'lane';
+    const stored = window.localStorage.getItem(KEY);
+    return stored === 'date' || stored === 'lane' ? stored : 'board';
   } catch {
-    return 'lane';
+    return 'board';
   }
 }
 
@@ -25,9 +34,9 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
-/** The view Home shows, the last one chosen on this device; the Lane view on the server. */
+/** The view Home shows, the last one chosen on this device; the Board view first (review). */
 export function useHomeView(): [HomeView, (view: HomeView) => void] {
-  const view = useSyncExternalStore(subscribe, read, () => 'lane' as const);
+  const view = useSyncExternalStore(subscribe, read, () => 'board' as const);
   const set = (next: HomeView): void => {
     try {
       window.localStorage.setItem(KEY, next);
@@ -40,7 +49,7 @@ export function useHomeView(): [HomeView, (view: HomeView) => void] {
 }
 
 /**
- * The header's segmented toggle, Lane | Date (round 3): the selected
+ * The header's segmented toggle, Board | Lane | Date (round 3; Board view first): the selected
  * segment white with blue words — on the water white carries what is
  * chosen (H21c) — the other quiet.
  */
@@ -55,6 +64,7 @@ export function ViewToggle({
 }
 
 const HOME_VIEWS = [
+  { value: 'board', label: 'Board' },
   { value: 'lane', label: 'Lane' },
   { value: 'date', label: 'Date' },
 ] as const;

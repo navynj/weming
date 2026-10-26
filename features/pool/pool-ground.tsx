@@ -21,6 +21,8 @@ import type { PoolView } from '@/lib/queries/pools';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
+import { MonthBoard } from '@/features/month-board/month-board';
+import { monthKey } from '@/features/splash/summary';
 
 import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
@@ -37,9 +39,10 @@ function nextView(view: PoolViewKind): PoolViewKind {
   return VIEWS[(at + 1) % VIEWS.length].value;
 }
 
-// Swimmers | Lane | Date (review): a pool is its people first; re-tapping
-// Pool walks them in this order.
+// Board | Swimmers | Lane | Date (review): the month as a board first, then
+// its people; re-tapping Pool walks them in this order.
 const VIEWS = [
+  { value: 'board', label: 'Board' },
   { value: 'swimmers', label: 'Swimmers' },
   { value: 'lane', label: 'Lane' },
   { value: 'date', label: 'Date' },
@@ -183,6 +186,12 @@ export function PoolGround({
   const cycleView = (): void => setKind(nextView(kind));
   // Compose from here defaults to this pool, its lanes as I linked them (H23).
   const composeHere = (): void => openSheet(poolScopeOf(view));
+  // The Board view's month: that of the post on top, else this month.
+  const [boardMonth, setBoardMonth] = useState(() => {
+    const top = shown.find((c) => c.splash.id === initialTop);
+    return monthKey(top ? top.day : today);
+  });
+  const boardView = kind === 'board';
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
   const current = view.members.filter((m) => !m.former);
   const laneNames = view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }));
@@ -276,45 +285,56 @@ export function PoolGround({
             </p>
           ) : null}
 
-          {pinnedStrip('phone')}
+          {boardView ? null : pinnedStrip('phone')}
 
-          {shown.length === 0 ? (
+          {shown.length === 0 && !boardView ? (
             <p data-pool-empty className="px-6 pt-6 text-sm/relaxed text-white/80">
               Nothing in this Pool yet. Splashes in your connected lanes land here, and so do joint
               splashes anyone opens.
             </p>
           ) : null}
 
-          <LaneGrid
-            view={kind === 'date' ? 'date' : 'lane'}
-            cards={shown}
-            categories={columns}
-            today={today}
-            ring={ring}
-            waterIds={waterIds}
-            initials={null}
-            scrollToMonth={null}
-            onPick={bringForward}
-            // A joint splash spans every column only where columns are people.
-            bands={kind === 'swimmers'}
-          />
+          {boardView ? (
+            <MonthBoard
+              cards={shown}
+              month={boardMonth}
+              onMonth={setBoardMonth}
+              lanes={laneNames}
+            />
+          ) : (
+            <LaneGrid
+              view={kind === 'date' ? 'date' : 'lane'}
+              cards={shown}
+              categories={columns}
+              today={today}
+              ring={ring}
+              waterIds={waterIds}
+              initials={null}
+              scrollToMonth={null}
+              onPick={bringForward}
+              // A joint splash spans every column only where columns are people.
+              bands={kind === 'swimmers'}
+            />
+          )}
         </div>
 
         <div
           data-board-column
-          className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
+          className={`flex shrink-0 flex-col ${boardView ? '' : 'lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10'}`}
         >
-          {pinnedStrip('wide')}
-          <StairBoard
-            cards={shown}
-            flip={flip}
-            categories={laneNames}
-            initials=""
-            pinnedIds={pinnedIds}
-            onPin={pin}
-            onDelete={remove}
-            hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
-          />
+          {boardView ? null : pinnedStrip('wide')}
+          {boardView ? null : (
+            <StairBoard
+              cards={shown}
+              flip={flip}
+              categories={laneNames}
+              initials=""
+              pinnedIds={pinnedIds}
+              onPin={pin}
+              onDelete={remove}
+              hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
+            />
+          )}
           <GroundFoot
             here="pool"
             poolId={poolId}

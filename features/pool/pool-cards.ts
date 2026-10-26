@@ -4,8 +4,8 @@ import type { PoolRipple, PoolView } from '@/lib/queries/pools';
 
 import { originTag } from './origin-tag';
 
-/** A pool's three views (H23). Lane and Date as on Home; Swimmers by member. */
-export type PoolViewKind = 'lane' | 'date' | 'swimmers';
+/** A pool's views (H23). Lane, Date and Board as on Home; Swimmers by member. */
+export type PoolViewKind = 'lane' | 'date' | 'swimmers' | 'board';
 
 /** Where a post of a pool opens: its page in the pool, coming back to this pool. */
 export function poolSplashHref(poolId: string, splashId: string): string {
@@ -85,6 +85,9 @@ export function poolCards(
         authorName: nameOf.get(r.author_id),
       }));
     const href = poolSplashHref(view.pool.id, splash.id);
+    // Its photos, for the Board view: every image across its ripples, oldest first.
+    const pictured = blocks.flatMap((r) => r.media.map((path) => ({ rippleId: r.id, path })));
+    const photo = pictured.length > 0 ? { photos: pictured } : {};
     if (splash.owner_id === null) {
       // A joint splash: the pool's, so its pin is shared (any member) and it
       // is deleted only while every ripple on it is mine.
@@ -92,6 +95,7 @@ export function poolCards(
       const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
       cards.push({
         ...card,
+        ...photo,
         column: splash.pool_lane_id ?? undefined,
         lane: lane ? { icon: lane.icon, name: lane.name } : null,
         origins: lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined,
@@ -117,6 +121,7 @@ export function poolCards(
     const mine = splash.owner_id === me;
     cards.push({
       ...card,
+      ...photo,
       column: kind === 'swimmers' ? splash.owner_id : placement?.poolLaneId,
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,
