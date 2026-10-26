@@ -95,6 +95,14 @@ function FaceStack({
 }
 
 /**
+ * What parts the words from the faces or the monogram after them: a space,
+ * not a margin (review). A space where the line breaks is dropped, so the
+ * mark starts a wrapped line flush at the padding; a margin stayed, and
+ * pushed it in from the left.
+ */
+const SEPARATOR = ' ';
+
+/**
  * A joint splash's writers, stacked after its caption, whatever the label's
  * style: who wrote on it, else (where the card carries no list) its
  * branches' authors, else me. On Home a pool's splash shows its pool's
@@ -106,9 +114,12 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
   const pool = card.pools?.[0];
   if (pool !== undefined) {
     return (
-      <span data-board-pool className="ml-1 inline-flex h-[13px] items-center align-top">
-        <Monogram name={pool} size="face" photo={card.poolPhoto ?? null} />
-      </span>
+      <>
+        {SEPARATOR}
+        <span data-board-pool className="inline-flex h-[13px] items-center align-top">
+          <Monogram name={pool} size="face" photo={card.poolPhoto ?? null} />
+        </span>
+      </>
     );
   }
   const faces: CardFace[] =
@@ -127,9 +138,12 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
         : []);
   if (faces.length === 0) return null;
   return (
-    <span data-board-faces className="ml-1 inline-flex h-[13px] items-center align-top">
-      <FaceStack faces={faces} ring={ring} />
-    </span>
+    <>
+      {SEPARATOR}
+      <span data-board-faces className="inline-flex h-[13px] items-center align-top">
+        <FaceStack faces={faces} ring={ring} />
+      </span>
+    </>
   );
 }
 
