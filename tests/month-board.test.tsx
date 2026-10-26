@@ -999,6 +999,28 @@ describe('a pool’s splash on Home (review)', () => {
     expect(inPool.previousSibling?.textContent).toMatch(/ $/);
   });
 
+  it('keeps a corner sticker’s first-line indent out of the monogram, the faces and the icon', () => {
+    // A filled label with a corner sticker indents its first line; nothing inline inherits it.
+    const pieces = [0, 1, 2, 3, 4, 5].map((at) => ({
+      ...card(`g${at}`, 'Grand Austria Hotel + Waltz', '2026-10-21'),
+      joint: true,
+      pools: ['Our Pool'],
+      poolPhoto: null,
+    }));
+    const { container } = board(pieces);
+    const indented = [...container.querySelectorAll<HTMLElement>('[data-board-text]')].filter(
+      (t) => t.style.textIndent !== '',
+    );
+    expect(indented.length).toBeGreaterThan(0);
+    for (const text of indented) {
+      for (const inline of text.querySelectorAll(
+        '[data-board-pool], [data-board-faces], [data-board-icon]',
+      )) {
+        expect(inline.className).toContain('indent-0');
+      }
+    }
+  });
+
   it('draws its photo there when the pool has one', () => {
     const { container } = board([
       { ...joint, pools: ['Our Pool'], poolPhoto: 'https://signed/pool.webp' },
