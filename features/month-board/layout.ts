@@ -412,7 +412,8 @@ type Plan = { recipe: Recipe; label: LabelStyle; size: StickerSize | null };
  * take a size by the id, never the size of the day's B before, big at
  * most once and only in a day of two or more. A joint splash alternates
  * white and ink with the day's other joint ones; everything else takes no
- * fill.
+ * fill. A joint one's fill set by hand, white or ink, is the person's; a
+ * label with no fill stays so.
  */
 function planDay(cards: Card[]): Plan[] {
   let fill: LabelStyle | null = null;
@@ -444,7 +445,10 @@ function planDay(cards: Card[]): Plan[] {
     let label: LabelStyle = 'none';
     if (card.joint) {
       const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'ink';
-      fill = drawnFill === fill ? (fill === 'white' ? 'ink' : 'white') : drawnFill;
+      // A fill set by hand (0027) is drawn as set; the next joint one alternates from it.
+      fill =
+        card.layout?.label?.style ??
+        (drawnFill === fill ? (fill === 'white' ? 'ink' : 'white') : drawnFill);
       label = fill;
     }
     let size: StickerSize | null = null;
@@ -546,6 +550,23 @@ function spanLabel(
     if (ctx.room({ x: m.column, y: 0, w: k * m.column, h: fit.h })) return { w, span: k, ...fit };
   }
   return { w: own, span: 0, ...heightFor(own) };
+}
+
+/**
+ * A label's width set by hand, as a share of the lane (0027): drawn as set,
+ * across the lanes to its right if it is wider than its own — the person's
+ * choice, so no room is asked for; else null, the recipe's width.
+ */
+function handWidth(
+  card: Card,
+  x: number,
+  heightFor: (w: number) => { lines: number; h: number },
+  m: BoardMetrics,
+): { w: number; span: number; lines: number; h: number } | null {
+  const set = card.layout?.label?.width;
+  if (set === undefined) return null;
+  const w = Math.max(m.pad.side * 2 + 8, Math.round(set * m.column));
+  return { w, span: Math.max(0, Math.ceil((x + w) / m.column) - 1), ...heightFor(w) };
 }
 
 function base(
@@ -664,8 +685,9 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
     w: labelBox.x + labelBox.w,
     h: labelBox.h,
   });
+  const hand = (x: number) => handWidth(card, x, fitFor, m);
   if (m.narrow) {
-    const fit = spanLabel(0, pad, fitFor, ctx);
+    const fit = hand(0) ?? spanLabel(0, pad, fitFor, ctx);
     return shape({ x: 0, y: 0, w: fit.w, h: fit.h }, fit.lines, fit.span > 0, fit.span);
   }
   if (col < COLUMNS - 1) {
@@ -674,10 +696,14 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
     );
     const fit = fitFor(m.column);
     if (ctx.room({ x: m.column, y: 0, w: x, h: fit.h })) {
+      const set = hand(x);
+      if (set) return shape({ x, y: 0, w: set.w, h: set.h }, set.lines, set.span > 0, set.span);
       return shape({ x, y: 0, w: m.column, h: fit.h }, fit.lines, true, 0);
     }
   }
   const x = Math.round(m.column * A_FALLBACK);
+  const set = hand(x);
+  if (set) return shape({ x, y: 0, w: set.w, h: set.h }, set.lines, set.span > 0, set.span);
   const fit = fitFor(m.column - x);
   return shape({ x, y: 0, w: m.column - x, h: fit.h }, fit.lines, false, 0);
 }
@@ -725,7 +751,7 @@ function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
         return { lines, h: v.top + lines * m.caption.line + bottom, bottom };
       };
       const pad0 = { top: v.top, bottom: v.bottom, left, right: m.pad.right };
-      const fit = spanLabel(x, pad0, (w) => fitFor(w), ctx);
+      const fit = handWidth(card, x, fitFor, m) ?? spanLabel(x, pad0, (w) => fitFor(w), ctx);
       const bottom = fitFor(fit.w).bottom;
       const pad = { ...pad0, bottom };
       const labelBox = { x, y: 0, w: fit.w, h: fit.h };
@@ -793,8 +819,9 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     const lines = linesIn(card, w - pad.left - pad.right, 0, true, ctx);
     return { lines, h: v.top + lines * m.caption.line + v.bottom };
   };
-  let fit = { w: size, span: 0, ...fitFor(size) };
-  if (m.narrow) {
+  const set = handWidth(card, x, fitFor, m);
+  let fit = set ?? { w: size, span: 0, ...fitFor(size) };
+  if (m.narrow && !set) {
     const wide = spanLabel(x, pad, fitFor, {
       ...ctx,
       room: (band) => ctx.room({ ...band, y: band.y + photoBox.h }),

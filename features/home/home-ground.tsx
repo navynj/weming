@@ -396,10 +396,9 @@ export function HomeGround({
           ) : (
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
-          {/* Desktop only (review): the top card's layout, under the stack. */}
+          {/* Desktop only (review): the top card's layout, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
           {boardView && wide && topCard ? (
             <LayoutPanel
-              key={topCard.splash.id}
               card={topCard}
               layout={drafts.shown(topCard.splash.id).layout}
               source={drafts.shown(topCard.splash.id).source}
