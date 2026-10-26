@@ -22,6 +22,9 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
+import { LayoutPanel } from '@/features/month-board/layout-panel';
+import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
+import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
 
 import { poolScopeOf } from './compose-scope';
@@ -165,6 +168,11 @@ export function PoolGround({
   );
   const flip = useFlip(ids, initialTop, -1);
   const { heading, bringForward } = flip;
+  // The calendar's hand-set layouts as the panel edits them (review): drawn
+  // at once, saved when the sliders rest; the pool's here.
+  const drafts = useLayoutDrafts(shown, poolId);
+  const wide = useWide();
+  const topCard = drafts.drawn.find((card) => card.splash.id === heading) ?? null;
 
   const [ring, setRing] = useState<Ring | null>(() =>
     initialTop ? { id: initialTop, seq: 0 } : null,
@@ -305,7 +313,7 @@ export function PoolGround({
           {boardView ? (
             <BoardFrame>
               <MonthBoard
-                cards={shown}
+                cards={drafts.drawn}
                 month={boardMonth}
                 onMonth={setBoardMonth}
                 today={today}
@@ -348,6 +356,19 @@ export function PoolGround({
             low={boardView}
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
+          {/* Desktop only (review): the top card's layout, the pool's, under the stack. */}
+          {boardView && wide && topCard ? (
+            <LayoutPanel
+              key={topCard.splash.id}
+              card={topCard}
+              layout={drafts.shown(topCard.splash.id).layout}
+              source={drafts.shown(topCard.splash.id).source}
+              home={false}
+              message={drafts.message}
+              onEdit={(patch, clear) => drafts.edit(topCard.splash.id, patch, clear)}
+              onRevert={() => drafts.revertToPool(topCard.splash.id)}
+            />
+          ) : null}
           <GroundFoot
             here="pool"
             poolId={poolId}

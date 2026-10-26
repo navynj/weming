@@ -25,6 +25,9 @@ import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
 import { homeViewName, nextHomeView, ViewToggle, type HomeView } from './view-toggle';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
+import { LayoutPanel } from '@/features/month-board/layout-panel';
+import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
+import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
 
 /**
@@ -185,6 +188,11 @@ export function HomeGround({
   );
   const flip = useFlip(ids, initialTop, board === 'stair' ? -1 : 1);
   const { heading, bringForward, jumpTo } = flip;
+  // The calendar's hand-set layouts as the panel edits them (review): drawn
+  // at once, saved when the sliders rest; mine on Home.
+  const drafts = useLayoutDrafts(shown, null);
+  const wide = useWide();
+  const topCard = drafts.drawn.find((card) => card.splash.id === heading) ?? null;
   const goTo = bringForward;
 
   // A bare `/` reached by the browser's back button finds the card that was
@@ -339,7 +347,7 @@ export function HomeGround({
             // Lane view: a tap brings the post's card to the top.
             <BoardFrame>
               <MonthBoard
-                cards={shown}
+                cards={drafts.drawn}
                 month={boardMonth}
                 onMonth={setBoardMonth}
                 today={today}
@@ -388,6 +396,19 @@ export function HomeGround({
           ) : (
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
+          {/* Desktop only (review): the top card's layout, under the stack. */}
+          {boardView && wide && topCard ? (
+            <LayoutPanel
+              key={topCard.splash.id}
+              card={topCard}
+              layout={drafts.shown(topCard.splash.id).layout}
+              source={drafts.shown(topCard.splash.id).source}
+              home
+              message={drafts.message}
+              onEdit={(patch, clear) => drafts.edit(topCard.splash.id, patch, clear)}
+              onRevert={() => drafts.revertToPool(topCard.splash.id)}
+            />
+          ) : null}
 
           {/* The foot (H23): Home — each tap switches the view, Lane to
               Date and back (review) — then Pool, and compose at the right. */}

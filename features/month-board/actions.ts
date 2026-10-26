@@ -9,10 +9,14 @@ import { BoardLayout, type BoardLayoutJson } from './board-layout';
 
 export type LayoutResult = { ok: true; layout: BoardLayoutJson } | { ok: false; message: string };
 
+// Any id Postgres holds: z.guid, not z.uuid's RFC variant check, which
+// refuses the fixtures' hand-made ids.
+const Id = z.guid();
+
 const Write = z.object({
-  splashId: z.string().uuid(),
+  splashId: Id,
   /** The pool's layout; null for my Home layout. */
-  poolId: z.string().uuid().nullable(),
+  poolId: Id.nullable(),
   patch: BoardLayout,
   clear: z.array(z.string().min(1).max(600)).max(64),
 });
@@ -30,7 +34,16 @@ function revalidate(poolId: string | null): void {
  */
 export async function setBoardLayout(input: z.infer<typeof Write>): Promise<LayoutResult> {
   const parsed = Write.safeParse(input);
-  if (!parsed.success) return { ok: false, message: 'That layout is out of range.' };
+  if (!parsed.success) {
+    const where = parsed.error.issues[0]?.path[0];
+    return {
+      ok: false,
+      message:
+        where === 'patch' || where === 'clear'
+          ? 'That layout is out of range.'
+          : 'That splash is not known.',
+    };
+  }
   const { splashId, poolId, patch, clear } = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('set_board_layout', {
@@ -57,7 +70,7 @@ export async function setBoardLayout(input: z.infer<typeof Write>): Promise<Layo
 
 /** "Use pool layout": my Home layout for the splash is gone, so my Home draws the pool's again. */
 export async function revertToPoolLayout(splashId: string): Promise<LayoutResult> {
-  if (!z.string().uuid().safeParse(splashId).success) {
+  if (!Id.safeParse(splashId).success) {
     return { ok: false, message: 'That splash is not known.' };
   }
   const supabase = await createClient();
