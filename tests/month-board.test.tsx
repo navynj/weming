@@ -196,8 +196,8 @@ function readable(layout: BoardLayout): void {
     else if (piece.recipe === 'A' && piece.overhang) expect(end).toBe(column + label.x);
     else if (piece.recipe === 'C') expect(end).toBeLessThanOrEqual(column + 0.01);
     else expect(end).toBeCloseTo(column, 5);
-    // No fill, no box: 4px above and below; a filled one 8 and 12 (a sticker hanging low may deepen it).
-    const v = piece.label === 'none' ? { top: 4, bottom: 4 } : { top: 8, bottom: 12 };
+    // No fill, no box: 4px above and below; a filled one 6 and 6 (a sticker hanging low may deepen it).
+    const v = piece.label === 'none' ? { top: 4, bottom: 4 } : { top: 6, bottom: 6 };
     expect(piece.pad.top).toBe(v.top);
     expect(piece.pad.bottom).toBeGreaterThanOrEqual(v.bottom);
     expect(piece.y + piece.h).toBeLessThanOrEqual(week.y + week.h);
@@ -389,7 +389,7 @@ describe('the month board', () => {
     expect(quiet.h).toBe(layout.metrics.rowBase);
   });
 
-  it('is chosen by the switch, remembered per device, deepens by the row, and a day opens its week', () => {
+  it('is chosen by the switch, remembered per device, transparent by the row, and a day opens its week', () => {
     const { container } = board();
     fireEvent.click(container.querySelector('[data-board-span-option="month"]')!);
     expect(container.querySelector('[data-month-board]')!.getAttribute('data-month-board')).toBe(
@@ -399,10 +399,13 @@ describe('the month board', () => {
     expect(container.querySelector('[data-board-span-option="month"]')!.className).toContain(
       'bg-white',
     );
-    const rows = container.querySelectorAll<HTMLElement>('[data-board-week-row]');
-    expect(rows[0].style.background).toBe('');
-    expect(rows[2].style.background).toContain('rgb(');
-    expect(rows[2].style.background).not.toBe(rows[1].style.background);
+    // No depth by row: every row transparent over the ground (review).
+    for (const row of container.querySelectorAll<HTMLElement>('[data-board-week-row]')) {
+      expect(row.style.background).toBe('');
+    }
+    expect(container.querySelector('[data-board-scroller]')!.className).not.toContain(
+      'water-ground',
+    );
     const outside = container.querySelector('[data-board-cell="2026-09-27"]')!;
     expect(outside.hasAttribute('data-in-month')).toBe(false);
     expect(outside.querySelector('[data-board-day]')!.className).toContain('text-white/40');
@@ -493,7 +496,9 @@ describe('three recipes, always readable (review)', () => {
         expect(piece.textBoxes[0].x).toBeGreaterThanOrEqual(sticker.x + s);
       }
       // The sticker stays on the board, and over the lane before by at most its right padding.
-      expect(piece.x + sticker.x).toBeGreaterThanOrEqual(piece.col === 0 ? 0 : -12);
+      expect(piece.x + sticker.x).toBeGreaterThanOrEqual(
+        piece.col === 0 ? 0 : piece.x - layout.metrics.pad.right,
+      );
     }
   });
 
@@ -514,13 +519,14 @@ describe('three recipes, always readable (review)', () => {
     );
   });
 
-  it('gives a bare label 4px above and below, a filled one 8 and 12', () => {
+  it('gives a bare label 4px above and below, a filled one 6 and 6 with 8 at each side', () => {
     const layout = layoutWeekBoard(WEEK, TODAY, { width: 728 });
     const bare = layout.pieces.find((p) => p.label === 'none' && p.recipe === 'A');
     if (bare) expect([bare.pad.top, bare.pad.bottom]).toEqual([4, 4]);
     const joint = layoutWeekBoard([{ ...WEEK[0], joint: true }], TODAY, { width: 728 }).pieces[0];
-    expect(joint.pad.top).toBe(8);
-    expect(joint.pad.bottom).toBeGreaterThanOrEqual(12);
+    expect(joint.pad.top).toBe(6);
+    expect(joint.pad.bottom).toBeGreaterThanOrEqual(6);
+    expect([joint.pad.left, joint.pad.right]).toEqual([8, 8]);
   });
 
   it('on a phone, reaches a label across empty lanes beside it, up to two, so short words read whole', () => {
@@ -822,7 +828,7 @@ describe('an open joint splash (meaning is shape)', () => {
     expect(slot.className).toContain('border-[1.5px]');
     expect(slot.className).not.toMatch(/rounded/);
     expect(slot.textContent).toBe('JOAdd your side');
-    expect(slot.querySelector('.opacity-50')).not.toBeNull();
+    expect(slot.querySelector('[data-board-slot-faces]')!.className).toContain('opacity-50');
     // Someone else's to fill: a mark, not a button.
     expect(slot.tagName).toBe('SPAN');
     expect(slot.closest('[data-board-label]')).toBeNull();
@@ -852,6 +858,47 @@ describe('an open joint splash (meaning is shape)', () => {
       layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }]), ...NEXT_DOOR], TODAY, {
         width: 358,
       }),
+    );
+  });
+
+  it('lays the note out as a row: faces first, 16px overlapping by 4, a 4px gap, then the words, 6px at the sides and 3 above and below', () => {
+    const { container } = board([
+      joint([
+        { authorId: 'u-jo', initials: 'JO' },
+        { authorId: 'u-ak', initials: 'AK' },
+      ]),
+    ]);
+    const slot = container.querySelector<HTMLElement>('[data-board-slot="jam"]')!;
+    expect(slot.className).toMatch(/\bflex\b/);
+    expect(slot.className).toContain('gap-1');
+    expect(slot.className).toContain('px-[6px]');
+    expect(slot.className).toContain('py-[3px]');
+    // Its content's own width: nothing fixes it.
+    expect(slot.style.width).toBe('');
+    const [faces, words] = [...slot.children];
+    expect(faces.hasAttribute('data-board-slot-faces')).toBe(true);
+    expect(words.hasAttribute('data-board-slot-words')).toBe(true);
+    expect(words.textContent).toBe('Add your side');
+    const avatars = [...faces.children];
+    expect(avatars).toHaveLength(2);
+    for (const a of avatars) expect(a.className).toMatch(/\bh-4\b.*\bw-4\b|\bw-4\b.*\bh-4\b/);
+    expect(avatars[1].className).toContain('-ml-1');
+    // The layout's room for it holds the whole row: border, padding, faces, gap, words.
+    const laid = layoutWeekBoard(
+      [
+        joint([
+          { authorId: 'u-jo', initials: 'JO' },
+          { authorId: 'u-ak', initials: 'AK' },
+        ]),
+      ],
+      TODAY,
+      { width: 980 },
+    ).pieces[0];
+    const content = 1.5 * 2 + 6 * 2 + 16 + 12 + 4 + 'Add your side'.length * 10 * 0.55;
+    expect(laid.slotBox!.w).toBeGreaterThanOrEqual(content);
+    expect(laid.slotBox!.h).toBe(16 + 3 * 2 + 1.5 * 2);
+    readable(
+      layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, { width: 980 }),
     );
   });
 

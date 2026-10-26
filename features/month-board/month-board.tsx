@@ -40,13 +40,6 @@ import { useBoardPhotos } from './use-board-photos';
 
 /** A sideways swipe this long turns the page, once its axis is decided (the first 8px). */
 const SWIPE_PX = 48;
-/** How much deeper each week row of a month sits than the one above (review). */
-const ROW_DEEPEN = 0.012;
-/** The water, as the ground's main-900, darkened by the row. */
-function rowWater(index: number): string {
-  const k = 1 - ROW_DEEPEN * index;
-  return `rgb(${Math.round(5 * k)}, ${Math.round(7 * k)}, ${Math.round(201 * k)})`;
-}
 
 /**
  * A day's waves (review): the pill's own glyph — the exported SVG, its pen
@@ -91,8 +84,8 @@ export function BoardFrame({ children }: { children: ReactNode }) {
  * corner), stacked flush in time order; a ranged post a band along the top
  * of each row it crosses. The week (the default) heads each lane with its
  * weekday, its number and its waves, and is titled by its range, the
- * arrows and a sideways swipe turning it; the month, rows that grow and
- * deepen, a day's number opening its week. Week or Month is
+ * arrows and a sideways swipe turning it; the month, rows that grow to
+ * their tallest lane, a day's number opening its week. Week or Month is
  * remembered per device. Laid out at the room's own width, scrolling
  * down, never sideways. A tap brings the post's card to the top of the
  * stack; the post the stack heads to bobs on its water, the board turning
@@ -340,8 +333,8 @@ export function MonthBoard({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        // The cards' radius; no scrollbar, the board is scrolled by hand; down only.
-        className="water-ground no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[24px]"
+        // Transparent over the ground (review: no depth by row); the cards' radius; no scrollbar; down only.
+        className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[24px]"
         style={{ touchAction: 'pan-y' }}
       >
         <div
@@ -396,8 +389,6 @@ export function MonthBoard({
               style={{
                 top: week.y,
                 height: week.h,
-                // A month deepens by the row (review); a week is the water itself.
-                background: span === 'month' && week.index > 0 ? rowWater(week.index) : undefined,
               }}
             >
               {week.cells.map((cell) => (

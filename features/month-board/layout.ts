@@ -63,17 +63,25 @@ export const C_TUCK_PX = 10;
 const CAPTION_LINES = 3;
 /** About how wide one 10px Poppins character is, for the line estimate: generous, so words never outgrow their box. */
 const CHAR_EM = 0.62;
-/** An open joint splash's slot: its height, how much of it lies on the label, its tilt, and its widths. */
-export const SLOT_PX = 16;
+/**
+ * An open joint splash's slot, a row (review): 6px at the sides and 3 above
+ * and below inside a 1.5px dashed outline, the faces first — 16px, overlapping by 4 — then a 4px gap, then
+ * "Add your side" ("Add" on a phone) at 10px. Drawn at its content's own
+ * width; the layout places it by a generous estimate of that width, which
+ * the drawn note never exceeds.
+ */
+export const SLOT_FACE_PX = 16;
+const SLOT_FACE_OVERLAP = 4;
+const SLOT_GAP_PX = 4;
+export const SLOT_PAD_PX = 6;
+export const SLOT_PAD_Y_PX = 3;
+const SLOT_BORDER_PX = 1.5;
+export const SLOT_PX = SLOT_FACE_PX + SLOT_PAD_Y_PX * 2 + SLOT_BORDER_PX * 2;
 const SLOT_ON_LABEL = 0.25;
 const SLOT_TILT_MIN = 3;
 const SLOT_TILT_MAX = 6;
-/** Faces 12px, overlapping by 4; then "Add your side" (desktop) or "Add" (phone) at 10px. */
-const SLOT_FACE_PX = 12;
-const SLOT_FACE_STEP = 8;
-const SLOT_WORDS_PX = { wide: 66, narrow: 18 } as const;
-const SLOT_INNER_PX = 4 + 4 + 4;
-
+/** The words' width, estimated generously (0.62em a character at 10px). */
+const SLOT_WORDS = { wide: 'Add your side', narrow: 'Add' } as const;
 /** A range band's height, the gap between bands, and the lanes bands pack into. */
 export const TAPE_PX = 24;
 const TAPE_GAP_PX = 2;
@@ -107,11 +115,11 @@ export type BoardMetrics = {
   /** B's stickers, by size (review): 1.6, 2.2 and 3 line heights. */
   stickers: Record<StickerSize, number>;
   /**
-   * A label's padding (review): a filled label 8 top, 12 sides, 12 bottom;
-   * one with no fill — no visible box — 4 top and bottom, so its padding
-   * makes no gaps. The left side is 6 on a phone. The right never drops
-   * under 12: a sticker from the next lane overhangs the line by at most
-   * that much, onto padding only.
+   * A label's padding (review): even — a filled label 6 above and below, 8
+   * at each side (6 on a phone); one with no fill — no visible box — 4
+   * above and below, so its padding makes no gaps. A sticker from
+   * the next lane overhangs the line by at most the right padding, onto
+   * padding only.
    */
   pad: {
     side: number;
@@ -131,7 +139,6 @@ export function boardMetrics(width: number): BoardMetrics {
   const narrow = column < 80;
   const size = 10;
   const line = size + 3;
-  const bottom = 12;
   return {
     width: w,
     column,
@@ -144,9 +151,9 @@ export function boardMetrics(width: number): BoardMetrics {
       big: Math.round(line * 3),
     },
     pad: {
-      side: narrow ? 6 : 12,
-      right: 12,
-      filled: { top: 8, bottom },
+      side: narrow ? 6 : 8,
+      right: narrow ? 6 : 8,
+      filled: { top: 6, bottom: 6 },
       none: { top: 4, bottom: 4 },
     },
     fanMin: narrow ? 3 : 4,
@@ -549,11 +556,15 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   if (!shape.slot) return shape;
   const { m } = ctx;
   const faces = Math.min(card.awaiting!.length, m.narrow ? 2 : 4);
-  const w =
-    SLOT_INNER_PX +
-    SLOT_FACE_PX +
-    (faces - 1) * SLOT_FACE_STEP +
-    (m.narrow ? SLOT_WORDS_PX.narrow : SLOT_WORDS_PX.wide);
+  const words = (m.narrow ? SLOT_WORDS.narrow : SLOT_WORDS.wide).length * m.caption.size * CHAR_EM;
+  const w = Math.ceil(
+    SLOT_BORDER_PX * 2 +
+      SLOT_PAD_PX * 2 +
+      SLOT_FACE_PX +
+      (faces - 1) * (SLOT_FACE_PX - SLOT_FACE_OVERLAP) +
+      SLOT_GAP_PX +
+      words,
+  );
   const label = shape.labelBox;
   const on = Math.min(Math.round(SLOT_PX * SLOT_ON_LABEL), shape.pad.bottom);
   const y = label.y + label.h - on;
