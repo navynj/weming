@@ -988,6 +988,17 @@ describe('a pool’s splash on Home (review)', () => {
     expect(piece.querySelector('[data-avatar-photo]')).toBeNull();
   });
 
+  it('parts the words from the monogram (and the faces) with a space, never a margin that indents a wrapped line', () => {
+    const { container } = board([{ ...joint, pools: ['Our Pool'], poolPhoto: null }]);
+    const pool = container.querySelector<HTMLElement>('[data-board-pool]')!;
+    expect(pool.className).not.toMatch(/\bm[lx]-/);
+    expect(pool.previousSibling?.textContent).toMatch(/ $/);
+    cleanup();
+    const inPool = board([joint]).container.querySelector<HTMLElement>('[data-board-faces]')!;
+    expect(inPool.className).not.toMatch(/\bm[lx]-/);
+    expect(inPool.previousSibling?.textContent).toMatch(/ $/);
+  });
+
   it('draws its photo there when the pool has one', () => {
     const { container } = board([
       { ...joint, pools: ['Our Pool'], poolPhoto: 'https://signed/pool.webp' },
