@@ -16,7 +16,7 @@ import { AXIS_LOCK_PX } from '@/components/ui/use-axis-lock';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import type { Card, GridColumn } from '@/features/home/grid';
 import type { Ring } from '@/features/home/lane-grid';
-import { WAVE_HEIGHT, waveLinePath } from '@/components/ui/waves';
+import { WaveGlyph, WAVE_GLYPH_W } from '@/components/ui/waves';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
@@ -46,17 +46,7 @@ function rowWater(index: number): string {
   return `rgb(${Math.round(5 * k)}, ${Math.round(7 * k)}, ${Math.round(201 * k)})`;
 }
 
-/**
- * A day's wave (review): the pill's own glyph — the mark's 14px wave, one
- * full period, both ends at the midline — scaled to 24px wide, drawn 2px
- * white at 60%. The same path, so the two can never drift apart.
- */
-export const DAY_WAVE_W = 24;
-const MARK_WAVE_W = 14;
-const MARK_WAVE_H = WAVE_HEIGHT;
-export const DAY_WAVE_D = waveLinePath(MARK_WAVE_W, 1);
-
-/** A day's waves (review): one per record, three at most, 4px apart; nothing when nothing. */
+/** A day's waves (review): the pill's own glyph at 24px, white at 60%, one per record, three at most. */
 function DayWaves({ count }: { count: number }) {
   const lines = Math.min(DAY_WAVES_MAX, count);
   if (lines === 0) return null;
@@ -68,25 +58,7 @@ function DayWaves({ count }: { count: number }) {
       className="flex flex-col items-center gap-1"
     >
       {Array.from({ length: lines }, (_, at) => (
-        <svg
-          key={at}
-          width={DAY_WAVE_W}
-          height={(DAY_WAVE_W / MARK_WAVE_W) * MARK_WAVE_H}
-          viewBox={`0 0 ${MARK_WAVE_W} ${MARK_WAVE_H}`}
-          fill="none"
-          className="overflow-visible"
-        >
-          <path
-            data-board-wave
-            d={DAY_WAVE_D}
-            stroke="#ffffff"
-            strokeOpacity={0.6}
-            strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <WaveGlyph key={at} width={WAVE_GLYPH_W} stroke="#ffffff" opacity={0.6} />
       ))}
     </span>
   );
@@ -122,6 +94,7 @@ export function MonthBoard({
   today,
   ring = null,
   dropped = null,
+  fills = false,
   onPick,
   lanes,
 }: {
@@ -134,6 +107,12 @@ export function MonthBoard({
   ring?: Ring | null;
   /** The post just dropped (review): it plunges into its water rather than bobbing on it. */
   dropped?: string | null;
+  /**
+   * Joint splashes take a fill, white or ink (review): only where the
+   * calendar is shared — a pool of two or more. Home and a pool of one draw
+   * every label with none.
+   */
+  fills?: boolean;
   /** Brings a post's card to the top of the stack. */
   onPick: (id: string) => void;
   /** What a post's icon falls back to: its lane's emoji. */
@@ -155,9 +134,9 @@ export function MonthBoard({
   const layout = useMemo(
     () =>
       span === 'week'
-        ? layoutWeekBoard(cards, week, { width: room ?? 980 })
-        : layoutMonthBoard(cards, month, { width: room ?? 980 }),
-    [cards, span, week, month, room],
+        ? layoutWeekBoard(cards, week, { width: room ?? 980, fills })
+        : layoutMonthBoard(cards, month, { width: room ?? 980, fills }),
+    [cards, span, week, month, room, fills],
   );
   const { metrics } = layout;
   const photos = useBoardPhotos(layout.pieces);

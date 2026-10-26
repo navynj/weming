@@ -314,6 +314,8 @@ export function PoolGround({
                 today={today}
                 ring={ring}
                 dropped={dropHere?.splash.id ?? null}
+                // A joint splash's fill says it is shared: only with someone to share it with.
+                fills={current.length >= 2}
                 onPick={bringForward}
                 lanes={laneNames}
               />
