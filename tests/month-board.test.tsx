@@ -568,12 +568,12 @@ describe('labels, photos and bands, drawn', () => {
     ).toBe('+1');
   });
 
-  it('runs a range band the full width of its lanes, translucent, outlined, square', () => {
+  it('runs a range band the full width of its lanes, translucent, no outline, square', () => {
     const { container } = board();
     const band = container.querySelector<HTMLElement>(
       '[data-board-tape="trip"] [data-board-band]',
     )!;
-    expect(band.className).toContain('border-white/50');
+    expect(band.className).not.toMatch(/border/);
     expect(band.className).toContain('bg-white/20');
     expect(band.className).not.toMatch(/rounded/);
     const laid = layoutWeekBoard(WEEK, TODAY, { width: 728 }).tapes[0];
