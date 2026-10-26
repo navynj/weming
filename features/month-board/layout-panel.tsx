@@ -6,6 +6,7 @@ import { ChevronDown, RotateCcw } from 'lucide-react';
 import type { Card } from '@/features/home/grid';
 
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
+import type { Recipe } from './layout';
 import { WAVE_DEFAULTS } from './board-pieces';
 import { useSignedPhotos } from './use-board-photos';
 
@@ -190,6 +191,7 @@ const degrees = (v: number): string => `${Math.round(v)}°`;
  */
 export function LayoutPanel({
   card,
+  recipe,
   layout,
   source,
   home,
@@ -198,6 +200,8 @@ export function LayoutPanel({
   onRevert,
 }: {
   card: Card;
+  /** The recipe the board drew it with; null while it is not on the page shown. */
+  recipe: Recipe | null;
   layout: BoardLayoutJson;
   source: LayoutSource;
   /** On Home: writes go to my Home layout. */
@@ -213,8 +217,10 @@ export function LayoutPanel({
   const icon = layout.icon ?? {};
   const label = layout.label ?? {};
   const wave = layout.wave ?? {};
-  const inline = icon.inline ?? true;
+  // As drawn (review): the recipe's sticker reads off, not on, while Inline is unset.
+  const inline = icon.inline ?? recipe !== 'B';
   const pooled = home && card.joint === true && card.poolLayout !== undefined;
+  const period = card.splash.range != null && card.splash.range.start < card.splash.range.end;
   const waveSize =
     wave.amp !== undefined ? wave.amp / WAVE_SIZE.amp : (wave.length ?? 0) / WAVE_SIZE.length || 1;
 
@@ -250,7 +256,7 @@ export function LayoutPanel({
                   type="button"
                   data-layout-use-pool
                   onClick={onRevert}
-                  className="text-main-900 rounded-full bg-white px-3 py-1 font-medium"
+                  className="rounded-full bg-white/30 px-3 py-1 font-medium text-white"
                 >
                   Use pool layout
                 </button>
@@ -258,81 +264,95 @@ export function LayoutPanel({
             </div>
           ) : null}
 
-          <Group title="Icon">
-            <Switch name="Inline" on={inline} onChange={(on) => onEdit({ icon: { inline: on } })} />
-            {!inline ? (
+          {/* A period is a tape along its days (review): only its words' size is its own. */}
+          {!period ? (
+            <Group title="Icon">
+              {/* A photo's caption keeps its icon inline: there is no sticker to switch to. */}
+              {recipe !== 'C' ? (
+                <Switch
+                  name="Inline"
+                  on={inline}
+                  onChange={(on) => onEdit({ icon: { inline: on } })}
+                />
+              ) : null}
+              {!inline ? (
+                <>
+                  <Slider
+                    name="Size"
+                    value={icon.size}
+                    fallback={2}
+                    min={0.8}
+                    max={4}
+                    step={0.1}
+                    unit={(v) => `${v.toFixed(1)}×`}
+                    onChange={(v) => onEdit({ icon: { size: v } })}
+                    onReset={() => onEdit({}, ['icon.size'])}
+                  />
+                  <Slider
+                    name="Icon X"
+                    value={icon.x}
+                    fallback={0}
+                    min={-0.6}
+                    max={0.6}
+                    step={0.01}
+                    unit={lanes}
+                    onChange={(v) => onEdit({ icon: { x: v } })}
+                    onReset={() => onEdit({}, ['icon.x'])}
+                  />
+                  <Slider
+                    name="Icon Y"
+                    value={icon.y}
+                    fallback={0}
+                    min={-6}
+                    max={6}
+                    step={0.1}
+                    unit={lines}
+                    onChange={(v) => onEdit({ icon: { y: v } })}
+                    onReset={() => onEdit({}, ['icon.y'])}
+                  />
+                </>
+              ) : null}
+              {/* Inline or a sticker, it turns. */}
+              <Slider
+                name="Icon tilt"
+                value={icon.tilt}
+                fallback={0}
+                min={-15}
+                max={15}
+                step={1}
+                unit={degrees}
+                onChange={(v) => onEdit({ icon: { tilt: v } })}
+                onReset={() => onEdit({}, ['icon.tilt'])}
+              />
+            </Group>
+          ) : null}
+
+          <Group title="Label">
+            {!period ? (
               <>
+                {/* Only a filled label — a joint splash's — has a fill to choose. */}
+                {card.joint ? (
+                  <Choice
+                    name="Style"
+                    value={label.style}
+                    options={LABEL_STYLE_CHOICES}
+                    onChange={(v) => onEdit({ label: { style: v } })}
+                    onReset={() => onEdit({}, ['label.style'])}
+                  />
+                ) : null}
                 <Slider
-                  name="Size"
-                  value={icon.size}
-                  fallback={2}
-                  min={0.8}
-                  max={4}
-                  step={0.1}
-                  unit={(v) => `${v.toFixed(1)}×`}
-                  onChange={(v) => onEdit({ icon: { size: v } })}
-                  onReset={() => onEdit({}, ['icon.size'])}
-                />
-                <Slider
-                  name="Icon X"
-                  value={icon.x}
-                  fallback={0}
-                  min={-0.6}
-                  max={0.6}
-                  step={0.01}
+                  name="Width"
+                  value={label.width}
+                  fallback={1}
+                  min={0.3}
+                  max={2}
+                  step={0.05}
                   unit={lanes}
-                  onChange={(v) => onEdit({ icon: { x: v } })}
-                  onReset={() => onEdit({}, ['icon.x'])}
-                />
-                <Slider
-                  name="Icon Y"
-                  value={icon.y}
-                  fallback={0}
-                  min={-6}
-                  max={6}
-                  step={0.1}
-                  unit={lines}
-                  onChange={(v) => onEdit({ icon: { y: v } })}
-                  onReset={() => onEdit({}, ['icon.y'])}
+                  onChange={(v) => onEdit({ label: { width: v } })}
+                  onReset={() => onEdit({}, ['label.width'])}
                 />
               </>
             ) : null}
-            {/* Inline or a sticker, it turns. */}
-            <Slider
-              name="Icon tilt"
-              value={icon.tilt}
-              fallback={0}
-              min={-15}
-              max={15}
-              step={1}
-              unit={degrees}
-              onChange={(v) => onEdit({ icon: { tilt: v } })}
-              onReset={() => onEdit({}, ['icon.tilt'])}
-            />
-          </Group>
-
-          <Group title="Label">
-            {/* Only a filled label — a joint splash's — has a fill to choose. */}
-            {card.joint ? (
-              <Choice
-                name="Style"
-                value={label.style}
-                options={LABEL_STYLE_CHOICES}
-                onChange={(v) => onEdit({ label: { style: v } })}
-                onReset={() => onEdit({}, ['label.style'])}
-              />
-            ) : null}
-            <Slider
-              name="Width"
-              value={label.width}
-              fallback={1}
-              min={0.3}
-              max={2}
-              step={0.05}
-              unit={lanes}
-              onChange={(v) => onEdit({ label: { width: v } })}
-              onReset={() => onEdit({}, ['label.width'])}
-            />
             <Slider
               name="Text size"
               value={label.fontSize}
@@ -344,42 +364,46 @@ export function LayoutPanel({
               onChange={(v) => onEdit({ label: { fontSize: v } })}
               onReset={() => onEdit({}, ['label.fontSize'])}
             />
-            <Slider
-              name="Label X"
-              value={label.x}
-              fallback={0}
-              min={-0.6}
-              max={0.6}
-              step={0.01}
-              unit={lanes}
-              onChange={(v) => onEdit({ label: { x: v } })}
-              onReset={() => onEdit({}, ['label.x'])}
-            />
-            <Slider
-              name="Label Y"
-              value={label.y}
-              fallback={0}
-              min={-6}
-              max={6}
-              step={0.1}
-              unit={lines}
-              onChange={(v) => onEdit({ label: { y: v } })}
-              onReset={() => onEdit({}, ['label.y'])}
-            />
-            <Slider
-              name="Label tilt"
-              value={label.tilt}
-              fallback={0}
-              min={-15}
-              max={15}
-              step={1}
-              unit={degrees}
-              onChange={(v) => onEdit({ label: { tilt: v } })}
-              onReset={() => onEdit({}, ['label.tilt'])}
-            />
+            {!period ? (
+              <>
+                <Slider
+                  name="Label X"
+                  value={label.x}
+                  fallback={0}
+                  min={-0.6}
+                  max={0.6}
+                  step={0.01}
+                  unit={lanes}
+                  onChange={(v) => onEdit({ label: { x: v } })}
+                  onReset={() => onEdit({}, ['label.x'])}
+                />
+                <Slider
+                  name="Label Y"
+                  value={label.y}
+                  fallback={0}
+                  min={-6}
+                  max={6}
+                  step={0.1}
+                  unit={lines}
+                  onChange={(v) => onEdit({ label: { y: v } })}
+                  onReset={() => onEdit({}, ['label.y'])}
+                />
+                <Slider
+                  name="Label tilt"
+                  value={label.tilt}
+                  fallback={0}
+                  min={-15}
+                  max={15}
+                  step={1}
+                  unit={degrees}
+                  onChange={(v) => onEdit({ label: { tilt: v } })}
+                  onReset={() => onEdit({}, ['label.tilt'])}
+                />
+              </>
+            ) : null}
           </Group>
 
-          {photos.length > 0 ? (
+          {photos.length > 0 && !period ? (
             <Group title="Photos">
               {photos.map((photo, at) => {
                 const set = layout.photos?.[photo.path] ?? {};
@@ -449,119 +473,123 @@ export function LayoutPanel({
             </Group>
           ) : null}
 
-          <Group title="Wave">
-            <Switch
-              name="Wave"
-              on={wave.on === true}
-              onChange={(on) => (on ? onEdit({ wave: { on: true } }) : onEdit({}, ['wave']))}
-            />
-            {wave.on ? (
-              <>
-                <Slider
-                  name="Wave size"
-                  value={wave.amp !== undefined || wave.length !== undefined ? waveSize : undefined}
-                  fallback={WAVE_DEFAULTS.amp / WAVE_SIZE.amp}
-                  min={WAVE_SIZE.min}
-                  max={WAVE_SIZE.max}
-                  step={0.05}
-                  unit={(v) => `${v.toFixed(2)}×`}
-                  onChange={(v) =>
-                    onEdit({ wave: { amp: v * WAVE_SIZE.amp, length: v * WAVE_SIZE.length } })
-                  }
-                  onReset={() => onEdit({}, ['wave.amp', 'wave.length'])}
-                />
-                <button
-                  type="button"
-                  aria-expanded={advanced}
-                  onClick={() => setAdvanced(!advanced)}
-                  className="self-start text-[10px] text-white/70 underline"
-                >
-                  {advanced ? 'Fewer' : 'Height and wavelength'}
-                </button>
-                {advanced ? (
-                  <>
-                    <Slider
-                      name="Wave height"
-                      value={wave.amp}
-                      fallback={WAVE_DEFAULTS.amp}
-                      min={1}
-                      max={8}
-                      step={0.5}
-                      unit={(v) => `${v}px`}
-                      onChange={(v) => onEdit({ wave: { amp: v } })}
-                      onReset={() => onEdit({}, ['wave.amp'])}
-                    />
-                    <Slider
-                      name="Wavelength"
-                      value={wave.length}
-                      fallback={WAVE_DEFAULTS.length}
-                      min={8}
-                      max={32}
-                      step={1}
-                      unit={(v) => `${v}px`}
-                      onChange={(v) => onEdit({ wave: { length: v } })}
-                      onReset={() => onEdit({}, ['wave.length'])}
-                    />
-                  </>
-                ) : null}
-                <Slider
-                  name="Weight"
-                  value={wave.weight}
-                  fallback={WAVE_DEFAULTS.weight}
-                  min={1}
-                  max={4}
-                  step={0.5}
-                  unit={(v) => `${v}px`}
-                  onChange={(v) => onEdit({ wave: { weight: v } })}
-                  onReset={() => onEdit({}, ['wave.weight'])}
-                />
-                <Slider
-                  name="Length"
-                  value={wave.span}
-                  fallback={WAVE_DEFAULTS.span}
-                  min={0.2}
-                  max={2}
-                  step={0.05}
-                  unit={lanes}
-                  onChange={(v) => onEdit({ wave: { span: v } })}
-                  onReset={() => onEdit({}, ['wave.span'])}
-                />
-                <Slider
-                  name="Wave X"
-                  value={wave.x}
-                  fallback={0}
-                  min={-0.6}
-                  max={0.6}
-                  step={0.01}
-                  unit={lanes}
-                  onChange={(v) => onEdit({ wave: { x: v } })}
-                  onReset={() => onEdit({}, ['wave.x'])}
-                />
-                <Slider
-                  name="Wave Y"
-                  value={wave.y}
-                  fallback={0}
-                  min={-6}
-                  max={6}
-                  step={0.1}
-                  unit={lines}
-                  onChange={(v) => onEdit({ wave: { y: v } })}
-                  onReset={() => onEdit({}, ['wave.y'])}
-                />
-                <Slider
-                  name="Wave tilt"
-                  value={wave.tilt}
-                  fallback={0}
-                  min={-15}
-                  max={15}
-                  step={1}
-                  unit={degrees}
-                  onChange={(v) => onEdit({ wave: { tilt: v } })}
-                  onReset={() => onEdit({}, ['wave.tilt'])}
-                />
-              </>
-            ) : null}
-          </Group>
+          {!period ? (
+            <Group title="Wave">
+              <Switch
+                name="Wave"
+                on={wave.on === true}
+                onChange={(on) => (on ? onEdit({ wave: { on: true } }) : onEdit({}, ['wave']))}
+              />
+              {wave.on ? (
+                <>
+                  <Slider
+                    name="Wave size"
+                    value={
+                      wave.amp !== undefined || wave.length !== undefined ? waveSize : undefined
+                    }
+                    fallback={WAVE_DEFAULTS.amp / WAVE_SIZE.amp}
+                    min={WAVE_SIZE.min}
+                    max={WAVE_SIZE.max}
+                    step={0.05}
+                    unit={(v) => `${v.toFixed(2)}×`}
+                    onChange={(v) =>
+                      onEdit({ wave: { amp: v * WAVE_SIZE.amp, length: v * WAVE_SIZE.length } })
+                    }
+                    onReset={() => onEdit({}, ['wave.amp', 'wave.length'])}
+                  />
+                  <button
+                    type="button"
+                    aria-expanded={advanced}
+                    onClick={() => setAdvanced(!advanced)}
+                    className="self-start text-[10px] text-white/70 underline"
+                  >
+                    {advanced ? 'Fewer' : 'Height and wavelength'}
+                  </button>
+                  {advanced ? (
+                    <>
+                      <Slider
+                        name="Wave height"
+                        value={wave.amp}
+                        fallback={WAVE_DEFAULTS.amp}
+                        min={1}
+                        max={8}
+                        step={0.5}
+                        unit={(v) => `${v}px`}
+                        onChange={(v) => onEdit({ wave: { amp: v } })}
+                        onReset={() => onEdit({}, ['wave.amp'])}
+                      />
+                      <Slider
+                        name="Wavelength"
+                        value={wave.length}
+                        fallback={WAVE_DEFAULTS.length}
+                        min={8}
+                        max={32}
+                        step={1}
+                        unit={(v) => `${v}px`}
+                        onChange={(v) => onEdit({ wave: { length: v } })}
+                        onReset={() => onEdit({}, ['wave.length'])}
+                      />
+                    </>
+                  ) : null}
+                  <Slider
+                    name="Weight"
+                    value={wave.weight}
+                    fallback={WAVE_DEFAULTS.weight}
+                    min={1}
+                    max={4}
+                    step={0.5}
+                    unit={(v) => `${v}px`}
+                    onChange={(v) => onEdit({ wave: { weight: v } })}
+                    onReset={() => onEdit({}, ['wave.weight'])}
+                  />
+                  <Slider
+                    name="Length"
+                    value={wave.span}
+                    fallback={WAVE_DEFAULTS.span}
+                    min={0.2}
+                    max={2}
+                    step={0.05}
+                    unit={lanes}
+                    onChange={(v) => onEdit({ wave: { span: v } })}
+                    onReset={() => onEdit({}, ['wave.span'])}
+                  />
+                  <Slider
+                    name="Wave X"
+                    value={wave.x}
+                    fallback={0}
+                    min={-0.6}
+                    max={0.6}
+                    step={0.01}
+                    unit={lanes}
+                    onChange={(v) => onEdit({ wave: { x: v } })}
+                    onReset={() => onEdit({}, ['wave.x'])}
+                  />
+                  <Slider
+                    name="Wave Y"
+                    value={wave.y}
+                    fallback={0}
+                    min={-6}
+                    max={6}
+                    step={0.1}
+                    unit={lines}
+                    onChange={(v) => onEdit({ wave: { y: v } })}
+                    onReset={() => onEdit({}, ['wave.y'])}
+                  />
+                  <Slider
+                    name="Wave tilt"
+                    value={wave.tilt}
+                    fallback={0}
+                    min={-15}
+                    max={15}
+                    step={1}
+                    unit={degrees}
+                    onChange={(v) => onEdit({ wave: { tilt: v } })}
+                    onReset={() => onEdit({}, ['wave.tilt'])}
+                  />
+                </>
+              ) : null}
+            </Group>
+          ) : null}
 
           <div className="flex items-center justify-between">
             {message ? (

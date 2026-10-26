@@ -261,6 +261,8 @@ export type BoardTape = Box & {
   endsHere: boolean;
   /** Only over days of the month before or after: drawn at half strength. */
   muted: boolean;
+  /** Its words' size: the board's, or a text size set by hand, the band growing with it (review). */
+  size: number;
 };
 
 export type BoardLayout = {
@@ -928,6 +930,8 @@ function layoutBoard(
     const ends: number[] = [];
     const rowTapes: Omit<BoardTape, 'y'>[] = [];
     const lanes: number[] = [];
+    // Each band lane as tall as its tallest band.
+    const laneH: number[] = [];
     for (const card of ranged) {
       const range = spanOf(card)!;
       const cols = cells.filter((c) => c.day >= range.start && c.day <= range.end);
@@ -940,6 +944,9 @@ function layoutBoard(
         ends.push(endCol);
       } else ends[lane] = endCol;
       lanes.push(lane);
+      const size = metricsFor(m, card.layout?.label?.fontSize).caption.size;
+      const h = Math.max(TAPE_PX, size + TAPE_PX - BASE_PX.wide);
+      laneH[lane] = Math.max(laneH[lane] ?? 0, h);
       rowTapes.push({
         key: `${card.splash.id}:${index}`,
         id: card.splash.id,
@@ -953,14 +960,23 @@ function layoutBoard(
         // The full width of its lanes, edge to edge.
         x: startCol * m.column,
         w: (endCol - startCol + 1) * m.column,
-        h: TAPE_PX,
+        h,
+        size,
       });
     }
     // Under the bands, room for a first sticker to hang into without touching their words.
+    const laneTop = laneH.map((_, l) =>
+      laneH.slice(0, l).reduce((sum, h) => sum + h + TAPE_GAP_PX, 0),
+    );
     const tapeBlock =
-      ends.length > 0 ? ends.length * (TAPE_PX + TAPE_GAP_PX) + Math.ceil(m.stickers.big / 2) : 0;
+      ends.length > 0
+        ? laneTop[laneH.length - 1] +
+          laneH[laneH.length - 1] +
+          TAPE_GAP_PX +
+          Math.ceil(m.stickers.big / 2)
+        : 0;
     rowTapes.forEach((tape, at) => {
-      tapes.push({ ...tape, y: y + numberBand + lanes[at] * (TAPE_PX + TAPE_GAP_PX) });
+      tapes.push({ ...tape, y: y + numberBand + laneTop[lanes[at]] });
     });
 
     // Pieces: right to left, so each lane decides its reach against lanes

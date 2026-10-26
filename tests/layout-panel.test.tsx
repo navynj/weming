@@ -167,6 +167,26 @@ describe('the Layout panel (review)', () => {
     expect(panel().querySelector('[data-layout-body]')).not.toBeNull();
   });
 
+  it('shows Inline as the board drew it while unset: off for a sticker, on inline', () => {
+    media(true);
+    const seen = new Set<string>();
+    for (const id of ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8']) {
+      const { container } = home([card(id, 'Grand Austria Hotel', '2026-10-21')]);
+      fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+      const recipe = container
+        .querySelector(`[data-board-piece="${id}"]`)!
+        .getAttribute('data-recipe')!;
+      const on = container
+        .querySelector('[data-layout-switch="Inline"]')!
+        .getAttribute('aria-checked');
+      expect(on, `${id} drawn ${recipe}`).toBe(recipe === 'B' ? 'false' : 'true');
+      seen.add(recipe);
+      cleanup();
+    }
+    // Both kinds came up, so the check is not one-sided.
+    expect([...seen].sort()).toEqual(['A', 'B']);
+  });
+
   it('is absent at a phone’s width, the layouts still drawn there', () => {
     media(false);
     const laid = [
@@ -271,6 +291,48 @@ describe('a label’s width and style in the panel (review)', () => {
     const range = container.querySelector<HTMLInputElement>('input[aria-label="Width"]')!;
     expect(range.className).toContain('layout-range');
     expect(range.style.getPropertyValue('--fill')).toMatch(/%$/);
+  });
+});
+
+describe('a period’s layout (review)', () => {
+  const PERIOD = {
+    ...ONE[0],
+    splash: { ...ONE[0].splash, range: { start: '2026-10-20', end: '2026-10-22' } },
+  } as Card;
+
+  it('offers only Text size for a period: it is a tape along its days', () => {
+    media(true);
+    const { container } = home([PERIOD]);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const controls = [...container.querySelectorAll('[data-layout-control]')].map((c) =>
+      c.getAttribute('data-layout-control'),
+    );
+    expect(controls).toEqual(['Text size']);
+    expect(container.querySelector('[data-layout-group="Icon"]')).toBeNull();
+    expect(container.querySelector('[data-layout-group="Wave"]')).toBeNull();
+  });
+
+  it('draws a period’s words at its text size, the tape growing and pushing the row down', () => {
+    const at = (fontSize?: number) =>
+      layoutWeekBoard(
+        [
+          { ...PERIOD, layout: fontSize ? { label: { fontSize } } : {} },
+          card('s2', 'Lynn Canyon', '2026-10-21'),
+        ],
+        TODAY,
+        { width: 980 },
+      );
+    const plain = at();
+    const big = at(16);
+    expect(plain.tapes[0].size).toBe(10);
+    expect(big.tapes[0].size).toBe(16);
+    expect(big.tapes[0].h).toBeGreaterThan(plain.tapes[0].h);
+    // The day's label below starts under the taller tape, never on it.
+    const below = big.pieces.find((p) => p.id === 's2')!;
+    expect(below.y).toBeGreaterThanOrEqual(big.tapes[0].y + big.tapes[0].h);
+    cleanup();
+    const { container } = board([{ ...PERIOD, layout: { label: { fontSize: 16 } } }]);
+    expect(container.querySelector<HTMLElement>('[data-board-band]')!.style.fontSize).toBe('16px');
   });
 });
 

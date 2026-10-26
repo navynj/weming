@@ -23,6 +23,7 @@ import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { LayoutPanel } from '@/features/month-board/layout-panel';
+import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
@@ -171,6 +172,8 @@ export function PoolGround({
   // The calendar's hand-set layouts as the panel edits them (review): drawn
   // at once, saved when the sliders rest; the pool's here.
   const drafts = useLayoutDrafts(shown, poolId);
+  // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
+  const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
   const topCard = drafts.drawn.find((card) => card.splash.id === heading) ?? null;
 
@@ -321,6 +324,7 @@ export function PoolGround({
                 dropped={dropHere?.splash.id ?? null}
                 onPick={bringForward}
                 lanes={laneNames}
+                onDrawn={setRecipes}
               />
             </BoardFrame>
           ) : (
@@ -360,6 +364,7 @@ export function PoolGround({
           {boardView && wide && topCard ? (
             <LayoutPanel
               card={topCard}
+              recipe={recipes[topCard.splash.id] ?? null}
               layout={drafts.shown(topCard.splash.id).layout}
               source={drafts.shown(topCard.splash.id).source}
               home={false}

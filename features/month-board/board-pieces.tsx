@@ -565,13 +565,7 @@ export function BoardPieceView({
  * of its lanes, translucent white with no outline (review), at the top of
  * the row above the items.
  */
-export function BoardTapeView({
-  tape,
-  lanes,
-  metrics,
-  onPick,
-  ripple,
-}: Shared & { tape: BoardTape }) {
+export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: BoardTape }) {
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
@@ -594,7 +588,7 @@ export function BoardTapeView({
         data-board-pick={tape.id}
         data-board-band
         className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
-        style={{ fontSize: metrics.caption.size }}
+        style={{ fontSize: tape.size }}
       >
         {icon ? <span aria-hidden>{icon}</span> : null}
         <span className="min-w-0 truncate">{caption}</span>
