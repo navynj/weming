@@ -839,9 +839,9 @@ describe('an open joint splash (meaning is shape)', () => {
     const closed = layoutWeekBoard([joint([])], TODAY, { width: 980 }).pieces[0];
     expect(open.labelBox.h).toBe(closed.labelBox.h);
     for (const words of open.textBoxes) expect(intersects(words, open.slotBounds!)).toBe(false);
-    // Wholly under the label: nothing of it over the label (review).
-    expect(open.slotBounds!.y).toBeGreaterThanOrEqual(open.labelBox.y + open.labelBox.h);
-    expect(intersects(open.slotBounds!, open.labelBox)).toBe(false);
+    // Up onto the label by its bottom padding (review): over its edge, never its words.
+    expect(open.slotBounds!.y).toBe(open.labelBox.y + open.labelBox.h - open.pad.bottom);
+    expect(intersects(open.slotBounds!, open.labelBox)).toBe(true);
     // Stuck on the bottom-right corner where the lanes to the right are empty.
     expect(open.slotAt).toBe('right');
     // Beside a lane taken at its height, on the bottom-left instead.

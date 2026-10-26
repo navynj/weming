@@ -202,10 +202,10 @@ export type BoardPiece = {
   photoBox: Box | null;
   stickerBox: Box | null;
   /**
-   * An open joint splash's slot (review): a dashed note hanging under the
+   * An open joint splash's slot (review): a dashed note stuck on the
    * label's bottom-right corner — or bottom-left, where the next lane is
-   * taken — tilted on the corner it hangs from so it never rises onto the
-   * label. `slotBox` is
+   * taken — overlapping the label by its bottom padding, tilted on the
+   * corner it hangs from so it never rises into the words. `slotBox` is
    * its box before the tilt, `slotBounds` all it covers after.
    */
   slot: boolean;
@@ -546,9 +546,10 @@ function tilted(box: Box, deg: number, pivot: 'left' | 'right'): Box {
 /**
  * The open slot (review), stuck on the label's bottom-right corner with
  * two fifths of it past the label, where the lanes to the right are empty
- * there; else on the bottom-left corner, inside the lane. It hangs wholly
- * under the label (review) and tilts 3–6° about the corner it hangs from,
- * downward, so it never rises onto the label. The piece grows to hold it.
+ * there; else on the bottom-left corner, inside the lane. It rides up onto
+ * the label by the label's bottom padding (review) — over its edge, never
+ * its words — and tilts 3–6° about the corner it hangs from, downward, so
+ * it rises no further. The piece grows to hold what hangs below.
  */
 function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   if (!shape.slot) return shape;
@@ -564,8 +565,8 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
       words,
   );
   const label = shape.labelBox;
-  // Wholly under the label (review): nothing of it, its faces least of all, over the label.
-  const y = label.y + label.h;
+  // Up onto the label (review), by all of its bottom padding: over its edge, never its words.
+  const y = label.y + label.h - shape.pad.bottom;
   const tilt = SLOT_TILT_MIN + unit(card.splash.id, 'slot') * (SLOT_TILT_MAX - SLOT_TILT_MIN);
   const right: Box = { x: label.x + label.w - Math.round(w * 0.6), y, w, h: SLOT_PX };
   const rightBounds = tilted(right, tilt, 'left');
