@@ -24,7 +24,16 @@ import { PoolEditScope } from '@/features/pool/edit-scope';
  * and icon are any member's, its ripples their authors'; someone else's
  * splash is read only. RLS decides whether it exists for me at all.
  */
-export async function PoolSplash({ id, sid }: { id: string; sid: string }) {
+export async function PoolSplash({
+  id,
+  sid,
+  writing = false,
+}: {
+  id: string;
+  sid: string;
+  /** Open with the next block's editor up: adding my side to a joint splash. */
+  writing?: boolean;
+}) {
   const supabase = await createClient();
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
@@ -75,6 +84,7 @@ export async function PoolSplash({ id, sid }: { id: string; sid: string }) {
   return (
     <PoolEditScope scope={poolScopeOf(view)}>
       <SplashPage
+        writing={writing}
         splash={summary}
         blocks={blocks}
         photos={photos}

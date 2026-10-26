@@ -517,10 +517,11 @@ describe('re-tapping Pool (review)', () => {
         o.getAttribute('data-view-option'),
       ),
     ).toEqual(['board', 'swimmers', 'lane', 'date']);
-    // Nothing remembered yet: a pool opens on its board (review), the stack hidden.
+    // Nothing remembered yet: a pool opens on its board (review).
     expect(selected()).toBe('board');
     expect(container.querySelector('[data-month-board]')).not.toBeNull();
-    expect(container.querySelector('[data-stack-card]')).toBeNull();
+    // The stack stays beside or beneath it, as in the Lane view.
+    expect(container.querySelector('[data-stack-card]')).not.toBeNull();
     fireEvent.click(tab);
     expect(selected()).toBe('swimmers');
     fireEvent.click(tab);

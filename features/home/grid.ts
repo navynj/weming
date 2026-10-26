@@ -54,7 +54,14 @@ export type Card = {
   editable?: boolean;
   /** Every image across its ripples, oldest first, for the Board view: each with the ripple it is on. */
   photos?: CardPhoto[];
+  /** A joint splash (Board view): who has written on it, once each, in the order they first wrote. */
+  writers?: CardFace[];
+  /** A joint splash (Board view): the current members who have not written on it yet. */
+  awaiting?: CardFace[];
 };
+
+/** A person as a face on the board: their id finds their photo; the initials stand in. */
+export type CardFace = { authorId: string; initials: string };
 
 /** One image of a post's, and the ripple it hangs on (whose visibility signs it). */
 export type CardPhoto = { rippleId: string; path: string };

@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const pushed: string[] = [];
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
+  useRouter: () => ({
+    push: (to: string) => pushed.push(to),
+    replace: () => {},
+    refresh: () => {},
+  }),
 }));
 vi.mock('@/lib/media', () => ({
   signBoardPhotos: (photos: { path: string }[]) =>
@@ -21,6 +26,7 @@ import {
   type BoardLayout,
 } from '@/features/month-board/layout';
 import { MonthBoard } from '@/features/month-board/month-board';
+import { PeopleProvider } from '@/features/people/people-provider';
 import { summarizeSplash, type Splash, type SplashBlock } from '@/features/splash/summary';
 import { written } from './written-on';
 
@@ -96,8 +102,19 @@ const OCTOBER = [
   card('sept', 'Not this month', '2026-09-20'),
 ];
 
-function board(cards: Card[] = OCTOBER) {
-  return render(<MonthBoard cards={cards} month="2026-10" onMonth={() => {}} lanes={LANES} />);
+const ME = 'u-yl';
+function board(cards: Card[] = OCTOBER, onPick: (id: string) => void = () => {}) {
+  return render(
+    <PeopleProvider
+      me={ME}
+      people={{
+        [ME]: { name: 'Yoonji Lee', photo: null },
+        'u-mk': { name: 'Mina Kim', photo: null },
+      }}
+    >
+      <MonthBoard cards={cards} month="2026-10" onMonth={() => {}} onPick={onPick} lanes={LANES} />
+    </PeopleProvider>,
+  );
 }
 
 describe('the month board’s layout', () => {
@@ -239,7 +256,7 @@ describe('the month board, drawn', () => {
     expect(pieces).toHaveLength(5);
     for (const piece of pieces) {
       expect(piece.querySelector('[data-board-label]')!.textContent).toContain(
-        piece.getAttribute('aria-label')!,
+        piece.querySelector('[data-board-pick]')!.getAttribute('aria-label')!,
       );
       const photo = piece.getAttribute('data-variant') === 'photo';
       expect(piece.querySelector('[data-board-icon]') !== null).toBe(photo);
@@ -248,6 +265,21 @@ describe('the month board, drawn', () => {
     expect(
       container.querySelector('[data-board-piece="lynn"] [data-board-sticker]')!.textContent,
     ).toBe('🍜');
+  });
+
+  it('shows a joint splash’s writers’ faces whatever its label’s style', () => {
+    const joint: Card = {
+      ...OCTOBER[0],
+      joint: true,
+      writers: [
+        { authorId: 'u-yl', initials: 'YL' },
+        { authorId: 'u-mk', initials: 'MK' },
+      ],
+    };
+    const { container } = board([joint, ...OCTOBER.slice(1)]);
+    const faces = container.querySelector('[data-board-piece="hoppers"] [data-board-faces]')!;
+    expect(faces.textContent).toBe('YLMK');
+    expect(container.querySelector('[data-board-piece="lynn"] [data-board-faces]')).toBeNull();
   });
 
   it('keeps label style and rotation across renders', () => {
@@ -262,18 +294,24 @@ describe('the month board, drawn', () => {
     expect(read()).toEqual(first);
   });
 
-  it('opens a piece’s or a tape’s sheet on a tap: the post’s own page, or its pool’s', () => {
-    const pooled = { ...OCTOBER[0], href: '/pool/p-a/splash/hoppers' };
-    const { container } = board([pooled, ...OCTOBER.slice(1)]);
-    expect(container.querySelector('[data-board-piece="hoppers"]')!.getAttribute('href')).toBe(
-      '/pool/p-a/splash/hoppers',
-    );
-    expect(container.querySelector('[data-board-piece="lynn"]')!.getAttribute('href')).toBe(
-      '/splash/lynn',
-    );
-    expect(container.querySelector('[data-board-tape="trip"]')!.getAttribute('href')).toBe(
-      '/splash/trip',
-    );
+  it('brings a tapped piece’s or tape’s post to the top of the stack, opening nothing', () => {
+    const picked: string[] = [];
+    const { container } = board(OCTOBER, (id) => picked.push(id));
+    fireEvent.click(container.querySelector('[data-board-pick="lynn"]')!);
+    fireEvent.click(container.querySelector('[data-board-tape="trip"]')!);
+    expect(picked).toEqual(['lynn', 'trip']);
+    expect(container.querySelector('[data-month-board] a')).toBeNull();
+  });
+
+  it('picks nothing on the click that ends a pan', () => {
+    const picked: string[] = [];
+    const { container } = board(OCTOBER, (id) => picked.push(id));
+    const scroller = container.querySelector('[data-month-board]')!;
+    const piece = container.querySelector('[data-board-pick="lynn"]')!;
+    fireEvent.touchStart(scroller, { touches: [{ clientX: 10, clientY: 10 }] });
+    fireEvent.touchMove(scroller, { touches: [{ clientX: 10, clientY: 60 }] });
+    fireEvent.click(piece);
+    expect(picked).toEqual([]);
   });
 
   it('heads the month, names the weekdays, and mutes the days outside it', () => {
@@ -293,5 +331,93 @@ describe('the month board, drawn', () => {
     expect(container.querySelector('[data-board-empty]')!.textContent).toBe(
       'Nothing on the board for October yet.',
     );
+  });
+});
+
+describe('label styles: rhythm, not meaning', () => {
+  // A month of posts, several a day.
+  const MONTH = Array.from({ length: 60 }, (_, at) =>
+    card(`p${at}`, `Post ${at}`, `2026-10-${String((at % 28) + 1).padStart(2, '0')}`),
+  );
+  const layout = layoutMonthBoard(MONTH, '2026-10');
+
+  it('uses all three styles over a month, roughly 4 : 3 : 3', () => {
+    const count = (style: string) => layout.pieces.filter((p) => p.label === style).length;
+    expect(count('none')).toBeGreaterThan(0);
+    expect(count('white')).toBeGreaterThan(0);
+    expect(count('ink')).toBeGreaterThan(0);
+    expect(count('none') + count('white') + count('ink')).toBe(60);
+  });
+
+  it('never repeats a style between two adjacent pieces in a cell', () => {
+    const byDay = new Map<string, string[]>();
+    for (const piece of layout.pieces)
+      byDay.set(piece.day, [...(byDay.get(piece.day) ?? []), piece.label]);
+    expect([...byDay.values()].some((styles) => styles.length > 1)).toBe(true);
+    for (const styles of byDay.values()) {
+      for (let at = 1; at < styles.length; at += 1) expect(styles[at]).not.toBe(styles[at - 1]);
+    }
+  });
+
+  it('draws the same styles on every layout', () => {
+    expect(layoutMonthBoard(MONTH, '2026-10').pieces.map((p) => p.label)).toEqual(
+      layout.pieces.map((p) => p.label),
+    );
+  });
+});
+
+describe('an open joint splash (meaning is shape)', () => {
+  const joint = (awaiting: { authorId: string; initials: string }[]): Card => ({
+    ...card('jam', 'Jam session', '2026-10-12'),
+    joint: true,
+    href: '/pool/p-a/splash/jam',
+    writers: [{ authorId: 'u-mk', initials: 'MK' }],
+    awaiting,
+  });
+
+  it('carries an empty slot holding the faded faces of who has not written', () => {
+    const { container } = board([joint([{ authorId: 'u-jo', initials: 'JO' }])]);
+    const slot = container.querySelector('[data-board-slot="jam"]')!;
+    expect(slot.className).toContain('border-dashed');
+    expect(slot.textContent).toBe('JO');
+    expect(slot.querySelector('.opacity-50')).not.toBeNull();
+    // Not mine to fill: it is a mark, not a button.
+    expect(slot.tagName).toBe('SPAN');
+  });
+
+  it('reads "Add your side" when I am missing, and opens the splash to write', () => {
+    pushed.length = 0;
+    const { container } = board([joint([{ authorId: ME, initials: 'YL' }])]);
+    const slot = container.querySelector('[data-board-slot="jam"]')!;
+    expect(slot.textContent).toContain('Add your side');
+    fireEvent.click(slot);
+    expect(pushed).toEqual(['/pool/p-a/splash/jam?write=1']);
+  });
+
+  it('is gone once every current member has written, the faces staying', () => {
+    const { container } = board([joint([])]);
+    expect(container.querySelector('[data-board-slot]')).toBeNull();
+    expect(container.querySelector('[data-board-piece="jam"] [data-board-faces]')).not.toBeNull();
+  });
+
+  it('keeps the slot inside the day cell, the row growing for it', () => {
+    within(layoutMonthBoard([joint([{ authorId: ME, initials: 'YL' }])], '2026-10'));
+  });
+});
+
+describe('the 10px floor', () => {
+  it('never scales the board so far that its least type renders under 10px', () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 358,
+    });
+    try {
+      const { container } = board();
+      const canvas = container.querySelector<HTMLElement>('[data-board-canvas]')!;
+      const scale = Number(/scale\(([\d.]+)\)/.exec(canvas.style.transform)![1]);
+      expect(12 * scale).toBeGreaterThanOrEqual(10);
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
   });
 });

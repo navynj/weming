@@ -5,6 +5,7 @@ import {
   initialsOf,
   placeCard,
   type Card,
+  type CardFace,
   type CardPhoto,
   type CardRipple,
   ownPoolColumn,
@@ -94,6 +95,43 @@ export async function HomeScreen({
       latestAt.set(r.splash_id, r.created_at);
     }
   }
+  // Who has written on each joint splash and which current members have not,
+  // for its faces and its open slot on the Board. A pool I left shows neither
+  // anyone else's ripples nor its members: only my own face, no slot.
+  const jointFaces = new Map<string, { writers: CardFace[]; awaiting: CardFace[] }>();
+  if (joints.length > 0) {
+    const [{ data: wrote }, { data: members }] = await Promise.all([
+      supabase
+        .from('ripples')
+        .select('splash_id, author_id, created_at')
+        .in(
+          'splash_id',
+          joints.map((j) => j.id),
+        )
+        .is('parent_ripple_id', null)
+        .order('created_at'),
+      supabase
+        .from('pool_members')
+        .select('pool_id, user_id')
+        .in('pool_id', [...new Set(joints.map((j) => j.pool_id!))])
+        .is('left_at', null),
+    ]);
+    const face = (id: string): CardFace => ({
+      authorId: id,
+      initials: id === profile.id ? initialsOf(profile.display_name) : '',
+    });
+    for (const j of joints) {
+      const writers = [
+        ...new Set((wrote ?? []).filter((r) => r.splash_id === j.id).map((r) => r.author_id)),
+      ];
+      const current = (members ?? []).filter((m) => m.pool_id === j.pool_id).map((m) => m.user_id);
+      jointFaces.set(j.id, {
+        writers: writers.map(face),
+        awaiting: current.filter((id) => !writers.includes(id)).map(face),
+      });
+    }
+  }
+
   // The joint splash's pool lane, for its tag "<Pool> · <emoji> <pool lane>".
   const jointLane = new Map<string, { name: string; icon: string | null }>();
   if (joints.length > 0) {
@@ -181,7 +219,11 @@ export async function HomeScreen({
         thread,
       );
       const pictured = photos.get(summary.id);
-      const card = pictured ? { ...placed, photos: pictured } : placed;
+      const card = {
+        ...placed,
+        ...(pictured ? { photos: pictured } : {}),
+        ...jointFaces.get(summary.id),
+      };
       if (summary.ownPoolId) {
         // No badge: the column header says where it lives.
         return {

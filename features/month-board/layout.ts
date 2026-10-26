@@ -65,8 +65,9 @@ const ICON_CHARS = 2;
 /** Room the joint faces take after a caption, in characters. */
 const FACES_CHARS = 4;
 
-export type LabelStyle = 'ink' | 'blue' | 'plain';
-export const LABEL_STYLES: readonly LabelStyle[] = ['ink', 'blue', 'plain'];
+/** A label's background: none (white words on the water), a white fill, or an ink fill. */
+export type LabelStyle = 'none' | 'white' | 'ink';
+export const LABEL_STYLES: readonly LabelStyle[] = ['none', 'white', 'ink'];
 export type StickerCorner = 'left' | 'right';
 
 /** A day of the board: its place, and whether it is the month's own. */
@@ -90,6 +91,8 @@ export type BoardPiece = {
   morePhotos: number;
   /** The label's box within the piece. */
   labelBox: { x: number; y: number; w: number };
+  /** An open joint splash: the slot's top within the piece, under the label; null when complete or not joint. */
+  slotY: number | null;
   corner: StickerCorner;
   rotate: number;
   captionLines: number;
@@ -155,8 +158,27 @@ export function rotationOf(id: string): number {
   return (draw(id, 'rotate', 81) - 40) / 10;
 }
 
+/**
+ * A label's style is rhythm, not meaning: drawn from the id, none : white :
+ * ink at 4 : 3 : 3. `layoutMonthBoard` then mixes each cell (see `mixed`).
+ */
 export function labelStyleOf(id: string): LabelStyle {
-  return LABEL_STYLES[draw(id, 'label', LABEL_STYLES.length)];
+  const roll = draw(id, 'label', 10);
+  return roll < 4 ? 'none' : roll < 7 ? 'white' : 'ink';
+}
+
+/** The style after this one in the cycle: what a piece takes rather than repeat the one above it. */
+export function nextLabelStyle(style: LabelStyle): LabelStyle {
+  return LABEL_STYLES[(LABEL_STYLES.indexOf(style) + 1) % LABEL_STYLES.length];
+}
+
+/** The open slot under a joint splash's label: one line of faded faces, or "Add your side". */
+export const SLOT_PX = 24;
+const SLOT_GAP_PX = 2;
+
+/** A joint splash still waiting on a current member: its label carries the open slot (meaning is shape). */
+export function isOpenJoint(card: Card): boolean {
+  return card.joint === true && (card.awaiting?.length ?? 0) > 0;
 }
 
 export function captionOf(card: Card): string {
@@ -217,7 +239,16 @@ function boardDays(month: string, weekStart: number): IsoDate[][] {
   return weeks;
 }
 
-type Shape = Pick<BoardPiece, 'w' | 'h' | 'captionLines' | 'fan' | 'morePhotos' | 'labelBox'>;
+type Shape = Pick<
+  BoardPiece,
+  'w' | 'h' | 'captionLines' | 'fan' | 'morePhotos' | 'labelBox' | 'slotY'
+>;
+
+/** Room for the open slot, under the label, when the splash is waiting on someone. */
+function withSlot(card: Card, shape: Omit<Shape, 'slotY'>): Shape {
+  if (!isOpenJoint(card)) return { ...shape, slotY: null };
+  return { ...shape, slotY: shape.h + SLOT_GAP_PX, h: shape.h + SLOT_GAP_PX + SLOT_PX };
+}
 
 const PIECE_W_PX = LABEL_PX + STICKER_OVERHANG_PX - 4;
 
@@ -228,6 +259,10 @@ const PIECE_W_PX = LABEL_PX + STICKER_OVERHANG_PX - 4;
  * overhanging a top corner.
  */
 function pieceShape(card: Card, corner: StickerCorner, label: LabelStyle): Shape {
+  return withSlot(card, bareShape(card, corner, label));
+}
+
+function bareShape(card: Card, corner: StickerCorner, label: LabelStyle): Omit<Shape, 'slotY'> {
   const id = card.splash.id;
   const photos = card.photos ?? [];
   const caption = captionOf(card) + (card.joint ? ' '.repeat(FACES_CHARS) : '');
@@ -249,9 +284,9 @@ function pieceShape(card: Card, corner: StickerCorner, label: LabelStyle): Shape
     // The frame includes its padding; the fan's spread is room above it.
     const area = PHOTO_H_PX + spread;
     const labelH = LABEL_PAD_BOTTOM_PX * 2 + lines * CAPTION_LINE_PX;
-    // A filled label rides over the photos' bottom edge; plain words would
-    // be lost on a photo, so they sit just under it, as a caption.
-    const labelY = label === 'plain' ? area : area - LABEL_OVERLAP_PX;
+    // A filled label rides over the photos' bottom edge; words with no fill
+    // would be lost on a photo, so they sit just under it, as a caption.
+    const labelY = label === 'none' ? area : area - LABEL_OVERLAP_PX;
     return {
       w: PIECE_W_PX,
       h: labelY + labelH,
@@ -279,9 +314,10 @@ function pieceShape(card: Card, corner: StickerCorner, label: LabelStyle): Shape
 /**
  * The month as a board: seven columns of days, each post on its day in a
  * variant chosen from the record itself, ranged posts as tapes along the
- * top of each week row they cross. Every choice — variant, label, corner,
- * rotation, offset, overlap — comes from the post's id, so the same month
- * lays out the same every time. A day's pieces stack down its own cell,
+ * top of each week row they cross. Every choice — label style (mixed
+ * within a cell), corner, rotation, offset, overlap, fan — comes from the
+ * post's id and its place in its day, so the same month lays out the same
+ * every time. A day's pieces stack down its own cell,
  * never into a neighbour's; a week row is as tall as its tallest cell.
  */
 export function layoutMonthBoard(
@@ -376,11 +412,15 @@ export function layoutMonthBoard(
     for (const cell of cells) {
       const list = cell.inMonth ? (byDay.get(cell.day) ?? []) : [];
       let top = y + DAY_NUMBER_PX + tapeBlock;
+      // A cell is always mixed: a piece that would repeat the one above takes the next style.
+      let above: LabelStyle | null = null;
       list.forEach((card, at) => {
         const id = card.splash.id;
         const variant = (card.photos?.length ?? 0) > 0 ? 'photo' : 'sticker';
         const corner: StickerCorner = draw(id, 'corner', 2) === 0 ? 'left' : 'right';
-        const label = labelStyleOf(id);
+        const drawn = labelStyleOf(id);
+        const label = drawn === above ? nextLabelStyle(drawn) : drawn;
+        above = label;
         const shape = pieceShape(card, corner, label);
         const { w, h } = shape;
         const room = COLUMN_PX - CELL_PAD_PX * 2 - w;

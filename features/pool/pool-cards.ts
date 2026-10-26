@@ -93,9 +93,14 @@ export function poolCards(
       // is deleted only while every ripple on it is mine.
       const lane = splash.pool_lane_id ? laneOf.get(splash.pool_lane_id) : undefined;
       const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
+      const wrote = [...new Set(blocks.map((r) => r.author_id))];
       cards.push({
         ...card,
         ...photo,
+        writers: wrote.map((id) => ({ authorId: id, initials: initialsOf.get(id) ?? '' })),
+        awaiting: view.members
+          .filter((m) => !m.former && !wrote.includes(m.userId))
+          .map((m) => ({ authorId: m.userId, initials: m.initials })),
         column: splash.pool_lane_id ?? undefined,
         lane: lane ? { icon: lane.icon, name: lane.name } : null,
         origins: lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined,
