@@ -22,6 +22,17 @@ export const STEP_SCALE = 0.94;
 /** How many unread cards show below the top, and how many read cards above it: exactly one (review). */
 const DOWN = 3;
 const UP = 1;
+/**
+ * The stair runs sideways on a wide screen only while this is true. Off
+ * (review, 2026-10-26): with the stack at a third of the width, a wide
+ * screen flips it up and down as a phone does, its top card taller with
+ * the column's height. The sideways stair stays in the tree behind it.
+ */
+export const SIDEWAYS = false;
+
+/** Low (the Board view on a phone): a shorter top card and one step, so the board above gets the height (review). */
+const LOW_CARD_PX = 128;
+const LOW_DOWN = 1;
 /** The board's box on a phone: the top card and the lower stair; the upper stair rises above it, into the water. */
 export const STACK_PX = CARD_PX + DOWN * STEP_PX;
 /** Sideways, the top card is never narrower than this; fewer cards fan to the right before it would be. */
@@ -160,6 +171,7 @@ export function StairBoard({
   onPin,
   onDelete,
   hrefFor,
+  low = false,
 }: {
   /** Newest first, in the order `flip.ids` follows. */
   cards: Card[];
@@ -171,10 +183,13 @@ export function StairBoard({
   onDelete: (card: Card) => void;
   /** Where the top card opens; Home's way back by default, a lane page's on a lane page. */
   hrefFor?: (id: string) => string;
+  /** On a phone: a shorter card and one step, giving the room above to the Board view. */
+  low?: boolean;
 }) {
   const { ids, n, next, bringForward } = flip;
   const byId = new Map(cards.map((card) => [card.splash.id, card]));
-  const horizontal = useWide();
+  const wide = useWide();
+  const horizontal = wide && SIDEWAYS;
 
   // The board measures its room. On a phone the box is the card's own and
   // the stair runs down; on a wide screen the board fills its half, the
@@ -214,16 +229,19 @@ export function StairBoard({
       up: UP,
     };
   } else {
+    // Low only on a phone: a wide screen's column has the height to spare.
+    const short = low && !wide;
+    const down = short ? LOW_DOWN : DOWN;
     stair = {
       horizontal: false,
       width: room?.width ?? 0,
-      height: Math.max(CARD_PX, (room?.height ?? 0) - DOWN * STEP_PX),
+      height: Math.max(short ? LOW_CARD_PX : CARD_PX, (room?.height ?? 0) - down * STEP_PX),
       left: 0,
-      down: DOWN,
+      down,
       up: UP,
     };
   }
-  const stackHeight = horizontal ? stair.height : stair.height + DOWN * STEP_PX;
+  const stackHeight = horizontal ? stair.height : stair.height + stair.down * STEP_PX;
   // The top card's width and seat move on the spring as cards come and go.
   const cardWidth = useSpring(stair.width, FLIP_SPRING);
   const cardLeft = useSpring(stair.left, FLIP_SPRING);
@@ -280,11 +298,12 @@ export function StairBoard({
       event.stopPropagation();
     }
   };
-  // The arrow keys, when the stack has focus: left back, right forward.
+  // The arrow keys, when the stack has focus: left or up back, right or down forward.
   const onKeyDown = (event: React.KeyboardEvent): void => {
     const at = Math.max(0, ids.indexOf(flip.heading ?? ''));
-    const target =
-      event.key === 'ArrowRight' ? ids[at + 1] : event.key === 'ArrowLeft' ? ids[at - 1] : null;
+    const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+    const back = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+    const target = forward ? ids[at + 1] : back ? ids[at - 1] : null;
     if (!target) return;
     event.preventDefault();
     bringForward(target);

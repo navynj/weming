@@ -15,23 +15,9 @@ import type { Card, GridColumn } from '@/features/home/grid';
 import { monthName } from '@/features/home/scope';
 
 import { BoardPieceView, BoardTapeView } from './board-pieces';
-import {
-  BOARD_PX,
-  CELL_PAD_PX,
-  COLUMN_PX,
-  COLUMNS,
-  HEAD_PX,
-  layoutMonthBoard,
-  shiftMonth,
-  TITLE_PX,
-  WEEKDAY_PX,
-} from './layout';
+import { BOARD_PX, COLUMNS, layoutMonthBoard, shiftMonth, WEEKDAY_PX } from './layout';
 import { useBoardPhotos } from './use-board-photos';
 import { useBoardZoom } from './use-board-zoom';
-
-/** The board's least type, in logical px, and the least scale that keeps it at 10px on screen. */
-const LEAST_TYPE_PX = 12;
-const MIN_FIT = 10 / LEAST_TYPE_PX;
 
 /** The board's room in the grid's place: a phone's side gutter, a breath above the stack. */
 export function BoardFrame({ children }: { children: ReactNode }) {
@@ -46,10 +32,11 @@ export function BoardFrame({ children }: { children: ReactNode }) {
  * The Board view (phase 1, read only): one month as a finished collage on
  * the water — seven days as lanes, roped in white, each post on its day as
  * a label (photos fanned above it, or its icon as a sticker on a corner),
- * ranged posts as tape along the top of each week row. Laid out once per
- * month at a fixed 980px and scaled to the room, so it never reflows; a
- * phone pinches or double-taps into it (to 3x) and pans. A tap brings the
- * post's card to the top of the stack, as a mark does in the Lane view.
+ * ranged posts as tape along the top of each week row. Laid out at the
+ * room's own width (980px at most, scaled up past that), so it always fits
+ * with nothing to pan; a pinch or a double tap zooms in (to 3x) and pans.
+ * A tap brings the post's card to the top of the stack, as a mark does in
+ * the Lane view.
  */
 export function MonthBoard({
   cards,
@@ -67,19 +54,21 @@ export function MonthBoard({
   /** What a post's icon falls back to: its lane's emoji. */
   lanes: Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 }) {
-  // Same data, same board: laid out once per month and set of posts.
-  const layout = useMemo(() => layoutMonthBoard(cards, month), [cards, month]);
+  const [room, setRoom] = useState<number | null>(null);
+  // Same data, same width, same board: laid out once per month, set of posts and width.
+  const layout = useMemo(
+    () => layoutMonthBoard(cards, month, { width: room ?? BOARD_PX }),
+    [cards, month, room],
+  );
   const photos = useBoardPhotos(layout.pieces);
-  const [fit, setFit] = useState<number | null>(null);
   const { scroller, zoom, moved, toggleAt } = useBoardZoom();
+  const { metrics } = layout;
 
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    // Fit the width, but never so small that the board's least type (12px)
-    // renders under the app's 10px floor: past that a phone pans sideways.
-    const measure = (): void =>
-      setFit(el.clientWidth > 0 ? Math.max(MIN_FIT, el.clientWidth / BOARD_PX) : 1);
+    // The room's width: the board is laid out at it, so it fits exactly.
+    const measure = (): void => setRoom(el.clientWidth > 0 ? el.clientWidth : BOARD_PX);
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
@@ -97,7 +86,9 @@ export function MonthBoard({
     [moved],
   );
 
-  const scale = (fit ?? 1) * zoom;
+  // Past 980px the board scales up to the room; below, it is laid out at it (1x).
+  const fit = room === null ? 1 : room / layout.width;
+  const scale = fit * zoom;
   const router = useRouter();
   // "Add your side": the splash's own sheet, opened with the next block's editor up.
   const onWrite = useCallback(
@@ -122,19 +113,19 @@ export function MonthBoard({
     >
       <div
         style={{
-          width: BOARD_PX * scale,
+          width: layout.width * scale,
           height: layout.height * scale,
-          visibility: fit === null ? 'hidden' : undefined,
+          visibility: room === null ? 'hidden' : undefined,
         }}
       >
         <div
           data-board-canvas
           className="relative origin-top-left text-white select-none"
-          style={{ width: BOARD_PX, height: layout.height, transform: `scale(${scale})` }}
+          style={{ width: layout.width, height: layout.height, transform: `scale(${scale})` }}
         >
           <div
             className="absolute inset-x-0 top-0 flex items-center justify-center gap-6"
-            style={{ height: TITLE_PX }}
+            style={{ height: metrics.title }}
           >
             <button
               type="button"
@@ -145,7 +136,10 @@ export function MonthBoard({
             >
               <ChevronLeft aria-hidden size={32} />
             </button>
-            <h2 data-board-title className="text-5xl font-semibold">
+            <h2
+              data-board-title
+              className={`font-semibold ${metrics.width < 600 ? 'text-3xl' : 'text-5xl'}`}
+            >
               {layout.title}
             </h2>
             <button
@@ -164,7 +158,11 @@ export function MonthBoard({
               key={weekday}
               data-board-weekday
               className="absolute text-xs font-medium"
-              style={{ left: col * COLUMN_PX + CELL_PAD_PX, top: TITLE_PX + 8, height: WEEKDAY_PX }}
+              style={{
+                left: col * metrics.column + metrics.pad,
+                top: metrics.title + 8,
+                height: WEEKDAY_PX,
+              }}
             >
               {weekday}
             </span>
@@ -177,7 +175,7 @@ export function MonthBoard({
               aria-hidden
               // Lane ropes: thin white at 20%.
               className="absolute w-px bg-white/20"
-              style={{ left: (at + 1) * COLUMN_PX, top: TITLE_PX, bottom: 16 }}
+              style={{ left: (at + 1) * metrics.column, top: metrics.title, bottom: 16 }}
             />
           ))}
 
@@ -195,11 +193,11 @@ export function MonthBoard({
                   data-board-cell={cell.day}
                   data-in-month={cell.inMonth ? '' : undefined}
                   className="absolute inset-y-0"
-                  style={{ left: cell.x, width: COLUMN_PX }}
+                  style={{ left: cell.x, width: metrics.column }}
                 >
                   <span
                     className={`absolute text-sm font-medium ${cell.inMonth ? '' : 'text-white/40'}`}
-                    style={{ left: CELL_PAD_PX, top: 6 }}
+                    style={{ left: metrics.pad, top: 6 }}
                   >
                     {Number(cell.day.slice(8))}
                   </span>
@@ -212,7 +210,7 @@ export function MonthBoard({
             <p
               data-board-empty
               className="absolute inset-x-0 text-center text-sm text-white/80"
-              style={{ top: HEAD_PX + 44 }}
+              style={{ top: metrics.head + 44 }}
             >
               Nothing on the board for {name} yet.
             </p>
@@ -223,6 +221,7 @@ export function MonthBoard({
               key={tape.key}
               tape={tape}
               lanes={lanes}
+              metrics={metrics}
               onPick={onPick}
               onClickCapture={onClickCapture}
             />
@@ -234,6 +233,7 @@ export function MonthBoard({
               piece={piece}
               photos={photos}
               lanes={lanes}
+              metrics={metrics}
               onPick={onPick}
               onClickCapture={onClickCapture}
             />

@@ -676,7 +676,7 @@ describe('the stair under a finger (touch)', () => {
   });
 });
 
-describe('the staircase sideways, on a wide screen', () => {
+describe('the staircase on a wide screen', () => {
   const wide = (): void => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -693,39 +693,21 @@ describe('the staircase sideways, on a wide screen', () => {
       }),
     });
   };
-  const translateX = (el: Element): number =>
-    Number(/translateX\((-?[\d.]+)px\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 0);
 
-  it('runs left to right after a flip forward: the read card left of the top, the stair to its right', async () => {
+  it('runs up and down as on a phone, the column’s height going to the top card (review)', async () => {
     wide();
     const { container } = ground();
-    expect(container.querySelector('[data-stack]')!.getAttribute('data-axis')).toBe('x');
+    expect(container.querySelector('[data-stack]')!.getAttribute('data-axis')).toBe('y');
     fireEvent.click(container.querySelector('[data-step-card="mid"]')!);
     await settled(container);
-    const read = container.querySelector('[data-stack-card="late"]')!;
-    expect(read.getAttribute('data-stair')).toBe('up');
-    expect(translateX(read)).toBeLessThan(0);
-    for (const id of stair(container, 'down')) {
-      expect(translateX(container.querySelector(`[data-stack-card="${id}"]`)!)).toBeGreaterThan(0);
-    }
-    expect(translateX(topCard(container))).toBe(0);
+    expect(container.querySelector('[data-stack-card="late"]')!.getAttribute('data-stair')).toBe(
+      'up',
+    );
+    // No spines: the sideways stair is off.
+    expect(container.querySelector('[data-card-spine]')).toBeNull();
   });
 
-  it('writes a peeking title downward on its 44px spine', () => {
-    wide();
-    const { container } = ground();
-    const spine = container.querySelector<HTMLElement>(
-      '[data-stack-card="mid"] [data-card-spine]',
-    )!;
-    const title = spine.querySelector<HTMLElement>('[data-card-title]')!;
-    expect(title.style.writingMode).toBe('vertical-rl');
-    expect(title.style.textOrientation).toBe('mixed');
-    expect(spine.style.width).toBe('44px');
-    expect(spine.textContent).toContain('📍');
-  });
-
-  it('brings the clicked spine\u2019s own card to the top', async () => {
-    // jsdom cannot measure the board, so one right-hand spine shows here.
+  it('brings the clicked step\u2019s own card to the top', async () => {
     wide();
     const { container } = ground();
     fireEvent.click(container.querySelector('[data-step-card="mid"]')!);
@@ -741,6 +723,18 @@ describe('the staircase sideways, on a wide screen', () => {
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
     fireEvent.keyDown(stack, { key: 'ArrowLeft' });
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+  });
+
+  it('flips with the up and down arrows too, as the stair now runs', async () => {
+    wide();
+    const { container } = ground();
+    const stack = container.querySelector('[data-stack]')!;
+    fireEvent.keyDown(stack, { key: 'ArrowDown' });
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    fireEvent.keyDown(stack, { key: 'ArrowUp' });
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
   });
