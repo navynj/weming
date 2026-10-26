@@ -15,12 +15,15 @@ export function WaveGlyph({
   width = WAVE_GLYPH_W,
   stroke = 'var(--wave-ink)',
   opacity,
+  strokeWidth = GLYPH_STROKE,
   className = '',
 }: {
   /** Drawn at this width; the height (and the pen) keep the export's proportion. */
   width?: number;
   stroke?: string;
   opacity?: number;
+  /** The pen, in the export's 17 × 4 units: 1.5 as exported. */
+  strokeWidth?: number;
   className?: string;
 }) {
   return (
@@ -37,7 +40,7 @@ export function WaveGlyph({
         d={WAVE_GLYPH_PATH}
         stroke={stroke}
         strokeOpacity={opacity}
-        strokeWidth={GLYPH_STROKE}
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
       />

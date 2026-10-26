@@ -592,13 +592,13 @@ describe('labels, photos and bands, drawn', () => {
     );
     for (const glyph of glyphs) {
       expect(glyph.querySelector('path')!.getAttribute('d')).toBe(pill.getAttribute('d'));
-      // 32px on a desktop (26 on a phone), the export's box and pen, white at 80%.
-      expect(glyph.getAttribute('width')).toBe('32');
+      // 26px on a desktop (22 on a phone), the export's box, a finer pen, white at 80%.
+      expect(glyph.getAttribute('width')).toBe('26');
       expect(glyph.getAttribute('viewBox')).toBe('0 0 17 4');
     }
     const path = glyphs[0].querySelector('path')!;
     expect(path.getAttribute('d')).toBe(WAVE_GLYPH_PATH);
-    expect(path.getAttribute('stroke-width')).toBe('1.5');
+    expect(path.getAttribute('stroke-width')).toBe('1.2');
     expect(path.getAttribute('stroke-linecap')).toBe('round');
     expect(path.getAttribute('stroke-opacity')).toBe('0.8');
     expect(header.querySelector('[data-board-waves]')!.className).toContain('gap-[5px]');
@@ -611,7 +611,7 @@ describe('labels, photos and bands, drawn', () => {
       const phone = board().container.querySelector(
         '[data-board-header="2026-10-20"] [data-wave-glyph]',
       )!;
-      expect(phone.getAttribute('width')).toBe('26');
+      expect(phone.getAttribute('width')).toBe('22');
     } finally {
       delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
     }
