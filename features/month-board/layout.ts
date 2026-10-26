@@ -77,7 +77,6 @@ export const SLOT_PAD_PX = 6;
 export const SLOT_PAD_Y_PX = 3;
 const SLOT_BORDER_PX = 1.5;
 export const SLOT_PX = SLOT_FACE_PX + SLOT_PAD_Y_PX * 2 + SLOT_BORDER_PX * 2;
-const SLOT_ON_LABEL = 0.25;
 const SLOT_TILT_MIN = 3;
 const SLOT_TILT_MAX = 6;
 /** The words' width, estimated generously (0.62em a character at 10px). */
@@ -203,10 +202,10 @@ export type BoardPiece = {
   photoBox: Box | null;
   stickerBox: Box | null;
   /**
-   * An open joint splash's slot (review): a dashed note stuck on the
+   * An open joint splash's slot (review): a dashed note hanging under the
    * label's bottom-right corner — or bottom-left, where the next lane is
-   * taken — overlapping the label's bottom padding only, tilted on the
-   * corner it hangs from so it never rises into the words. `slotBox` is
+   * taken — tilted on the corner it hangs from so it never rises onto the
+   * label. `slotBox` is
    * its box before the tilt, `slotBounds` all it covers after.
    */
   slot: boolean;
@@ -547,10 +546,9 @@ function tilted(box: Box, deg: number, pivot: 'left' | 'right'): Box {
 /**
  * The open slot (review), stuck on the label's bottom-right corner with
  * two fifths of it past the label, where the lanes to the right are empty
- * there; else on the bottom-left corner, inside the lane. A quarter of its
- * height lies on the label — within its bottom padding — and it tilts
- * 3–6° about the corner it hangs from, downward, so it never reaches the
- * words. The piece grows to hold what hangs below the label.
+ * there; else on the bottom-left corner, inside the lane. It hangs wholly
+ * under the label (review) and tilts 3–6° about the corner it hangs from,
+ * downward, so it never rises onto the label. The piece grows to hold it.
  */
 function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   if (!shape.slot) return shape;
@@ -566,8 +564,8 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
       words,
   );
   const label = shape.labelBox;
-  const on = Math.min(Math.round(SLOT_PX * SLOT_ON_LABEL), shape.pad.bottom);
-  const y = label.y + label.h - on;
+  // Wholly under the label (review): nothing of it, its faces least of all, over the label.
+  const y = label.y + label.h;
   const tilt = SLOT_TILT_MIN + unit(card.splash.id, 'slot') * (SLOT_TILT_MAX - SLOT_TILT_MIN);
   const right: Box = { x: label.x + label.w - Math.round(w * 0.6), y, w, h: SLOT_PX };
   const rightBounds = tilted(right, tilt, 'left');
