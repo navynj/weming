@@ -3,6 +3,8 @@ import type { LinkDirection } from '@/features/pool/direction';
 import { originTag } from '@/features/pool/origin-tag';
 import type { Splash } from '@/features/splash/summary';
 import type { Database } from '@/lib/database.types';
+import type { BoardLayoutJson } from '@/features/month-board/board-layout';
+import { getPoolLayouts } from '@/lib/queries/layouts';
 import type { DuringClient } from '@/lib/queries/profile';
 
 export type PoolRow = Database['public']['Tables']['pools']['Row'];
@@ -72,6 +74,8 @@ export type PoolView = {
   splashes: Splash[];
   ripples: PoolRipple[];
   invites: PoolInvite[];
+  /** The calendar's layouts its members set, by splash (0025). */
+  layouts?: Record<string, BoardLayoutJson>;
 };
 
 const RIPPLE_COLUMNS =
@@ -294,6 +298,7 @@ export async function getPoolView(
     splashes,
     ripples,
     invites: invites.data ?? [],
+    layouts: await getPoolLayouts(supabase, poolId),
   };
 }
 

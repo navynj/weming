@@ -1,0 +1,120 @@
+import { z } from 'zod';
+
+/**
+ * A splash's layout on the calendar, set by hand (0025; review): only the
+ * fields a person set. X is a share of the column's width, Y in line
+ * heights, so one layout reads the same in Week, Month and on a phone.
+ * The ranges are the database's (board_layout_valid); checked here too, so
+ * a refused value never leaves the browser.
+ */
+const x = z.number().min(-0.6).max(0.6);
+const y = z.number().min(-6).max(6);
+const tilt = z.number().min(-15).max(15);
+
+export const IconLayout = z
+  .object({ inline: z.boolean(), size: z.number().min(0.8).max(4), x, y })
+  .partial()
+  .strict();
+export const LabelLayout = z
+  .object({ x, y, tilt, fontSize: z.number().int().min(10).max(18) })
+  .partial()
+  .strict();
+export const PhotoLayout = z
+  .object({ size: z.number().min(0.3).max(1), x, y, tilt })
+  .partial()
+  .strict();
+export const WaveLayout = z
+  .object({
+    on: z.boolean(),
+    amp: z.number().min(1).max(8),
+    length: z.number().min(8).max(32),
+    weight: z.number().min(1).max(4),
+    span: z.number().min(0.2).max(2),
+    x,
+    y,
+    tilt,
+  })
+  .partial()
+  .strict();
+export const BoardLayout = z
+  .object({
+    icon: IconLayout,
+    label: LabelLayout,
+    photos: z.record(z.string(), PhotoLayout).refine((p) => Object.keys(p).length <= 20),
+    wave: WaveLayout,
+  })
+  .partial()
+  .strict();
+export type BoardLayoutJson = z.infer<typeof BoardLayout>;
+
+/** Where a splash's layout comes from on the screen it is drawn on. */
+export type LayoutSource = 'pool' | 'home' | null;
+
+type Group = 'icon' | 'label' | 'wave';
+
+/**
+ * The database's merge, mirrored (set_board_layout): icon, label and wave
+ * field by field; photos per media path, then per field. So the screen
+ * shows at once what the row will hold.
+ */
+export function mergeLayout(base: BoardLayoutJson, patch: BoardLayoutJson): BoardLayoutJson {
+  const out: BoardLayoutJson = { ...base };
+  for (const key of ['icon', 'label', 'wave'] as const satisfies readonly Group[]) {
+    if (patch[key]) (out as Record<Group, unknown>)[key] = { ...base[key], ...patch[key] };
+  }
+  if (patch.photos) {
+    const photos = { ...base.photos };
+    for (const [path, value] of Object.entries(patch.photos))
+      photos[path] = { ...photos[path], ...value };
+    out.photos = photos;
+  }
+  return out;
+}
+
+/** The database's dotted clears, mirrored: "wave", "icon.size", "photos.<path>", "photos.<path>.tilt". */
+export function clearLayout(layout: BoardLayoutJson, paths: string[]): BoardLayoutJson {
+  let out: BoardLayoutJson = structuredClone(layout);
+  for (const path of paths) {
+    const photo = /^photos\.(.+)\.(size|x|y|tilt)$/.exec(path);
+    if (photo && out.photos?.[photo[1]]) {
+      delete (out.photos[photo[1]] as Record<string, unknown>)[photo[2]];
+    } else if (path.startsWith('photos.') && out.photos) {
+      delete out.photos[path.slice(7)];
+    } else if (path.includes('.')) {
+      const [group, field] = path.split('.') as [Group, string];
+      if (out[group]) delete (out[group] as Record<string, unknown>)[field];
+    } else {
+      out = { ...out };
+      delete (out as Record<string, unknown>)[path];
+    }
+  }
+  // A group left with nothing in it is gone, so only set fields remain.
+  if (out.photos) {
+    for (const [path, value] of Object.entries(out.photos)) {
+      if (Object.keys(value).length === 0) delete out.photos[path];
+    }
+  }
+  for (const key of Object.keys(out) as (keyof BoardLayoutJson)[]) {
+    if (out[key] && Object.keys(out[key]!).length === 0) delete out[key];
+  }
+  return out;
+}
+
+/**
+ * What a splash is drawn with (review): the automatic recipe, then the
+ * pool's layout; on Home, while I have a Home layout, mine instead of the
+ * pool's — wholly, so later pool edits do not reach my Home.
+ */
+export function effectiveLayout(
+  home: BoardLayoutJson | null | undefined,
+  pool: BoardLayoutJson | null | undefined,
+): { layout: BoardLayoutJson; source: LayoutSource } {
+  if (home) return { layout: home, source: 'home' };
+  if (pool) return { layout: pool, source: 'pool' };
+  return { layout: {}, source: null };
+}
+
+/** Photos keyed by a media path the splash no longer carries are ignored when drawing. */
+export function photoLayout(layout: BoardLayoutJson | undefined, path: string) {
+  return layout?.photos?.[path];
+}

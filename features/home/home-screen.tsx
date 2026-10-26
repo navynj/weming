@@ -22,6 +22,8 @@ import {
   getMyPlacements,
   getMyPoolNames,
 } from '@/lib/queries/pools';
+import { effectiveLayout } from '@/features/month-board/board-layout';
+import { getHomeLayouts } from '@/lib/queries/layouts';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -261,6 +263,20 @@ export async function HomeScreen({
       return tags ? { ...card, origins: tags } : card;
     })
     .sort(byNewest);
+  // The calendar's layouts (0025): mine on Home; else, for a joint splash,
+  // its pool's — wholly one or the other, never a mix.
+  const layouts = await getHomeLayouts(
+    supabase,
+    profile.id,
+    joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! })),
+  );
+  const laid = cards.map((card) => {
+    const pooled = layouts.pool[card.splash.id] ?? null;
+    const { layout, source } = effectiveLayout(layouts.home[card.splash.id], pooled);
+    return source
+      ? { ...card, layout, layoutSource: source, poolLayout: pooled }
+      : { ...card, poolLayout: pooled };
+  });
   const pinned = summaries
     .filter((s) => s.pinnedAt !== null && !jointPool.has(s.id))
     .sort((a, b) => b.pinnedAt!.localeCompare(a.pinnedAt!));
@@ -270,7 +286,7 @@ export async function HomeScreen({
     // stays put above the safe area.
     <main className="water-ground flex h-dvh min-h-0 flex-col">
       <HomeGround
-        cards={cards}
+        cards={laid}
         pinned={pinned}
         categories={categories}
         today={today}
