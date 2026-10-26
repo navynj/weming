@@ -581,7 +581,7 @@ describe('labels, photos and bands, drawn', () => {
     expect(laid.w).toBe(5 * (728 / 7));
   });
 
-  it('draws the day’s waves with the pill’s own glyph — the given path — at 24px, one per record, three at most', () => {
+  it('draws the day’s waves with the pill’s own glyph — the given path — at the reference’s size, one per record, three at most', () => {
     const { container } = board();
     const header = container.querySelector('[data-board-header="2026-10-20"]')!;
     const glyphs = header.querySelectorAll('[data-wave-glyph]');
@@ -590,14 +590,30 @@ describe('labels, photos and bands, drawn', () => {
     expect(pill.getAttribute('d')).toBe('M1 6 C4 6 5 2 8 2 S12 6 15 6 S19 2 23 2');
     for (const glyph of glyphs) {
       expect(glyph.querySelector('path')!.getAttribute('d')).toBe(pill.getAttribute('d'));
-      expect(glyph.getAttribute('width')).toBe('24');
+      // The reference: 32px on a desktop (26 on a phone), a 3px round pen, white at 80%.
+      expect(glyph.getAttribute('width')).toBe('32');
       expect(glyph.getAttribute('viewBox')).toBe('0 0 24 8');
     }
     const path = glyphs[0].querySelector('path')!;
     expect(path.getAttribute('d')).toBe(WAVE_GLYPH_PATH);
-    expect(path.getAttribute('stroke-width')).toBe('2');
+    expect(path.getAttribute('stroke-width')).toBe('3');
+    expect(path.getAttribute('vector-effect')).toBe('non-scaling-stroke');
     expect(path.getAttribute('stroke-linecap')).toBe('round');
-    expect(path.getAttribute('stroke-opacity')).toBe('0.6');
+    expect(path.getAttribute('stroke-opacity')).toBe('0.8');
+    expect(header.querySelector('[data-board-waves]')!.className).toContain('gap-[5px]');
+    cleanup();
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 358,
+    });
+    try {
+      const phone = board().container.querySelector(
+        '[data-board-header="2026-10-20"] [data-wave-glyph]',
+      )!;
+      expect(phone.getAttribute('width')).toBe('26');
+    } finally {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+    }
     expect(path.getAttribute('fill')).toBe('none');
   });
 });

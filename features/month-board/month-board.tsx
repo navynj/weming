@@ -16,7 +16,7 @@ import { AXIS_LOCK_PX } from '@/components/ui/use-axis-lock';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import type { Card, GridColumn } from '@/features/home/grid';
 import type { Ring } from '@/features/home/lane-grid';
-import { WaveGlyph, WAVE_GLYPH_W } from '@/components/ui/waves';
+import { WaveGlyph } from '@/components/ui/waves';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
@@ -46,8 +46,15 @@ function rowWater(index: number): string {
   return `rgb(${Math.round(5 * k)}, ${Math.round(7 * k)}, ${Math.round(201 * k)})`;
 }
 
-/** A day's waves (review): the pill's own glyph at 24px, white at 60%, one per record, three at most. */
-function DayWaves({ count }: { count: number }) {
+/**
+ * A day's waves (review, the reference): the pill's own glyph — the same
+ * path — 32px wide on a desktop and 26 on a phone, a 3px round pen, white
+ * at 80%; one per record, three at most, 5px apart.
+ */
+const DAY_WAVE_W = { wide: 32, narrow: 26 } as const;
+const DAY_WAVE_STROKE = 3;
+
+function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
   const lines = Math.min(DAY_WAVES_MAX, count);
   if (lines === 0) return null;
   return (
@@ -55,10 +62,16 @@ function DayWaves({ count }: { count: number }) {
       aria-hidden
       data-board-waves
       data-lines={lines}
-      className="flex flex-col items-center gap-1"
+      className="flex flex-col items-center gap-[5px]"
     >
       {Array.from({ length: lines }, (_, at) => (
-        <WaveGlyph key={at} width={WAVE_GLYPH_W} stroke="#ffffff" opacity={0.6} />
+        <WaveGlyph
+          key={at}
+          width={narrow ? DAY_WAVE_W.narrow : DAY_WAVE_W.wide}
+          stroke="#ffffff"
+          opacity={0.8}
+          strokeWidth={DAY_WAVE_STROKE}
+        />
       ))}
     </span>
   );
@@ -348,8 +361,8 @@ export function MonthBoard({
                   <span className="h-6 text-base/6 font-semibold tabular-nums">
                     {header.number}
                   </span>
-                  <span className="flex h-5 items-start pt-0.5">
-                    <DayWaves count={layout.weeks[0].cells[col].count} />
+                  <span className="flex items-start pt-1.5">
+                    <DayWaves count={layout.weeks[0].cells[col].count} narrow={metrics.narrow} />
                   </span>
                 </>
               ) : (
@@ -390,8 +403,8 @@ export function MonthBoard({
                       style={{ top: 0, height: DAY_NUMBER_PX }}
                     >
                       <span className="h-5">{Number(cell.day.slice(8))}</span>
-                      <span className="flex h-5 items-start pt-0.5">
-                        <DayWaves count={cell.count} />
+                      <span className="flex items-start pt-1.5">
+                        <DayWaves count={cell.count} narrow={metrics.narrow} />
                       </span>
                     </button>
                   ) : null}

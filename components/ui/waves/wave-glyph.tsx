@@ -13,12 +13,15 @@ export function WaveGlyph({
   width = WAVE_GLYPH_W,
   stroke = 'var(--wave-ink)',
   opacity,
+  strokeWidth = GLYPH_STROKE,
   className = '',
 }: {
   /** Drawn at this width; the height keeps the 24 × 8 proportion. */
   width?: number;
   stroke?: string;
   opacity?: number;
+  /** The pen, in screen pixels at any width: the path scales, the line does not thicken with it. */
+  strokeWidth?: number;
   className?: string;
 }) {
   return (
@@ -29,13 +32,15 @@ export function WaveGlyph({
       height={(width / WAVE_GLYPH_W) * WAVE_GLYPH_H}
       viewBox={`0 0 ${WAVE_GLYPH_W} ${WAVE_GLYPH_H}`}
       fill="none"
-      className={className}
+      // The round caps reach past the box's ends: let them show.
+      className={`overflow-visible ${className}`}
     >
       <path
         d={WAVE_GLYPH_PATH}
         stroke={stroke}
         strokeOpacity={opacity}
-        strokeWidth={GLYPH_STROKE}
+        strokeWidth={strokeWidth}
+        vectorEffect="non-scaling-stroke"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"

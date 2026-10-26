@@ -29,11 +29,11 @@ export const WEEK_START = 0;
  * A week's column header: the weekday over the day number, centred, and
  * the day's waves beneath — one per record, three at most.
  */
-export const HEADER_PX = 72;
+export const HEADER_PX = 96;
 /** A month's column header carries only the weekday names. */
 export const MONTH_HEADER_PX = 28;
 /** A month cell's day number and waves, at the top of the cell: nothing is placed over it. */
-export const DAY_NUMBER_PX = 46;
+export const DAY_NUMBER_PX = 70;
 /** How many waves a day shows at most. */
 export const DAY_WAVES_MAX = 3;
 const FOOT_PX = 24;
