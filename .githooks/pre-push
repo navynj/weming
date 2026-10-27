@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# The push gate: the whole suite — unit, dom and the database tests — since
+# every push goes to main or to a pull request. The commit hook ran only the
+# tests related to each commit; this is where everything is proven together.
+#
+# The database tests need the local stack (pnpm db:start); a stack that is
+# down fails the push rather than skipping. Bypassing it with --no-verify is
+# not how work lands.
+set -euo pipefail
+
+printf '\n→ push gate: the whole suite\n'
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+pnpm -s test > "$out" 2>&1 || {
+  grep -E '×|FAIL|Tests |Error' "$out" | head -20 >&2
+  echo '✖ tests failed: nothing pushed' >&2
+  exit 1
+}
+grep -E 'Tests ' "$out" || true
+printf '\n✓ push gate passed\n'

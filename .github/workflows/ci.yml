@@ -1,8 +1,9 @@
-# The gate, in CI (review): types, lint, format and the non-database tests
-# (the CI suite) on every push to main — the same checks as the local
-# pre-commit hook, minus the tests that need a local Postgres. Vercel waits
-# for this run before a production build and skips the build unless it
-# passed (scripts/vercel-ignore.mjs, vercel.json ignoreCommand).
+# The gate, in CI (review): types, lint and format once, and the
+# non-database suite in three shards run in parallel, on every push to main.
+# The database tests run locally before every push (.githooks/pre-push).
+# Vercel waits for this whole run before a production build and skips the
+# build unless every job passed (scripts/vercel-ignore.mjs, vercel.json
+# ignoreCommand); the build itself only builds.
 name: CI
 
 on:
@@ -18,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  gate:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -47,5 +48,25 @@ jobs:
       - name: Format
         run: pnpm exec prettier --check .
 
-      - name: Tests (the CI suite, no database)
-        run: pnpm test:ci
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Tests (no database), shard ${{ matrix.shard }} of 3
+        run: pnpm test:ci --shard=${{ matrix.shard }}/3

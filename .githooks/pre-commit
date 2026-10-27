@@ -1,37 +1,59 @@
 #!/usr/bin/env bash
-# The commit gate: types, lint, format and the full test suite, in that
-# order. Any failure stops the commit (set -e) — a check that reports a
-# problem and lets the commit through is no gate (744a021 went in with a
-# formatting failure). Bypassing it with --no-verify is not how work lands.
+# The commit gate, sized to what is staged (review: the whole suite on every
+# commit took minutes): types for the whole project (incremental), lint and
+# format on the staged files, then only the tests related to them — no
+# database tests here. The whole suite, database included, runs before every
+# push (.githooks/pre-push), and CI runs it again on main.
 #
-# The suite includes the DB-backed tests, so the local stack must be up
-# (pnpm db:start); a stack that is down fails the gate rather than skipping.
+# Any failure stops the commit (set -e) — a check that reports a problem and
+# lets the commit through is no gate (744a021 went in with a formatting
+# failure). Bypassing it with --no-verify is not how work lands.
 set -euo pipefail
 
 step() { printf '\n→ gate: %s\n' "$1"; }
+
+# Staged files that still exist (added, copied, modified, renamed).
+staged=()
+while IFS= read -r -d '' f; do staged+=("$f"); done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+if [ ${#staged[@]} -eq 0 ]; then
+  printf '\n✓ gate passed (nothing staged)\n'
+  exit 0
+fi
+code=()
+for f in "${staged[@]}"; do
+  case "$f" in *.ts | *.tsx | *.mts | *.mjs | *.js) code+=("$f") ;; esac
+done
 
 step 'types'
 pnpm -s exec tsc --noEmit -p .
 
 step 'lint'
-pnpm -s lint
+if [ ${#code[@]} -gt 0 ]; then pnpm -s exec eslint "${code[@]}"; fi
+# The token and origin guards read the whole tree; they are greps, and fast.
+./scripts/check-tokens.sh
+./scripts/check-origin.sh
 
 out="$(mktemp)"
 trap 'rm -f "$out"' EXIT
 
 step 'format'
-pnpm -s exec prettier --check . > "$out" 2>&1 || {
+pnpm -s exec prettier --check --ignore-unknown "${staged[@]}" > "$out" 2>&1 || {
   grep '\[warn\]' "$out" | grep -v 'Code style issues' >&2 || true
   echo '✖ format: run pnpm format' >&2
   exit 1
 }
 
-step 'tests'
-pnpm -s test > "$out" 2>&1 || {
-  grep -E '×|FAIL|Tests ' "$out" | head -20 >&2
-  echo '✖ tests failed' >&2
-  exit 1
-}
-grep -E 'Tests ' "$out" || true
+step 'related tests'
+if [ ${#code[@]} -gt 0 ]; then
+  pnpm -s exec vitest related "${code[@]}" --run --passWithNoTests \
+    --project unit --project unit-iso --project dom > "$out" 2>&1 || {
+    grep -E '×|FAIL|Tests ' "$out" | head -20 >&2
+    echo '✖ tests failed' >&2
+    exit 1
+  }
+  grep -E 'Tests ' "$out" || echo 'no related tests'
+else
+  echo 'no code staged'
+fi
 
 printf '\n✓ gate passed\n'

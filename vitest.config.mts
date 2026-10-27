@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
@@ -16,14 +17,105 @@ import { defineConfig } from 'vitest/config';
 // and these configs are inside the project's type check.
 Object.assign(process.env, { NODE_ENV: 'test' });
 
+/**
+ * The files that talk to the local Postgres. They prove RLS, the triggers and
+ * the RPCs actually hold, so they run before every push (the pre-push hook);
+ * a build machine has no stack to point them at, so CI runs the rest.
+ */
+export const NEEDS_LOCAL_STACK = [
+  'tests/rls.test.ts',
+  'tests/edit-delete.test.ts',
+  'tests/timeline-exclusivity.test.ts',
+  'tests/break.test.ts',
+  'tests/bootstrap-profile.test.ts',
+  'tests/auth-redirect.test.ts',
+  'tests/splash-crud.test.ts',
+  'tests/date-only-span.test.ts',
+  'tests/sessions.test.ts',
+  'tests/pools-rls.test.ts',
+  'tests/written-on-db.test.ts',
+  'tests/pool-delete.test.ts',
+  'tests/joint-ripple-lane.test.ts',
+  'tests/avatars-db.test.ts',
+  'tests/splash-edit-db.test.ts',
+  'tests/conversions-db.test.ts',
+  'tests/pool-photo-db.test.ts',
+  'tests/board-layouts-db.test.ts',
+  'tests/ripple-responses-db.test.ts',
+  'tests/dated-ripples-db.test.ts',
+  'tests/per-pool-invitees-db.test.ts',
+  'tests/left-pool-ripples-db.test.ts',
+];
+
+/**
+ * A node test that mocks a module or rewrites process.env needs its own
+ * module graph; without isolation the mock would leak into the next file.
+ * Found by reading the files, so a new one cannot be missed.
+ */
+const MUTATES = /\bvi\.(mock|doMock|stubGlobal|stubEnv)\(|process\.env\.\w+\s*(\?\?)?=[^=]/;
+const nodeUnit = readdirSync('tests')
+  .filter((f) => f.endsWith('.test.ts'))
+  .map((f) => `tests/${f}`)
+  .filter((f) => !NEEDS_LOCAL_STACK.includes(f));
+const SIDE_EFFECTS = nodeUnit.filter((f) => MUTATES.test(readFileSync(f, 'utf8')));
+
+const shared = {
+  resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
+};
+
+/**
+ * Four projects by what a file needs (review: the gate took minutes, mostly
+ * starting jsdom for files that never touch a DOM, one file at a time):
+ *   unit      node, pure functions: one shared module graph, no isolation;
+ *   unit-iso  node, files that mock modules or env: isolated;
+ *   dom       jsdom, every .tsx (each a render): isolated, in parallel;
+ *   db        node, the local stack: one file at a time, they share it.
+ * `pnpm test` runs all four; CI and the commit hook run every one but db.
+ */
 export default defineConfig({
-  resolve: {
-    alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
-  },
+  ...shared,
   test: {
-    // The suites talk to the local stack; keep them serial and patient.
-    include: ['tests/**/*.test.{ts,tsx}'],
     setupFiles: ['tests/setup.ts'],
-    fileParallelism: false,
+    projects: [
+      {
+        ...shared,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: nodeUnit.filter((f) => !SIDE_EFFECTS.includes(f)),
+          setupFiles: ['tests/setup.ts'],
+          isolate: false,
+        },
+      },
+      {
+        ...shared,
+        test: {
+          name: 'unit-iso',
+          environment: 'node',
+          include: SIDE_EFFECTS,
+          setupFiles: ['tests/setup.ts'],
+        },
+      },
+      {
+        ...shared,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: ['tests/**/*.test.tsx'],
+          setupFiles: ['tests/setup.ts'],
+        },
+      },
+      {
+        ...shared,
+        test: {
+          name: 'db',
+          environment: 'node',
+          include: NEEDS_LOCAL_STACK,
+          setupFiles: ['tests/setup.ts'],
+          // The suites share the local stack; keep them serial and patient.
+          fileParallelism: false,
+        },
+      },
+    ],
   },
 });

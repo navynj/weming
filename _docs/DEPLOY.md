@@ -183,9 +183,13 @@ that a closed-group app does not need.
 
 Import the repo (`navynj/during`). Framework preset: Next.js.
 
-`vercel.json` sets the build command to `pnpm verify && next build`, so every
-deploy runs ESLint, the design-token guard, and the test suite minus the
-files that need a live Postgres (`vitest.ci.config.ts` names them).
+`vercel.json` sets the build command to `next build` and nothing else: the
+checks run before it, not in it. A production build waits for this commit's
+CI run (`.github/workflows/ci.yml`: types, lint and format once, the suite
+minus the files that need a live Postgres in three parallel shards) and is
+skipped unless it passed (`scripts/vercel-ignore.mjs`). Locally, the
+pre-commit hook checks what is staged and the pre-push hook runs the whole
+suite, the database tests included (`vitest.config.mts` names them).
 
 ### Environment variables — Production and Preview
 

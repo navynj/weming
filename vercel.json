@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "pnpm verify && next build",
+  "buildCommand": "next build",
   "ignoreCommand": "node scripts/vercel-ignore.mjs",
   "redirects": [
     {
