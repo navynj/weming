@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
-import { downscale } from '@/lib/downscale';
+import { downscale, isHeic } from '@/lib/downscale';
 import { MEDIA_BUCKET } from '@/lib/media-bucket';
 import { createClient } from '@/lib/supabase/client';
 
@@ -39,26 +39,40 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sign in again to attach a photo.');
+      if (!user) {
+        setFailed('You are signed out. Sign in again to attach a photo.');
+        return;
+      }
 
       const added: string[] = [];
       const seen: Record<string, string> = {};
+      const refused: string[] = [];
+      // Each photo on its own: one that fails says why and the rest still go.
       for (const file of Array.from(files)) {
         const shrunk = await downscale(file);
-        const path = `${user.id}/${crypto.randomUUID()}-${shrunk.name}`;
-
+        if (isHeic(shrunk)) {
+          refused.push(`${file.name}: ${HEIC_UNREADABLE}`);
+          continue;
+        }
+        const path = mediaKey(user.id, shrunk.type);
         const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, shrunk, {
           contentType: shrunk.type,
           upsert: false,
         });
-        if (error) throw error;
+        if (error) {
+          refused.push(`${file.name}: ${uploadFailure(error)}`);
+          continue;
+        }
         added.push(path);
         seen[path] = URL.createObjectURL(shrunk);
       }
       setPreviews((current) => ({ ...current, ...seen }));
-      onChange([...paths, ...added]);
+      if (added.length > 0) onChange([...paths, ...added]);
+      if (refused.length > 0) setFailed(refused.join('\n'));
     } catch (thrown) {
-      setFailed(thrown instanceof Error ? thrown.message : 'That photo would not upload.');
+      setFailed(
+        `That photo would not upload: ${thrown instanceof Error ? uploadFailure(thrown) : 'no reason given.'}`,
+      );
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -66,6 +80,44 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
   }
 
   return { input, busy, failed, previews, attach };
+}
+
+const HEIC_UNREADABLE =
+  'this browser cannot read HEIC photos. Add it from your iPhone, or save it as a JPEG first.';
+
+/** The type's extension, for a key that is never the file's own name. */
+const EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/avif': 'avif',
+};
+
+/**
+ * Where a photo is stored: my folder, a fresh id, the type's extension. Never
+ * the file's own name: Storage refuses a key with characters outside its
+ * set, so a Korean file name (a KakaoTalk save, a screenshot) failed with
+ * "Invalid key" (review: a friend could not attach a photo).
+ */
+export function mediaKey(userId: string, type: string): string {
+  return `${userId}/${crypto.randomUUID()}.${EXTENSIONS[type] ?? 'img'}`;
+}
+
+/** Why an upload failed, in words a person can act on; never silent. */
+export function uploadFailure(error: { message?: string; statusCode?: string | number }): string {
+  const message = error.message ?? '';
+  const status = String(error.statusCode ?? '');
+  if (status === '413' || /maximum allowed size|too large|payload/i.test(message)) {
+    return 'it is too large to upload (50MB at most).';
+  }
+  if (status === '401' || status === '403' || /row-level security|jwt|unauthori/i.test(message)) {
+    return 'you are signed out. Sign in again, then add it.';
+  }
+  if (/failed to fetch|network|load failed|timed? ?out/i.test(message)) {
+    return 'it could not reach the server. Check the connection and try again.';
+  }
+  return `it would not upload (${message || 'no reason given'}).`;
 }
 
 export function AddImageAffordance({
@@ -138,7 +190,7 @@ export function MediaPreviews({
       ) : null}
 
       {failed ? (
-        <p role="alert" className="text-pool-500 text-xs">
+        <p role="alert" className="text-ink text-xs whitespace-pre-line">
           {failed}
         </p>
       ) : null}

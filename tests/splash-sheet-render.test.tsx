@@ -31,7 +31,10 @@ vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
-vi.mock('@/lib/downscale', () => ({ downscale: (file: File) => Promise.resolve(file) }));
+vi.mock('@/lib/downscale', async (actual) => ({
+  ...(await actual<typeof import('@/lib/downscale')>()),
+  downscale: (file: File) => Promise.resolve(file),
+}));
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     auth: { getUser: () => Promise.resolve({ data: { user: { id: 'a1' } } }) },

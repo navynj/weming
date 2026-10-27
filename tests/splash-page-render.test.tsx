@@ -31,7 +31,10 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
   deleteRipple: record('deleteRipple', { ok: true, rippleId: 'r' }),
   setRippleLock: record('setRippleLock', { ok: true, rippleId: 'r' }),
 }));
-vi.mock('@/lib/downscale', () => ({ downscale: (file: File) => Promise.resolve(file) }));
+vi.mock('@/lib/downscale', async (actual) => ({
+  ...(await actual<typeof import('@/lib/downscale')>()),
+  downscale: (file: File) => Promise.resolve(file),
+}));
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     auth: { getUser: () => Promise.resolve({ data: { user: { id: 'a1' } } }) },

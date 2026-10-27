@@ -9,19 +9,25 @@
 const MAX_EDGE = 2000;
 const QUALITY = 0.82;
 
+/** An iPhone's HEIC: only Safari draws it, so it always leaves as a JPEG. */
+export function isHeic(file: Pick<File, 'type' | 'name'>): boolean {
+  return /^image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+}
+
 export async function downscale(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) return file;
+  if (!file.type.startsWith('image/') && !isHeic(file)) return file;
 
   const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) return file; // An unreadable image is the upload's problem, not ours.
+  // Unreadable here: the caller decides (a HEIC outside Safari is refused there).
+  if (!bitmap) return file;
 
   const longest = Math.max(bitmap.width, bitmap.height);
-  if (longest <= MAX_EDGE) {
+  if (longest <= MAX_EDGE && !isHeic(file)) {
     bitmap.close();
     return file;
   }
 
-  const scale = MAX_EDGE / longest;
+  const scale = Math.min(1, MAX_EDGE / longest);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);

@@ -11,7 +11,10 @@ vi.mock('@/features/splash/actions', () => ({}));
 vi.mock('@/features/input-sheet/commit', () => ({}));
 vi.mock('@/features/ripple-sheet/actions', () => ({}));
 vi.mock('@/features/pool/actions', () => ({}));
-vi.mock('@/lib/downscale', () => ({ downscale: (file: File) => Promise.resolve(file) }));
+vi.mock('@/lib/downscale', async (actual) => ({
+  ...(await actual<typeof import('@/lib/downscale')>()),
+  downscale: (file: File) => Promise.resolve(file),
+}));
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';

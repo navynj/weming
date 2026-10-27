@@ -20,7 +20,8 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
     return Promise.resolve({ ok: true, rippleId: 'r' });
   },
 }));
-vi.mock('@/lib/downscale', () => ({
+vi.mock('@/lib/downscale', async (actual) => ({
+  ...(await actual<typeof import('@/lib/downscale')>()),
   downscale: (file: File) => Promise.resolve(file),
 }));
 vi.mock('@/lib/supabase/client', () => ({
@@ -172,7 +173,8 @@ describe('what a valid commit is (SPEC 6)', () => {
     fireEvent.click(drop(view));
 
     await waitFor(() => expect(commits).toHaveLength(1));
-    expect((commits[0].media as string[])[0]).toMatch(/^a1\/.*beach\.jpg$/);
+    // Stored under a fresh id and its type, never the file's own name (review).
+    expect((commits[0].media as string[])[0]).toMatch(/^a1\/[0-9a-f-]{36}\.jpg$/);
     expect(commits[0].note).toBe('');
   });
 
