@@ -60,7 +60,7 @@ export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
 
 const themeInput = z.object({
   color: z.enum(THEME_COLORS as [ThemeColor, ...ThemeColor[]]),
-  mode: z.enum(['dark', 'light', 'pastel']),
+  mode: z.enum(['dark', 'light']),
 });
 
 /** Saves my theme (0032): one colour and a mode, on my profile alone. */

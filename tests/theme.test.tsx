@@ -22,7 +22,7 @@ vi.mock('@/features/people/actions', () => ({
 
 import { ThemePicker } from '@/features/people/theme-picker';
 import { ThemeProvider } from '@/features/people/theme-provider';
-import { asTheme, PASTEL_INK, THEMES } from '@/lib/theme';
+import { asTheme, THEMES } from '@/lib/theme';
 
 afterEach(() => {
   cleanup();
@@ -51,26 +51,17 @@ describe('the eleven colours', () => {
     for (const t of THEMES) expect(contrast(t.hex, '#ffffff')).toBeGreaterThanOrEqual(3);
   });
 
-  it('keep pastel mode’s soft grey readable on every pastel: 4.5:1 at least (0036)', () => {
-    for (const t of THEMES) {
-      expect(contrast(t.pastel, PASTEL_INK), t.key).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-
-  it('each has its rule in globals.css, the same hex and pastel', () => {
+  it('each has its rule in globals.css, the same hex', () => {
     const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8').toLowerCase();
     for (const t of THEMES) {
       expect(css).toContain(`[data-theme='${t.key}']`);
       expect(css).toContain(`--theme-900: ${t.hex.toLowerCase()};`);
-      expect(css).toContain(`--theme-pastel: ${t.pastel.toLowerCase()};`);
     }
-    expect(css).toContain(`--pastel-ink: ${PASTEL_INK.toLowerCase()};`);
   });
 
   it('reads anything unknown as the blue water, dark', () => {
     expect(asTheme('teal', 'dim')).toEqual({ color: 'blue', mode: 'dark' });
     expect(asTheme('pink', 'light')).toEqual({ color: 'pink', mode: 'light' });
-    expect(asTheme('sky', 'pastel')).toEqual({ color: 'sky', mode: 'pastel' });
   });
 });
 
@@ -101,17 +92,6 @@ describe('choosing a theme in Settings', () => {
     expect(document.documentElement.dataset.mode).toBe('light');
     await waitFor(() => expect(saved).toHaveLength(2));
     expect(saved[1]).toEqual({ color: 'pink', mode: 'light' });
-  });
-
-  it('offers Pastel, and shows each swatch in its pastel there (0036)', async () => {
-    const { container } = picker();
-    const modes = [...container.querySelectorAll('[data-theme-mode]')].map((m) => m.textContent);
-    expect(modes).toEqual(['Dark', 'Light', 'Pastel']);
-    fireEvent.click(container.querySelector('[data-theme-mode="pastel"]')!);
-    expect(document.documentElement.dataset.mode).toBe('pastel');
-    const sky = container.querySelector<HTMLElement>('[data-theme-swatch="sky"]')!;
-    expect(sky.style.backgroundColor).toBe('rgb(168, 213, 240)');
-    await waitFor(() => expect(saved.at(-1)).toEqual({ color: 'blue', mode: 'pastel' }));
   });
 
   it('takes a refused choice back and says why', async () => {

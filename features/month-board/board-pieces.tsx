@@ -129,8 +129,7 @@ function WaveDecoration({
     >
       <path
         d={wavePath(width, amp, wavelength, pad)}
-        // What reads as white on the ground in every mode (0032, 0036).
-        style={{ stroke: 'var(--color-white)' }}
+        stroke="#ffffff"
         strokeOpacity={0.8}
         strokeWidth={weight}
         strokeLinecap="round"

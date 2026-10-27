@@ -60,8 +60,7 @@ function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
         <WaveGlyph
           key={at}
           width={narrow ? DAY_WAVE_W.narrow : DAY_WAVE_W.wide}
-          // What reads as white on the ground in every mode (0032, 0036).
-          stroke="var(--color-white)"
+          stroke="#ffffff"
           opacity={0.8}
           strokeWidth={DAY_WAVE_STROKE}
         />

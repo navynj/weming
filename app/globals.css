@@ -65,47 +65,36 @@
 :root,
 [data-theme='blue'] {
   --theme-900: #0507c9;
-  --theme-pastel: #afb8f0;
 }
 [data-theme='red'] {
   --theme-900: #d92d20;
-  --theme-pastel: #f2a7a0;
 }
 [data-theme='orange'] {
   --theme-900: #d9480f;
-  --theme-pastel: #f7c59b;
 }
 [data-theme='yellow'] {
   --theme-900: #b07c00;
-  --theme-pastel: #f3de8a;
 }
 [data-theme='green'] {
   --theme-900: #14804a;
-  --theme-pastel: #a9dbb8;
 }
 [data-theme='lime'] {
   --theme-900: #4e8a1a;
-  --theme-pastel: #cbe79b;
 }
 [data-theme='sky'] {
   --theme-900: #0b7fc2;
-  --theme-pastel: #a8d5f0;
 }
 [data-theme='purple'] {
-  --theme-900: #6338d8;
-  --theme-pastel: #c2b8f2;
+  --theme-900: #7b2fd0;
 }
 [data-theme='pink'] {
   --theme-900: #c2307a;
-  --theme-pastel: #f3b6cf;
 }
 [data-theme='brown'] {
   --theme-900: #8a5a2b;
-  --theme-pastel: #d6bc9f;
 }
 [data-theme='black'] {
   --theme-900: #161621;
-  --theme-pastel: #d3d3da;
 }
 
 /* No pinch or double-tap zoom on a phone (layout.tsx's viewport says why);
@@ -313,26 +302,6 @@ body {
   background-color: #ffffff;
   color: var(--theme-900);
   --wave-ink: var(--theme-900);
-}
-
-/*
- * Pastel mode (0036): the ground is the colour's pastel, and what was white
- * on it takes a soft grey (--pastel-ink), not pure black (Yoonji, in the
- * session). The same one swap as light mode, inside the ground only.
- */
-[data-mode='pastel'] .water-ground {
-  --pastel-ink: #45424d;
-  --color-white: var(--pastel-ink);
-  --color-main-900: var(--theme-pastel);
-  --color-main-400: color-mix(in srgb, var(--pastel-ink) 40%, var(--theme-pastel));
-  /* As in light mode, the pale tint turns strong, so a tile in it (a pool's
-     monogram) keeps its letters readable. */
-  --color-main-100: color-mix(in srgb, var(--pastel-ink) 85%, var(--theme-pastel));
-  --color-joint: color-mix(in srgb, #ffffff 45%, var(--theme-pastel));
-  --color-joint-face: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
-  background-color: var(--theme-pastel);
-  color: var(--pastel-ink);
-  --wave-ink: var(--pastel-ink);
 }
 
 /*

@@ -45,10 +45,7 @@ export function ThemeProvider({ initial, children }: { initial: Theme; children:
     },
     [theme],
   );
-  const api = useMemo(
-    () => ({ theme, hex: themeHex(theme.color, theme.mode), choose }),
-    [theme, choose],
-  );
+  const api = useMemo(() => ({ theme, hex: themeHex(theme.color), choose }), [theme, choose]);
   return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;
 }
 
