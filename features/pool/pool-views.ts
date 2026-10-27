@@ -12,7 +12,5 @@ export const POOL_VIEWS = [
 
 /** `?view=`: a pool lane page's tabs send the pool back on that view (review); anything else, the Calendar. */
 export function poolViewParam(value: string | undefined): PoolViewKind {
-  // An old link's ?view=swimmers opens Members (renamed, 0048).
-  if (value === 'swimmers') return 'members';
   return value === 'members' || value === 'lane' || value === 'date' ? value : 'board';
 }

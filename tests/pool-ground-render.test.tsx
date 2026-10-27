@@ -1079,11 +1079,3 @@ describe('whose a record is, in a pool (review)', () => {
     expect(ground(A).container.querySelector('[data-board-author]')).toBeNull();
   });
 });
-
-describe('the Members view, renamed from Swimmers (0048)', () => {
-  it('opens on Members from an old ?view=swimmers link', async () => {
-    const { poolViewParam } = await import('@/features/pool/pool-views');
-    expect(poolViewParam('swimmers')).toBe('members');
-    expect(poolViewParam('members')).toBe('members');
-  });
-});
