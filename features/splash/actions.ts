@@ -50,6 +50,8 @@ const Drop = Header.extend({
   media: z.array(z.string()).max(8),
   /** Today in the author's zone: the post's date when none is given (H24). */
   today: z.string().regex(ISO_DATE),
+  /** The first block's own day, when the post has a range (0031). */
+  blockDay: z.string().regex(ISO_DATE).nullable().optional(),
   /** The custom shelf to sit on, if any (H21e). */
   sessionId: z.uuid().nullable(),
 });
@@ -105,6 +107,8 @@ export async function dropSplash(input: Drop): Promise<SplashResult> {
       note: drop.body.length > 0 ? drop.body : null,
       media: drop.media,
       splash_id: splash.id,
+      // Its own day inside the post's range (0031); the database checks it.
+      ...(drop.blockDay && drop.declaredEnd ? { occurred_on: drop.blockDay } : {}),
     });
     if (blockError) {
       // A post without the words that made it is not what was dropped.

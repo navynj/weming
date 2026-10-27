@@ -193,14 +193,15 @@ describe('the white page above the water (SPEC 5, H21c)', () => {
     expect(container.querySelector('[data-wave-underline]')!.getAttribute('data-lines')).toBe('2');
   });
 
-  it('reads the blocks oldest first under small date labels, photos full width', () => {
+  it('reads the blocks by their day inside the range under small day labels, photos full width', () => {
     const { container } = page();
     const ids = [...container.querySelectorAll('[data-block]')].map((b) =>
       b.getAttribute('data-block'),
     );
     expect(ids).toEqual(['first', 'night', 'later']);
     const labels = [...container.querySelectorAll('[data-block-date]')].map((l) => l.textContent);
-    expect(labels[0]).toBe('Aug 17 · 8. 17 11:30');
+    // Inside a range, a block reads by its day alone: no clock (0031).
+    expect(labels[0]).toBe('Aug 17');
     expect(labels[2]).toBe('Aug 20');
     expect(container.querySelector('[data-block-body]')!.className).toMatch(/text-\[15px\]/);
     expect(container.querySelector('[data-photo]')!.className).toContain('w-full');
@@ -261,12 +262,22 @@ describe('writing on the page, in place', () => {
     expect(field.className).toContain('resize-none');
   });
 
-  it('saves a block’s words and photos, never a lane or a date of its own (H24)', async () => {
+  it('saves a block’s words, photos and its day inside the range, never a lane (H24, 0031)', async () => {
     const { container, getByText, getByLabelText } = page();
     fireEvent.click(container.querySelector('[data-block="first"]')!);
     const editor = container.querySelector<HTMLElement>('[data-block-editor="first"]')!;
     expect(editor.querySelector('[role="group"][aria-label="Lane"]')).toBeNull();
     expect(within(editor).queryByText('+ Add Time')).toBeNull();
+    // Its day, Aug 17, picked among the range's days only.
+    const day = within(editor).getByLabelText('Day') as HTMLSelectElement;
+    expect(day.value).toBe('2026-08-17');
+    expect([...day.options].map((o) => o.textContent)).toEqual([
+      'Aug 17',
+      'Aug 18',
+      'Aug 19',
+      'Aug 20',
+    ]);
+    fireEvent.change(day, { target: { value: '2026-08-19' } });
     fireEvent.change(getByLabelText('Block'), { target: { value: 'sea to sky, fog' } });
     fireEvent.click(getByText('Save'));
     await waitFor(() => expect(calls.some((c) => c.name === 'editBlock')).toBe(true));
@@ -274,6 +285,7 @@ describe('writing on the page, in place', () => {
       id: 'first',
       note: 'sea to sky, fog',
       media: [],
+      occurredOn: '2026-08-19',
     });
     expect(router.refresh).toHaveBeenCalled();
   });
@@ -283,7 +295,7 @@ describe('writing on the page, in place', () => {
     expect(container.querySelector('[data-block-editor="new"]')).not.toBeNull();
   });
 
-  it('starts a new block from the add slot with no lane or date to choose: the post’s (H24)', async () => {
+  it('starts a new block on a range at its last day when today is past it, never a lane (0031)', async () => {
     const { container, getByText, getByLabelText } = page();
     fireEvent.click(getByText('Drop your words here'));
     await waitFor(() =>
@@ -291,14 +303,52 @@ describe('writing on the page, in place', () => {
     );
     const editor = container.querySelector<HTMLElement>('[data-block-editor="new"]')!;
     expect(editor.querySelector('[role="group"][aria-label="Lane"]')).toBeNull();
-    expect(within(editor).queryByText('+ Add Time')).toBeNull();
+    // Today (Sep 25) is past Aug 17–20: the range's last day.
+    expect((within(editor).getByLabelText('Day') as HTMLSelectElement).value).toBe('2026-08-20');
     fireEvent.change(getByLabelText('Block'), { target: { value: 'the drive home' } });
     fireEvent.click(getByText('Save'));
     await waitFor(() => expect(calls.some((c) => c.name === 'addBlock')).toBe(true));
     const added = calls.find((c) => c.name === 'addBlock')!.args[0];
-    expect(added).toMatchObject({ splashId: 's1', note: 'the drive home', media: [] });
+    expect(added).toMatchObject({
+      splashId: 's1',
+      note: 'the drive home',
+      media: [],
+      occurredOn: '2026-08-20',
+    });
     expect(added).not.toHaveProperty('categoryId');
-    expect(added).not.toHaveProperty('occurredOn');
+  });
+
+  it('offers no day on a one-day post: the block takes the post’s (H24)', async () => {
+    const oneDay = { ...board, declared_end: null };
+    const { container, getByText, getByLabelText } = page({
+      splash: summarizeSplash(oneDay, blocks, TZ, NOW),
+    });
+    fireEvent.click(getByText('Drop your words here'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-block-editor="new"]')).not.toBeNull(),
+    );
+    const editor = container.querySelector<HTMLElement>('[data-block-editor="new"]')!;
+    expect(within(editor).queryByLabelText('Day')).toBeNull();
+    fireEvent.change(getByLabelText('Block'), { target: { value: 'lunch' } });
+    fireEvent.click(getByText('Save'));
+    await waitFor(() => expect(calls.some((c) => c.name === 'addBlock')).toBe(true));
+    expect(calls.find((c) => c.name === 'addBlock')!.args[0]).not.toHaveProperty('occurredOn');
+  });
+
+  it('reads Oct 10 before Oct 12 inside a range, whatever order they were written in (0031)', () => {
+    const range = { ...board, declared_start: '2026-10-08', declared_end: '2026-10-12' };
+    const late = [
+      block({ id: 'oct12', occurred_on: '2026-10-12', created_at: '2026-10-12T16:00:00.000Z' }),
+      block({ id: 'oct10', occurred_on: '2026-10-10', created_at: '2026-10-13T16:00:00.000Z' }),
+    ];
+    const { container } = page({
+      splash: summarizeSplash(range, late, TZ, NOW),
+      blocks: late,
+    });
+    const ids = [...container.querySelectorAll('[data-block]')].map((b) =>
+      b.getAttribute('data-block'),
+    );
+    expect(ids).toEqual(['oct10', 'oct12']);
   });
 
   it('carries the lock beside the block, and deletes a block behind a confirm', async () => {

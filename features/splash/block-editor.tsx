@@ -9,6 +9,11 @@ import {
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { IsoDate } from '@/lib/time';
+
+import { blockDay, defaultBlockDay, isRange } from './block-day';
+import { DayChip } from './day-chip';
+import type { DateRange } from './summary';
 
 export type EditorTarget =
   { kind: 'edit'; block: RippleWithCategory; locked: boolean } | { kind: 'add'; splashId: string };
@@ -18,25 +23,33 @@ export type BlockDraft = {
   id: string;
   note: string;
   media: string[];
+  /** Its own day, on a range splash only (0031); absent elsewhere. */
+  occurredOn?: IsoDate;
 };
 
 /**
  * A block, edited in place on the post's page (SPEC 5, H21): blog-editor
  * style, no sheet. The cursor goes into the words; `+ Add Image`, the lock
  * toggle and Delete sit beneath them; Cancel and Save close it. A block has
- * no lane or date of its own to choose (H24): it takes its post's.
+ * no lane of its own to choose (H24): it takes its post's. On a post with a
+ * range it has a day chip — the range's days only, no time (0031).
  *
  * The editor only describes the change; the page applies it optimistically
  * and runs the action (CLAUDE.md, the principle).
  */
 export function BlockEditor({
   target,
+  range = null,
+  today,
   onSubmit,
   onDelete,
   onLock,
   onCancel,
 }: {
   target: EditorTarget;
+  /** The post's range: a day chip when it spans more than a day (0031). */
+  range?: DateRange | null;
+  today: IsoDate;
   onSubmit: (draft: BlockDraft) => void;
   onDelete: () => void;
   onLock: (locked: boolean) => void;
@@ -45,6 +58,14 @@ export function BlockEditor({
   const editing = target.kind === 'edit' ? target.block : null;
   const [note, setNote] = useState(editing?.note ?? '');
   const [media, setMedia] = useState<string[]>(editing?.media ?? []);
+  // Its day: the one it has inside the range, else today's or the last.
+  const [day, setDay] = useState<IsoDate | null>(() =>
+    isRange(range)
+      ? editing
+        ? blockDay(editing.occurred_on, range)
+        : defaultBlockDay(range, today)
+      : null,
+  );
   const [locked, setLocked] = useState(target.kind === 'edit' ? target.locked : false);
   const [confirming, setConfirming] = useState(false);
   const attach = useMediaAttach(media, setMedia);
@@ -61,7 +82,12 @@ export function BlockEditor({
   const hasContent = note.trim().length > 0 || media.length > 0;
 
   function submit(): void {
-    onSubmit({ id: editing?.id ?? crypto.randomUUID(), note, media });
+    onSubmit({
+      id: editing?.id ?? crypto.randomUUID(),
+      note,
+      media,
+      ...(day ? { occurredOn: day } : {}),
+    });
   }
 
   return (
@@ -79,6 +105,7 @@ export function BlockEditor({
       />
 
       <div className="flex flex-wrap items-center gap-2">
+        {day && isRange(range) ? <DayChip range={range} value={day} onChange={setDay} /> : null}
         <AddImageAffordance attach={attach.attach} busy={attach.busy} input={attach.input} />
       </div>
 
