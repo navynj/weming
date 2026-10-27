@@ -576,5 +576,5 @@ A member's column in Swimmers opens nothing.
   - Becoming mine happens on Home only ("Make it mine", Move to Home). The lane and Audience are set anew: Audience starts as a new record's would, and the record leaves its pool unless Audience shares it there.
   - A Home record's lane change moves no placement.
   - Joint → pool record is gone.
-- **Retired:** link directions, "include my earlier records" (`_place_history`), and lane matching on join and create. They are dropped in 0034 with quoted approval; H24's release 2 follows as its own migration.
+- **Retired:** link directions, "include my earlier records" (`_place_history`), and lane matching on join and create. They are dropped in 0035 with quoted approval; H24's release 2 follows as its own migration.
 
