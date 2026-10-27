@@ -64,7 +64,7 @@ A pool whose creator's account is gone (`owner_id` null) cannot be deleted for n
 - Splash pool-wide (H20d): the compound pool pill, the joint ripples filter, the sharing record carrying `pool_lane_id`; participants on ripples
 - Swim: FAB entry + lane long-press, live intruding card, focus screen = enlarged lane card + my timer, nothing more. **The dormant live modules (Timer, now band, focus screen, Break, inner ripples) wake here** (H20b)
 
-## Next migration: Sharing model v2 contract (0034) — drop list
+## Next migration: Sharing model v2 contract (0035) — drop list
 
 Destructive DDL waits for this migration, and each line needs Yoonji's explicit approval there, quoted in the migration and its commit (CLAUDE.md, "Data is real now"). The full list with reasons is `_docs/SHARING-V2.md` §3; these are the ones added since it was drafted.
 
@@ -73,13 +73,14 @@ Destructive DDL waits for this migration, and each line needs Yoonji's explicit 
 | `public.splash_reaction_summary(uuid[])` | 0030 | Fed the board's reactions badge, removed the same day (amends H25); the app no longer calls it |
 | `public.splash_reply_preview(uuid[])` | 0030 | Fed the board's reply lines, removed with the badge; the app no longer calls it |
 | `public.create_joint_splash(…)`, `public.splash_to_joint(uuid, uuid)` | 0011, 0022 (wrappers since 0033) | The old app's calls, kept through the 0033 window to make Everyone on; the new app calls `create_together_splash` and `splash_to_together` |
+| `public.splash_to_pool_record(uuid)` | 0033 | Joint → pool record, retired before it was used: "Make it mine" is on Home only (0034) |
 
 Until then each stays in the database, unread by the app.
 
 ## Sharing v2, after the switch
 
 - **"Make it joint…" from Home** (SHARING-V2 §5, Home record edit sheet): pick the pool, a pool lane and Together without opening the pool. Today a Home record becomes joint from its edit sheet opened in the pool it is shared to. Needs each pool's members on Home.
-- **Per-pool invitees on my records (0035)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
+- **Per-pool invitees on my records (0036)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
 
 ## Later, unscheduled
 

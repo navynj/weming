@@ -39,7 +39,7 @@ function said(error: { message: string; code?: string } | null): string {
   if (error.code === '42501' && /ripples? by other members/.test(error.message)) {
     return error.message;
   }
-  // 0009, until 0034 lifts it: a pool lane connects to one lane of mine.
+  // 0009, until 0035 lifts it: a pool lane connects to one lane of mine.
   if (error.code === '23505' && /lane_mappings_one_per_pool_lane/.test(error.message)) {
     return 'Each lane of this Pool connects to one of your lanes for now.';
   }
@@ -90,7 +90,7 @@ export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> 
       description: lane.description,
       my_category_id: null,
     })),
-    // Retired with matching on create (0033); the argument stays until 0034.
+    // Retired with matching on create (0033); the argument stays until 0035.
     p_include_history: false,
   });
   if (error || !data) return { ok: false, message: said(error) };

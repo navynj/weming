@@ -101,14 +101,14 @@ Read-only, run on 2026-10-26.
 
 ## 3. Schema (expand, switch, contract)
 
-The theme work (in progress) takes 0032, so v2 is **0033** (expand) and **0034** (contract).
+The theme work (in progress) takes 0032, so v2 is **0033** (expand) and **0035** (contract).
 
 ### Links: `lane_mappings`, kept and widened
 
 ```
 lane_mappings(
   id, user_id, my_category_id, pool_lane_id, pool_id, created_at,   -- as now
-  direction            -- frozen in 0033, dropped in 0034
+  direction            -- frozen in 0033, dropped in 0035
   is_default       boolean not null default false,  -- the default pool lane for (my_category_id, pool_id)
   share_by_default boolean,                         -- on the default row only; false when created
   is_home          boolean not null default false   -- the home lane for (user_id, pool_lane_id); optional
@@ -146,11 +146,12 @@ A pool record **is** today's Just-mine row: `splashes.own_pool_id` and its place
 
 | Step | Contents |
 | --- | --- |
-| **0033 expand** | Add the three markers and `joint_invitees`, and backfill them by §2 and decision 4. Until 0034, the old indexes still hold: one link of mine per pool lane (0009), and one `out`/`both` link per (my lane, pool) (0019). The new app writes every new link as `in`, a value nothing reads after the switch, so 0019 never refuses it; many-to-many waits for 0034. Add the deferred one-default trigger. Add the new functions beside the old (§4). Relax the placement policy's helper as in §4. Old app and new app both work. |
+| **0033 expand** | Add the three markers and `joint_invitees`, and backfill them by §2 and decision 4. Until 0035, the old indexes still hold: one link of mine per pool lane (0009), and one `out`/`both` link per (my lane, pool) (0019). The new app writes every new link as `in`, a value nothing reads after the switch, so 0019 never refuses it; many-to-many waits for 0035. Add the deferred one-default trigger. Add the new functions beside the old (§4). Relax the placement policy's helper as in §4. Old app and new app both work. |
 | **Switch (app)** | Audience per record; pool compose with Together; Home pool columns; Advanced links. Nothing writes `direction`, calls the retired functions, or reads Just mine as a separate kind. |
-| **0034 contract** | Destructive; needs your quoted approval (§6, decision 8). See the list below. |
+| **0034 follow-up** | Additive. 0033 reached production as it stood at the push, and two later edits to it never did, since a pushed migration is not applied again. The 0033 file was put back to what production ran, and the edits land here: `joint_invitees.pool_id` with its placement key, `joint_together` reading joint rows alone, and `splash_to_mine` keeping no placement. |
+| **0035 contract** | Destructive; needs your quoted approval (§6, decision 8). See the list below. |
 
-**0034 contract steps:**
+**0035 contract steps:**
 - **Freeze `direction`,** then drop it with its enum `lane_link_direction`.
 - **Drop the indexes that block v2:**
   - `lane_mappings_one_per_pool_lane` (0009), which forbids many-to-many;
@@ -171,7 +172,7 @@ A pool record **is** today's Just-mine row: `splashes.own_pool_id` and its place
 | Placement policies (`lane_is_mine_in`) | a placement on a pool lane any of my lanes links | a placement of my record on **any lane of a pool I am a current member of**, needed because Audience picks a pool lane per record with no link. Same author-only rules as now. Not a widening of who reads: only the author places, and only into their own pools |
 | `_set_links` | writes links with directions; switches placements off on unlink and on losing `out` | writes links and markers; **switches nothing off.** Unlinking changes defaults and display only |
 | `set_lane_links` (settings) | the full link set with directions | the Advanced screen's links and markers |
-| `join_pool` / `create_pool` | take links and "include earlier records" | links ignored; the UI sends none since the hotfix (`p_links` stays in the signature until 0034) |
+| `join_pool` / `create_pool` | take links and "include earlier records" | links ignored; the UI sends none since the hotfix (`p_links` stays in the signature until 0035) |
 | `_place_history` | places earlier posts from `out`/`both` links on join | **retired** with join-time matching (decision 5) |
 | `placeNewSplash` / `poolLaneFor` (app) | the pool lane my record's lane links | the pool lane chosen in Audience for this record |
 | `set_splash_lane` | a lane change moves my record's placements to where the new lane sends | a lane change **moves no placement**: sharing is per record |
@@ -235,7 +236,7 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 5. **"Include my earlier records" and `_place_history` are retired.**
 6. **Any current member can add people to Together.**
 7. **Placement on any lane of a pool I'm a current member of, author only:** approved.
-8. **H24 release 2 stays separate** from 0034, as its own migration right after 0034 is verified.
+8. **H24 release 2 stays separate** from 0035, as its own migration right after 0035 is verified.
 9. **Numbering:** the theme lands as 0032 first. If it slips, v2 is renumbered rather than leaving a gap or an ordering problem.
 
 **Mapping change (Yoonji):**
@@ -246,25 +247,26 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 
 ---
 
-## 7. Next, after v2 ships: open splashes, as per-pool invitees (0035)
+## 7. Next, after v2 ships: open splashes, as per-pool invitees (0036)
 
-Scheduled as **0035**, after v2 ships (Yoonji, in the session). 0033 already widens `joint_invitees` to carry a pool, so 0035 adds no table for invitees. 0034 is the contract.
+Scheduled as **0036**, after v2 ships (Yoonji, in the session). 0034 widens `joint_invitees` to carry a pool, so 0036 adds no table for invitees. 0035 is the contract.
 
 **As decided:** instead of one "Open to everyone in <Pool>" switch, each pool my Home record is shared to gets its own **With**: Everyone, or faces picked. These are the same controls as a joint record's. Only those invited in a pool add their side there. The fill follows those invitees, as for any record.
 
-**The shape in 0033** (`joint_invitees`):
+**The shape after 0034** (`joint_invitees`):
 - `pool_id` is null for a joint record's invitees, and set for invitees on my record in one pool.
 - A per-pool row references its placement, `(splash_id, pool_id) → splash_placements`, on delete cascade.
-- Keys: unique `(splash_id, user_id)` where `pool_id` is null; unique `(splash_id, pool_id, user_id)` where it is set.
-- Read by that pool's current members and by me, its author. `joint_together` reads joint rows alone.
+- Keys today: the primary key `(splash_id, user_id)` from 0033, plus unique `(splash_id, pool_id, user_id)` where `pool_id` is set. That primary key still allows one row per person per record, so 0036 must move it to a surrogate `id` with unique `(splash_id, user_id)` where `pool_id` is null. Dropping a key is destructive and needs quoted approval there.
+- `joint_together` reads joint rows alone.
+- **For 0036:** read access to per-pool rows. Today's policy reads a joint record's rows; 0036 adds that pool's current members, and me as the record's author.
 
-**Decided for 0035: unsharing hides, never deletes** (Yoonji, in the session).
+**Decided for 0036: unsharing hides, never deletes** (Yoonji, in the session).
 - **Hidden, not deleted:** when my record stops being shared to a pool (its placement switched off), the ripples its members wrote there are hidden from that pool.
 - **Back on reshare:** they reappear if I share it to that pool again.
 - **The author still sees theirs:** each author keeps their own ripple on their Home, under the record's title, with a note that it is no longer shared.
-- **What this needs:** a placement is switched off, never deleted, while a member's ripple hangs off it. The Audience functions already switch off rather than delete. 0035 must hold that for a placement with ripples, and also for `splash_to_together`, which today deletes placements (into joint is refused once others have written, so it never meets one).
+- **What this needs:** a placement is switched off, never deleted, while a member's ripple hangs off it. The Audience functions already switch off rather than delete. 0036 must hold that for a placement with ripples, and also for `splash_to_together`, which today deletes placements (into joint is refused once others have written, so it never meets one).
 
-Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035 to settle.
+Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0036 to settle.
 
 **The idea:** my record, open to several pools.
 - **The switch:** on a shared placement of my record, "Open to everyone in <Pool>". An open placement shows the record with a joint-style fill and "Add your side" for that pool's members.
@@ -279,7 +281,7 @@ Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035
 - `ripples.thread_pool_id`: null for the owner's ripples, set for others'.
 - RLS: a ripple with a `thread_pool_id` is readable by current members of that pool and by the splash owner.
 
-**Does 0033 or 0034 block it?** Checked against today's schema; nothing blocks it, and every change it needs is additive:
+**Does 0033 or 0035 block it?** Checked against today's schema; nothing blocks it, and every change it needs is additive:
 
 | Piece | Today, and after v2 | What open splashes need |
 | --- | --- | --- |
@@ -291,6 +293,6 @@ Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035
 | Unsharing or removing a placement | v2's `_set_links` switches nothing off, and `set_splash_lane` moves nothing; Audience turns a placement off | **Decided:** off hides the pool's ripples, never deletes them, and resharing brings them back. Removal is refused while members' ripples hang off it (see above) |
 | `_require_only_mine` (to joint, Move to Home) | refuses once others have written | Fits by default: an open record with threads cannot become joint. Whether that is wanted needs deciding then |
 | `delete_pool`, `leave_pool` | v2 rewrites `delete_pool` for pool records and joint (home lane) | The pool's thread ripples on others' records need a destination: as for joint, each author's ripples become a post of theirs. `leave_pool` hides them as for joint |
-| 0034 drops | `direction`, the 0009/0019 indexes, `_sending_lane`, `_joint_lane_for`, `_place_history`, `invite_lanes`, the two summaries | None of these is needed. H24 release 2 dropping `ripples.category_id` is neutral |
+| 0035 drops | `direction`, the 0009/0019 indexes, `_sending_lane`, `_joint_lane_for`, `_place_history`, `invite_lanes`, the two summaries | None of these is needed. H24 release 2 dropping `ripples.category_id` is neutral |
 
 **Adjustments to v2:** none needed. One thing to keep in mind while writing 0033: placement removal is the only path that could orphan a thread later, so the new Audience functions should keep turning a placement off (`shared = false`) rather than deleting the row. That is already today's behaviour, and 0033 will keep it.
