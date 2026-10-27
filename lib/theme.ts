@@ -1,39 +1,51 @@
 /**
- * A person's theme (0032): one colour of eleven and a mode. Dark mode is the
- * colour as the water ground, white on it — the ground as it always was;
- * light mode is a white ground where what was white on it (labels, marks,
- * text) takes the colour. Every hex keeps white on it at 3:1 or better, so
- * dark mode's white labels read on all of them (tests/theme.test.ts).
+ * A person's theme (0032, 0036): one colour of eleven and a mode. Dark mode
+ * is the colour as the water ground, white on it — the ground as it always
+ * was; light mode is a white ground where what was white on it (labels,
+ * marks, text) takes the colour; pastel mode is the colour's pastel as the
+ * ground with a soft grey on it. Every hex keeps white at 3:1 or better
+ * (dark and light swap the same pair); every pastel keeps the grey at 4.5:1
+ * (tests/theme.test.tsx).
  *
  * The keys are the database's (profiles.theme_color's check); the hexes live
  * here alone, as CSS variables in globals.css read them too.
  */
 export const THEMES = [
-  { key: 'red', name: 'Red', hex: '#D92D20' },
-  { key: 'orange', name: 'Orange', hex: '#D9480F' },
-  { key: 'yellow', name: 'Yellow', hex: '#B07C00' },
-  { key: 'green', name: 'Green', hex: '#14804A' },
-  { key: 'lime', name: 'Lime', hex: '#4E8A1A' },
-  { key: 'sky', name: 'Sky', hex: '#0B7FC2' },
-  { key: 'blue', name: 'Blue', hex: '#0507C9' },
-  { key: 'purple', name: 'Purple', hex: '#7B2FD0' },
-  { key: 'pink', name: 'Pink', hex: '#C2307A' },
-  { key: 'brown', name: 'Brown', hex: '#8A5A2B' },
-  { key: 'black', name: 'Black', hex: '#161621' },
+  { key: 'red', name: 'Red', hex: '#D92D20', pastel: '#F2A7A0' },
+  { key: 'orange', name: 'Orange', hex: '#D9480F', pastel: '#F7C59B' },
+  { key: 'yellow', name: 'Yellow', hex: '#B07C00', pastel: '#F3DE8A' },
+  { key: 'green', name: 'Green', hex: '#14804A', pastel: '#A9DBB8' },
+  { key: 'lime', name: 'Lime', hex: '#4E8A1A', pastel: '#CBE79B' },
+  { key: 'sky', name: 'Sky', hex: '#0B7FC2', pastel: '#A8D5F0' },
+  { key: 'blue', name: 'Blue', hex: '#0507C9', pastel: '#AFB8F0' },
+  // A step toward blue (Yoonji, in the session): it read reddish.
+  { key: 'purple', name: 'Purple', hex: '#6338D8', pastel: '#C2B8F2' },
+  { key: 'pink', name: 'Pink', hex: '#C2307A', pastel: '#F3B6CF' },
+  { key: 'brown', name: 'Brown', hex: '#8A5A2B', pastel: '#D6BC9F' },
+  { key: 'black', name: 'Black', hex: '#161621', pastel: '#D3D3DA' },
 ] as const;
 
+/**
+ * Pastel mode's labels, marks and words on the pastel ground (Yoonji, in
+ * the session): not pure black, a soft grey that reads 4.5:1 or better on
+ * every pastel (tests/theme.test.tsx).
+ */
+export const PASTEL_INK = '#45424D';
+
 export type ThemeColor = (typeof THEMES)[number]['key'];
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode = 'dark' | 'light' | 'pastel';
 export type Theme = { color: ThemeColor; mode: ThemeMode };
 
 /** What everyone saw before 0032: the blue water. */
 export const DEFAULT_THEME: Theme = { color: 'blue', mode: 'dark' };
 
 export const THEME_COLORS = THEMES.map((t) => t.key) as ThemeColor[];
-export const THEME_MODES: ThemeMode[] = ['dark', 'light'];
+export const THEME_MODES: ThemeMode[] = ['dark', 'light', 'pastel'];
 
-export function themeHex(color: ThemeColor): string {
-  return THEMES.find((t) => t.key === color)?.hex ?? THEMES[6].hex;
+/** The colour the ground wears: the theme's own, or its pastel in pastel mode. */
+export function themeHex(color: ThemeColor, mode: ThemeMode = 'dark'): string {
+  const theme = THEMES.find((t) => t.key === color) ?? THEMES[6];
+  return mode === 'pastel' ? theme.pastel : theme.hex;
 }
 
 /** A stored value read safely: anything unknown is the default. */

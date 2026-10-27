@@ -35,7 +35,7 @@ export function WaveMark({
         width: MARK_SIZE,
         height: MARK_SIZE,
         gap: WAVE_GAP,
-        ['--wave-ink' as string]: tone === 'blue' ? '#ffffff' : 'var(--color-main-900)',
+        ['--wave-ink' as string]: tone === 'blue' ? 'var(--color-white)' : 'var(--color-main-900)',
       }}
     >
       {/* The pill's glyph (review): the one path the calendar's days draw too. */}

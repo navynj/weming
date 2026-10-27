@@ -9,10 +9,12 @@ import { useTheme } from './theme-provider';
 const MODES: { mode: ThemeMode; label: string }[] = [
   { mode: 'dark', label: 'Dark' },
   { mode: 'light', label: 'Light' },
+  { mode: 'pastel', label: 'Pastel' },
 ];
 
 /**
- * My theme (0032, H26): eleven colours and a mode. A choice shows at once
+ * My theme (0032, H26; 0036): eleven colours and a mode — Dark, Light, or
+ * Pastel (the colour's pastel as the ground, a soft grey on it). A choice shows at once
  * everywhere and saves behind it (CLAUDE.md, the principle); a refusal takes
  * it back and says why. Dark is the colour as the water with white on it;
  * light is a white ground with the colour on it. What is chosen wears ink,
@@ -42,7 +44,8 @@ export function ThemePicker() {
               data-theme-swatch={t.key}
               onClick={() => void pick({ ...theme, color: t.key })}
               className={`h-9 w-9 justify-self-center rounded-full ${on ? 'ring-ink ring-2 ring-offset-2' : ''}`}
-              style={{ backgroundColor: t.hex }}
+              // In pastel mode each swatch shows its pastel (0036).
+              style={{ backgroundColor: theme.mode === 'pastel' ? t.pastel : t.hex }}
             />
           );
         })}
