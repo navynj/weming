@@ -619,4 +619,5 @@ A member's column in Swimmers opens nothing.
 - **Saved toasts:** a change that saves with no Save button says so once it has: "Theme saved", "Saved", "Description saved", "Audience saved", "Layout saved".
   - One line at the foot, then gone (`components/ui/toast.tsx`). A refusal is never a toast: it is said where the change was made.
   - `useOptimisticAction`'s `run` takes the toast's words as a third argument.
+- **Replies:** the reply field is no longer always open under a ripple. "Reply" sits at the right end of the reactions row and opens it with Cancel and Save; Save (or Enter) sends and closes it, Cancel (or Escape) closes it with nothing sent. Amends H25.
 

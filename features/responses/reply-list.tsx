@@ -22,8 +22,9 @@ export type ReplyHandlers = {
  * A block's replies (H25): the first two, oldest first, then "+n more
  * replies"; each its author's face, name, age and text — "edited" once
  * edited, "Hidden by the author" once hidden. Mine I edit and delete; on my
- * ripple I hide anyone's. The one-line input sits at the bottom and grows
- * to four lines.
+ * ripple I hide anyone's. The one-line input opens from the reactions
+ * row's "Reply" (Yoonji, in the session), at the bottom, with Cancel and
+ * Save, and grows to four lines.
  */
 export function ReplyList({
   replies,
@@ -32,6 +33,8 @@ export function ReplyList({
   canReply,
   onMore,
   on,
+  composing = false,
+  onDoneComposing = () => {},
 }: {
   replies: ReplyRow[];
   more: number;
@@ -39,10 +42,13 @@ export function ReplyList({
   canReply: boolean;
   onMore: () => void;
   on: ReplyHandlers;
+  /** The reply field is open, asked for by the reactions row's "Reply". */
+  composing?: boolean;
+  onDoneComposing?: () => void;
 }) {
   const { me } = usePeople();
   const [editing, setEditing] = useState<string | null>(null);
-  if (replies.length === 0 && !canReply) return null;
+  if (replies.length === 0 && !(canReply && composing)) return null;
   return (
     <div data-replies className="flex flex-col gap-2">
       {replies.length > 0 ? (
@@ -112,7 +118,17 @@ export function ReplyList({
           +{more} more {more === 1 ? 'reply' : 'replies'}
         </button>
       ) : null}
-      {canReply ? <ReplyInput label="Reply" onSubmit={on.reply} /> : null}
+      {canReply && composing ? (
+        <ReplyInput
+          label="Reply"
+          autoFocus
+          onSubmit={(body) => {
+            on.reply(body);
+            onDoneComposing();
+          }}
+          onCancel={onDoneComposing}
+        />
+      ) : null}
     </div>
   );
 }

@@ -24,10 +24,13 @@ export function ReactionChips({
   canReact,
   onToggle,
   floating = false,
+  trailing = null,
 }: {
   chips: ReactionChip[];
   canReact: boolean;
   onToggle: (emoji: string) => void;
+  /** At the row's right end: the "Reply" that opens the reply field. */
+  trailing?: React.ReactNode;
   /**
    * The picker and the who-reacted list float over the page, where the chips
    * sit in something that clips: the top card, cut at its fixed height.
@@ -56,7 +59,7 @@ export function ReactionChips({
     floating && anchor ? createPortal(node, document.body) : node;
   const nameOf = (id: string): string => (id === me ? 'You' : (people[id]?.name ?? 'Someone'));
 
-  if (chips.length === 0 && !canReact) return null;
+  if (chips.length === 0 && !canReact && !trailing) return null;
 
   function press(emoji: string): void {
     held.current = false;
@@ -119,6 +122,7 @@ export function ReactionChips({
           +
         </button>
       ) : null}
+      {trailing ? <span className="ml-auto">{trailing}</span> : null}
 
       {picking
         ? pop(

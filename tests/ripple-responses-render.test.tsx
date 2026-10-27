@@ -102,13 +102,18 @@ describe('reactions under a block', () => {
 describe('replies under a block', () => {
   const five = [0, 1, 2, 3, 4].map((at) => reply(`p${at}`, at % 2 ? ME : MINA, at));
 
-  it('shows the first two, then "+3 more replies", and the input at the bottom', () => {
+  it('shows the first two, then "+3 more replies"; the input waits behind "Reply"', () => {
     const { container, onExpand } = view({ reactions: [], replies: five });
     expect(container.querySelectorAll('[data-reply]')).toHaveLength(2);
     const more = container.querySelector('[data-replies-more]')!;
     expect(more.textContent).toBe('+3 more replies');
     fireEvent.click(more);
     expect(onExpand).toHaveBeenCalled();
+    // Not always open (Yoonji, in the session): "Reply" at the reactions row's right end.
+    expect(container.querySelector('[data-reply-input]')).toBeNull();
+    const toggle = container.querySelector('[data-reactions] [data-reply-toggle]')!;
+    expect(toggle.textContent).toBe('Reply');
+    fireEvent.click(toggle);
     const input = container.querySelector('[data-reply-input] textarea')!;
     expect(input.getAttribute('placeholder')).toBe('Reply…');
     expect(input.getAttribute('maxlength')).toBe('500');
@@ -120,14 +125,36 @@ describe('replies under a block', () => {
     expect(container.querySelector('[data-replies-more]')).toBeNull();
   });
 
-  it('sends on Enter, keeps a line break on Shift+Enter', () => {
+  it('sends on Enter, keeps a line break on Shift+Enter, and closes once sent', () => {
     const { container, on } = view({ reactions: [], replies: [] });
+    fireEvent.click(container.querySelector('[data-reply-toggle]')!);
     const input = container.querySelector('[data-reply-input] textarea')!;
     fireEvent.change(input, { target: { value: '  so good  ' } });
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
     expect(on.reply).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(on.reply).toHaveBeenCalledWith('so good');
+    expect(container.querySelector('[data-reply-input]')).toBeNull();
+  });
+
+  it('opens with Cancel and Save: Save sends, Cancel closes with nothing sent', () => {
+    const { container, on } = view({ reactions: [], replies: [] });
+    fireEvent.click(container.querySelector('[data-reply-toggle]')!);
+    const input = container.querySelector('[data-reply-input] textarea')!;
+    fireEvent.change(input, { target: { value: 'nice' } });
+    const buttons = [...container.querySelectorAll('[data-reply-input] button')].map(
+      (b) => b.textContent,
+    );
+    expect(buttons).toEqual(['Cancel', 'Save']);
+    fireEvent.click(container.querySelector('[data-reply-send]')!);
+    expect(on.reply).toHaveBeenCalledWith('nice');
+    fireEvent.click(container.querySelector('[data-reply-toggle]')!);
+    fireEvent.change(container.querySelector('[data-reply-input] textarea')!, {
+      target: { value: 'never mind' },
+    });
+    fireEvent.click([...container.querySelectorAll('[data-reply-input] button')][0]);
+    expect(container.querySelector('[data-reply-input]')).toBeNull();
+    expect(on.reply).toHaveBeenCalledTimes(1);
   });
 
   it('marks edited, former members, and a hidden reply; mine I edit and delete, not hide', () => {

@@ -13,11 +13,13 @@ export function ReplyInput({
   label,
   onSubmit,
   onCancel,
+  autoFocus = false,
 }: {
   initial?: string;
   label: string;
   onSubmit: (body: string) => void;
   onCancel?: () => void;
+  autoFocus?: boolean;
 }) {
   const [body, setBody] = useState(initial);
   const ready = body.trim().length > 0;
@@ -38,6 +40,7 @@ export function ReplyInput({
       <textarea
         aria-label={label}
         rows={1}
+        autoFocus={autoFocus}
         value={body}
         maxLength={REPLY_MAX}
         placeholder="Reply…"
