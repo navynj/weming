@@ -6,3 +6,4 @@ supabase/.branches
 supabase/.temp
 lib/database.types.ts
 _docs
+.claude/worktrees

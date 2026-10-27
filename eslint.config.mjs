@@ -14,7 +14,15 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'lib/database.types.ts']),
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    'lib/database.types.ts',
+    // Agent worktrees: whole checkouts of their own, linted from their own root.
+    '.claude/worktrees/**',
+  ]),
 ]);
 
 export default eslintConfig;
