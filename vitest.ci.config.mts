@@ -47,6 +47,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/ripple-responses-db.test.ts',
   'tests/dated-ripples-db.test.ts',
   'tests/per-pool-invitees-db.test.ts',
+  'tests/left-pool-ripples-db.test.ts',
 ];
 
 export default defineConfig({
