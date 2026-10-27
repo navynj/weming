@@ -633,13 +633,14 @@ A member's column in Swimmers opens nothing.
   - Rejected: a layout mode entered from a "Layout" button on the top card, with Done to leave it (the first brief); Yoonji replaced it with the second tap in the session.
 - **Who may:** the same as the panel. On Home every layout is my Home override, always mine to set; in a pool, only a current member edits the pool's layout. A piece I cannot edit never shows handles, and a second tap does what a first does. Per view: Calendar, Lane, Members.
 - **What each piece type allows:** exactly what the panel offers for it.
-  - **Label:** move and rotate. No corner handle.
+  - **Label:** move, rotate, and a width handle — a short bar on the middle of its right edge (a 44px target) — that sets `label.width`, the title rewrapping as it moves. No corner handle and no text-size handle. The width is the panel's existing field (0027), not a second one (Yoonji, in the session); 0050 widens its range to 0.3–4 column widths, additive. A range along its days keeps its automatic width.
   - **Sticker** (an icon not inline): move, rotate, and size from a corner.
   - **Each photo shown:** move, rotate, and size from a corner.
   - **Wave** (when on): move; its two ends set its length, the other end staying put.
   - **A range along its days** (a Calendar band, or any ranged post): an outline and the text size stepper, nothing more.
   - **A Members band** (Everyone, joint): its label, its icon once Inline is off, and its wave, as 0047 gave the panel.
-  - On a phone, two fingers pinch and twist the selected part; the second finger may land anywhere.
+  - **Resizing a sticker or photo holds the opposite corner:** the pulled corner follows the finger one to one. The new size is the finger's travel added to the corner, projected on the box's original diagonal from the held corner, over that diagonal, times the starting size — so a 20px pull on a 100px photo makes it about 120px. The part's offset is taken back by however far the held corner drifts as the box is redrawn, so it stays put on screen. The first 4px of a pull are ignored; after that it tracks the finger with no smoothing. Rejected (the first build): scaling by the finger's distance from the centre, which grew the part by a multiple of the pull.
+  - On a phone, two fingers pinch and twist the selected part; the second finger may land anywhere. A pinch scales by the fingers' distance now over their distance at the start, around their starting midpoint, which stays put the same way.
   - A turn snaps to 0° within 3°. Every value is clamped to the existing ranges (board_layout_valid). Overflow stays visible, as 0044 has it.
 - **Text size is a stepper, not a handle:** the toolbar reads "T | − 14 +" while the label is selected, a point a press within 10 to 18, saved after the panel's 400ms rest. Rejected: a corner handle on labels scaling the text (the first plan); Yoonji chose the stepper in the session. The size is whole points in a narrow range, which a stepper says exactly.
 - **Y in line heights moves with the text size.** A part's Y offset is measured in lines, so changing the size shifts its pixel offset slightly. Kept as the sliders already behave, so a handle and a slider never disagree.
