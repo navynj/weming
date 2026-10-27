@@ -256,7 +256,7 @@ export function PoolGround({
                     id={member.userId}
                     initials={member.initials}
                     // Solid, so an avatar never shows the one beneath it (review).
-                    className={`text-main-900/60 ring-main-900 flex h-8 w-8 items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
+                    className={`text-main-900/60 ring-main-900 bg-joint-face flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-medium ring-2 ${
                       at > 0 ? '-ml-2' : ''
                     }`}
                   />

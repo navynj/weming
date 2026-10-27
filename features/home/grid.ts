@@ -107,7 +107,7 @@ export type CardLane = { icon: string | null; name: string };
  * on it can wear a ring of the same colour that separates them unseen; over
  * a translucent fill that ring showed as a line.
  */
-export const JOINT_SURFACE = '#3739D4';
+export const JOINT_SURFACE = 'var(--color-joint)';
 
 /** A joint splash's ripple, as a branch off its band: the column it drops into, and whose it is. */
 export type Branch = { id: string; column: string; initials: string; authorId?: string };

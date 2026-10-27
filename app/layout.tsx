@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { Poppins } from 'next/font/google';
 
 import { Providers } from '@/app/providers';
+import { createClient } from '@/lib/supabase/server';
+import { asTheme, DEFAULT_THEME, type Theme } from '@/lib/theme';
 import './globals.css';
 
 // Poppins is not a variable font, so every weight is listed explicitly;
@@ -56,11 +58,32 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
 };
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+/** My theme (0032), worn from the first paint; signed out, the blue water. */
+async function myTheme(): Promise<Theme> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return DEFAULT_THEME;
+  const { data } = await supabase
+    .from('profiles')
+    .select('theme_color, theme_mode')
+    .eq('id', user.id)
+    .maybeSingle();
+  return data ? asTheme(data.theme_color, data.theme_mode) : DEFAULT_THEME;
+}
+
+export default async function RootLayout({ children }: LayoutProps<'/'>) {
+  const theme = await myTheme();
   return (
-    <html lang="en" className={`${poppins.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      data-theme={theme.color}
+      data-mode={theme.mode}
+      className={`${poppins.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
-        <Providers>{children}</Providers>
+        <Providers theme={theme}>{children}</Providers>
       </body>
     </html>
   );

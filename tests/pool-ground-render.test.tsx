@@ -747,8 +747,8 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
 });
 
 describe('the joint surface is solid, and the faces’ ring is its colour (review)', () => {
-  const SURFACE = 'bg-[#3739D4]';
-  const RING = 'ring-[#3739D4]';
+  const SURFACE = 'bg-joint';
+  const RING = 'ring-joint';
   const faces = (root: Element) => [
     ...root.querySelectorAll('[data-joint-faces] > :not([data-joint-more])'),
   ];
@@ -818,7 +818,7 @@ describe('a joint band on top of the stack reads as the top card does (review)',
     const band = () => container.querySelector('[data-joint-band="s-joint"]')!;
     // Not on top yet: the solid joint surface.
     expect(band().hasAttribute('data-dived')).toBe(true);
-    expect(band().className).toContain('bg-[#3739D4]');
+    expect(band().className).toContain('bg-joint');
     fireEvent.click(band());
     expect(band().hasAttribute('data-dived')).toBe(false);
     expect(band().className).toContain('bg-white');
