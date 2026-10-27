@@ -295,6 +295,9 @@ body {
 [data-mode='light'] .water-ground {
   --color-white: var(--theme-900);
   --color-main-900: #ffffff;
+  /* The pale tint turns strong, so a tile in it (a pool's monogram) keeps
+     its white letters readable: the same swap, one step further. */
+  --color-main-100: color-mix(in srgb, var(--theme-900) 85%, #ffffff);
   --color-joint: color-mix(in srgb, var(--theme-900) 20%, #ffffff);
   background-color: #ffffff;
   color: var(--theme-900);
@@ -309,6 +312,7 @@ body {
 .water-ground .surface {
   --color-white: #ffffff;
   --color-main-900: var(--theme-900);
+  --color-main-100: color-mix(in srgb, var(--theme-900) 17%, #ffffff);
   --color-joint: color-mix(in srgb, #ffffff 20%, var(--theme-900));
   --wave-ink: var(--theme-900);
 }

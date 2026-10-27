@@ -483,7 +483,10 @@ function Step({
     >
       {/* The face, clipped to the card's corners so the frost stays inside. */}
       <motion.div
-        className={`absolute inset-0 overflow-hidden rounded-[24px] ${frosted ? 'frosted' : ''}`}
+        // A white surface on the ground (0032): it stays white with ink in
+        // light mode, its edge a hairline; the frosted read card is the
+        // ground's own glass and inverts with it.
+        className={`surface-edge absolute inset-0 overflow-hidden rounded-[24px] ${frosted ? 'frosted' : 'surface'}`}
         style={{
           background,
           ['--face' as string]: background,

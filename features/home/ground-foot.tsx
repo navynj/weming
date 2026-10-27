@@ -1,13 +1,14 @@
 'use client';
 
-import { useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode, useState } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 
 import { Monogram } from '@/components/ui/monogram';
 import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { initialsOf } from '@/features/home/grid';
 import { Avatar } from '@/features/people/avatar';
+import { ProfileSheet } from '@/features/people/profile-sheet';
 import { usePeople } from '@/features/people/people-provider';
 import { UnseenDot, useStripPools } from '@/features/pool/activity';
 
@@ -56,6 +57,7 @@ export function GroundFoot({
   const pools = useStripPools();
   const myName = me ? (people[me]?.name ?? '') : '';
   const atHome = here === 'home';
+  const [settings, setSettings] = useState(false);
 
   return (
     <div
@@ -77,6 +79,16 @@ export function GroundFoot({
           wide ? 'min-h-0 flex-col overflow-y-auto p-1.5' : 'min-w-0 flex-1 overflow-x-auto p-1.5'
         }`}
       >
+        {/* Settings first, before my face (0032): my photo, my name, my theme. */}
+        <button
+          type="button"
+          aria-label="Settings"
+          data-strip-settings
+          onClick={() => setSettings(true)}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/80"
+        >
+          <Settings aria-hidden size={20} />
+        </button>
         <Place
           current={atHome}
           label={atHome ? homeLabel : 'Home'}
@@ -130,6 +142,7 @@ export function GroundFoot({
       >
         <Plus aria-hidden size={24} />
       </button>
+      {settings ? <ProfileSheet onClose={() => setSettings(false)} /> : null}
     </div>
   );
 }

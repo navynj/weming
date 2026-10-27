@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -13,7 +12,6 @@ import type { SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
-import { ProfileSheet } from '@/features/people/profile-sheet';
 
 import { FlipBoard } from './diving-board-flip';
 import { GroundFoot } from './ground-foot';
@@ -101,7 +99,6 @@ export function HomeGround({
   initialView?: HomeView;
 }) {
   const [newLane, setNewLane] = useState(false);
-  const [profile, setProfile] = useState(false);
   const [editingLanes, setEditingLanes] = useState(manageLanes);
   // Every visit opens on the Calendar, not the view used last (review); a
   // view chosen here holds while I stay.
@@ -309,9 +306,8 @@ export function HomeGround({
           // Wide, every view on the left takes two thirds and the stack one (review).
           className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
-          {/* The header (round 3): lane management at the left, the view
-              toggle at the centre, and a gear at the right for my profile
-              (review: no face floats on Home). */}
+          {/* The header (round 3): lane management at the left and the view
+              toggle beside it. Settings live in the strip (0032). */}
           <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
             <button
               type="button"
@@ -326,15 +322,6 @@ export function HomeGround({
             <div className="min-w-0 flex-1">
               <ViewToggle view={view} onChange={setView} />
             </div>
-            <button
-              type="button"
-              aria-label="Profile"
-              data-home-settings
-              onClick={() => setProfile(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
-            >
-              <Settings aria-hidden size={20} />
-            </button>
           </header>
 
           {dropMessage || lanes.message ? (
@@ -434,7 +421,6 @@ export function HomeGround({
         />
       </div>
 
-      {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
       {newLane ? (
         <CategorySheet category={null} apply={lanes.run} onClose={() => setNewLane(false)} />
       ) : null}

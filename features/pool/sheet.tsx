@@ -31,7 +31,7 @@ export function PoolSheet({
         role="dialog"
         aria-label={label}
         data-pool-sheet={label}
-        className={`sheet-rise relative mx-auto flex w-full ${COLUMN_MAX_WIDTH} ${SHEET_MAX_HEIGHT} flex-col overflow-hidden rounded-t-[32px] bg-white`}
+        className={`surface sheet-rise relative mx-auto flex w-full ${COLUMN_MAX_WIDTH} ${SHEET_MAX_HEIGHT} flex-col overflow-hidden rounded-t-[32px] bg-white`}
       >
         <div
           className="flex min-h-0 flex-col overflow-y-auto px-6 pt-7"

@@ -72,7 +72,7 @@ export function CardMenu({
           <ul
             role="menu"
             data-card-menu
-            className="bg-ink absolute top-full right-0 z-20 flex w-40 flex-col rounded-xl py-1 text-sm text-white shadow-lg"
+            className="surface bg-ink absolute top-full right-0 z-20 flex w-40 flex-col rounded-xl py-1 text-sm text-white shadow-lg"
           >
             <li>
               <Link

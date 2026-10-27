@@ -77,7 +77,7 @@ The database holds records someone actually wrote. Everything below outranks con
 ## Design tokens and visual rules
 
 - The ONLY custom design tokens are three color ramps plus the typeface. Everything else (spacing, radius, type scale) uses the Tailwind default scale.
-  - Main ramp (content vitality): `#0507C9` live/now, `#787BE2` recent, `#D3D7F6` settled/past
+  - Main ramp (content vitality): `#0507C9` live/now, `#787BE2` recent, `#D3D7F6` settled/past — **the default theme**. Since H26 (0032) the main ramp follows the person's theme colour (one of eleven, `lib/theme.ts`), set on `<html>` as `data-theme`; `main-400` and `main-100` are mixed from it. Write `main-900`, `white` and `joint` as utilities, never a hex: light mode (`data-mode="light"`) swaps `white` and `main-900` inside the water ground, and a white card or sheet on the ground carries `surface` to stay white with ink.
   - Gray ramp (structure): `#F1F3F7` surfaces, `#D8DCE8` deeper surfaces / dividers / lane ropes, `#6B79A3` muted text
   - Ink: `#161621` body text (was `#313338` until the refounding review)
 - Typeface: **Poppins** (weights 300/400/500/600/700), self-hosted via `next/font/google` and exposed as Tailwind's `--font-sans`, so `font-sans` and `body` cannot drift apart. The type size _scale_ is untouched.

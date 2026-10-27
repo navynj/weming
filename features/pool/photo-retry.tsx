@@ -71,7 +71,7 @@ export function PhotoRetryToast({ poolId }: { poolId: string }) {
     <div
       role="status"
       data-photo-toast={state}
-      className="fixed inset-x-4 z-30 mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-white py-3 pr-2 pl-4 shadow-xl lg:bottom-6"
+      className="surface fixed inset-x-4 z-30 mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-white py-3 pr-2 pl-4 shadow-xl lg:bottom-6"
       style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <p className="text-ink min-w-0 flex-1 text-sm">{PHOTO_FAILED}</p>

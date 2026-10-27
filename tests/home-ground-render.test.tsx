@@ -287,9 +287,12 @@ describe('the water ground (H22)', () => {
     for (const mark of container.querySelectorAll('[data-mark]')) {
       expect(mark.className).toContain('bg-white');
     }
-    // No face floats above the lanes on Home (review): the gear beside the views opens my profile.
+    // No face floats above the lanes on Home (review). Settings open from the
+    // strip's gear, before my face (0032); the header carries none.
     expect(container.querySelector('[data-avatar-row]')).toBeNull();
-    expect(container.querySelector('[data-home-header] [data-home-settings]')).not.toBeNull();
+    expect(container.querySelector('[data-home-header] [data-home-settings]')).toBeNull();
+    const strip = container.querySelector('[data-home-foot="phone"] [data-place-strip]')!;
+    expect(strip.firstElementChild!.hasAttribute('data-strip-settings')).toBe(true);
   });
 });
 

@@ -84,7 +84,8 @@ const avatar = (root: Element) =>
   )!;
 /** My profile opens from the header's gear (review). */
 const openProfile = (root: Element) =>
-  fireEvent.click(root.querySelector<HTMLElement>('[data-home-settings]')!);
+  // The strip's gear, before my face (0032).
+  fireEvent.click(root.querySelector<HTMLElement>('[data-strip-settings]')!);
 const thread = (root: Element, id: string) =>
   root.querySelector<HTMLElement>(`[data-thread-entry="${id}"] [data-thread-avatar]`)!;
 
@@ -138,7 +139,7 @@ afterEach(() => {
 });
 
 describe('the profile editor (0018)', () => {
-  it('opens from the gear beside the views on Home; Save waits for a change and a 1–40 character name', () => {
+  it('opens from the strip’s gear before my face; Save waits for a change and a 1–40 character name', () => {
     const { container, getByLabelText } = home({ [ME]: { name: 'Yoonji Lee', photo: null } });
     openProfile(container);
     const save = container.querySelector<HTMLButtonElement>('[data-profile-save]')!;

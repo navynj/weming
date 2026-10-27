@@ -206,7 +206,7 @@ function Page({
         data-stack-card={card.splash.id}
         data-slot={i < n ? -1 : faceSlot}
         data-turning={turning ? (forward ? 'down' : 'up') : undefined}
-        className="absolute top-0 origin-bottom overflow-hidden rounded-t-[24px]"
+        className="surface surface-edge absolute top-0 origin-bottom overflow-hidden rounded-t-[24px]"
         style={{
           left: faceInset,
           right: faceInset,

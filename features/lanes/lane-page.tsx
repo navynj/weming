@@ -10,7 +10,6 @@ import { DAY_LIST_TEMPLATE, DateDay } from '@/features/home/date-day';
 import { GroundFoot } from '@/features/home/ground-foot';
 import { LaneIcon } from '@/features/home/lane-icon';
 import { HOME_VIEWS, SegmentedToggle } from '@/features/home/view-toggle';
-import { ProfileSheet } from '@/features/people/profile-sheet';
 import { POOL_VIEWS } from '@/features/pool/pool-views';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PostRow } from '@/features/home/post-row';
@@ -69,7 +68,6 @@ export function LanePage({
   const { openSheet, pendingEdits, dropMessage } = useInputSheet();
   const saved = useOptimisticAction({ name: lane.name, icon: lane.icon ?? '' });
   const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState(false);
   const [name, setName] = useState(lane.name);
   const [icon, setIcon] = useState(lane.icon ?? '');
 
@@ -174,17 +172,7 @@ export function LanePage({
             >
               <Settings aria-hidden size={20} />
             </Link>
-          ) : (
-            <button
-              type="button"
-              aria-label="Profile"
-              data-home-settings
-              onClick={() => setProfile(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
-            >
-              <Settings aria-hidden size={20} />
-            </button>
-          )}
+          ) : null}
         </header>
         {/* No side padding on the scroller itself: the day list's rail is
             sticky to its left edge, and padding there pushed it over the
@@ -210,7 +198,7 @@ export function LanePage({
                 onChange={(event) => setName(event.target.value)}
                 aria-label="Lane name"
                 maxLength={pool ? 40 : 24}
-                className="text-ink w-full max-w-60 rounded-full bg-white px-4 py-2 text-center text-base outline-none"
+                className="surface text-ink w-full max-w-60 rounded-full bg-white px-4 py-2 text-center text-base outline-none"
               />
               <span className="flex gap-4 text-sm">
                 <button
@@ -348,7 +336,6 @@ export function LanePage({
         onPool={pool ? () => router.push(`/pool/${pool.poolId}`) : undefined}
         onCompose={() => openSheet(pool ?? null)}
       />
-      {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
     </div>
   );
 }
