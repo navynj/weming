@@ -869,7 +869,11 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     return set ? Math.round(m.column * set) : auto;
   };
   const size = Math.max(...shown.map((p) => sizeOf(p.path)));
-  const x = draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - size);
+  // Its place is the recipe's: left, or right against the line, for the
+  // recipe's own size (review, 2026-10-27). A size set by hand grows it right
+  // and down from that corner, so a resize never pulls the photo, or the
+  // caption that starts at its left edge, to the left.
+  const x = draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - auto);
   let dy = 0;
   const fan: PhotoCard[] = [];
   // Back to front: the last shown — the newest — is drawn last, on top.
