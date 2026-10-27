@@ -64,9 +64,11 @@ export function poolCards(
 
   const cards: Card[] = [];
   for (const splash of view.splashes) {
-    const blocks = (byPost.get(splash.id) ?? []).sort((a, b) =>
-      a.created_at.localeCompare(b.created_at),
-    );
+    // On someone's record: the owner's ripples and this pool's members' sides
+    // only — another pool's are not this pool's to see (0035).
+    const blocks = (byPost.get(splash.id) ?? [])
+      .filter((r) => !r.thread_pool_id || r.thread_pool_id === view.pool.id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const writer = splash.owner_id ?? splash.created_by;
     const summary: SplashSummary = summarizeSplash(
       splash,
@@ -135,9 +137,23 @@ export function poolCards(
     const author = initialsOf.get(splash.owner_id) ?? '';
     const card = placeCard(summary, bodyOf(thread), timeZone, thread);
     const mine = splash.owner_id === me;
+    // With, in this pool (0035): filled once Everyone or anyone is picked;
+    // the slot waits for the invited who have not written here.
+    const withHere = view.placementTogether?.[splash.id] ?? [];
+    const sides = [...new Set(blocks.map((r) => r.author_id))];
+    const together = Boolean(placement?.inviteAll) || withHere.length > 0;
     cards.push({
       ...card,
       ...photo,
+      ...(together
+        ? {
+            together: true,
+            writers: sides.map((id) => ({ authorId: id, initials: initialsOf.get(id) ?? '' })),
+            awaiting: view.members
+              .filter((m) => !m.former && withHere.includes(m.userId) && !sides.includes(m.userId))
+              .map((m) => ({ authorId: m.userId, initials: m.initials })),
+          }
+        : {}),
       column: kind === 'swimmers' ? splash.owner_id : placement?.poolLaneId,
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,

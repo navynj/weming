@@ -8,6 +8,7 @@ import {
   defaultAudience,
   preselectLane,
   withPick,
+  withTogether,
   type AudiencePick,
 } from '@/features/pool/audience';
 import { AudienceChip } from '@/features/pool/audience-sheet';
@@ -30,6 +31,8 @@ import type { SheetContext } from './splash-sheet';
 type Loaded = Extract<SplashEditState, { ok: true }>;
 
 export type EditLanes = {
+  /** My pool record: With in its pool, when it changed (0035). */
+  ownTogether?: Together | null;
   conversion: Conversion;
   /** Mine from Home: the lane chosen (its declaration). */
   laneId: string | null;
@@ -79,7 +82,12 @@ export function useEditLanes(
 
   // From a pool: the chosen pool lane and Together.
   const [chosenLane, setChosenLane] = useState<string | null>(null);
-  const [together, setTogether] = useState<Together>({ everyone: false, picked: [] });
+  // A joint record: people added. My pool record: With in its pool (0035).
+  const [together, setTogether] = useState<Together>(
+    initial.kind === 'own' && initial.ownTogether
+      ? initial.ownTogether
+      : { everyone: false, picked: [] },
+  );
   const poolLane = chosenLane ?? hereLane;
   // From Home: my lane, the Audience, or (a joint someone else wrote in) a pool lane.
   const [laneId, setLaneId] = useState<string | null>(
@@ -104,13 +112,23 @@ export function useEditLanes(
     const inviteEveryone = adding && together.everyone;
     const invite =
       adding && !together.everyone ? together.picked.filter((id) => !fixed.includes(id)) : [];
+    // My pool record: With in its pool sets who may add their side (0035).
+    const own = initial.kind === 'own';
+    const ownChanged =
+      own &&
+      JSON.stringify({ ...together, picked: [...together.picked].sort() }) !==
+        JSON.stringify({
+          ...(initial.ownTogether ?? { everyone: false, picked: [] }),
+          picked: [...(initial.ownTogether?.picked ?? [])].sort(),
+        });
     return {
       conversion,
       laneId: null,
       shared: initial.sharedIn,
       invite,
       inviteEveryone,
-      changed: conversion.op !== 'none' || invite.length > 0 || inviteEveryone,
+      ownTogether: ownChanged ? together : null,
+      changed: conversion.op !== 'none' || invite.length > 0 || inviteEveryone || ownChanged,
       confirm:
         conversion.op === 'to_joint' && initial.kind !== 'joint'
           ? { pool: pool.poolName, removed }
@@ -125,7 +143,7 @@ export function useEditLanes(
             onTogether={setTogether}
             fixed={fixed}
             fixedEveryone={joint && initial.inviteAll}
-            withTogether={joint}
+            withTogether={joint || initial.kind === 'own'}
           />
           <Notes
             lines={
@@ -177,7 +195,10 @@ export function useEditLanes(
     mine ? setShared(next) : setFresh(next(audience));
   const key = (list: AudiencePick[]): string =>
     list
-      .map((p) => `${p.poolId}:${p.poolLaneId}`)
+      .map(
+        (p) =>
+          `${p.poolId}:${p.poolLaneId}:${p.together?.everyone ? 'all' : [...(p.together?.picked ?? [])].sort().join('+')}`,
+      )
       .sort()
       .join();
   return {
@@ -216,6 +237,7 @@ export function useEditLanes(
                 if (chip) rememberPick(laneId, poolId, chip);
                 setAudience((list) => withPick(list, poolId, chip));
               }}
+              onTogether={(poolId, next) => setAudience((list) => withTogether(list, poolId, next))}
             />
           ) : null}
         </div>

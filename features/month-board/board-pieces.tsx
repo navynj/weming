@@ -531,7 +531,9 @@ export function BoardPieceView({
               </span>
             ) : null}
             {caption}
-            {card.joint ? <Faces card={card} ring={FACE_RING[piece.label]} /> : null}
+            {card.joint || card.together ? (
+              <Faces card={card} ring={FACE_RING[piece.label]} />
+            ) : null}
           </span>
         </span>
         {piece.stickerBox && icon ? (
@@ -593,7 +595,7 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
         {icon ? <span aria-hidden>{icon}</span> : null}
         <span className="min-w-0 truncate">{caption}</span>
         {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
-        {card.joint ? <Faces card={card} ring="ring-joint" /> : null}
+        {card.joint || card.together ? <Faces card={card} ring="ring-joint" /> : null}
       </button>
     </div>
   );

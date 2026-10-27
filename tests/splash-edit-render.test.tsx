@@ -328,7 +328,12 @@ describe('converting from the edit sheet (0022, 0033)', () => {
       { id: 'c-day', name: 'Day', icon: '🖋' },
     ],
     pools: [
-      { id: 'p-ours', name: 'Our Pool', lanes: OUR_LANES },
+      {
+        id: 'p-ours',
+        name: 'Our Pool',
+        lanes: OUR_LANES,
+        members: [{ id: 'u-mina', name: 'Mina', initials: 'MI' }],
+      },
       { id: 'p-other', name: 'Other Pool', lanes: [{ id: 'o-play', name: 'Play', icon: '🃏' }] },
     ],
     links: [
@@ -367,22 +372,31 @@ describe('converting from the edit sheet (0022, 0033)', () => {
   const warnings = (view: ReturnType<typeof render>) =>
     [...view.container.querySelectorAll('[data-edit-warning]')].map((w) => w.textContent);
 
-  it('from a pool: my own records offer no With — they never become joint here', async () => {
-    for (const record of [
-      MINE_SHARED,
+  it('from a pool: my Home record offers no With there; it never becomes joint here', async () => {
+    const view = await sheet(MINE_SHARED, SCOPE);
+    expect(view.container.querySelector('[data-together]')).toBeNull();
+    expect(view.container.querySelector('[data-together-face]')).toBeNull();
+  });
+
+  it('from a pool: my pool record’s With sets who may add their side, never joint (0035)', async () => {
+    const view = await sheet(
       {
         ...MINE_SHARED,
-        kind: 'own' as const,
+        kind: 'own',
         poolId: 'p-ours',
         poolLaneId: 'l-media',
         sharedIn: [],
+        ownTogether: { everyone: false, picked: [] },
       },
-    ]) {
-      const view = await sheet(record, SCOPE);
-      expect(view.container.querySelector('[data-together]')).toBeNull();
-      expect(view.container.querySelector('[data-together-face]')).toBeNull();
-      view.unmount();
-    }
+      SCOPE,
+    );
+    fireEvent.click(face(view, 'u-mina'));
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      conversion: { op: 'none' },
+      ownTogether: { everyone: false, picked: ['u-mina'] },
+    });
+    expect(view.container.querySelector('[data-joint-confirm]')).toBeNull();
   });
 
   it('from a pool: moving my Home record to another pool lane places it there, nothing more', async () => {
@@ -445,6 +459,28 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     expect(saved[0]).toMatchObject({
       conversion: { op: 'set_lane', myLaneId: 'c-day', placeOn: null },
       share: [],
+    });
+  });
+
+  it('from Home: a pool turned on in Audience shows its With; a face picked is saved with it (0035)', async () => {
+    const view = await sheet({ ...MINE_SHARED, shared: [], sharedIn: [] }, null);
+    fireEvent.click(view.container.querySelector('[data-audience-chip]')!);
+    expect(view.container.querySelector('[data-audience-with]')).toBeNull();
+    fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
+    const line = view.container.querySelector('[data-audience-with="p-ours"]')!;
+    expect(line.textContent).toContain('With');
+    expect(line.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(line.querySelector('[data-audience-face="u-mina"]')!);
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      share: [
+        {
+          poolId: 'p-ours',
+          on: true,
+          poolLaneId: 'l-games',
+          together: { everyone: false, picked: ['u-mina'] },
+        },
+      ],
     });
   });
 

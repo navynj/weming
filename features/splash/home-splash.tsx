@@ -5,12 +5,19 @@ import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { orderBlocks } from '@/features/splash/block-day';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
-import { signOwnMedia } from '@/lib/media';
+import { signOwnMedia, signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { audienceFor } from '@/features/pool/audience-for';
-import { getMyLinks, getMyOriginTags, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
+import {
+  getMyLinks,
+  getMyOriginTags,
+  getMyPlacements,
+  getPlacementPicks,
+  getMyPoolNames,
+} from '@/lib/queries/pools';
 import { getRippleResponses } from '@/lib/queries/responses';
 import { getMySplashes } from '@/lib/queries/splashes';
+import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -39,6 +46,7 @@ export async function HomeSplash({ id }: { id: string }) {
   ]);
 
   const board = boards.find((b) => b.id === id) ?? null;
+  const picks = board ? await getPlacementPicks(supabase, board.id) : {};
   // A block whose post I cannot read (a joint splash of a pool I left) reads
   // alone, by its own id, as Home shows it (summarizeAll).
   const lone = board
@@ -48,9 +56,28 @@ export async function HomeSplash({ id }: { id: string }) {
   // never a 404 (review).
   if (!board && !lone) return <SplashGone />;
 
+  // Members' sides on my record, as RLS lets me read them (0035): Home shows
+  // a record with exactly the ripples I can read.
+  const { data: theirs } = board
+    ? await supabase
+        .from('ripples')
+        .select(WITH_CATEGORY)
+        .eq('splash_id', id)
+        .neq('author_id', profile.id)
+        .is('parent_ripple_id', null)
+        .returns<RippleWithCategory[]>()
+    : { data: [] as RippleWithCategory[] };
+  const others = theirs ?? [];
+  const { data: names } = others.length
+    ? await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', [...new Set(others.map((r) => r.author_id))])
+    : { data: [] as { id: string; display_name: string }[] };
+
   // By day inside a range, else as written (0031): a frozen date places nothing.
   const blocks = orderBlocks(
-    board ? ripples.filter((r) => r.splash_id === id) : [lone!],
+    board ? [...ripples.filter((r) => r.splash_id === id), ...others] : [lone!],
     board?.declared_start
       ? { start: board.declared_start, end: board.declared_end ?? board.declared_start }
       : null,
@@ -78,12 +105,34 @@ export async function HomeSplash({ id }: { id: string }) {
     );
 
   // A photo that could not be signed is a placeholder, never a failed page.
+  // Mine by path; someone else's through the ripple, where the check lives.
   const signed = await signOwnMedia(blocks.flatMap((r) => r.media));
-  const photos = Object.fromEntries(
-    blocks
-      .filter((r) => r.media.length > 0)
-      .map((r) => [r.id, r.media.map((path) => signed[path] ?? null)]),
+  const theirPhotos = await Promise.all(
+    others.filter((r) => r.media.length > 0).map(async (r) => [r.id, await signRippleMedia(r.id)]),
   );
+  const photos = {
+    ...Object.fromEntries(
+      blocks
+        .filter((r) => r.media.length > 0 && r.author_id === profile.id)
+        .map((r) => [r.id, r.media.map((path) => signed[path] ?? null)]),
+    ),
+    ...Object.fromEntries(theirPhotos),
+  };
+
+  // A tab per pool once anyone has written a side (0035): the pools it is
+  // shared to, and one switched off that still holds a side, muted.
+  const placed = board ? placements.filter((p) => p.splashId === board.id) : [];
+  const threads =
+    others.length === 0
+      ? []
+      : placed
+          .filter((p) => p.shared || others.some((r) => r.thread_pool_id === p.poolId))
+          .map((p) => ({
+            poolId: p.poolId,
+            label: pools.find((x) => x.id === p.poolId)?.name ?? 'A pool',
+            count: others.filter((r) => r.thread_pool_id === p.poolId).length,
+            off: !p.shared,
+          }));
 
   return (
     <SplashPage
@@ -97,6 +146,8 @@ export async function HomeSplash({ id }: { id: string }) {
       initials={initialsOf(profile.display_name)}
       responses={responses}
       respondable={respondable}
+      threads={threads}
+      initialsOf={Object.fromEntries((names ?? []).map((n) => [n.id, initialsOf(n.display_name)]))}
       poolTags={board ? (tags.get(board.id) ?? []) : []}
       audience={audienceFor({
         board,
@@ -105,6 +156,7 @@ export async function HomeSplash({ id }: { id: string }) {
         links,
         pools,
         placements,
+        picks,
       })}
     />
   );

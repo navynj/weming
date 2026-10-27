@@ -80,7 +80,7 @@ Until then each stays in the database, unread by the app.
 ## Sharing v2, after the switch
 
 - **"Make it joint…" from Home** (SHARING-V2 §5, Home record edit sheet): pick the pool, a pool lane and Together without opening the pool. Today a Home record becomes joint from its edit sheet opened in the pool it is shared to. Needs each pool's members on Home.
-- **Per-pool invitees on my records (0035)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
+- **Per-pool invitees on my records (0035)** (SHARING-V2 §7–8, H28): built, rehearsed, awaiting the push.
 - **After 0035, what remains for sharing:**
   - the 0036 contract (drop list above, with quoted approval);
   - H24 release 2 (`ripples.category_id`), its own migration after 0036 is verified;

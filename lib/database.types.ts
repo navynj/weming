@@ -98,18 +98,21 @@ export type Database = {
       }
       joint_invitees: {
         Row: {
+          id: string
           invited_at: string
           pool_id: string | null
           splash_id: string
           user_id: string
         }
         Insert: {
+          id?: string
           invited_at?: string
           pool_id?: string | null
           splash_id: string
           user_id: string
         }
         Update: {
+          id?: string
           invited_at?: string
           pool_id?: string | null
           splash_id?: string
@@ -748,6 +751,7 @@ export type Database = {
           planned: boolean
           splash_id: string | null
           started_at: string | null
+          thread_pool_id: string | null
           written_on: string
         }
         Insert: {
@@ -765,6 +769,7 @@ export type Database = {
           planned?: boolean
           splash_id?: string | null
           started_at?: string | null
+          thread_pool_id?: string | null
           written_on?: string
         }
         Update: {
@@ -782,6 +787,7 @@ export type Database = {
           planned?: boolean
           splash_id?: string | null
           started_at?: string | null
+          thread_pool_id?: string | null
           written_on?: string
         }
         Relationships: [
@@ -812,6 +818,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "splashes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ripples_thread_placement_fkey"
+            columns: ["splash_id", "thread_pool_id"]
+            isOneToOne: false
+            referencedRelation: "splash_placements"
+            referencedColumns: ["splash_id", "pool_id"]
           },
         ]
       }
@@ -904,6 +917,7 @@ export type Database = {
       splash_placements: {
         Row: {
           created_at: string
+          invite_all: boolean
           origin_pool_lane_icon: string | null
           origin_pool_lane_name: string | null
           origin_pool_name: string | null
@@ -915,6 +929,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          invite_all?: boolean
           origin_pool_lane_icon?: string | null
           origin_pool_lane_name?: string | null
           origin_pool_name?: string | null
@@ -926,6 +941,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          invite_all?: boolean
           origin_pool_lane_icon?: string | null
           origin_pool_lane_name?: string | null
           origin_pool_name?: string | null
@@ -1083,6 +1099,10 @@ export type Database = {
       _board_layout_clear: { Args: { l: Json; paths: string[] }; Returns: Json }
       _board_layout_merge: { Args: { base: Json; patch: Json }; Returns: Json }
       _board_layout_prune: { Args: { l: Json; media: string[] }; Returns: Json }
+      _detach_thread: {
+        Args: { made?: Json; pid: string; sid: string }
+        Returns: undefined
+      }
       _home_lane_for: { Args: { sid: string; uid: string }; Returns: string }
       _inherit_backfill: { Args: never; Returns: undefined }
       _inherit_post_title: { Args: { note: string }; Returns: string }
@@ -1244,6 +1264,32 @@ export type Database = {
         Args: { p_pool_lane: string; p_splash: string }
         Returns: undefined
       }
+      my_thread_ripples: {
+        Args: never
+        Returns: {
+          declared_end: string
+          declared_start: string
+          icon: string
+          owner_id: string
+          pool_id: string
+          pool_lane_icon: string
+          pool_lane_id: string
+          pool_lane_name: string
+          pool_name: string
+          ripple_id: string
+          shared: boolean
+          splash_id: string
+          title: string
+        }[]
+      }
+      placement_together: {
+        Args: { p_splashes: string[] }
+        Returns: {
+          pool_id: string
+          splash_id: string
+          user_id: string
+        }[]
+      }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
       rename_pool: {
         Args: { p_name: string; p_pool: string }
@@ -1275,6 +1321,7 @@ export type Database = {
         Args: { ended: string; started: string }
         Returns: unknown
       }
+      ripple_writable: { Args: { sid: string; tp: string }; Returns: boolean }
       set_board_layout: {
         Args: {
           p_clear?: string[]
@@ -1286,6 +1333,15 @@ export type Database = {
       }
       set_lane_links: {
         Args: { p_links: Json; p_pool: string }
+        Returns: undefined
+      }
+      set_placement_together: {
+        Args: {
+          p_everyone: boolean
+          p_pool: string
+          p_splash: string
+          p_users: string[]
+        }
         Returns: undefined
       }
       set_pool_invite_all: {

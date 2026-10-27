@@ -67,6 +67,7 @@ function splash(over: Partial<Splash> & { id: string }): Splash {
 function ripple(over: Partial<PoolRipple> & { id: string; splash_id: string }): PoolRipple {
   return written({
     author_id: ME,
+    thread_pool_id: null,
     note: 'words',
     media: [],
     occurred_on: '2026-10-21',
@@ -763,6 +764,19 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
     const row = container.querySelector('[data-pill="s-joint"]')!;
     expect(row.hasAttribute('data-joint-pill')).toBe(false);
     expect(row.className).toContain('border-b');
+  });
+
+  it('is a pill for my record with someone with it in this pool, a plain row without (0035)', () => {
+    setView('date');
+    const plain = ground(A);
+    expect(
+      plain.container.querySelector('[data-pill="s-mine"]')!.hasAttribute('data-joint-pill'),
+    ).toBe(false);
+    plain.unmount();
+    const { container } = ground({ ...A, placementTogether: { 's-mine': [MINA] } });
+    expect(container.querySelector('[data-pill="s-mine"]')!.hasAttribute('data-joint-pill')).toBe(
+      true,
+    );
   });
 
   it('is a pill with Everyone on, even in a pool of one (0033)', () => {

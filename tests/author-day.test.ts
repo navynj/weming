@@ -50,6 +50,7 @@ function ripple(
 ): PoolRipple {
   return {
     author_id: 'u-van',
+    thread_pool_id: null,
     note: 'words',
     media: [],
     occurred_on: null,

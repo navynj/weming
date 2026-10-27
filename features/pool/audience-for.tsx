@@ -19,6 +19,7 @@ export function audienceFor({
   links,
   pools,
   placements,
+  picks = {},
 }: {
   board: Splash | null;
   summary: SplashSummary;
@@ -26,6 +27,8 @@ export function audienceFor({
   links: MyLink[];
   pools: AudiencePool[];
   placements: Placement[];
+  /** The faces I picked on it, by pool (0035). */
+  picks?: Record<string, string[]>;
 }): ReactNode {
   if (!board || board.owner_id !== me) return null;
   if (board.own_pool_id) {
@@ -42,7 +45,11 @@ export function audienceFor({
       myLaneId={summary.declaredLaneId ?? representativeLane(summary)}
       shared={placements
         .filter((p) => p.splashId === board.id && p.shared)
-        .map((p) => ({ poolId: p.poolId, poolLaneId: p.poolLaneId }))}
+        .map((p) => ({
+          poolId: p.poolId,
+          poolLaneId: p.poolLaneId,
+          together: { everyone: Boolean(p.inviteAll), picked: picks[p.poolId] ?? [] },
+        }))}
       pools={pools}
       links={links}
     />

@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import type { Annotation } from '@/features/input-sheet/draft';
-import { setPlacement } from '@/features/pool/actions';
-import { getJointInvitees } from '@/lib/queries/pools';
+import { setPlacement, setPlacementTogether } from '@/features/pool/actions';
+import { getJointInvitees, getPlacementPicks } from '@/lib/queries/pools';
 import { updateSplashHeader } from '@/features/splash/actions';
 import { createClient } from '@/lib/supabase/server';
 
@@ -29,8 +29,14 @@ export type SplashEditState =
       /** A pool's own splash (joint, Just mine): its pool's lanes, and the one it is in (0020). */
       poolLanes: { id: string; name: string; icon: string | null }[];
       poolLaneId: string | null;
-      /** Mine: each pool it is shared to now, and on which pool lane (0022). */
-      sharedIn: { poolId: string; poolLaneId: string }[];
+      /** Mine: each pool it is shared to now, on which pool lane (0022), and with whom (0035). */
+      sharedIn: {
+        poolId: string;
+        poolLaneId: string;
+        together: { everyone: boolean; picked: string[] };
+      }[];
+      /** My pool record: who it is with in its pool (0035). */
+      ownTogether: { everyone: boolean; picked: string[] } | null;
       /** Someone else has a ripple here I can see: it cannot become mine (0022). */
       othersWrote: boolean;
       /** A joint record: who it is together with, picked one by one (0033). */
@@ -59,6 +65,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     { data: writers },
     invited,
     { data: allLanes },
+    picks,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -68,11 +75,15 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
       )
       .eq('id', id)
       .maybeSingle(),
-    supabase.from('splash_placements').select('pool_id, pool_lane_id, shared').eq('splash_id', id),
+    supabase
+      .from('splash_placements')
+      .select('pool_id, pool_lane_id, shared, invite_all')
+      .eq('splash_id', id),
     supabase.from('ripples').select('author_id').eq('splash_id', id),
     getJointInvitees(supabase, [id]),
     // RLS: the lanes of pools I am a current member of.
     supabase.from('pool_lanes').select('id, name, icon, pool_id, position').order('position'),
+    getPlacementPicks(supabase, id),
   ]);
   if (!user) return { ok: false, message: 'Sign in again to edit this.' };
   if (!splash) return { ok: false, message: 'That splash is gone.' };
@@ -92,7 +103,11 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     !joint && !splash.own_pool_id
       ? (placements ?? [])
           .filter((p) => p.shared)
-          .map((p) => ({ poolId: p.pool_id, poolLaneId: p.pool_lane_id }))
+          .map((p) => ({
+            poolId: p.pool_id,
+            poolLaneId: p.pool_lane_id,
+            together: { everyone: p.invite_all, picked: picks[p.pool_id] ?? [] },
+          }))
       : [];
   return {
     ok: true,
@@ -110,6 +125,10 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
       .map(({ id: laneId, name, icon }) => ({ id: laneId, name, icon })),
     poolLaneId: splash.pool_lane_id ?? placed?.pool_lane_id ?? null,
     sharedIn,
+    ownTogether:
+      splash.own_pool_id && placed
+        ? { everyone: placed.invite_all, picked: picks[splash.own_pool_id] ?? [] }
+        : null,
     othersWrote: (writers ?? []).some((w) => w.author_id !== user.id),
     invitees: joint ? (invited[id] ?? []) : [],
     inviteAll: splash.joint_invite_all,
@@ -200,10 +219,22 @@ const Edit = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
   declaredLaneId: z.uuid().nullable(),
-  /** Mine only: the pools that changed, each on a pool lane or off (0033). */
+  /** Mine only: the pools that changed, each on a pool lane or off (0033), and With (0035). */
   share: z
-    .array(z.object({ poolId: z.uuid(), on: z.boolean(), poolLaneId: z.uuid().nullable() }))
+    .array(
+      z.object({
+        poolId: z.uuid(),
+        on: z.boolean(),
+        poolLaneId: z.uuid().nullable(),
+        together: z.object({ everyone: z.boolean(), picked: z.array(z.uuid()).max(64) }).optional(),
+      }),
+    )
     .max(24),
+  /** My pool record: With in its pool, when it changed (0035). */
+  ownTogether: z
+    .object({ everyone: z.boolean(), picked: z.array(z.uuid()).max(64) })
+    .nullable()
+    .optional(),
   /** A joint record: members added in Together (0033), or Everyone turned on. */
   invite: z.array(z.uuid()).max(64).default([]),
   inviteEveryone: z.boolean().default(false),
@@ -277,6 +308,15 @@ export async function saveSplashEdit(
     const moved = await movePoolSplash(supabase, edit.id, edit.poolLaneId);
     if (moved) return moved;
   }
+  if (edit.kind === 'own' && edit.ownTogether && edit.poolId && edit.conversion?.op !== 'to_mine') {
+    const withDone = await setPlacementTogether(
+      edit.id,
+      edit.poolId,
+      edit.ownTogether.picked,
+      edit.ownTogether.everyone,
+    );
+    if (!withDone.ok) return { ok: false, message: `Saved, but not with: ${withDone.message}` };
+  }
   revalidatePath('/');
   revalidatePath(`/splash/${edit.id}`);
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
@@ -298,11 +338,20 @@ export async function saveSplashEdit(
 /** Each pool the Audience changed, on its pool lane or off; null when done. */
 async function applyShare(
   id: string,
-  share: { poolId: string; on: boolean; poolLaneId: string | null }[],
+  share: {
+    poolId: string;
+    on: boolean;
+    poolLaneId: string | null;
+    together?: { everyone: boolean; picked: string[] };
+  }[],
 ): Promise<{ ok: false; message: string } | null> {
-  for (const { poolId, on, poolLaneId } of share) {
+  for (const { poolId, on, poolLaneId, together } of share) {
     const done = await setPlacement(id, poolId, on, poolLaneId);
     if (!done.ok) return { ok: false, message: `Saved, but not shared: ${done.message}` };
+    if (on && together) {
+      const withDone = await setPlacementTogether(id, poolId, together.picked, together.everyone);
+      if (!withDone.ok) return { ok: false, message: `Saved, but not with: ${withDone.message}` };
+    }
   }
   return null;
 }

@@ -17,6 +17,7 @@ import {
   defaultAudience,
   preselectLane,
   withPick,
+  withTogether,
   type AudienceLink,
   type AudiencePick,
 } from '@/features/pool/audience';
@@ -470,6 +471,9 @@ export function SplashComposer({
                 if (poolLaneId) rememberPick(laneId, poolId, poolLaneId);
                 setAudienceEdited(withPick(audienceEdited ?? sharedByDefault, poolId, poolLaneId));
               }}
+              onTogether={(poolId, together) =>
+                setAudienceEdited(withTogether(audienceEdited ?? sharedByDefault, poolId, together))
+              }
             />
           ) : null}
         </div>

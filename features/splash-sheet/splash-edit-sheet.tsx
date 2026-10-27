@@ -124,7 +124,14 @@ type Edit = {
   declaredStart: string | null;
   declaredEnd: string | null;
   declaredLaneId: string | null;
-  share: { poolId: string; on: boolean; poolLaneId: string | null }[];
+  share: {
+    poolId: string;
+    on: boolean;
+    poolLaneId: string | null;
+    together?: { everyone: boolean; picked: string[] };
+  }[];
+  /** My pool record: With in its pool, when it changed (0035). */
+  ownTogether: { everyone: boolean; picked: string[] } | null;
   /** A joint record: members added in Together (0033), and Everyone turned on. */
   invite: string[];
   inviteEveryone: boolean;
@@ -157,6 +164,16 @@ function pendingFor(conversion: Conversion, loaded: Loaded): Partial<PendingEdit
     default:
       return {};
   }
+}
+
+/** The same With, picks in any order (0035). */
+function sameTogether(
+  a: { everyone: boolean; picked: string[] } | undefined,
+  b: { everyone: boolean; picked: string[] } | undefined,
+): boolean {
+  const norm = (t?: { everyone: boolean; picked: string[] }) =>
+    t ? `${t.everyone}:${[...t.picked].sort().join()}` : 'false:';
+  return norm(a) === norm(b);
 }
 
 /** The same annotation, compared on what it says. */
@@ -315,16 +332,25 @@ function EditForm({
                 .filter(
                   (pick) =>
                     !initial.sharedIn.some(
-                      (was) => was.poolId === pick.poolId && was.poolLaneId === pick.poolLaneId,
+                      (was) =>
+                        was.poolId === pick.poolId &&
+                        was.poolLaneId === pick.poolLaneId &&
+                        sameTogether(was.together, pick.together),
                     ),
                 )
-                .map((pick) => ({ poolId: pick.poolId, on: true, poolLaneId: pick.poolLaneId })),
+                .map((pick) => ({
+                  poolId: pick.poolId,
+                  on: true,
+                  poolLaneId: pick.poolLaneId,
+                  ...(pick.together ? { together: pick.together } : {}),
+                })),
               ...initial.sharedIn
                 .filter((was) => !shared.some((pick) => pick.poolId === was.poolId))
                 .map((was) => ({ poolId: was.poolId, on: false, poolLaneId: null })),
             ]
           : [],
       invite: lanes.invite,
+      ownTogether: lanes.ownTogether ?? null,
       inviteEveryone: lanes.inviteEveryone,
       poolId: initial.poolId,
       poolLaneId: null,

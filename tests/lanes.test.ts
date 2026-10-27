@@ -163,6 +163,7 @@ describe("the Trail groups by the author's own days", () => {
     return written({
       id: 'r',
       author_id: 'a1',
+      thread_pool_id: null,
       category_id: FOCUS,
       note: 'fixture',
       media: [],

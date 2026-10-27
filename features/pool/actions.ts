@@ -318,14 +318,51 @@ export async function setPlacement(
   return { ok: true };
 }
 
+/**
+ * With, for my record in one pool (0035): Everyone, or the faces picked —
+ * the picks as given, so people may be taken off; one who already wrote
+ * keeps their side.
+ */
+export async function setPlacementTogether(
+  splashId: string,
+  poolId: string,
+  picked: string[],
+  everyone: boolean,
+): Promise<Done> {
+  const parsed = z
+    .object({ splashId: z.uuid(), poolId: z.uuid(), picked: z.array(z.uuid()).max(64) })
+    .safeParse({ splashId, poolId, picked });
+  if (!parsed.success) return { ok: false, message: 'Those people are not valid.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_placement_together', {
+    p_splash: splashId,
+    p_pool: poolId,
+    p_users: picked,
+    p_everyone: everyone,
+  });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  revalidatePath(`/splash/${splashId}`);
+  return { ok: true };
+}
+
 /** A new record's audience, written right after the record (compose). */
 export async function placeNewSplash(
   splashId: string,
-  picks: { poolId: string; poolLaneId: string }[],
+  picks: {
+    poolId: string;
+    poolLaneId: string;
+    together?: { everyone: boolean; picked: string[] };
+  }[],
 ): Promise<Done> {
   for (const pick of picks) {
     const done = await setPlacement(splashId, pick.poolId, true, pick.poolLaneId);
     if (!done.ok) return done;
+    const t = pick.together;
+    if (t && (t.everyone || t.picked.length > 0)) {
+      const withDone = await setPlacementTogether(splashId, pick.poolId, t.picked, t.everyone);
+      if (!withDone.ok) return withDone;
+    }
   }
   return { ok: true };
 }

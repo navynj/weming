@@ -25,6 +25,7 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
   return written({
     id: 'r1',
     author_id: 'a1',
+    thread_pool_id: null,
     category_id: 'c1',
     note: 'kitsilano beach',
     media: [],

@@ -9,7 +9,13 @@ import { orderBlocks } from '@/features/splash/block-day';
 import { summarizeSplash } from '@/features/splash/summary';
 import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { getMyLinks, getMyPlacements, getMyPoolNames, getPoolView } from '@/lib/queries/pools';
+import {
+  getMyLinks,
+  getMyPlacements,
+  getMyPoolNames,
+  getPlacementPicks,
+  getPoolView,
+} from '@/lib/queries/pools';
 import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
 import { getRippleResponses } from '@/lib/queries/responses';
 import { createClient } from '@/lib/supabase/server';
@@ -91,11 +97,17 @@ export async function PoolSplash({
   const laneId = board.pool_lane_id ?? placement?.poolLaneId ?? null;
   const lane = view.lanes.find((l) => l.id === laneId) ?? null;
   const initials = Object.fromEntries(view.members.map((m) => [m.userId, m.initials]));
+  // Someone's record I am invited on in this pool (0035): my side goes here.
+  const invited =
+    !joint &&
+    board.owner_id !== profile.id &&
+    (view.placementTogether?.[sid] ?? []).includes(profile.id);
 
   return (
     <PoolEditScope scope={poolScopeOf(view)}>
       <SplashPage
         writing={writing}
+        sidePool={invited ? id : null}
         // Every member reads it here, so its blocks take reactions and replies (H25).
         responses={responses}
         respondable
@@ -108,7 +120,15 @@ export async function PoolSplash({
         today={todayIn(profile.timezone)}
         initials={initialsOf(profile.display_name)}
         poolTags={lane ? [originTag(view.pool.name, lane.icon, lane.name)] : []}
-        audience={audienceFor({ board, summary, me: profile.id, links, pools, placements })}
+        audience={audienceFor({
+          board,
+          summary,
+          me: profile.id,
+          links,
+          pools,
+          placements,
+          picks: board.owner_id === profile.id ? await getPlacementPicks(supabase, sid) : {},
+        })}
         pool={{
           poolId: id,
           me: profile.id,

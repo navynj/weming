@@ -304,7 +304,7 @@ Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035
 
 ## 8. Plan: 0035, per-pool invitees on my records (for review, 2026-10-26)
 
-Status: **plan approved** (decisions below). It is built after #13 merges, rehearsed, and stopped before the push. It implements §7 as decided, plus Yoonji's additions: pool deletion, members leaving, and the ROADMAP list afterwards.
+Status: **built** on `feat/per-pool-invitees` (0035), rehearsed on the fixture and the production dump, and stopped before the push. It implements §7 as decided, plus Yoonji's additions: pool deletion, members leaving, and the ROADMAP list afterwards.
 
 ### What it does
 - **Audience:** each pool row that is on shows its own With line ("With · Everyone" and that pool's member faces), none picked by default. My pool record gets the same With in its edit sheet, for its one pool.
@@ -362,6 +362,15 @@ Status: **plan approved** (decisions below). It is built after #13 merges, rehea
   - reactions follow the thread's pool.
 - **Render tests:** With in Audience, tabs, slot and fill per pool.
 - **Rehearsal:** the fixture and a fresh production dump. Before and after: every placement and every ripple's visibility to each member is unchanged (no thread ripples exist yet).
+
+### Home visibility (Yoonji, in the session): no new rules, only where things show
+- **Home shows each record with exactly the ripples I can already read.** Nothing is hidden or added because it is Home.
+- **My record:**
+  - the detail shows every pool's thread as tabs;
+  - the stack card shows my ripples first, then others';
+  - one line sums up each pool, faces and counts: "JY · 3 · SY · 2".
+- **A friend's record where I added my side:** it appears on my Home in that pool's column, or my home lane if linked. It shows what that pool sees: the friend's ripples, that pool's members' ripples, and mine. Other pools' threads on it stay invisible to me.
+- **Joint records:** unchanged.
 
 ### Decisions (Yoonji, 2026-10-26)
 1. **Approved,** to be quoted in the migration and its commit: "Approved: drop joint_invitees' primary key (splash_id, user_id) and use a surrogate id with one unique key per use. Production has 0 rows."

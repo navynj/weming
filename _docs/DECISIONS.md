@@ -578,3 +578,16 @@ A member's column in Swimmers opens nothing.
   - Joint → pool record is gone.
 - **Retired:** link directions, "include my earlier records" (`_place_history`), and lane matching on join and create. They are dropped in 0036 with quoted approval; H24's release 2 follows as its own migration.
 
+**H28. Per-pool invitees on my records (0035, 2026-10-26).** Planned in `_docs/SHARING-V2.md` §8, and every decision there is Yoonji's from the session.
+- **With, per pool:** my record shared to a pool can be with that pool's members: Everyone (`splash_placements.invite_all`) or faces picked (`joint_invitees` rows carrying the pool). It is set in Audience per pool row, and for my pool record in its edit sheet.
+- **Sides:** the invited add their side there. It carries the pool (`ripples.thread_pool_id`) and is read only by that pool's current members and by me. My own ripples are read in every pool the record is shared to.
+- **Switched off:** a placement holding members' ripples is switched off, never deleted, and the database holds that rule. That pool no longer reads them; I still do, in a muted "<Pool> (off)" tab; each author always reads their own. Switching it on again brings them back.
+- **Deleted:** deleting my record, or the pool, returns members' ripples to their authors as a post of one per (record, author), titled like the record, in a lane made from the pool lane.
+- **Leaving:** a leaver's ripples follow keep-or-remove, like their placements.
+- **Refused while members have written:** Move to Home and "Make it a joint record of…".
+- **Home:** each record shows exactly the ripples I can read.
+  - My record: tabs per pool in the detail; on the stack card, my ripples first, then a per-pool line ("JY · 3 · SY · 2"). Filled once any pool has someone with it.
+  - A friend's record I wrote on sits in that pool's column, or my home lane, and shows what that pool sees.
+  - Joint records are unchanged.
+- **Destructive DDL, approved and quoted in the migration:** `joint_invitees`' primary key moved to a surrogate `id`.
+
