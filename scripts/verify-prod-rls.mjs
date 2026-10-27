@@ -45,7 +45,10 @@ const TABLES = [
  */
 const NIL = '00000000-0000-0000-0000-000000000000';
 const FUNCTIONS = [
-  ['set_board_layout', { p_splash: NIL, p_pool: null, p_patch: {}, p_clear: [] }],
+  [
+    'set_board_layout',
+    { p_splash: NIL, p_pool: null, p_patch: {}, p_clear: [], p_view: 'calendar' },
+  ],
   ['splash_in_pool', { sid: NIL, pid: NIL }],
   ['board_layout_valid', { l: {} }],
   ['_layout_group', { g: {}, kind: 'label' }],
@@ -63,8 +66,9 @@ const FUNCTIONS = [
   ['delete_reply', { p_reply: NIL }],
   ['hide_reply', { p_reply: NIL, p_hidden: true }],
   ['ripple_replies_for', { p_ripples: [NIL] }],
-  ['splash_reaction_summary', { p_splashes: [NIL] }],
-  ['splash_reply_preview', { p_splashes: [NIL] }],
+  // Production's applied migrations (0046): the service role's alone, for
+  // Vercel's Ignored Build Step; never anyone signed out or in.
+  ['applied_migrations', {}],
 ];
 
 /** Env first, then .env.local, so this runs against whatever is linked. */
