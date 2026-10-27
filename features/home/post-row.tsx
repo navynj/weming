@@ -51,11 +51,12 @@ export function PostRow({
       data-dived={current ? undefined : ''}
       data-ring={ring !== null ? '' : undefined}
       onClick={() => onPick(card.splash.id)}
-      data-joint-pill={card.joint ? '' : undefined}
-      // A joint splash's row is one pill across the whole row (review), so the
-      // Date view shows it is the pool's; every other row keeps its faint line.
+      data-joint-pill={card.together ? '' : undefined}
+      // A record with invitees is one pill across the whole row (review,
+      // 0033), so the Date view shows it is shared work; every other row
+      // keeps its faint line.
       className={`flex w-full min-w-0 items-center gap-3 text-left text-white ${
-        card.joint
+        card.together
           ? // The joint surface, solid (JOINT_SURFACE), as on the band.
             'bg-joint my-1 rounded-full py-1.5 pr-3 pl-1.5'
           : 'border-b border-white/15 py-2.5'

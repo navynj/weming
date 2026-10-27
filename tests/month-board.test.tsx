@@ -249,7 +249,7 @@ const BUSY: Card[] = [
       'x',
     ][at % 5];
     const c = card(`b${String(at).padStart(2, '0')}`, title, day, { photos: at % 7 === 3 ? 2 : 0 });
-    return at % 4 === 1 ? { ...c, joint: true } : c;
+    return at % 4 === 1 ? { ...c, joint: true, together: true } : c;
   }),
   card('span1', 'A long weekend', '2026-10-02', {
     over: { declared_start: '2026-10-02', declared_end: '2026-10-06' },
@@ -576,7 +576,9 @@ describe('three recipes, always readable (review)', () => {
     const layout = layoutWeekBoard(WEEK, TODAY, { width: 728 });
     const bare = layout.pieces.find((p) => p.label === 'none' && p.recipe === 'A');
     if (bare) expect([bare.pad.top, bare.pad.bottom]).toEqual([4, 4]);
-    const joint = layoutWeekBoard([{ ...WEEK[0], joint: true }], TODAY, { width: 728 }).pieces[0];
+    const joint = layoutWeekBoard([{ ...WEEK[0], joint: true, together: true }], TODAY, {
+      width: 728,
+    }).pieces[0];
     expect(joint.pad.top).toBe(6);
     expect(joint.pad.bottom).toBeGreaterThanOrEqual(6);
     expect([joint.pad.left, joint.pad.right]).toEqual([8, 8]);
@@ -675,6 +677,7 @@ describe('fills: what is the pool’s own (review)', () => {
   const JOINTS = ['j1', 'j2', 'j3'].map((id) => ({
     ...card(id, `Joint ${id}`, '2026-10-21'),
     joint: true,
+    together: true,
   }));
 
   it('never fills a splash that is not joint — Just mine, shared, photo captions — and always fills a joint one', () => {
@@ -694,11 +697,22 @@ describe('fills: what is the pool’s own (review)', () => {
     ).toMatch(/bg-(white|ink)/);
   });
 
+  it('fills by invitees, not by owner: a joint record with nobody else invited stays unfilled (0033)', () => {
+    const alone: Card = { ...card('alone', 'Alone', '2026-10-19'), joint: true, together: false };
+    const layout = layoutWeekBoard([alone], TODAY, { width: 728 });
+    expect(layout.pieces[0].label).toBe('none');
+    const { container } = board([alone]);
+    expect(
+      container.querySelector('[data-board-piece="alone"] [data-board-label]')!.className,
+    ).not.toMatch(/bg-/);
+  });
+
   it('fills a joint splash with a single ripple, and one waiting on a member, wherever it is drawn (Home included)', () => {
     // The pool's own, one ripple by someone else, me not yet written: Add your side.
     const lone: Card = {
       ...card('test', 'Test', '2026-10-19'),
       joint: true,
+      together: true,
       href: '/pool/p-a/splash/test',
       writers: [{ authorId: 'u-mk', initials: 'MK' }],
       awaiting: [{ authorId: ME, initials: 'YL' }],
@@ -869,6 +883,7 @@ describe('an open joint splash (meaning is shape)', () => {
   const joint = (awaiting: { authorId: string; initials: string }[]): Card => ({
     ...card('jam', 'Jam session', '2026-10-21'),
     joint: true,
+    together: true,
     href: '/pool/p-a/splash/jam',
     writers: [{ authorId: 'u-mk', initials: 'MK' }],
     awaiting,
@@ -1030,6 +1045,7 @@ describe('a pool’s splash on Home (review)', () => {
   const joint: Card = {
     ...card('ours', 'Ours', '2026-10-21'),
     joint: true,
+    together: true,
     writers: [{ authorId: 'u-mk', initials: 'MK' }],
   };
 
@@ -1057,6 +1073,7 @@ describe('a pool’s splash on Home (review)', () => {
     const pieces = [0, 1, 2, 3, 4, 5].map((at) => ({
       ...card(`g${at}`, 'Grand Austria Hotel + Waltz', '2026-10-21'),
       joint: true,
+      together: true,
       pools: ['Our Pool'],
       poolPhoto: null,
     }));
@@ -1181,6 +1198,7 @@ describe('the stacking order (review)', () => {
   const joint = (awaiting: { authorId: string; initials: string }[]): Card => ({
     ...card('jam', 'Jam session', '2026-10-21'),
     joint: true,
+    together: true,
     href: '/pool/p-a/splash/jam',
     writers: [{ authorId: 'u-mk', initials: 'MK' }],
     awaiting,

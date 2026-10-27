@@ -114,7 +114,10 @@ export async function HomeScreen({
   // Who has written on each joint splash and which invitees have not (0033),
   // for its faces and its open slot on the Board. A pool I left shows neither
   // anyone else's ripples nor its members: only my own face, no slot.
-  const jointFaces = new Map<string, { writers: CardFace[]; awaiting: CardFace[] }>();
+  const jointFaces = new Map<
+    string,
+    { together: boolean; writers: CardFace[]; awaiting: CardFace[] }
+  >();
   if (joints.length > 0) {
     const [{ data: wrote }, { data: members }, together] = await Promise.all([
       supabase
@@ -146,6 +149,8 @@ export async function HomeScreen({
       ];
       const current = (members ?? []).filter((m) => m.pool_id === j.pool_id).map((m) => m.user_id);
       jointFaces.set(j.id, {
+        // Filled once someone besides its maker is invited (0033).
+        together: (together[j.id] ?? []).some((id) => id !== j.created_by),
         writers: writers.map(face),
         // Together's slots (0033): who it is with now, less those who wrote.
         awaiting: (together[j.id] ?? [])

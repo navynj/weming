@@ -226,6 +226,7 @@ describe('the Layout panel (review)', () => {
     media(true);
     const joint = card('j1', 'Ours', '2026-10-21', {
       joint: true,
+      together: true,
       layout: { label: { y: 1 } },
       layoutSource: 'home',
       poolLayout: { label: { y: -1 } },
@@ -243,7 +244,7 @@ describe('a label’s width and style in the panel (review)', () => {
   it('widens the label as Width moves, and swaps a joint label’s fill as Style is picked; Auto hands it back', async () => {
     vi.useFakeTimers();
     media(true);
-    const { container } = home([{ ...ONE[0], joint: true, layoutSource: 'pool' }]);
+    const { container } = home([{ ...ONE[0], joint: true, together: true, layoutSource: 'pool' }]);
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
     const label = () =>
       container.querySelector<HTMLElement>('[data-board-piece="s1"] [data-board-label]')!;
@@ -407,7 +408,7 @@ describe('hand-set layouts on the calendar (review)', () => {
 
   it('draws a joint label’s hand-set fill; a label with no fill stays so', () => {
     for (const style of ['white', 'ink'] as const) {
-      const joint = { ...ONE[0], joint: true, layout: { label: { style } } };
+      const joint = { ...ONE[0], joint: true, together: true, layout: { label: { style } } };
       expect(layoutWeekBoard([joint], TODAY, { width: 980 }).pieces[0].label).toBe(style);
     }
     const plain = { ...ONE[0], layout: { label: { style: 'ink' as const } } };
