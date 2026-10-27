@@ -13,7 +13,7 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 ];
 
 /**
- * My theme (0032, H26; 0036): twelve colours and a mode — Dark, Light, or
+ * My theme (0032, H26; 0036): eleven colours and a mode — Dark, Light, or
  * Pastel (the colour's pastel as the ground, a soft grey on it). A choice shows at once
  * everywhere and saves behind it (CLAUDE.md, the principle); a refusal takes
  * it back and says why. Dark is the colour as the water with white on it;
@@ -45,7 +45,7 @@ export function ThemePicker() {
               onClick={() => void pick({ ...theme, color: t.key })}
               className={`h-9 w-9 justify-self-center rounded-full ${on ? 'ring-ink ring-2 ring-offset-2' : ''}`}
               // In pastel mode each swatch shows its pastel (0036).
-              style={{ backgroundColor: theme.mode === 'pastel' ? t.pastel.fill : t.hex }}
+              style={{ backgroundColor: theme.mode === 'pastel' ? t.pastel : t.hex }}
             />
           );
         })}

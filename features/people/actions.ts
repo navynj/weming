@@ -66,7 +66,7 @@ const themeInput = z.object({
 /** Saves my theme (0032): one colour and a mode, on my profile alone. */
 export async function saveTheme(raw: z.input<typeof themeInput>): Promise<ProfileSaved> {
   const parsed = themeInput.safeParse(raw);
-  if (!parsed.success) return { ok: false, message: 'That theme is not one of the twelve.' };
+  if (!parsed.success) return { ok: false, message: 'That theme is not one of the eleven.' };
   const supabase = await createClient();
   const {
     data: { user },
