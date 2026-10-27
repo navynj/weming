@@ -553,5 +553,5 @@ A member's column in Swimmers opens nothing.
 - **Taps:** a reply or *+n* opens the post's sheet scrolled to that reply; the card body opens the post. A reaction chip reacts in place, optimistically. The picker floats over the page, so the card's clip never cuts it.
 - **Fixed height:** the card never grows. What does not fit fades out over its last 32px into the card's own colour, with no inner scroll; everything lives in the detail sheet, which is unchanged from H25. On a phone the same content is usually cut by the fade, and that is expected.
 - **Unchanged:** the peeking cards on the upper and lower stair; the unseen dot beside a thread avatar; the pool's *new since last visit* dot.
-- **Removed with the board's:** the 0030 functions `splash_reaction_summary` and `splash_reply_preview` are no longer called by the app. They stay in the database, unread, until a migration removes them with approval.
+- **Removed with the board's:** the 0030 functions `splash_reaction_summary` and `splash_reply_preview` are no longer called by the app. They stay in the database, unread, on the drop list of the next migration (Sharing model v2, ROADMAP), where their removal asks for approval.
 

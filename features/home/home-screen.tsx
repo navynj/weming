@@ -27,7 +27,8 @@ import {
 import { effectiveLayout } from '@/features/month-board/board-layout';
 import { getHomeLayouts } from '@/lib/queries/layouts';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
-import { getLockedIds, getResponsesOnMine, getRippleResponses } from '@/lib/queries/responses';
+import { getResponsesOnMine } from '@/lib/queries/responses';
+import { sharedSplashIds, withResponded } from '@/features/home/responded';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -266,20 +267,10 @@ export async function HomeScreen({
     profile.id,
     joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! })),
   );
-  // What readers left (H25), only where someone besides me can see the post:
-  // a pool's own, or one shared to a pool.
-  const sharedIds = new Set([
-    ...joints.map((j) => j.id),
-    ...mine.flatMap((s) => (s.own_pool_id ? [s.id] : [])),
-    ...(await getMyPlacements(supabase, profile.id)).flatMap((p) => (p.shared ? [p.splashId] : [])),
-  ]);
-  // Everything on the ripples a top card reads, and my locked ones among them.
-  const answerable = cards.flatMap((c) =>
-    sharedIds.has(c.splash.id) ? c.ripples.map((r) => r.id) : [],
-  );
-  const [responded, locked, respondedAt] = await Promise.all([
-    getRippleResponses(supabase, answerable),
-    getLockedIds(supabase, answerable),
+  // What readers left (H25), only where someone besides me can see the post.
+  const sharedIds = await sharedSplashIds(supabase, profile.id, mine, joints);
+  const [answered, respondedAt] = await Promise.all([
+    withResponded(supabase, cards, sharedIds),
     getResponsesOnMine(
       supabase,
       profile.id,
@@ -288,23 +279,8 @@ export async function HomeScreen({
       ),
     ),
   ]);
-  const laid = cards.map((read) => {
-    const ids = new Set(read.ripples.map((r) => r.id));
-    const card: Card = {
-      ...read,
-      ...(sharedIds.has(read.splash.id)
-        ? {
-            responded: {
-              value: {
-                reactions: responded.reactions.filter((r) => ids.has(r.ripple_id)),
-                replies: responded.replies.filter((r) => ids.has(r.ripple_id)),
-              },
-              locked,
-            },
-          }
-        : {}),
-      respondedAt: respondedAt[read.splash.id],
-    };
+  const laid = answered.map((read) => {
+    const card: Card = { ...read, respondedAt: respondedAt[read.splash.id] };
     const pooled = layouts.pool[card.splash.id] ?? null;
     const { layout, source } = effectiveLayout(layouts.home[card.splash.id], pooled);
     return source

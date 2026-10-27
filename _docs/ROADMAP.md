@@ -64,6 +64,17 @@ A pool whose creator's account is gone (`owner_id` null) cannot be deleted for n
 - Splash pool-wide (H20d): the compound pool pill, the joint ripples filter, the sharing record carrying `pool_lane_id`; participants on ripples
 - Swim: FAB entry + lane long-press, live intruding card, focus screen = enlarged lane card + my timer, nothing more. **The dormant live modules (Timer, now band, focus screen, Break, inner ripples) wake here** (H20b)
 
+## Next migration: Sharing model v2 — drop list
+
+Destructive DDL waits for this migration, and each line needs Yoonji's explicit approval there, quoted in the migration and its commit (CLAUDE.md, "Data is real now").
+
+| Drop | From | Why it goes |
+| --- | --- | --- |
+| `public.splash_reaction_summary(uuid[])` | 0030 | Fed the board's reactions badge, removed the same day (amends H25); the app no longer calls it |
+| `public.splash_reply_preview(uuid[])` | 0030 | Fed the board's reply lines, removed with the badge; the app no longer calls it |
+
+Until then both stay in the database, unread, granted to signed-in users only (0030).
+
 ## Later, unscheduled
 
 Home Weekly zoom; one year ago today; background auto-collection (timeline autofill; Spotify first); Lists UI and multi-pool routing settings; notifications (Splash opened / Swim started / Link request only, max 2/day); Splash-born ephemeral pools; open/searchable pools; desktop score layout + ambient window; couple weekly grouping on Splash; recurrence engine; note-convention parsing; photo book export; dark mode (night pool); TTL setting UI (instant/1d/3d/7d).

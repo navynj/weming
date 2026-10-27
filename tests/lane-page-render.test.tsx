@@ -35,7 +35,7 @@ vi.mock('@/features/lanes/actions', () => ({
   },
 }));
 
-import { byNewest, placeCard } from '@/features/home/grid';
+import { byNewest, placeCard, type Card } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
 import { summarizeSplash, type SplashBlock } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
@@ -338,5 +338,62 @@ describe('a post moved to another pool lane (0020, review)', () => {
     );
     expect(container.querySelector('[data-lane-post="ramen"]')).toBeNull();
     expect(container.querySelector('[data-lane-post="soup"]')).not.toBeNull();
+  });
+});
+
+describe('the top card on a lane’s page reads responses, as Home does (H25, review)', () => {
+  it('shows each ripple’s reaction chips and its first two replies, then "+n"', () => {
+    const shared: Card = {
+      ...CARDS[0],
+      ripples: [{ id: 'noodles-b', note: 'noodles', createdAt: '2026-10-12T16:00:00.000Z' }],
+      responded: {
+        value: {
+          reactions: [
+            {
+              ripple_id: 'noodles-b',
+              user_id: 'u-mina',
+              emoji: '❤️',
+              created_at: '2026-10-13T01:00:00Z',
+            },
+          ],
+          replies: ['first', 'second', 'third'].map((body, i) => ({
+            id: `re-${i}`,
+            ripple_id: 'noodles-b',
+            author_id: 'u-mina',
+            body,
+            created_at: `2026-10-13T0${i + 2}:00:00Z`,
+            edited_at: null,
+            hidden: false,
+            former: false,
+          })),
+        },
+        locked: [],
+      },
+    };
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={[shared, ...CARDS.slice(1)]} />
+      </InputSheetProvider>,
+    );
+    const top = container.querySelector('[data-lane-stack] [data-stack-card][data-slot="0"]')!;
+    const responses = top.querySelector('[data-card-responses="noodles-b"]')!;
+    expect(responses.querySelector('[data-reaction="❤️"]')!.textContent).toContain('1');
+    expect([...responses.querySelectorAll('[data-card-reply]')].map((r) => r.textContent)).toEqual([
+      'first',
+      'second',
+    ]);
+    expect(responses.querySelector('[data-card-replies-more]')!.getAttribute('href')).toBe(
+      '/splash/noodles#reply-re-2',
+    );
+  });
+
+  it('offers none on a post nobody else reads', () => {
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
+    const top = container.querySelector('[data-lane-stack] [data-stack-card][data-slot="0"]')!;
+    expect(top.querySelector('[data-card-responses]')).toBeNull();
   });
 });

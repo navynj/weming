@@ -12,7 +12,9 @@ import { LanePage } from '@/features/lanes/lane-page';
 import { jointLaneFor } from '@/features/pool/direction';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { sharedSplashIds, withResponded } from '@/features/home/responded';
 import { getJointSplashes, getMyLinks, getMyPoolNames } from '@/lib/queries/pools';
+import { getResponsesOnMine } from '@/lib/queries/responses';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -97,12 +99,26 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
       return summary.orphan ? card : { ...card, editable: true };
     })
     .sort(byNewest);
+  // What readers left (H25), on the posts others can read, as on Home: the
+  // top card's chips and first replies, and the unseen dots.
+  const shared = await sharedSplashIds(supabase, profile.id, mine, joints);
+  const [answered, respondedAt] = await Promise.all([
+    withResponded(supabase, cards, shared),
+    getResponsesOnMine(
+      supabase,
+      profile.id,
+      ripples.flatMap((r) =>
+        r.splash_id && shared.has(r.splash_id) ? [{ id: r.id, splashKey: r.splash_id }] : [],
+      ),
+    ),
+  ]);
+  const read = answered.map((card) => ({ ...card, respondedAt: respondedAt[card.splash.id] }));
 
   return (
     <main className="water-ground flex h-dvh min-h-0 flex-col">
       <LanePage
         lane={lane}
-        cards={cards}
+        cards={read}
         categories={categories}
         initials={initialsOf(profile.display_name)}
         topParam={typeof top === 'string' ? top : null}
