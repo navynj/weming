@@ -30,7 +30,11 @@ function said(message: string): string {
       : message;
 }
 
-const NewBlock = Block.extend({ splashId: z.uuid() });
+const NewBlock = Block.extend({
+  splashId: z.uuid(),
+  /** My side on someone's record, in the pool I write it in (0035). */
+  threadPoolId: z.uuid().nullable().optional(),
+});
 
 /**
  * Writes a block onto its post (H24): its words, its photos, its post. Its
@@ -38,7 +42,7 @@ const NewBlock = Block.extend({ splashId: z.uuid() });
  * day inside it (0031), and nowhere else — the database refuses one that
  * tries (0029, 0031).
  */
-export async function addBlock(input: z.infer<typeof NewBlock>): Promise<CommitResult> {
+export async function addBlock(input: z.input<typeof NewBlock>): Promise<CommitResult> {
   const parsed = NewBlock.safeParse(input);
   if (!parsed.success) return { ok: false, reason: 'error', message: 'That block is incomplete.' };
   const block = parsed.data;
@@ -55,6 +59,7 @@ export async function addBlock(input: z.infer<typeof NewBlock>): Promise<CommitR
     note: block.note.length > 0 ? block.note : null,
     media: block.media,
     splash_id: block.splashId,
+    ...(block.threadPoolId ? { thread_pool_id: block.threadPoolId } : {}),
     ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
   });
   if (error) return { ok: false, reason: 'error', message: said(error.message) };

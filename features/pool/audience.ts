@@ -11,8 +11,14 @@ export type AudienceLink = MarkedLink & {
   poolName: string;
 };
 
-/** One pool a record is shared to, and on which of its lanes. */
-export type AudiencePick = { poolId: string; poolLaneId: string };
+/** Who my record is with in one pool (0035): Everyone, or faces picked. */
+export type PickTogether = { everyone: boolean; picked: string[] };
+
+/** One pool a record is shared to, on which of its lanes, and with whom there. */
+export type AudiencePick = { poolId: string; poolLaneId: string; together?: PickTogether };
+
+/** Nobody picked, Everyone off: the default With (0035). */
+export const NOBODY: PickTogether = { everyone: false, picked: [] };
 
 /** "Only me", the pool's name, or "N pools". */
 export function audienceLabel(poolNames: string[]): string {
@@ -57,6 +63,23 @@ export function withPick(
   poolId: string,
   poolLaneId: string | null,
 ): AudiencePick[] {
+  const was = audience.find((a) => a.poolId === poolId);
   const rest = audience.filter((a) => a.poolId !== poolId);
-  return poolLaneId ? [...rest, { poolId, poolLaneId }] : rest;
+  return poolLaneId
+    ? [...rest, { poolId, poolLaneId, ...(was?.together ? { together: was.together } : {}) }]
+    : rest;
+}
+
+/** The audience with one pool's With set (0035). */
+export function withTogether(
+  audience: AudiencePick[],
+  poolId: string,
+  together: PickTogether,
+): AudiencePick[] {
+  return audience.map((a) => (a.poolId === poolId ? { ...a, together } : a));
+}
+
+/** Whether a pick's With names anyone (Everyone, or a face). */
+export function invitesAnyone(together: PickTogether | undefined): boolean {
+  return Boolean(together && (together.everyone || together.picked.length > 0));
 }

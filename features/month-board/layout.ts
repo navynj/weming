@@ -287,7 +287,7 @@ function draw(id: string, salt: string, buckets: number): number {
 
 /** A joint splash still waiting on a current member: its label carries the open slot (meaning is shape). */
 export function isOpenJoint(card: Card): boolean {
-  return card.joint === true && (card.awaiting?.length ?? 0) > 0;
+  return (card.joint === true || card.together === true) && (card.awaiting?.length ?? 0) > 0;
 }
 
 export function captionOf(card: Card): string {
@@ -498,7 +498,7 @@ function linesIn(card: Card, textW: number, indent: number, icon: boolean, ctx: 
   const chars = Math.max(2, Math.floor(textW / charW));
   const length =
     [...captionOf(card)].length +
-    (card.joint ? FACES_CHARS : 0) +
+    (card.joint || card.together ? FACES_CHARS : 0) +
     (icon ? ICON_CHARS : 0) +
     Math.ceil(indent / charW);
   return Math.min(m.caption.lines, Math.max(1, Math.ceil(length / chars)));

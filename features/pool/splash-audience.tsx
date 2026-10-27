@@ -2,8 +2,14 @@
 
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
-import { setPlacement } from './actions';
-import { preselectLane, withPick, type AudienceLink, type AudiencePick } from './audience';
+import { setPlacement, setPlacementTogether } from './actions';
+import {
+  preselectLane,
+  withPick,
+  withTogether,
+  type AudienceLink,
+  type AudiencePick,
+} from './audience';
 import { AudienceChip, type AudiencePool } from './audience-sheet';
 import { lastPicked, rememberPick } from './last-pick';
 
@@ -49,6 +55,12 @@ export function SplashAudience({
             () => setPlacement(splashId, poolId, poolLaneId !== null, poolLaneId),
           );
         }}
+        onTogether={(poolId, together) =>
+          audience.run(
+            (current) => withTogether(current, poolId, together),
+            () => setPlacementTogether(splashId, poolId, together.picked, together.everyone),
+          )
+        }
       />
       {audience.message ? (
         <span role="alert" className="text-pool-500 text-[10px]">

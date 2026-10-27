@@ -66,6 +66,7 @@ function ripple(id: string, author: string, note: string): RippleWithCategory {
   return {
     id,
     author_id: author,
+    thread_pool_id: null,
     category_id: author === ME ? 'c-media' : null,
     note,
     media: [],

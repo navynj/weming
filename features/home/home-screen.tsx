@@ -24,13 +24,20 @@ import {
   getJointTogether,
   getMyPlacements,
   getMyPoolNames,
+  getMyThreadRipples,
+  getPlacementTogether,
+  type MyThreadRipple,
 } from '@/lib/queries/pools';
 import { effectiveLayout } from '@/features/month-board/board-layout';
 import { getHomeLayouts } from '@/lib/queries/layouts';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getResponsesOnMine } from '@/lib/queries/responses';
 import { sharedSplashIds, withResponded } from '@/features/home/responded';
+import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
 import { getMyTrail } from '@/lib/queries/trail';
+import { originTag } from '@/features/pool/origin-tag';
+import { poolSplashHref } from '@/features/pool/pool-cards';
+import type { Splash } from '@/features/splash/summary';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 import { signPoolPhotos } from '@/lib/avatars';
@@ -91,17 +98,66 @@ export async function HomeScreen({
     getMyJointShells(supabase, profile.id),
   ]);
   const joints = [...written, ...made.filter((shell) => !written.some((j) => j.id === shell.id))];
-  const boards = [...mine, ...joints];
-  const summaries = summarizeSplashes(boards, ripples, profile.timezone, now);
+  // Friends' records I added my side to (0035): each in the pool I wrote it
+  // in, as that pool sees it; the record row read while it is shared there,
+  // else kept from my side's own reading, "no longer shared".
+  const myThreads = await getMyThreadRipples(supabase);
+  const threadOf = new Map(myThreads.map((t) => [t.splashId, t]));
+  const friendIds = [...threadOf.keys()];
+  const { data: friendRows } = friendIds.length
+    ? await supabase.from('splashes').select('*').in('id', friendIds)
+    : { data: [] as Splash[] };
+  const friends: Splash[] = friendIds.map(
+    (id) => (friendRows ?? []).find((row) => row.id === id) ?? fromThread(threadOf.get(id)!),
+  );
+  const friendIdSet = new Set(friendIds);
+  // Every ripple I can read on my records and theirs (0035): Home shows a
+  // record with exactly those. On a friend's, only the pool I wrote in.
+  const { data: theirRows } =
+    mine.length + friendIds.length > 0
+      ? await supabase
+          .from('ripples')
+          .select(WITH_CATEGORY)
+          .in('splash_id', [...mine.map((s) => s.id), ...friendIds])
+          .neq('author_id', profile.id)
+          .is('parent_ripple_id', null)
+          .returns<RippleWithCategory[]>()
+      : { data: [] as RippleWithCategory[] };
+  const theirs = (theirRows ?? []).filter((r) => {
+    const friend = r.splash_id ? threadOf.get(r.splash_id) : undefined;
+    return !friend || !r.thread_pool_id || r.thread_pool_id === friend.poolId;
+  });
+  const { data: theirNames } = theirs.length
+    ? await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', [...new Set(theirs.map((r) => r.author_id))])
+    : { data: [] as { id: string; display_name: string }[] };
+  const initialsBy = new Map((theirNames ?? []).map((n) => [n.id, initialsOf(n.display_name)]));
+  const boards = [...mine, ...joints, ...friends];
+  const summaries = summarizeSplashes(boards, [...ripples, ...theirs], profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
   // A joint entry sits in my home lane for its pool lane, else in its pool's
   // column (H24, 0033): derived from my marker, never a ripple.
   const linkedLane = new Map(joints.map((j) => [j.id, homeLaneFor(j.pool_lane_id, links)]));
   // My pool records too (0033): the home lane for the pool lane they are on.
-  const myPlacements = mine.some((s) => s.own_pool_id)
-    ? await getMyPlacements(supabase, profile.id)
-    : [];
+  const myPlacements = mine.length > 0 ? await getMyPlacements(supabase, profile.id) : [];
+  // With, per pool, on my records (0035): filled on Home once any pool has
+  // someone with it.
+  const withByPool = await getPlacementTogether(
+    supabase,
+    mine.map((s) => s.id),
+  );
+  const filledMine = new Set(
+    mine
+      .filter(
+        (s) =>
+          myPlacements.some((p) => p.splashId === s.id && p.inviteAll) ||
+          Object.values(withByPool[s.id] ?? {}).some((ids) => ids.length > 0),
+      )
+      .map((s) => s.id),
+  );
   const ownLane = new Map(
     mine.flatMap((s) => {
       const at = myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
@@ -184,6 +240,8 @@ export async function HomeScreen({
         s.own_pool_id && (ownHome.get(s.id) ?? null) === null ? [s.own_pool_id] : [],
       ),
       ...joints.flatMap((j) => ((linkedLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
+      // A friend's record sits in the pool's column, or my home lane (0035).
+      ...myThreads.flatMap((t) => (homeLaneFor(t.poolLaneId, links) === null ? [t.poolId] : [])),
     ]),
   ];
   const ownLaneIcon = new Map<string, string | null>();
@@ -218,18 +276,39 @@ export async function HomeScreen({
 
   // A card's ripples: its blocks with words or photos, oldest first — the
   // top card shows each one's photos under its words. A lone block's is its own.
+  // Mine first, then others' (0035), each oldest first.
   const threads = new Map<string, CardRipple[]>();
-  for (const ripple of [...ripples].reverse()) {
+  const othersOldest = [...theirs].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  for (const ripple of [...[...ripples].reverse(), ...othersOldest]) {
     if (!ripple.note && ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
-    const entry = { id: ripple.id, note: ripple.note ?? '', createdAt: ripple.created_at };
+    const theirsToo = ripple.author_id !== profile.id;
+    const entry = {
+      id: ripple.id,
+      note: ripple.note ?? '',
+      createdAt: ripple.created_at,
+      ...(theirsToo
+        ? { authorId: ripple.author_id, initials: initialsBy.get(ripple.author_id) ?? '' }
+        : {}),
+    };
     const list = threads.get(key);
     if (list) list.push(entry);
     else threads.set(key, [entry]);
   }
+  // My record's sides, a line per pool: its members' ripples there (0035).
+  const sidesOf = new Map<string, { label: string; count: number }[]>();
+  for (const r of theirs) {
+    if (!r.splash_id || !r.thread_pool_id || !mineIds.has(r.splash_id)) continue;
+    const list = sidesOf.get(r.splash_id) ?? [];
+    const label = poolName.get(r.thread_pool_id) ?? 'A pool';
+    const at = list.find((x) => x.label === label);
+    if (at) at.count += 1;
+    else list.push({ label, count: 1 });
+    sidesOf.set(r.splash_id, list);
+  }
   // A card's photos, for the Board view: every image across its ripples, oldest first.
   const photos = new Map<string, CardPhoto[]>();
-  for (const ripple of [...ripples].reverse()) {
+  for (const ripple of [...[...ripples].reverse(), ...othersOldest]) {
     if (ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
     const list = photos.get(key) ?? [];
@@ -250,7 +329,32 @@ export async function HomeScreen({
         ...placed,
         ...(pictured ? { photos: pictured } : {}),
         ...jointFaces.get(summary.id),
+        ...(filledMine.has(summary.id) ? { together: true } : {}),
+        ...(sidesOf.has(summary.id) ? { sides: sidesOf.get(summary.id) } : {}),
       };
+      const friend = friendIdSet.has(summary.id) ? threadOf.get(summary.id) : undefined;
+      if (friend) {
+        // Someone's record I wrote on in one pool (0035): that pool's, read as
+        // it reads it, opening there while shared; never mine to pin or edit.
+        const home = homeLaneFor(friend.poolLaneId, links);
+        const name = friend.poolName ?? 'A pool you left';
+        return {
+          ...card,
+          column: home ?? ownPoolColumn(friend.poolId),
+          pools: friend.poolName ? [friend.poolName] : [],
+          poolPhoto: columnPhotos[friend.poolId] ?? null,
+          href: friend.shared ? poolSplashHref(friend.poolId, friend.splashId) : undefined,
+          menu: { pin: false, delete: false },
+          editable: false,
+          ...(home || !friend.poolLane ? {} : { lane: { icon: friend.poolLane.icon, name } }),
+          origins: [
+            ...(friend.poolLane
+              ? [originTag(name, friend.poolLane.icon, friend.poolLane.name)]
+              : []),
+            ...(friend.shared ? [] : ['No longer shared']),
+          ],
+        };
+      }
       if (summary.ownPoolId) {
         // No badge: the column header says where it lives.
         const home = ownHome.get(summary.id) ?? null;
@@ -335,4 +439,29 @@ export async function HomeScreen({
       />
     </main>
   );
+}
+
+/** A friend's record I can no longer read, from my side's own reading of it (0035). */
+function fromThread(t: MyThreadRipple): Splash {
+  return {
+    id: t.splashId,
+    owner_id: t.ownerId,
+    title: t.title,
+    icon: t.icon,
+    declared_start: t.declaredStart,
+    declared_end: t.declaredEnd,
+    declared_lane_id: null,
+    session_id: null,
+    pinned_at: null,
+    pool_id: null,
+    pool_lane_id: null,
+    own_pool_id: null,
+    joint_invite_all: false,
+    created_by: null,
+    type: 'free',
+    prompt: null,
+    ends_at: null,
+    created_at: new Date(0).toISOString(),
+    written_on: t.declaredStart ?? new Date(0).toISOString().slice(0, 10),
+  };
 }

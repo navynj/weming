@@ -3,14 +3,21 @@
 import { useState } from 'react';
 import { Users } from 'lucide-react';
 
-import type { PoolLaneChip } from '@/lib/queries/pools';
+import { usePeople } from '@/features/people/people-provider';
+import type { PoolFace, PoolLaneChip } from '@/lib/queries/pools';
 
-import { audienceLabel, type AudiencePick } from './audience';
+import { audienceLabel, NOBODY, type AudiencePick, type PickTogether } from './audience';
+import { WithLine } from './with-line';
 import { Switch } from './lane-match';
 import { PoolSheet, SheetTitle } from './sheet';
 
-/** A pool I am in, with its lanes: one row in Audience. */
-export type AudiencePool = { id: string; name: string; lanes: PoolLaneChip[] };
+/** A pool I am in, with its lanes and members: one row in Audience. */
+export type AudiencePool = {
+  id: string;
+  name: string;
+  lanes: PoolLaneChip[];
+  members?: PoolFace[];
+};
 
 /**
  * The Audience chip (H23, 0033): one compact chip beside the lane picker in
@@ -23,6 +30,7 @@ export function AudienceChip({
   pools,
   preselect,
   onChange,
+  onTogether,
 }: {
   /** Where the record is shared now: a pool lane per pool. */
   shared: AudiencePick[];
@@ -32,6 +40,8 @@ export function AudienceChip({
   preselect: (poolId: string) => string | null;
   /** A pool on a pool lane, or off (null). */
   onChange: (poolId: string, poolLaneId: string | null) => void;
+  /** With, per pool that is on (0035); absent, no With line. */
+  onTogether?: (poolId: string, together: PickTogether) => void;
 }) {
   const [open, setOpen] = useState(false);
   const on = shared.filter((pick) => pools.some((p) => p.id === pick.poolId));
@@ -53,6 +63,7 @@ export function AudienceChip({
           shared={on}
           preselect={preselect}
           onChange={onChange}
+          onTogether={onTogether}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -102,14 +113,17 @@ function AudienceSheet({
   shared,
   preselect,
   onChange,
+  onTogether,
   onClose,
 }: {
   pools: AudiencePool[];
   shared: AudiencePick[];
   preselect: (poolId: string) => string | null;
   onChange: (poolId: string, poolLaneId: string | null) => void;
+  onTogether?: (poolId: string, together: PickTogether) => void;
   onClose: () => void;
 }) {
+  const { me } = usePeople();
   // Turned on with no chip to start on: shown on, shared only once picked.
   const [waiting, setWaiting] = useState<string[]>([]);
   const laneOf = (poolId: string): string | null =>
@@ -177,6 +191,15 @@ function AudienceSheet({
                       );
                     })}
                   </span>
+                ) : null}
+                {/* With, in this pool (0035): once it sits on a pool lane. */}
+                {lane && onTogether ? (
+                  <WithLine
+                    poolId={pool.id}
+                    faces={(pool.members ?? []).filter((m) => m.id !== me)}
+                    together={shared.find((p) => p.poolId === pool.id)?.together ?? NOBODY}
+                    onChange={(next) => onTogether(pool.id, next)}
+                  />
                 ) : null}
               </li>
             );

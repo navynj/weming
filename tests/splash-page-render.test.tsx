@@ -68,6 +68,7 @@ const LANES = [
 function block(over: Partial<RippleWithCategory> & { id: string }): RippleWithCategory {
   return written({
     author_id: 'a1',
+    thread_pool_id: null,
     category_id: 'c-place',
     note: 'fixture',
     media: [],
@@ -483,5 +484,33 @@ describe('a block read alone: its post is a joint splash of a pool I left (H23, 
     expect(queryByText('Drop your words here')).toBeNull();
     expect(container.querySelector('[data-add-slot]')).toBeNull();
     expect(queryByLabelText('Edit the title')).toBeNull();
+  });
+});
+
+describe('my record’s sides, a tab per pool (0035)', () => {
+  it('shows my ripples and the chosen pool’s members’, the off pool muted', () => {
+    const theirs = [
+      block({ id: 'side-a', author_id: 'u-mina', note: 'from Crew', thread_pool_id: 'p-crew' }),
+      block({ id: 'side-b', author_id: 'u-jae', note: 'from Club', thread_pool_id: 'p-club' }),
+    ];
+    const { container, getByRole } = page({
+      blocks: [...blocks, ...theirs],
+      threads: [
+        { poolId: 'p-crew', label: 'Crew', count: 1, off: false },
+        { poolId: 'p-club', label: 'Club', count: 1, off: true },
+      ],
+      initialsOf: { 'u-mina': 'MI', 'u-jae': 'JA' },
+    });
+    const tabs = [...container.querySelectorAll('[data-thread-tab]')].map((t) => t.textContent);
+    expect(tabs).toEqual(['Crew · 1', 'Club (off)']);
+    expect(container.querySelector('[data-thread-tab="p-club"]')!.hasAttribute('data-off')).toBe(
+      true,
+    );
+    const shown = () => container.querySelector('[data-blocks]')!.textContent ?? '';
+    expect(shown()).toContain('from Crew');
+    expect(shown()).not.toContain('from Club');
+    fireEvent.click(getByRole('tab', { name: 'Club (off)' }));
+    expect(shown()).toContain('from Club');
+    expect(shown()).not.toContain('from Crew');
   });
 });

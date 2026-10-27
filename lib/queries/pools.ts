@@ -34,6 +34,7 @@ export type PoolRipple = Pick<
   | 'category_id'
   | 'written_on'
   | 'started_at'
+  | 'thread_pool_id'
 >;
 
 export type PoolMember = {
@@ -61,6 +62,8 @@ export type Placement = {
   poolId: string;
   poolLaneId: string;
   shared: boolean;
+  /** With · Everyone in that pool (0035). */
+  inviteAll?: boolean;
 };
 
 export type PoolView = {
@@ -85,6 +88,8 @@ export type PoolView = {
   invites: PoolInvite[];
   /** Who each joint record here is together with now (0033). */
   together?: Record<string, string[]>;
+  /** Who each record of someone's, shared here, is with in this pool now (0035). */
+  placementTogether?: Record<string, string[]>;
   /** The calendar's layouts its members set, by splash (0025). */
   layouts?: Record<string, BoardLayoutJson>;
   /** What readers left on every ripple here, for the top card (H25), and my locked ones. */
@@ -95,7 +100,7 @@ export type PoolView = {
 };
 
 const RIPPLE_COLUMNS =
-  'id, author_id, splash_id, note, media, occurred_on, occurred_time, ended_at, created_at, category_id, written_on, started_at';
+  'id, author_id, splash_id, note, media, occurred_on, occurred_time, ended_at, created_at, category_id, written_on, started_at, thread_pool_id';
 
 type MemberRow = {
   pool_id: string;
@@ -242,7 +247,7 @@ export async function getPoolView(
       .order('created_at'),
     supabase
       .from('splash_placements')
-      .select('splash_id, pool_id, pool_lane_id, shared, splash:splashes(*)')
+      .select('splash_id, pool_id, pool_lane_id, shared, invite_all, splash:splashes(*)')
       .eq('pool_id', poolId)
       .returns<
         {
@@ -250,6 +255,7 @@ export async function getPoolView(
           pool_id: string;
           pool_lane_id: string;
           shared: boolean;
+          invite_all: boolean;
           splash: Splash | null;
         }[]
       >(),
@@ -318,6 +324,7 @@ export async function getPoolView(
       poolId: p.pool_id,
       poolLaneId: p.pool_lane_id,
       shared: p.shared,
+      inviteAll: p.invite_all,
       ownerId: p.splash!.owner_id ?? '',
     })),
     splashes,
@@ -326,6 +333,14 @@ export async function getPoolView(
     together: await getJointTogether(
       supabase,
       (joints.data ?? []).map((j) => j.id),
+    ),
+    placementTogether: Object.fromEntries(
+      Object.entries(
+        await getPlacementTogether(
+          supabase,
+          shown.map((p) => p.splash_id),
+        ),
+      ).map(([id, byPool]) => [id, byPool[poolId] ?? []]),
     ),
     layouts: await getPoolLayouts(supabase, poolId),
     responded: await getRippleResponses(
@@ -389,6 +404,9 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
 /** A pool's lane as Audience offers it: emoji and name (0033). */
 export type PoolLaneChip = { id: string; name: string; icon: string | null };
 
+/** A current member as With offers them: a face (0035). */
+export type PoolFace = { id: string; name: string; initials: string };
+
 /**
  * The pools I am in now, by name, with their lanes in order: the Audience
  * sheet's rows and chips, and Home's monograms.
@@ -396,7 +414,15 @@ export type PoolLaneChip = { id: string; name: string; icon: string | null };
 export async function getMyPoolNames(
   supabase: DuringClient,
   me: string,
-): Promise<{ id: string; name: string; photoVersion: number | null; lanes: PoolLaneChip[] }[]> {
+): Promise<
+  {
+    id: string;
+    name: string;
+    photoVersion: number | null;
+    lanes: PoolLaneChip[];
+    members: PoolFace[];
+  }[]
+> {
   const { data, error } = await supabase
     .from('pool_members')
     .select('pool:pools(id, name, photo_version, lanes:pool_lanes(id, name, icon, position))')
@@ -414,6 +440,10 @@ export async function getMyPoolNames(
       }[]
     >();
   if (error) throw error;
+  const members = await membersOf(
+    supabase,
+    data.flatMap((row) => (row.pool ? [row.pool.id] : [])),
+  );
   return data.flatMap((row) =>
     row.pool
       ? [
@@ -424,10 +454,83 @@ export async function getMyPoolNames(
             lanes: [...(row.pool.lanes ?? [])]
               .sort((a, b) => a.position - b.position)
               .map(({ id, name, icon }) => ({ id, name, icon })),
+            members: members
+              .filter((m) => m.pool_id === row.pool!.id && m.left_at === null)
+              .map(toMember)
+              .map((m) => ({ id: m.userId, name: m.name, initials: m.initials })),
           },
         ]
       : [],
   );
+}
+
+/**
+ * Who each of these records is with, pool by pool (0035,
+ * `placement_together`): every current member under Everyone, else the
+ * picked ones still there; never its owner. RLS-shaped: the owner reads
+ * all; a member, the pools they are in while shared.
+ */
+export async function getPlacementTogether(
+  supabase: DuringClient,
+  splashIds: string[],
+): Promise<Record<string, Record<string, string[]>>> {
+  if (splashIds.length === 0) return {};
+  const { data, error } = await supabase.rpc('placement_together', { p_splashes: splashIds });
+  if (error) throw error;
+  const by: Record<string, Record<string, string[]>> = {};
+  for (const row of data ?? []) ((by[row.splash_id] ??= {})[row.pool_id] ??= []).push(row.user_id);
+  return by;
+}
+
+/** The faces I picked on my record, pool by pool (0035): the rows, not Everyone. */
+export async function getPlacementPicks(
+  supabase: DuringClient,
+  splashId: string,
+): Promise<Record<string, string[]>> {
+  const { data, error } = await supabase
+    .from('joint_invitees')
+    .select('pool_id, user_id')
+    .eq('splash_id', splashId)
+    .not('pool_id', 'is', null);
+  if (error) throw error;
+  const by: Record<string, string[]> = {};
+  for (const row of data) if (row.pool_id) (by[row.pool_id] ??= []).push(row.user_id);
+  return by;
+}
+
+/** My own ripples on others' records (0035), with what Home shows them under. */
+export type MyThreadRipple = {
+  rippleId: string;
+  splashId: string;
+  ownerId: string;
+  title: string;
+  icon: string | null;
+  declaredStart: string | null;
+  declaredEnd: string | null;
+  poolId: string;
+  poolName: string | null;
+  poolLaneId: string;
+  poolLane: { name: string; icon: string | null } | null;
+  shared: boolean;
+};
+
+export async function getMyThreadRipples(supabase: DuringClient): Promise<MyThreadRipple[]> {
+  const { data, error } = await supabase.rpc('my_thread_ripples');
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    rippleId: r.ripple_id,
+    splashId: r.splash_id,
+    ownerId: r.owner_id,
+    title: r.title,
+    icon: r.icon,
+    declaredStart: r.declared_start,
+    declaredEnd: r.declared_end,
+    poolId: r.pool_id,
+    poolName: r.pool_name,
+    poolLaneId: r.pool_lane_id,
+    poolLane: r.pool_lane_name ? { name: r.pool_lane_name, icon: r.pool_lane_icon } : null,
+    shared: r.shared,
+  }));
 }
 
 /**
@@ -471,7 +574,7 @@ export async function getMyPlacements(supabase: DuringClient, me: string): Promi
   const { data, error } = await supabase
     .from('splash_placements')
     .select(
-      'splash_id, pool_id, pool_lane_id, shared, splash:splashes!inner(owner_id), pool:pools(id)',
+      'splash_id, pool_id, pool_lane_id, shared, invite_all, splash:splashes!inner(owner_id), pool:pools(id)',
     )
     .eq('splash.owner_id', me)
     .returns<
@@ -480,6 +583,7 @@ export async function getMyPlacements(supabase: DuringClient, me: string): Promi
         pool_id: string;
         pool_lane_id: string;
         shared: boolean;
+        invite_all: boolean;
         pool: { id: string } | null;
       }[]
     >();
@@ -491,6 +595,7 @@ export async function getMyPlacements(supabase: DuringClient, me: string): Promi
       poolId: row.pool_id,
       poolLaneId: row.pool_lane_id,
       shared: row.shared,
+      inviteAll: row.invite_all,
     }));
 }
 

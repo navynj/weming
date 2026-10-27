@@ -180,6 +180,25 @@ export function CardFace({
             ))}
           </span>
         ) : null}
+        {card.sides && card.sides.length > 0 ? (
+          // Each pool's side on my record, in one line (0035).
+          <span
+            data-card-sides
+            className="text-pool-500 flex flex-wrap items-center gap-x-2 text-[10px]/tight"
+          >
+            {card.sides.map((side, at) => (
+              <span
+                key={side.label}
+                data-card-side={side.label}
+                className="flex items-center gap-1"
+              >
+                {at > 0 ? <span aria-hidden>·</span> : null}
+                <Monogram name={side.label} size="chip" />
+                <span className="tabular-nums">{side.count}</span>
+              </span>
+            ))}
+          </span>
+        ) : null}
         {/* Fixed height, no inner scroll: what does not fit fades out (review). */}
         <span data-card-body className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Each ripple an entry of its own, threaded avatar to avatar (round 3). */}

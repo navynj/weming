@@ -11,6 +11,7 @@ function session(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
   return written({
     id: 'sess',
     author_id: 'a1',
+    thread_pool_id: null,
     category_id: 'c1',
     note: 'long afternoon',
     media: [],

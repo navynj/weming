@@ -813,7 +813,9 @@ describe('writing', () => {
     const { error } = await asUser(ben)
       .from('ripples')
       .insert({ author_id: ben, note: 'mine?', splash_id: ANA_OLD_POST });
-    expect(error?.code).toBe('42501');
+    // Refused: with no pool named, the thread rule says so first (0035);
+    // naming one he is not invited in, RLS does (per-pool-invitees-db).
+    expect(error?.code).toBe('23514');
   });
 
   it('lets members write into a joint splash, and only members', async () => {

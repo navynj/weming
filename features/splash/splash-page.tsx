@@ -97,6 +97,9 @@ export function SplashPage({
   writing = false,
   responses = NO_RESPONSES,
   respondable = false,
+  threads = [],
+  initialsOf = {},
+  sidePool = null,
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -120,9 +123,19 @@ export function SplashPage({
   responses?: RippleResponsesValue;
   /** Someone besides me can see it, so its blocks take reactions and replies (H25). */
   respondable?: boolean;
+  /**
+   * My record on Home, shared to pools whose members wrote (0035): a tab per
+   * pool, each my ripples and that pool's members'; off placements muted.
+   */
+  threads?: { poolId: string; label: string; count: number; off: boolean }[];
+  /** Initials by author, for others' ripples read on Home (0035). */
+  initialsOf?: Record<string, string>;
+  /**
+   * Someone's record I am invited on in this pool (0035): I may add my side,
+   * written in this pool.
+   */
+  sidePool?: string | null;
 }) {
-  // Mine to edit: everything off a pool; in one, my own ripples only.
-  const editable = (block: RippleWithCategory): boolean => !pool || block.author_id === pool.me;
   const scope = pool?.scope ?? 'mine';
   const orphan = splash.orphan;
   const router = useRouter();
@@ -131,6 +144,9 @@ export function SplashPage({
   // Inside the splash sheet (review): a delete closes it over the screen beneath.
   const closeSheet = useCloseSplash();
   const { me } = usePeople();
+  // Mine to edit: my own ripples only — on Home others' are read there too (0035).
+  const editable = (block: RippleWithCategory): boolean =>
+    pool ? block.author_id === pool.me : !me || block.author_id === me;
   const answered = useRippleResponses(responses);
   // Opened at a reply from the board: its block's replies open in full (H25).
   const openedAt = useOpenedAt();
@@ -155,6 +171,13 @@ export function SplashPage({
   const [editor, setEditor] = useState<EditorTarget | null>(() =>
     writing && !splash.orphan ? { kind: 'add', splashId: splash.id } : null,
   );
+  // Tabs per pool on my record (0035): the first opens.
+  const [tab, setTab] = useState<string | null>(threads[0]?.poolId ?? null);
+  // Which blocks show: in a pool, the owner's and that pool's members'; on
+  // Home with tabs, the owner's and the tab's; else every one I can read.
+  const shownPool = pool ? pool.poolId : threads.length > 0 ? tab : null;
+  const showsBlock = (block: RippleWithCategory): boolean =>
+    !block.thread_pool_id || shownPool === null || block.thread_pool_id === shownPool;
   const {
     value: page,
     run,
@@ -246,6 +269,7 @@ export function SplashPage({
         // Mine, written now: today in my zone, as the trigger will store it.
         written_on: today,
         parent_ripple_id: null,
+        thread_pool_id: sidePool,
         splash_id: target.splashId,
         category: null,
         splash: {
@@ -268,6 +292,7 @@ export function SplashPage({
             note: draft.note,
             media: draft.media,
             splashId: target.splashId,
+            ...(sidePool ? { threadPoolId: sidePool } : {}),
             ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
           }),
         ),
@@ -374,80 +399,113 @@ export function SplashPage({
       </div>
 
       <div data-splash-blocks className="flex flex-col lg:pt-3">
+        {threads.length > 0 ? (
+          // A tab per pool whose members wrote on my record (0035).
+          <div
+            role="tablist"
+            data-thread-tabs
+            className="no-scrollbar flex gap-2 overflow-x-auto pb-2"
+          >
+            {threads.map((t) => (
+              <button
+                key={t.poolId}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.poolId}
+                data-thread-tab={t.poolId}
+                data-off={t.off ? '' : undefined}
+                onClick={() => setTab(t.poolId)}
+                className={`h-8 shrink-0 rounded-full px-3 text-sm ${
+                  tab === t.poolId ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
+                } ${t.off ? 'opacity-50' : ''}`}
+              >
+                {t.off ? `${t.label} (off)` : `${t.label} · ${t.count}`}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {/* Each block an entry of its own, threaded avatar to avatar (round 3). */}
         <div data-blocks className="py-2">
           <RippleThread
             initials={initials}
             // By day inside a range, then as written (0031).
-            entries={orderBlocks(page.blocks, page.splash.declaredRange).map((block) => ({
-              id: block.id,
-              // Each ripple keeps its author in a pool (H23).
-              initials: pool ? (pool.initialsOf[block.author_id] ?? '') : undefined,
-              authorId: block.author_id,
-              // Something new from someone else on my ripple since I last opened it (H25).
-              dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
-              body: (
-                <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
-                  {editor?.kind === 'edit' && editor.block.id === block.id ? (
-                    <BlockEditor
-                      target={editor}
-                      range={page.splash.declaredRange}
-                      today={today}
-                      onSubmit={(draft) => saveBlock(editor, draft)}
-                      onDelete={() => removeBlock(block)}
-                      onLock={(locked) => lockBlock(block, locked)}
-                      onCancel={() => setEditor(null)}
-                    />
-                  ) : (
-                    <>
-                      <BlockView
-                        block={block}
+            entries={orderBlocks(page.blocks.filter(showsBlock), page.splash.declaredRange).map(
+              (block) => ({
+                id: block.id,
+                // Each ripple keeps its author in a pool (H23), and on Home
+                // someone else's on my record (0035).
+                initials: pool
+                  ? (pool.initialsOf[block.author_id] ?? '')
+                  : block.author_id !== me && initialsOf[block.author_id]
+                    ? initialsOf[block.author_id]
+                    : undefined,
+                authorId: block.author_id,
+                // Something new from someone else on my ripple since I last opened it (H25).
+                dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
+                body: (
+                  <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
+                    {editor?.kind === 'edit' && editor.block.id === block.id ? (
+                      <BlockEditor
+                        target={editor}
                         range={page.splash.declaredRange}
-                        photos={photos[block.id] ?? []}
-                        clock={
-                          pool
-                            ? authorClock(
-                                block.started_at ?? block.created_at,
-                                timeZone,
-                                pool.zoneOf[block.author_id] ?? timeZone,
-                              )
-                            : null
-                        }
-                        timeZone={timeZone}
                         today={today}
-                        onEdit={
-                          editable(block)
-                            ? () =>
-                                setEditor({
-                                  kind: 'edit',
-                                  block,
-                                  locked: page.lockedIds.includes(block.id),
-                                })
-                            : undefined
-                        }
+                        onSubmit={(draft) => saveBlock(editor, draft)}
+                        onDelete={() => removeBlock(block)}
+                        onLock={(locked) => lockBlock(block, locked)}
+                        onCancel={() => setEditor(null)}
                       />
-                      <RippleResponses
-                        rippleId={block.id}
-                        rippleAuthor={block.author_id}
-                        value={answered.value}
-                        canRespond={respondable && !page.lockedIds.includes(block.id)}
-                        expanded={isExpanded(block.id)}
-                        onExpand={() => setExpanded((ids) => [...ids, block.id])}
-                        onReact={(emoji) => answered.react(block.id, emoji)}
-                        on={answered.handlers(block.id)}
-                      />
-                    </>
-                  )}
-                </div>
-              ),
-            }))}
+                    ) : (
+                      <>
+                        <BlockView
+                          block={block}
+                          range={page.splash.declaredRange}
+                          photos={photos[block.id] ?? []}
+                          clock={
+                            pool
+                              ? authorClock(
+                                  block.started_at ?? block.created_at,
+                                  timeZone,
+                                  pool.zoneOf[block.author_id] ?? timeZone,
+                                )
+                              : null
+                          }
+                          timeZone={timeZone}
+                          today={today}
+                          onEdit={
+                            editable(block)
+                              ? () =>
+                                  setEditor({
+                                    kind: 'edit',
+                                    block,
+                                    locked: page.lockedIds.includes(block.id),
+                                  })
+                              : undefined
+                          }
+                        />
+                        <RippleResponses
+                          rippleId={block.id}
+                          rippleAuthor={block.author_id}
+                          value={answered.value}
+                          canRespond={respondable && !page.lockedIds.includes(block.id)}
+                          expanded={isExpanded(block.id)}
+                          onExpand={() => setExpanded((ids) => [...ids, block.id])}
+                          onReact={(emoji) => answered.react(block.id, emoji)}
+                          on={answered.handlers(block.id)}
+                        />
+                      </>
+                    )}
+                  </div>
+                ),
+              }),
+            )}
           />
         </div>
 
         {/* The add slot: the seat of the next block, at the bottom where the
           story continues. The ring ripples as the one invitation (law 3). */}
-        {/* Someone else's splash takes no words of mine (review). */}
-        {scope === 'theirs' || orphan ? null : (
+        {/* Someone else's splash takes no words of mine (review), unless I
+          am invited on it in this pool (0035). */}
+        {(scope === 'theirs' && !sidePool) || orphan ? null : (
           <div data-add-slot className="border-pool-100 mt-2 border-t pt-4 pb-10">
             {editor?.kind === 'add' ? (
               <BlockEditor
