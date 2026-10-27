@@ -209,7 +209,7 @@ describe('a pool layout', () => {
       { label: { colour: 'red' } },
       { icon: { inline: 'yes' } },
       { label: { width: 0.2 } },
-      { label: { width: 2.5 } },
+      { label: { width: 4.5 } },
       { label: { style: 'blue' } },
       { label: { style: 'none' } },
       { label: { style: 1 } },
@@ -230,10 +230,11 @@ describe('a pool layout', () => {
     ).toBeNull();
   });
 
-  it('takes the far ends of the widened ranges and a hidden photo, and clears them (0044)', async () => {
+  it('takes the far ends of the widened ranges and a hidden photo, and clears them (0044, 0050)', async () => {
     const far = {
       icon: { size: 8, x: -3, y: 20, tilt: 45 },
-      label: { x: 3, y: -20, tilt: -45 },
+      // A label's width to four column widths: the board's width handle (0050).
+      label: { x: 3, y: -20, tilt: -45, width: 4 },
       photos: { [PHOTO_A]: { size: 2, x: 3, y: -20, tilt: 45, hidden: true } },
       wave: { on: true, span: 4, x: -3, y: 20 },
     };
