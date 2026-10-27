@@ -12,6 +12,7 @@ import {
   type PoolPick,
   type Together,
 } from './pool-pick';
+import { WithFace } from './with-face';
 
 export type { PoolPick } from './pool-pick';
 
@@ -108,20 +109,16 @@ export function PoolLanePicker({
                 const on = picked.includes(member.id);
                 const kept = fixedEveryone || fixed.includes(member.id);
                 return (
-                  <button
+                  <WithFace
                     key={member.id}
-                    type="button"
-                    aria-pressed={on}
-                    aria-label={member.name}
-                    data-together-face={member.id}
+                    id={member.id}
+                    name={member.name}
+                    initials={member.initials}
+                    on={on}
                     disabled={kept || togetherLocked !== null}
-                    onClick={() => change(toggleFace(together, member.id, otherIds))}
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold disabled:cursor-default ${
-                      on ? 'bg-ink text-white' : 'bg-pool-100 text-pool-500'
-                    }`}
-                  >
-                    {member.initials}
-                  </button>
+                    onToggle={() => change(toggleFace(together, member.id, otherIds))}
+                    data="together"
+                  />
                 );
               })}
             </div>

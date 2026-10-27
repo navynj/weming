@@ -3,6 +3,7 @@
 import type { PoolFace } from '@/lib/queries/pools';
 
 import { Switch } from './lane-match';
+import { WithFace } from './with-face';
 import { toggleEveryone, toggleFace, type Together } from './pool-pick';
 
 /**
@@ -45,19 +46,15 @@ export function WithLine({
           {faces.map((face) => {
             const on = picked.includes(face.id);
             return (
-              <button
+              <WithFace
                 key={face.id}
-                type="button"
-                aria-pressed={on}
-                aria-label={face.name}
-                data-audience-face={face.id}
-                onClick={() => onChange(toggleFace(together, face.id, ids))}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                  on ? 'bg-ink text-white' : 'bg-pool-100 text-pool-500'
-                }`}
-              >
-                {face.initials}
-              </button>
+                id={face.id}
+                name={face.name}
+                initials={face.initials}
+                on={on}
+                onToggle={() => onChange(toggleFace(together, face.id, ids))}
+                data="audience"
+              />
             );
           })}
         </div>
