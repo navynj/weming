@@ -21,6 +21,7 @@ import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
 import { BoardPieceView, BoardTapeView } from './board-pieces';
+import { boardPhotos } from './board-layout';
 import { useBoardSpan, type BoardSpan } from './board-span';
 import {
   addDays,
@@ -136,13 +137,26 @@ export function MonthBoard({
   const [tall, setTall] = useState<number | null>(null);
   // The words' lines as the browser wrapped them, fed back so every label hugs them (review).
   const [measured, setMeasured] = useState<Measured>({});
+  // A photo hidden from the board (0044) is not on it: with every one hidden,
+  // the post is drawn as one with no photos (the sticker's recipe).
+  const drawn = useMemo(
+    () =>
+      cards.map((card) =>
+        card.photos?.length ? { ...card, photos: boardPhotos(card.photos, card.layout) } : card,
+      ),
+    [cards],
+  );
   // Same data, same width, same page, same board: laid out once per each.
   const layout = useMemo(
     () =>
       span === 'week'
-        ? layoutWeekBoard(cards, week, { width: room ?? 980, measured })
-        : layoutMonthBoard(cards, month, { width: room ?? 980, fill: tall ?? undefined, measured }),
-    [cards, span, week, month, room, tall, measured],
+        ? layoutWeekBoard(drawn, week, { width: room ?? 980, measured })
+        : layoutMonthBoard(drawn, month, {
+            width: room ?? 980,
+            fill: tall ?? undefined,
+            measured,
+          }),
+    [drawn, span, week, month, room, tall, measured],
   );
   const { metrics } = layout;
 
@@ -190,6 +204,41 @@ export function MonthBoard({
   }, [layout, measured]);
   const photos = useBoardPhotos(layout.pieces);
   const scroller = useRef<HTMLDivElement>(null);
+
+  // A part pushed by hand past the board's edge (0044) stays on it: the board
+  // takes room on that side, read from what was drawn. Rounded up to a step,
+  // so a bob in progress does not move it.
+  const [bleed, setBleed] = useState<Bleed>(NO_BLEED);
+  useLayoutEffect(() => {
+    const el = canvas.current;
+    if (!el) return;
+    const frame = requestAnimationFrame(() => {
+      const edge = el.getBoundingClientRect();
+      let next = NO_BLEED;
+      for (const part of el.querySelectorAll<HTMLElement | SVGElement>('[data-board-moved] *')) {
+        const r = part.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;
+        next = {
+          top: Math.max(next.top, edge.top - r.top),
+          right: Math.max(next.right, r.right - edge.right),
+          bottom: Math.max(next.bottom, r.bottom - (edge.top + layout.height)),
+          left: Math.max(next.left, edge.left - r.left),
+        };
+      }
+      const room: Bleed = {
+        top: stepUp(next.top),
+        right: stepUp(next.right),
+        bottom: stepUp(next.bottom),
+        left: stepUp(next.left),
+      };
+      setBleed((current) => (sameBleed(current, room) ? current : room));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [layout, photos]);
+  // Room on the left: the board opens where it always does, the pushed part a scroll away.
+  useLayoutEffect(() => {
+    if (scroller.current) scroller.current.scrollLeft = bleed.left;
+  }, [bleed.left]);
   const reducedMotion = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
@@ -359,153 +408,178 @@ export function MonthBoard({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         // Transparent over the ground (review: no depth by row); the cards' radius; no scrollbar; down only.
-        className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[24px]"
+        className={`no-scrollbar relative min-h-0 flex-1 ${bleed.left + bleed.right > 0 ? 'overflow-x-auto' : 'overflow-x-hidden'} overflow-y-auto overscroll-contain rounded-[24px]`}
         style={{ touchAction: 'pan-y' }}
       >
         <div
-          // One grid per page: a new week or month is a new grid, the last one gone with it.
-          key={`${span}:${layout.key}`}
-          ref={canvas}
-          data-board-canvas
-          className="relative min-h-full text-white select-none"
+          data-board-bleed
+          className="relative min-h-full"
           style={{
-            width: '100%',
-            height: layout.height,
-            visibility: room === null ? 'hidden' : undefined,
+            width: `calc(100% + ${bleed.left + bleed.right}px)`,
+            height: layout.height + bleed.top + bleed.bottom,
           }}
         >
-          {layout.headers.map((header, col) => (
-            <span
-              key={header.day}
-              data-board-header={header.day}
-              // Each line at a fixed height, so the waves beneath never move the number (review).
-              className="absolute flex flex-col items-center justify-start pt-2"
-              style={{
-                left: col * metrics.column,
-                width: metrics.column,
-                height: span === 'week' ? HEADER_PX : MONTH_HEADER_PX,
-              }}
-            >
-              {span === 'week' ? (
-                <>
-                  {/* The weekday over the day number, centred (the mockup); the day's waves beneath. */}
-                  <span className="h-3.5 text-[10px]/3.5 font-medium text-white/80">
-                    {header.weekday}
-                  </span>
-                  <span className="h-6 text-base/6 font-semibold tabular-nums">
-                    {header.number}
-                  </span>
-                  <span className="flex items-start pt-1.5">
-                    <DayWaves count={layout.weeks[0].cells[col].count} narrow={metrics.narrow} />
-                  </span>
-                </>
-              ) : (
-                <span className="text-xs font-medium">{header.weekday}</span>
-              )}
-            </span>
-          ))}
+          <div
+            // One grid per page: a new week or month is a new grid, the last one gone with it.
+            key={`${span}:${layout.key}`}
+            ref={canvas}
+            data-board-canvas
+            className="absolute text-white select-none"
+            style={{
+              left: bleed.left,
+              top: bleed.top,
+              width: room ?? '100%',
+              height: layout.height,
+              visibility: room === null ? 'hidden' : undefined,
+            }}
+          >
+            {layout.headers.map((header, col) => (
+              <span
+                key={header.day}
+                data-board-header={header.day}
+                // Each line at a fixed height, so the waves beneath never move the number (review).
+                className="absolute flex flex-col items-center justify-start pt-2"
+                style={{
+                  left: col * metrics.column,
+                  width: metrics.column,
+                  height: span === 'week' ? HEADER_PX : MONTH_HEADER_PX,
+                }}
+              >
+                {span === 'week' ? (
+                  <>
+                    {/* The weekday over the day number, centred (the mockup); the day's waves beneath. */}
+                    <span className="h-3.5 text-[10px]/3.5 font-medium text-white/80">
+                      {header.weekday}
+                    </span>
+                    <span className="h-6 text-base/6 font-semibold tabular-nums">
+                      {header.number}
+                    </span>
+                    <span className="flex items-start pt-1.5">
+                      <DayWaves count={layout.weeks[0].cells[col].count} narrow={metrics.narrow} />
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs font-medium">{header.weekday}</span>
+                )}
+              </span>
+            ))}
 
-          {layout.weeks.map((week) => (
-            <div
-              key={week.index}
-              data-board-week-row={week.index}
-              data-height={week.h}
-              className="absolute inset-x-0"
-              style={{
-                top: week.y,
-                height: week.h,
-              }}
-            >
-              {week.cells.map((cell) => (
-                <div
-                  key={cell.day}
-                  data-board-cell={cell.day}
-                  data-in-month={cell.inMonth ? '' : undefined}
-                  className="absolute inset-y-0"
-                  style={{ left: cell.x, width: metrics.column }}
-                >
-                  {span === 'month' ? (
-                    // A day's number opens its week (review); its waves beneath.
-                    <button
-                      type="button"
-                      data-board-day={cell.day}
-                      aria-label={`Open the week of ${cell.day}`}
-                      onClick={() => openWeek(cell.day)}
-                      className={`absolute inset-x-0 flex flex-col items-center justify-start pt-1 text-sm/5 font-medium tabular-nums ${cell.inMonth ? '' : 'text-white/40'}`}
-                      style={{ top: 0, height: DAY_NUMBER_PX }}
-                    >
-                      {/* No waves under a month's numbers (review). */}
-                      <span className="h-5">{Number(cell.day.slice(8))}</span>
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {/* The lane lines, once for the whole grid, from the header to its bottom edge:
-              over the rows' water, under every item, so an overhang lies across them. */}
-          {Array.from({ length: COLUMNS - 1 }, (_, at) => (
-            <span
-              key={at}
-              aria-hidden
-              data-board-rule={at + 1}
-              className="absolute top-0 w-px bg-white/20"
-              style={{ left: (at + 1) * metrics.column, height: gridBottom }}
-            />
-          ))}
-
-          {empty ? (
-            <p
-              data-board-empty
-              className="absolute inset-x-0 text-center text-sm text-white/80"
-              style={{ top: (span === 'week' ? HEADER_PX : MONTH_HEADER_PX) + 44 }}
-            >
-              {span === 'week' ? 'Nothing this week yet.' : 'Nothing this month yet.'}
-            </p>
-          ) : null}
-
-          {/* Each row's items and bands, clipped to the row: nothing leaves its week. */}
-          {layout.weeks.map((week) => (
-            <div
-              key={week.index}
-              data-board-row-items={week.index}
-              className="absolute inset-x-0 overflow-hidden"
-              style={{ top: week.y, height: week.h }}
-            >
-              <div className="absolute inset-x-0" style={{ top: -week.y, height: layout.height }}>
-                {layout.tapes
-                  .filter((tape) => tape.week === week.index)
-                  .map((tape) => (
-                    <BoardTapeView
-                      key={tape.key}
-                      tape={tape}
-                      lanes={lanes}
-                      metrics={metrics}
-                      onPick={onPick}
-                      ripple={ripple(tape.id)}
-                    />
-                  ))}
-                {layout.pieces
-                  .filter((piece) => piece.week === week.index)
-                  .map((piece) => (
-                    <BoardPieceView
-                      key={piece.id}
-                      piece={piece}
-                      photos={photos}
-                      lanes={lanes}
-                      metrics={metrics}
-                      onPick={onPick}
-                      onWrite={onWrite}
-                      ripple={ripple(piece.id)}
-                      plunge={plunge(piece.id)}
-                    />
-                  ))}
+            {layout.weeks.map((week) => (
+              <div
+                key={week.index}
+                data-board-week-row={week.index}
+                data-height={week.h}
+                className="absolute inset-x-0"
+                style={{
+                  top: week.y,
+                  height: week.h,
+                }}
+              >
+                {week.cells.map((cell) => (
+                  <div
+                    key={cell.day}
+                    data-board-cell={cell.day}
+                    data-in-month={cell.inMonth ? '' : undefined}
+                    className="absolute inset-y-0"
+                    style={{ left: cell.x, width: metrics.column }}
+                  >
+                    {span === 'month' ? (
+                      // A day's number opens its week (review); its waves beneath.
+                      <button
+                        type="button"
+                        data-board-day={cell.day}
+                        aria-label={`Open the week of ${cell.day}`}
+                        onClick={() => openWeek(cell.day)}
+                        className={`absolute inset-x-0 flex flex-col items-center justify-start pt-1 text-sm/5 font-medium tabular-nums ${cell.inMonth ? '' : 'text-white/40'}`}
+                        style={{ top: 0, height: DAY_NUMBER_PX }}
+                      >
+                        {/* No waves under a month's numbers (review). */}
+                        <span className="h-5">{Number(cell.day.slice(8))}</span>
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
+            ))}
+
+            {/* The lane lines, once for the whole grid, from the header to its bottom edge:
+              over the rows' water, under every item, so an overhang lies across them. */}
+            {Array.from({ length: COLUMNS - 1 }, (_, at) => (
+              <span
+                key={at}
+                aria-hidden
+                data-board-rule={at + 1}
+                className="absolute top-0 w-px bg-white/20"
+                style={{ left: (at + 1) * metrics.column, height: gridBottom }}
+              />
+            ))}
+
+            {empty ? (
+              <p
+                data-board-empty
+                className="absolute inset-x-0 text-center text-sm text-white/80"
+                style={{ top: (span === 'week' ? HEADER_PX : MONTH_HEADER_PX) + 44 }}
+              >
+                {span === 'week' ? 'Nothing this week yet.' : 'Nothing this month yet.'}
+              </p>
+            ) : null}
+
+            {/* Each row's items and bands. Not clipped (0044): a part moved by hand
+              reaches into the next cells and draws over them; the automatic
+              layout keeps to its row by its own rules. */}
+            {layout.weeks.map((week) => (
+              <div
+                key={week.index}
+                data-board-row-items={week.index}
+                className="absolute inset-x-0"
+                style={{ top: week.y, height: week.h }}
+              >
+                <div className="absolute inset-x-0" style={{ top: -week.y, height: layout.height }}>
+                  {layout.tapes
+                    .filter((tape) => tape.week === week.index)
+                    .map((tape) => (
+                      <BoardTapeView
+                        key={tape.key}
+                        tape={tape}
+                        lanes={lanes}
+                        metrics={metrics}
+                        onPick={onPick}
+                        ripple={ripple(tape.id)}
+                      />
+                    ))}
+                  {layout.pieces
+                    .filter((piece) => piece.week === week.index)
+                    .map((piece) => (
+                      <BoardPieceView
+                        key={piece.id}
+                        piece={piece}
+                        photos={photos}
+                        lanes={lanes}
+                        metrics={metrics}
+                        onPick={onPick}
+                        onWrite={onWrite}
+                        ripple={ripple(piece.id)}
+                        plunge={plunge(piece.id)}
+                      />
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+/** Room the board takes past each edge for a part pushed there by hand (0044). */
+type Bleed = { top: number; right: number; bottom: number; left: number };
+const NO_BLEED: Bleed = { top: 0, right: 0, bottom: 0, left: 0 };
+/** Room grows in steps, with a margin, so a part is reachable and a bob changes nothing. */
+const BLEED_STEP_PX = 24;
+function stepUp(px: number): number {
+  return px <= 0 ? 0 : Math.ceil((px + 8) / BLEED_STEP_PX) * BLEED_STEP_PX;
+}
+function sameBleed(a: Bleed, b: Bleed): boolean {
+  return a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
 }

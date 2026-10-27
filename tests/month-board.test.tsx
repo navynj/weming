@@ -370,7 +370,10 @@ describe('the week board, drawn', () => {
       expect(selected.className).toContain('bg-white');
       expect(selected.className).not.toContain('bg-ink');
       expect(container.querySelector('[data-board-title]')!.textContent).toBe('Oct 18 – 24');
-      expect(container.querySelector<HTMLElement>('[data-board-canvas]')!.style.width).toBe('100%');
+      // Nothing pushed past an edge: no room added, so nothing to scroll sideways (0044).
+      expect(container.querySelector<HTMLElement>('[data-board-bleed]')!.style.width).toBe(
+        'calc(100% + 0px)',
+      );
       expect(container.querySelector('[data-board-scroller]')!.className).toContain(
         'overflow-x-hidden',
       );
@@ -767,6 +770,31 @@ describe('labels, photos and bands, drawn', () => {
     ).toBe('+1');
   });
 
+  it('leaves a photo hidden from the board off it, and draws a post with all hidden as one with none (0044)', () => {
+    const four = card('four', 'Four photos', '2026-10-23', { photos: 4 });
+    const oneHidden: Card = { ...four, layout: { photos: { 'a1/four-1.webp': { hidden: true } } } };
+    const view = board([oneHidden]);
+    const shown = [
+      ...view.container.querySelectorAll('[data-board-piece="four"] [data-board-photo-card]'),
+    ].map((p) => p.getAttribute('data-board-photo-card'));
+    expect(shown).toHaveLength(3);
+    expect(shown).not.toContain('a1/four-1.webp');
+    // Three left on the board: none more to count.
+    expect(
+      view.container.querySelector('[data-board-piece="four"] [data-board-more-photos]'),
+    ).toBeNull();
+    cleanup();
+
+    const soup = card('soup', 'Soup', '2026-10-20', { photos: 1 });
+    const allHidden: Card = { ...soup, layout: { photos: { 'a1/soup-0.webp': { hidden: true } } } };
+    const { container } = board([allHidden]);
+    const piece = container.querySelector('[data-board-piece="soup"]')!;
+    expect(piece.getAttribute('data-recipe')).not.toBe('C');
+    expect(piece.querySelector('[data-board-photo-card]')).toBeNull();
+    // The card itself still carries it: only the board leaves it out.
+    expect(allHidden.photos).toHaveLength(1);
+  });
+
   it('runs a range band the full width of its lanes, translucent, no outline, square', () => {
     const { container } = board();
     const band = container.querySelector<HTMLElement>(
@@ -1017,7 +1045,8 @@ describe('the month grid (review)', () => {
     const rows = [...view.container.querySelectorAll<HTMLElement>('[data-board-row-items]')];
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
-      expect(row.className).toContain('overflow-hidden');
+      // Never clipped: a part moved by hand reaches into the next cells (0044).
+      expect(row.className).not.toContain('overflow-hidden');
       expect(parseFloat(row.style.top)).toBeGreaterThanOrEqual(28);
     }
   });

@@ -225,6 +225,51 @@ describe('the Layout panel (review)', () => {
     ]);
   });
 
+  it('hides a photo from the board with "Show on board", and shows it again (0044)', async () => {
+    vi.useFakeTimers();
+    media(true);
+    const photos = [0, 1].map((at) => ({ rippleId: 's1-b', path: `a1/s1-${at}.webp` }));
+    const { container } = home([{ ...ONE[0], photos }]);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const row = container.querySelector('[data-layout-photo="a1/s1-1.webp"]')!;
+    const show = row.querySelector<HTMLElement>('[data-layout-switch="Show on board"]')!;
+    expect(show.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(show);
+    // Off the board at once; the panel keeps its row, to turn it back on.
+    expect(
+      container.querySelector('[data-board-piece="s1"] [data-board-photo-card="a1/s1-1.webp"]'),
+    ).toBeNull();
+    expect(container.querySelector('[data-layout-photo="a1/s1-1.webp"]')).not.toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+    expect(saved.at(-1)).toMatchObject({
+      patch: { photos: { 'a1/s1-1.webp': { hidden: true } } },
+    });
+    cleanup();
+
+    // Stored hidden: the switch reads off, and turning it on clears the field.
+    const hidden = { photos: { 'a1/s1-1.webp': { hidden: true } } };
+    const again = home([{ ...ONE[0], photos, layout: hidden }]);
+    fireEvent.click(again.container.querySelector('[data-layout-toggle]')!);
+    const off = again.container.querySelector<HTMLElement>(
+      '[data-layout-photo="a1/s1-1.webp"] [data-layout-switch="Show on board"]',
+    )!;
+    expect(off.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(off);
+    expect(
+      again.container.querySelector(
+        '[data-board-piece="s1"] [data-board-photo-card="a1/s1-1.webp"]',
+      ),
+    ).not.toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+    expect(saved.at(-1)).toMatchObject({ clear: ['photos.a1/s1-1.webp.hidden'] });
+  });
+
   it('says whose layout Home draws, and gives a joint splash back to its pool’s', () => {
     media(true);
     const joint = card('j1', 'Ours', '2026-10-21', {
@@ -460,8 +505,10 @@ describe('hand-set layouts on the calendar (review)', () => {
     // The label's own X and the piece's add up; Y is the piece's alone.
     expect(label.style.transform).toMatch(/^translate\(/);
     expect(label.style.transform).toContain('px');
-    expect(label.style.zIndex).toBe('5');
-    expect(pick.style.zIndex).toBe('5');
+    // Moved by hand, it sits above every piece in place (0044): its layer 2
+    // plus six, two steps a layer, over the label's 1.
+    expect(label.style.zIndex).toBe('17');
+    expect(pick.style.zIndex).toBe('17');
     // The piece itself carries no transform or z: no stacking context of its own.
     const piece = container.querySelector<HTMLElement>('[data-board-piece="s1"]')!;
     expect(piece.style.transform).toBe('');

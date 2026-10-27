@@ -7,12 +7,14 @@ import { z } from 'zod';
  * The ranges are the database's (board_layout_valid); checked here too, so
  * a refused value never leaves the browser.
  */
-const x = z.number().min(-0.6).max(0.6);
-const y = z.number().min(-6).max(6);
-const tilt = z.number().min(-15).max(15);
+// Wide on purpose (0044): sliders are the only control, so a person can
+// push a part far — three columns across, twenty lines down.
+const x = z.number().min(-3).max(3);
+const y = z.number().min(-20).max(20);
+const tilt = z.number().min(-45).max(45);
 
 export const IconLayout = z
-  .object({ inline: z.boolean(), size: z.number().min(0.8).max(4), x, y, tilt })
+  .object({ inline: z.boolean(), size: z.number().min(0.5).max(8), x, y, tilt })
   .partial()
   .strict();
 export const LabelLayout = z
@@ -29,7 +31,8 @@ export const LabelLayout = z
   .partial()
   .strict();
 export const PhotoLayout = z
-  .object({ size: z.number().min(0.3).max(1), x, y, tilt })
+  // `hidden` (0044): off the board only; the card and the sheet keep it.
+  .object({ size: z.number().min(0.2).max(2), x, y, tilt, hidden: z.boolean() })
   .partial()
   .strict();
 export const WaveLayout = z
@@ -38,7 +41,7 @@ export const WaveLayout = z
     amp: z.number().min(1).max(8),
     length: z.number().min(8).max(32),
     weight: z.number().min(1).max(4),
-    span: z.number().min(0.2).max(2),
+    span: z.number().min(0.2).max(4),
     x,
     y,
     tilt,
@@ -94,7 +97,7 @@ export function mergeLayout(base: BoardLayoutJson, patch: BoardLayoutJson): Boar
 export function clearLayout(layout: BoardLayoutJson, paths: string[]): BoardLayoutJson {
   let out: BoardLayoutJson = structuredClone(layout);
   for (const path of paths) {
-    const photo = /^photos\.(.+)\.(size|x|y|tilt)$/.exec(path);
+    const photo = /^photos\.(.+)\.(size|x|y|tilt|hidden)$/.exec(path);
     if (photo && out.photos?.[photo[1]]) {
       delete (out.photos[photo[1]] as Record<string, unknown>)[photo[2]];
     } else if (path.startsWith('photos.') && out.photos) {
@@ -131,6 +134,30 @@ export function effectiveLayout(
   if (home) return { layout: home, source: 'home' };
   if (pool) return { layout: pool, source: 'pool' };
   return { layout: {}, source: null };
+}
+
+/**
+ * Moved by hand (0044): any part, or the whole piece, set off its place. Such
+ * a post may reach into its neighbours' cells, so it is drawn above them.
+ */
+export function handMoved(layout: BoardLayoutJson | undefined): boolean {
+  if (!layout) return false;
+  const off = (g: { x?: number; y?: number } | undefined): boolean => !!(g?.x || g?.y);
+  return (
+    off(layout.piece) ||
+    off(layout.icon) ||
+    off(layout.label) ||
+    off(layout.wave) ||
+    Object.values(layout.photos ?? {}).some(off)
+  );
+}
+
+/** The photos a card shows on the board: every one but those hidden from it (0044). */
+export function boardPhotos<P extends { path: string }>(
+  photos: P[] | undefined,
+  layout: BoardLayoutJson | undefined,
+): P[] {
+  return (photos ?? []).filter((photo) => layout?.photos?.[photo.path]?.hidden !== true);
 }
 
 /** Photos keyed by a media path the splash no longer carries are ignored when drawing. */

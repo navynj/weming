@@ -179,17 +179,21 @@ describe('a pool layout', () => {
 
   it('refuses values outside the ranges, unknown keys, and a font size between whole pixels', async () => {
     for (const bad of [
-      { icon: { size: 5 } },
-      { icon: { x: 0.7 } },
-      { label: { y: -6.5 } },
-      { label: { tilt: 16 } },
+      // Just past the ranges as widened in 0044.
+      { icon: { size: 8.5 } },
+      { icon: { size: 0.4 } },
+      { icon: { x: 3.1 } },
+      { label: { y: -20.5 } },
+      { label: { tilt: 46 } },
       { label: { fontSize: 19 } },
       { label: { fontSize: 10.5 } },
-      { photos: { [PHOTO_A]: { size: 0.2 } } },
+      { photos: { [PHOTO_A]: { size: 0.1 } } },
+      { photos: { [PHOTO_A]: { size: 2.1 } } },
+      { photos: { [PHOTO_A]: { hidden: 'yes' } } },
       { wave: { weight: 5 } },
       { wave: { amp: 0 } },
       { wave: { length: 40 } },
-      { wave: { span: 3 } },
+      { wave: { span: 4.5 } },
       { colour: 'red' },
       { label: { colour: 'red' } },
       { icon: { inline: 'yes' } },
@@ -199,7 +203,7 @@ describe('a pool layout', () => {
       { label: { style: 'none' } },
       { label: { style: 1 } },
       { icon: { width: 1 } },
-      { icon: { tilt: 16 } },
+      { icon: { tilt: -46 } },
       { wave: { style: 'ink' } },
     ]) {
       const refused = await set(ana, bad);
@@ -212,6 +216,25 @@ describe('a pool layout', () => {
           wave: { on: true, amp: 3, length: 16, weight: 2, span: 1.2, tilt: -4 },
         })
       ).error,
+    ).toBeNull();
+  });
+
+  it('takes the far ends of the widened ranges and a hidden photo, and clears them (0044)', async () => {
+    const far = {
+      icon: { size: 8, x: -3, y: 20, tilt: 45 },
+      label: { x: 3, y: -20, tilt: -45 },
+      photos: { [PHOTO_A]: { size: 2, x: 3, y: -20, tilt: 45, hidden: true } },
+      wave: { on: true, span: 4, x: -3, y: 20 },
+    };
+    expect((await set(ana, far)).error).toBeNull();
+    expect((await read(ana, 'pool'))[0].layout.photos[PHOTO_A].hidden).toBe(true);
+    await set(ana, {}, { clear: ['icon', 'label', 'wave', `photos.${PHOTO_A}`] });
+    const left = (await read(ana, 'pool'))[0].layout;
+    expect(left.icon).toBeUndefined();
+    expect(left.photos?.[PHOTO_A]).toBeUndefined();
+    // And back to what the tests after this one expect.
+    expect(
+      (await set(ana, { label: { y: 0.5 }, photos: { [PHOTO_A]: { size: 0.6 } } })).error,
     ).toBeNull();
   });
 

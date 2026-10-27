@@ -23,6 +23,7 @@ import {
   type LabelStyle,
   type PhotoCard,
 } from './layout';
+import { handMoved } from './board-layout';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 
@@ -70,6 +71,9 @@ function nudge<T extends { x?: number; y?: number }>(
  * rises together, two steps a layer, so its own order (sticker over label)
  * holds and pieces still interleave with no stacking context of their own.
  */
+/** Above the highest layer (5) a post in place can take: a moved post's lift (0044). */
+const MOVED_LAYERS = 6;
+
 function lifted(base: number, layer: number | undefined): CSSProperties | undefined {
   return layer ? { zIndex: base + 2 * layer } : undefined;
 }
@@ -110,6 +114,7 @@ function WaveDecoration({
   column,
   line,
   moving = '',
+  stack = 0,
 }: {
   label: Box;
   wave: {
@@ -125,6 +130,8 @@ function WaveDecoration({
   line: number;
   /** The piece's bob or plunge, played on each part (motionOf). */
   moving?: string;
+  /** The piece's layers (lifted), so a moved wave rises with its piece. */
+  stack?: number;
 }) {
   const amp = wave.amp ?? WAVE_DEFAULTS.amp;
   const wavelength = wave.length ?? WAVE_DEFAULTS.length;
@@ -146,6 +153,7 @@ function WaveDecoration({
         top: label.y + label.h - height / 2,
         transform: moveOf(wave, column, line),
         transformOrigin: 'left center',
+        ...lifted(0, stack),
       }}
     >
       <path
@@ -413,7 +421,7 @@ function PhotoCardView({
 }) {
   return (
     <span
-      data-board-photo-card
+      data-board-photo-card={photo.path}
       data-size={photo.size}
       className="absolute block"
       style={{
@@ -484,6 +492,8 @@ export function BoardPieceView({
   // never the stack; X is a share of the lane, Y in line heights.
   const layout = card.layout ?? {};
   const line = piece.type.line;
+  // Moved by hand (0044): above every piece in place, its own layer kept among the moved.
+  const stack = (layout.piece?.layer ?? 0) + (handMoved(layout) ? MOVED_LAYERS : 0);
   return (
     <div
       // Remounted per ring, so the motion plays again for the same post.
@@ -497,6 +507,7 @@ export function BoardPieceView({
       data-heading={ripple !== null ? '' : undefined}
       data-dropped={plunge ? '' : undefined}
       data-muted={piece.muted ? '' : undefined}
+      data-board-moved={handMoved(layout) ? '' : undefined}
       // No stacking context of its own (no opacity, no z-index): its parts
       // stack with every other piece's in the row — the slot under the
       // labels, the stickers over them (review). A muted day's half
@@ -514,14 +525,14 @@ export function BoardPieceView({
         aria-label={caption}
         data-board-pick={piece.id}
         className={`absolute inset-0 z-[1] block ${moving}`}
-        style={lifted(1, layout.piece?.layer)}
+        style={lifted(1, stack)}
       />
       <div aria-hidden className="pointer-events-none absolute inset-0">
         {piece.photoBox ? (
           <span
             data-board-photos
             className={`absolute z-[1] block ${fade} ${moving}`}
-            style={{ ...placed(piece.photoBox), ...lifted(1, layout.piece?.layer) }}
+            style={{ ...placed(piece.photoBox), ...lifted(1, stack) }}
           >
             {piece.fan.map((photo, at) => (
               <PhotoCardView
@@ -546,6 +557,7 @@ export function BoardPieceView({
             column={metrics.column}
             line={line}
             moving={moving}
+            stack={stack}
           />
         ) : null}
         <span
@@ -554,7 +566,7 @@ export function BoardPieceView({
           style={{
             ...placed(label),
             transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
-            ...lifted(1, layout.piece?.layer),
+            ...lifted(1, stack),
             paddingTop: piece.pad.top,
             paddingRight: piece.pad.right,
             paddingBottom: piece.pad.bottom,
@@ -612,7 +624,7 @@ export function BoardPieceView({
               ...placed(piece.stickerBox),
               fontSize: piece.stickerBox.w,
               transform: moveOf(nudge(layout.icon, layout.piece), metrics.column, line),
-              ...lifted(2, layout.piece?.layer),
+              ...lifted(2, stack),
             }}
           >
             {icon}
@@ -627,7 +639,7 @@ export function BoardPieceView({
           onWrite={onWrite}
           muted={piece.muted}
           shift={moveOf(layout.piece, metrics.column, line)}
-          layer={layout.piece?.layer}
+          layer={stack}
           moving={moving}
         />
       ) : null}

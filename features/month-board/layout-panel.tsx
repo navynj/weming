@@ -224,7 +224,8 @@ export function LayoutPanel({
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const [advanced, setAdvanced] = useState(false);
-  const photos = (card.photos ?? []).slice(0, 3);
+  // Every photo, so one hidden from the board (0044) can be shown again.
+  const photos = card.photos ?? [];
   const signed = useSignedPhotos(photos);
   const piece = layout.piece ?? {};
   const icon = layout.icon ?? {};
@@ -284,8 +285,8 @@ export function LayoutPanel({
                 name="X"
                 value={piece.x}
                 fallback={0}
-                min={-0.6}
-                max={0.6}
+                min={-3}
+                max={3}
                 step={0.01}
                 unit={lanes}
                 onChange={(v) => onEdit({ piece: { x: v } })}
@@ -295,8 +296,8 @@ export function LayoutPanel({
                 name="Y"
                 value={piece.y}
                 fallback={0}
-                min={-6}
-                max={6}
+                min={-20}
+                max={20}
                 step={0.1}
                 unit={lines}
                 onChange={(v) => onEdit({ piece: { y: v } })}
@@ -334,8 +335,8 @@ export function LayoutPanel({
                     name="Size"
                     value={icon.size}
                     fallback={2}
-                    min={0.8}
-                    max={4}
+                    min={0.5}
+                    max={8}
                     step={0.1}
                     unit={(v) => `${v.toFixed(1)}×`}
                     onChange={(v) => onEdit({ icon: { size: v } })}
@@ -345,8 +346,8 @@ export function LayoutPanel({
                     name="Icon X"
                     value={icon.x}
                     fallback={0}
-                    min={-0.6}
-                    max={0.6}
+                    min={-3}
+                    max={3}
                     step={0.01}
                     unit={lanes}
                     onChange={(v) => onEdit({ icon: { x: v } })}
@@ -356,8 +357,8 @@ export function LayoutPanel({
                     name="Icon Y"
                     value={icon.y}
                     fallback={0}
-                    min={-6}
-                    max={6}
+                    min={-20}
+                    max={20}
                     step={0.1}
                     unit={lines}
                     onChange={(v) => onEdit({ icon: { y: v } })}
@@ -370,8 +371,8 @@ export function LayoutPanel({
                 name="Icon tilt"
                 value={icon.tilt}
                 fallback={0}
-                min={-15}
-                max={15}
+                min={-45}
+                max={45}
                 step={1}
                 unit={degrees}
                 onChange={(v) => onEdit({ icon: { tilt: v } })}
@@ -431,8 +432,8 @@ export function LayoutPanel({
                   name="Label X"
                   value={label.x}
                   fallback={0}
-                  min={-0.6}
-                  max={0.6}
+                  min={-3}
+                  max={3}
                   step={0.01}
                   unit={lanes}
                   onChange={(v) => onEdit({ label: { x: v } })}
@@ -442,8 +443,8 @@ export function LayoutPanel({
                   name="Label Y"
                   value={label.y}
                   fallback={0}
-                  min={-6}
-                  max={6}
+                  min={-20}
+                  max={20}
                   step={0.1}
                   unit={lines}
                   onChange={(v) => onEdit({ label: { y: v } })}
@@ -453,8 +454,8 @@ export function LayoutPanel({
                   name="Label tilt"
                   value={label.tilt}
                   fallback={0}
-                  min={-15}
-                  max={15}
+                  min={-45}
+                  max={45}
                   step={1}
                   unit={degrees}
                   onChange={(v) => onEdit({ label: { tilt: v } })}
@@ -468,7 +469,9 @@ export function LayoutPanel({
             <Group title="Photos">
               {photos.map((photo, at) => {
                 const set = layout.photos?.[photo.path] ?? {};
-                const field = (f: 'size' | 'x' | 'y' | 'tilt') => `photos.${photo.path}.${f}`;
+                const field = (f: 'size' | 'x' | 'y' | 'tilt' | 'hidden') =>
+                  `photos.${photo.path}.${f}`;
+                const shown = set.hidden !== true;
                 return (
                   <div key={photo.path} data-layout-photo={photo.path} className="flex gap-2">
                     {signed[photo.path] ? (
@@ -483,12 +486,22 @@ export function LayoutPanel({
                       <span aria-hidden className="h-10 w-10 shrink-0 bg-white/20" />
                     )}
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      {/* Off the board only; the card and the sheet keep it (0044). */}
+                      <Switch
+                        name="Show on board"
+                        on={shown}
+                        onChange={(on) =>
+                          on
+                            ? onEdit({}, [field('hidden')])
+                            : onEdit({ photos: { [photo.path]: { hidden: true } } })
+                        }
+                      />
                       <Slider
                         name={`Photo ${at + 1} size`}
                         value={set.size}
                         fallback={0.6}
-                        min={0.3}
-                        max={1}
+                        min={0.2}
+                        max={2}
                         step={0.01}
                         unit={lanes}
                         onChange={(v) => onEdit({ photos: { [photo.path]: { size: v } } })}
@@ -498,8 +511,8 @@ export function LayoutPanel({
                         name={`Photo ${at + 1} X`}
                         value={set.x}
                         fallback={0}
-                        min={-0.6}
-                        max={0.6}
+                        min={-3}
+                        max={3}
                         step={0.01}
                         unit={lanes}
                         onChange={(v) => onEdit({ photos: { [photo.path]: { x: v } } })}
@@ -509,8 +522,8 @@ export function LayoutPanel({
                         name={`Photo ${at + 1} Y`}
                         value={set.y}
                         fallback={0}
-                        min={-6}
-                        max={6}
+                        min={-20}
+                        max={20}
                         step={0.1}
                         unit={lines}
                         onChange={(v) => onEdit({ photos: { [photo.path]: { y: v } } })}
@@ -520,8 +533,8 @@ export function LayoutPanel({
                         name={`Photo ${at + 1} tilt`}
                         value={set.tilt}
                         fallback={0}
-                        min={-15}
-                        max={15}
+                        min={-45}
+                        max={45}
                         step={1}
                         unit={degrees}
                         onChange={(v) => onEdit({ photos: { [photo.path]: { tilt: v } } })}
@@ -608,7 +621,7 @@ export function LayoutPanel({
                     value={wave.span}
                     fallback={WAVE_DEFAULTS.span}
                     min={0.2}
-                    max={2}
+                    max={4}
                     step={0.05}
                     unit={lanes}
                     onChange={(v) => onEdit({ wave: { span: v } })}
@@ -618,8 +631,8 @@ export function LayoutPanel({
                     name="Wave X"
                     value={wave.x}
                     fallback={0}
-                    min={-0.6}
-                    max={0.6}
+                    min={-3}
+                    max={3}
                     step={0.01}
                     unit={lanes}
                     onChange={(v) => onEdit({ wave: { x: v } })}
@@ -629,8 +642,8 @@ export function LayoutPanel({
                     name="Wave Y"
                     value={wave.y}
                     fallback={0}
-                    min={-6}
-                    max={6}
+                    min={-20}
+                    max={20}
                     step={0.1}
                     unit={lines}
                     onChange={(v) => onEdit({ wave: { y: v } })}
@@ -640,8 +653,8 @@ export function LayoutPanel({
                     name="Wave tilt"
                     value={wave.tilt}
                     fallback={0}
-                    min={-15}
-                    max={15}
+                    min={-45}
+                    max={45}
                     step={1}
                     unit={degrees}
                     onChange={(v) => onEdit({ wave: { tilt: v } })}
