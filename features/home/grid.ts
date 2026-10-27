@@ -39,6 +39,12 @@ export type Card = {
   authorName?: string;
   /** A joint splash (H23), wherever it is drawn: its mark and its row are a pill, not a disc (review). */
   joint?: boolean;
+  /**
+   * Someone besides its maker is invited (0033): the filled background, on
+   * the Calendar's label and the List's row. A joint record with nobody
+   * else — Everyone in a pool of one — stays unfilled, as any record.
+   */
+  together?: boolean;
   /** A joint splash (H23): drawn as a band across the columns, each ripple a branch. */
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */

@@ -209,6 +209,7 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 - **Home record:** lane, title, icon and dates; Audience per pool with its lane chip. **Make it joint…** picks the pool, a pool lane and who's together.
 - **Pool record (mine):** title, icon, dates and pool lane chip. In the pool: **Together** makes it joint. On Home: picking a lane of mine moves it to Home.
 - **Joint:** title and icon for any member; pool lane; **Together** to add people (decision 6). **Make it mine** is on Home only (Yoonji, in the session), while every ripple is mine: picking a lane of mine makes it mine.
+- **The fill** (Yoonji, in the session) follows invitees, not ownership. A record is filled (the Calendar's white or ink label, the List's pill) once someone besides its maker is invited. A joint record with nobody else, Everyone in a pool of one, stays unfilled like any record, and fills when someone joins.
 - **Becoming mine on Home**, for a pool record or a joint record, sets its lane and its Audience anew. Audience starts as a new record's would (Only me, unless the lane's link shares by default), and it leaves its pool unless Audience shares it there.
 
 ### Home pool columns

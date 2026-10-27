@@ -118,6 +118,10 @@ export function SplashComposer({
   // lane, else in the pool's column — derived from the marker, never stored
   // on a ripple (H24, 0033).
   const poolLane = pool && pick ? pool.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
+  // Filled once someone besides me is invited (0033): Everyone in a pool of one is not.
+  const invitesOthers = together.everyone
+    ? (pool?.members ?? []).some((m) => m.id !== me)
+    : together.picked.length > 0;
   const homeLane = poolLane?.homeLaneId ?? null;
   // Today is in the field from the start (review): the post's date, days
   // only (H24). Removed with its ×, the post rests on today all the same.
@@ -237,6 +241,7 @@ export function SplashComposer({
             ...(joint
               ? {
                   joint: true,
+                  together: invitesOthers,
                   branches: body
                     ? [
                         {
@@ -273,6 +278,7 @@ export function SplashComposer({
                 ? {
                     column: homeLane ?? poolColumn.id,
                     joint: true,
+                    together: invitesOthers,
                     pools: [pool.poolName],
                     href: poolSplashHref(pool.poolId, id),
                     menu: { pin: false, delete: false },

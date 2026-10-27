@@ -13,7 +13,13 @@ import { homeLaneFor } from '@/features/pool/links';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { sharedSplashIds, withResponded } from '@/features/home/responded';
-import { getJointSplashes, getMyLinks, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
+import {
+  getJointSplashes,
+  getJointTogether,
+  getMyLinks,
+  getMyPlacements,
+  getMyPoolNames,
+} from '@/lib/queries/pools';
 import { getResponsesOnMine } from '@/lib/queries/responses';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
@@ -49,6 +55,10 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     ),
   ]);
   const jointOf = new Map(joints.map((j) => [j.id, j]));
+  const together = await getJointTogether(
+    supabase,
+    joints.map((j) => j.id),
+  );
   // My pool records whose pool lane has this lane as its home lane (0033).
   const placements = mine.some((s) => s.own_pool_id)
     ? await getMyPlacements(supabase, profile.id)
@@ -100,12 +110,17 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
       };
       const joint = jointOf.get(summary.id);
       if (joint) {
-        return withPoolBadge(card, {
-          poolId: joint.pool_id!,
-          poolName: poolName.get(joint.pool_id!) ?? null,
-          linkedLane: id,
-          poolLane: null,
-        });
+        // Filled once someone besides its maker is invited (0033).
+        const filled = (together[joint.id] ?? []).some((uid) => uid !== joint.created_by);
+        return withPoolBadge(
+          { ...card, together: filled },
+          {
+            poolId: joint.pool_id!,
+            poolName: poolName.get(joint.pool_id!) ?? null,
+            linkedLane: id,
+            poolLane: null,
+          },
+        );
       }
       // My own splash carries the pencil; a block read alone has none.
       return summary.orphan ? card : { ...card, editable: true };

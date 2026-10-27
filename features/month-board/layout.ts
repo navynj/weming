@@ -412,10 +412,10 @@ type Plan = { recipe: Recipe; label: LabelStyle; size: StickerSize | null };
  * being no other way to draw them); a day of two or more items has a B —
  * an A turned, which can sit by no B, A never following A. B's stickers
  * take a size by the id, never the size of the day's B before, big at
- * most once and only in a day of two or more. A joint splash alternates
- * white and ink with the day's other joint ones; everything else takes no
- * fill. A joint one's fill set by hand, white or ink, is the person's; a
- * label with no fill stays so.
+ * most once and only in a day of two or more. A record with invitees
+ * (together, 0033) alternates white and ink with the day's other such ones;
+ * everything else takes no fill. Its fill set by hand, white or ink, is the
+ * person's; a label with no fill stays so.
  */
 function planDay(cards: Card[]): Plan[] {
   let fill: LabelStyle | null = null;
@@ -445,7 +445,7 @@ function planDay(cards: Card[]): Plan[] {
   let bigUsed = false;
   return cards.map((card, at) => {
     let label: LabelStyle = 'none';
-    if (card.joint) {
+    if (card.together) {
       const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'ink';
       // A fill set by hand (0027) is drawn as set; the next joint one alternates from it.
       fill =

@@ -156,6 +156,8 @@ const A: PoolView = {
     ripple({ id: 'r-j2', splash_id: 's-joint', author_id: ME, occurred_on: '2026-10-20' }),
   ],
   invites: [],
+  // Mina made it with me: someone besides its maker is invited, so it is filled (0033).
+  together: { 's-joint': [MINA, ME] },
 };
 
 /** Pool B: nothing of A's. */
@@ -753,6 +755,14 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
     const plain = container.querySelector('[data-pill="s-mine"]')!;
     expect(plain.hasAttribute('data-joint-pill')).toBe(false);
     expect(plain.className).toContain('border-b');
+  });
+
+  it('is a plain row while nobody besides its maker is invited (0033)', () => {
+    setView('date');
+    const { container } = ground({ ...A, together: { 's-joint': [MINA] } });
+    const row = container.querySelector('[data-pill="s-joint"]')!;
+    expect(row.hasAttribute('data-joint-pill')).toBe(false);
+    expect(row.className).toContain('border-b');
   });
 });
 
