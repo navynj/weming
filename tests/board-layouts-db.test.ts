@@ -42,7 +42,7 @@ function set(
     pool: p = pool,
     clear = [] as string[],
     view,
-  }: { pool?: string | null; clear?: string[]; view?: 'calendar' | 'lane' | 'swimmers' } = {},
+  }: { pool?: string | null; clear?: string[]; view?: 'calendar' | 'lane' | 'members' } = {},
 ) {
   // No view is the call as the app before 0045 made it: the Calendar's.
   return asUser(who).rpc('set_board_layout', {
@@ -57,7 +57,7 @@ function set(
 async function read(
   who: string,
   scope: 'pool' | 'home',
-  view: 'calendar' | 'lane' | 'swimmers' = 'calendar',
+  view: 'calendar' | 'lane' | 'members' = 'calendar',
 ) {
   const { data } = await asUser(who)
     .from('board_layouts')
@@ -327,11 +327,11 @@ describe('a layout per view (0045)', () => {
     expect(await read(ben, 'home')).toHaveLength(1);
   });
 
-  it('keeps Swimmers apart from the Calendar and the Lane view (0047)', async () => {
+  it('keeps Members apart from the Calendar and the Lane view (0047)', async () => {
     const calendar = (await read(ana, 'pool'))[0].layout;
     const lane = (await read(ana, 'pool', 'lane'))[0].layout;
-    expect((await set(ana, { label: { x: 2, tilt: -10 } }, { view: 'swimmers' })).error).toBeNull();
-    expect((await read(ana, 'pool', 'swimmers'))[0].layout).toEqual({ label: { x: 2, tilt: -10 } });
+    expect((await set(ana, { label: { x: 2, tilt: -10 } }, { view: 'members' })).error).toBeNull();
+    expect((await read(ana, 'pool', 'members'))[0].layout).toEqual({ label: { x: 2, tilt: -10 } });
     expect((await read(ana, 'pool'))[0].layout).toEqual(calendar);
     expect((await read(ana, 'pool', 'lane'))[0].layout).toEqual(lane);
   });
@@ -354,5 +354,36 @@ describe('after leaving the pool', () => {
     expect(await read(ben, 'pool')).toHaveLength(0);
     expect(await read(ana, 'pool')).toHaveLength(1);
     expect(await read(ben, 'home')).toHaveLength(1);
+  });
+});
+
+describe('Members, stored as members (0048)', () => {
+  it('still takes a write from the app before the rename, as swimmers, until 0049', async () => {
+    const old = await set(ana, { label: { y: 1 } }, { view: 'swimmers' as never });
+    expect(old.error).toBeNull();
+    const rows = await asUser(ana)
+      .from('board_layouts')
+      .select('view')
+      .eq('splash_id', splash)
+      .eq('scope', 'pool')
+      .in('view', ['swimmers', 'members']);
+    expect(new Set(rows.data!.map((r) => r.view))).toEqual(new Set(['swimmers', 'members']));
+  });
+
+  it('reads a leftover swimmers row as Members, the members row winning where both stand', async () => {
+    const { getPoolLayouts } = await import('@/lib/queries/layouts');
+    const byMembers = await getPoolLayouts(asUser(ana), pool, 'members');
+    // The members row (written by the earlier test as label x 2, tilt -10) wins.
+    expect(byMembers[splash]).toMatchObject({ label: { x: 2, tilt: -10 } });
+    // With only the old row, it is read.
+    await asAdmin()
+      .from('board_layouts')
+      .delete()
+      .eq('splash_id', splash)
+      .eq('scope', 'pool')
+      .eq('view', 'members');
+    expect((await getPoolLayouts(asUser(ana), pool, 'members'))[splash]).toEqual({
+      label: { y: 1 },
+    });
   });
 });

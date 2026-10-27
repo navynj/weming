@@ -61,7 +61,7 @@ type Sheet = 'members' | 'invite' | 'lanes' | null;
  * pool's name (going to another pool is the foot's strip), the members' initials and a `+`
  * that opens the invite link, and the settings gear; beneath it the lane
  * glyph (the pool's lanes, any member edits them), the Lane | Date |
- * Swimmers toggle, and the members icon. Pinned cards and the stair stack
+ * Members toggle, and the members icon. Pinned cards and the stair stack
  * work as on Home: cards carry their author's initials, joint splashes are
  * bands with their ripples branching off. The foot is Home · Pool · +, and
  * compose from here defaults to this pool.
@@ -84,7 +84,7 @@ export function PoolGround({
 }) {
   const router = useRouter();
   const poolId = view.pool.id;
-  // Every visit opens on the Calendar, not Swimmers (review); a view chosen
+  // Every visit opens on the Calendar, not Members (review); a view chosen
   // here holds while I stay.
   const [kind, setKind] = useState<PoolViewKind>(initialView);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -114,9 +114,9 @@ export function PoolGround({
       initials: view.members.find((m) => m.userId === me)?.initials ?? '',
     }).filter((c) => !pendingDeletes.includes(c.splash.id));
     if (!dropHere || landed) return kept;
-    // In Swimmers my drop sits in my column, and a joint splash's first ripple branches into it.
+    // In Members my drop sits in my column, and a joint splash's first ripple branches into it.
     const seated: Card =
-      kind === 'swimmers'
+      kind === 'members'
         ? {
             ...dropHere,
             column: me,
@@ -173,7 +173,7 @@ export function PoolGround({
   // at once, saved when the sliders rest; the pool's here.
   const drafts = useLayoutDrafts(shown, poolId);
   // The Lane view's own (0045): the pool's Lane layouts, read as the card's and
-  // saved as the Lane view's. Swimmers has none: its posts draw by the recipe.
+  // saved as the Lane view's. Members has none: its posts draw by the recipe.
   const laneShown = useMemo(
     () =>
       shown.map((card) => ({
@@ -185,24 +185,24 @@ export function PoolGround({
     [shown],
   );
   const laneDrafts = useLayoutDrafts(laneShown, poolId, 'lane');
-  // Swimmers' own (0047), the same way: apart from the Calendar's and the Lane view's.
-  const swimmersShown = useMemo(
+  // Members' own (0047), the same way: apart from the Calendar's and the Lane view's.
+  const membersShown = useMemo(
     () =>
       shown.map((card) => ({
         ...card,
-        layout: card.swimmersLayout?.layout,
-        layoutSource: card.swimmersLayout?.layoutSource,
-        poolLayout: card.swimmersLayout?.poolLayout,
+        layout: card.membersLayout?.layout,
+        layoutSource: card.membersLayout?.layoutSource,
+        poolLayout: card.membersLayout?.poolLayout,
       })),
     [shown],
   );
-  const swimmersDrafts = useLayoutDrafts(swimmersShown, poolId, 'swimmers');
+  const membersDrafts = useLayoutDrafts(membersShown, poolId, 'members');
   // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
   const laneKind = kind === 'lane';
-  const swimmersKind = kind === 'swimmers';
-  const viewDrafts = laneKind ? laneDrafts : swimmersKind ? swimmersDrafts : drafts;
+  const membersKind = kind === 'members';
+  const viewDrafts = laneKind ? laneDrafts : membersKind ? membersDrafts : drafts;
   const topCard = viewDrafts.drawn.find((card) => card.splash.id === heading) ?? null;
 
   const [ring, setRing] = useState<Ring | null>(() =>
@@ -358,8 +358,8 @@ export function PoolGround({
           ) : (
             <LaneGrid
               view={kind === 'date' ? 'date' : 'lane'}
-              cards={laneKind ? laneDrafts.drawn : swimmersKind ? swimmersDrafts.drawn : shown}
-              // The Calendar's pieces in the Lane view and Swimmers (review).
+              cards={laneKind ? laneDrafts.drawn : membersKind ? membersDrafts.drawn : shown}
+              // The Calendar's pieces in the Lane view and Members (review).
               pieces
               onDrawn={setRecipes}
               categories={columns}
@@ -370,7 +370,7 @@ export function PoolGround({
               scrollToMonth={null}
               onPick={bringForward}
               // A joint splash spans every column only where columns are people.
-              bands={kind === 'swimmers'}
+              bands={kind === 'members'}
             />
           )}
         </div>
@@ -392,15 +392,15 @@ export function PoolGround({
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
           {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
-          {/* The Calendar, the Lane view and Swimmers, each its own layouts. */}
-          {(boardView || laneKind || swimmersKind) && wide && topCard ? (
+          {/* The Calendar, the Lane view and Members, each its own layouts. */}
+          {(boardView || laneKind || membersKind) && wide && topCard ? (
             <LayoutPanel
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}
               source={viewDrafts.shown(topCard.splash.id).source}
               home={false}
-              view={laneKind ? 'lane' : swimmersKind ? 'swimmers' : 'calendar'}
+              view={laneKind ? 'lane' : membersKind ? 'members' : 'calendar'}
               message={viewDrafts.message}
               onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
               onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}

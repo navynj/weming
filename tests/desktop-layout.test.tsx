@@ -116,7 +116,7 @@ describe('desktop layout at 1280px', () => {
     });
   }
 
-  for (const view of ['lane', 'swimmers', 'date'] as const) {
+  for (const view of ['lane', 'members', 'date'] as const) {
     it(`Pool, ${view} view`, () => {
       const { container } = render(
         <InputSheetProvider>

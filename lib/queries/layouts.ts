@@ -2,7 +2,7 @@ import { BoardLayout, type BoardLayoutJson } from '@/features/month-board/board-
 import type { DuringClient } from '@/lib/queries/profile';
 
 /** Which view a layout is for (0045): each keeps its own values. */
-export type BoardView = 'calendar' | 'lane' | 'swimmers';
+export type BoardView = 'calendar' | 'lane' | 'members';
 
 /** A row's layout, read through the shape the database holds it to; anything else is no layout. */
 function parsed(raw: unknown): BoardLayoutJson | null {
@@ -19,19 +19,26 @@ export async function getPoolLayouts(
   poolId: string,
   view: BoardView = 'calendar',
 ): Promise<Record<string, BoardLayoutJson>> {
+  // Members was stored as 'swimmers' before 0048: until 0049 moves those
+  // rows, one is read where no 'members' row stands for its splash.
+  const views = view === 'members' ? ['members', 'swimmers'] : [view];
   const { data, error } = await supabase
     .from('board_layouts')
-    .select('splash_id, layout')
+    .select('splash_id, layout, view')
     .eq('scope', 'pool')
     .eq('pool_id', poolId)
-    .eq('view', view);
+    .in('view', views);
   if (error) throw error;
-  return Object.fromEntries(
-    (data ?? []).flatMap((row) => {
-      const layout = parsed(row.layout);
-      return layout ? [[row.splash_id, layout]] : [];
-    }),
+  const out: Record<string, BoardLayoutJson> = {};
+  // The old name first, so the new one wins where both stand.
+  const rows = [...(data ?? [])].sort(
+    (a, b) => (a.view === view ? 1 : 0) - (b.view === view ? 1 : 0),
   );
+  for (const row of rows) {
+    const layout = parsed(row.layout);
+    if (layout) out[row.splash_id] = layout;
+  }
+  return out;
 }
 
 /**

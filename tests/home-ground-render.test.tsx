@@ -1179,11 +1179,11 @@ describe('?view= (review)', () => {
       homeViewParam('x'),
     ]).toEqual(['lane', 'date', 'board', 'board', 'board']);
     expect([
-      poolViewParam('swimmers'),
+      poolViewParam('members'),
       poolViewParam('lane'),
       poolViewParam('date'),
       poolViewParam(undefined),
-    ]).toEqual(['swimmers', 'lane', 'date', 'board']);
+    ]).toEqual(['members', 'lane', 'date', 'board']);
   });
 });
 

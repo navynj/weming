@@ -222,7 +222,7 @@ export function LayoutPanel({
   onEdit: Edit;
   onRevert: () => void;
   /** Which view it edits (0045): its title says so, "Layout · Lane". */
-  view?: 'calendar' | 'lane' | 'swimmers';
+  view?: 'calendar' | 'lane' | 'members';
 }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -256,7 +256,7 @@ export function LayoutPanel({
       >
         {view === 'lane'
           ? 'Layout · Lane'
-          : view === 'swimmers'
+          : view === 'members'
             ? 'Layout · Members'
             : 'Layout · Calendar'}
         <ChevronDown aria-hidden size={16} className={open ? 'rotate-180' : ''} />

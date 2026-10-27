@@ -157,8 +157,8 @@ describe('the views’ tabs on a lane’s page (review)', () => {
       'Lane',
       'List',
     ]);
-    fireEvent.click(tabs.querySelector('[data-view-option="swimmers"]')!);
-    expect(pushed).toEqual(['/pool/p-ours?view=swimmers']);
+    fireEvent.click(tabs.querySelector('[data-view-option="members"]')!);
+    expect(pushed).toEqual(['/pool/p-ours?view=members']);
   });
 
   it('keep the ground’s two thirds and one third on a wide screen', () => {

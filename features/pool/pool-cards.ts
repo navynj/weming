@@ -4,8 +4,8 @@ import type { PoolRipple, PoolView } from '@/lib/queries/pools';
 
 import { originTag } from './origin-tag';
 
-/** A pool's views (H23). Lane, Date and Board as on Home; Swimmers by member. */
-export type PoolViewKind = 'lane' | 'date' | 'swimmers' | 'board';
+/** A pool's views (H23). Lane, Date and Board as on Home; Members by member. */
+export type PoolViewKind = 'lane' | 'date' | 'members' | 'board';
 
 /** Where a post of a pool opens: its page in the pool, coming back to this pool. */
 export function poolSplashHref(poolId: string, splashId: string): string {
@@ -13,12 +13,12 @@ export function poolSplashHref(poolId: string, splashId: string): string {
 }
 
 /**
- * The grid's columns (H23): the pool's lanes in the Lane view; in Swimmers
+ * The grid's columns (H23): the pool's lanes in the Lane view; in Members
  * the current members, me first then join order (D7) — never a former
  * member, whose kept records sit in the unlabelled column.
  */
 export function poolColumns(view: PoolView, kind: PoolViewKind): GridColumn[] {
-  if (kind === 'swimmers') {
+  if (kind === 'members') {
     return view.members
       .filter((m) => !m.former)
       .map((m) => ({ id: m.userId, name: m.name, icon: null, avatar: m.initials, href: null }));
@@ -36,7 +36,7 @@ export function poolColumns(view: PoolView, kind: PoolViewKind): GridColumn[] {
  * Every placed post and joint splash as a card, newest first, with its
  * column for the view: a placed post sits in the pool lane it was placed in,
  * or in its author's column; a joint splash is a band, each ripple a branch
- * in the band's lane (Lane) or in its author's column (Swimmers). Days are
+ * in the band's lane (Lane) or in its author's column (Members). Days are
  * read in my zone: the pool is read from where I am.
  */
 export function poolCards(
@@ -100,7 +100,7 @@ export function poolCards(
       cards.push({
         ...card,
         ...photo,
-        // With Everyone on: a band across Swimmers' members (review).
+        // With Everyone on: a band across Members' members (review).
         everyone: splash.joint_invite_all,
         // Filled with Everyone on, or once anyone besides its maker is picked (0033).
         together:
@@ -116,16 +116,16 @@ export function poolCards(
               (view.together?.[splash.id] ?? []).includes(m.userId),
           )
           .map((m) => ({ authorId: m.userId, initials: m.initials })),
-        // In Swimmers, picked: its maker's column (review); else its pool lane.
+        // In Members, picked: its maker's column (review); else its pool lane.
         column:
-          kind === 'swimmers'
+          kind === 'members'
             ? (splash.created_by ?? wrote[0] ?? undefined)
             : (splash.pool_lane_id ?? undefined),
         lane: lane ? { icon: lane.icon, name: lane.name } : null,
         origins: lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined,
         branches: blocks.map((r) => ({
           id: r.id,
-          column: kind === 'swimmers' ? r.author_id : (splash.pool_lane_id ?? ''),
+          column: kind === 'members' ? r.author_id : (splash.pool_lane_id ?? ''),
           initials: initialsOf.get(r.author_id) ?? '',
           authorId: r.author_id,
         })),
@@ -151,7 +151,7 @@ export function poolCards(
     cards.push({
       ...card,
       ...photo,
-      // Shared here with Everyone on: a band across Swimmers' members (review).
+      // Shared here with Everyone on: a band across Members' members (review).
       everyone: Boolean(placement?.inviteAll),
       ...(together
         ? {
@@ -162,12 +162,12 @@ export function poolCards(
               .map((m) => ({ authorId: m.userId, initials: m.initials })),
           }
         : {}),
-      column: kind === 'swimmers' ? splash.owner_id : placement?.poolLaneId,
+      column: kind === 'members' ? splash.owner_id : placement?.poolLaneId,
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,
       authorId: splash.owner_id,
       // Its author's face after the title, but where the column already says who.
-      authorFace: kind !== 'swimmers',
+      authorFace: kind !== 'members',
       authorName: nameOf.get(splash.owner_id),
       href,
       origins,
@@ -177,21 +177,21 @@ export function poolCards(
     });
   }
   // The calendar's layouts its members set (0025): the pool's, for every splash
-  // in it; the Lane view's (0045) and Swimmers' (0047), each kept apart.
+  // in it; the Lane view's (0045) and Members' (0047), each kept apart.
   const layouts = view.layouts ?? {};
   const laneLayouts = view.laneLayouts ?? {};
-  const swimmersLayouts = view.swimmersLayouts ?? {};
+  const membersLayouts = view.membersLayouts ?? {};
   return (
     cards
       .map((card) => {
         const layout = layouts[card.splash.id];
         const lane = laneLayouts[card.splash.id];
-        const swimmers = swimmersLayouts[card.splash.id];
+        const byMembers = membersLayouts[card.splash.id];
         return {
           ...card,
           ...(layout ? { layout, layoutSource: 'pool' as const } : {}),
           laneLayout: lane ? { layout: lane, layoutSource: 'pool' as const } : {},
-          swimmersLayout: swimmers ? { layout: swimmers, layoutSource: 'pool' as const } : {},
+          membersLayout: byMembers ? { layout: byMembers, layoutSource: 'pool' as const } : {},
         };
       })
       // What readers left, for the top card and the unseen dots (H25): every
@@ -235,7 +235,7 @@ export function poolPinned(cards: Card[], me: string, view: PoolView): Card[] {
  * A pool's own splash moved to another lane a moment ago (0020, review): it
  * shows there at once — its column in the Lane view, its lane chip and its
  * origin tag everywhere — until the re-read lands; a refusal clears the edit
- * and it goes back. Swimmers keeps its author's column.
+ * and it goes back. Members keeps its author's column.
  */
 export function withPoolMoves(
   cards: Card[],
@@ -254,7 +254,7 @@ export function withPoolMoves(
     const edit = edits[card.splash.id];
     const to = edit?.poolLane;
     if (!edit || (!to && !edit.kind)) return card;
-    const column = to ? (kind === 'swimmers' ? card.column : to.id) : card.column;
+    const column = to ? (kind === 'members' ? card.column : to.id) : card.column;
     const moved: Card = {
       ...card,
       ...(to
@@ -264,7 +264,7 @@ export function withPoolMoves(
             column,
             branches: card.branches?.map((branch) => ({
               ...branch,
-              column: kind === 'swimmers' ? branch.column : to.id,
+              column: kind === 'members' ? branch.column : to.id,
             })),
           }
         : {}),
@@ -280,7 +280,7 @@ export function withPoolMoves(
         branches: [
           {
             id: `${card.splash.id}-mine`,
-            column: kind === 'swimmers' ? me.id : (column ?? ''),
+            column: kind === 'members' ? me.id : (column ?? ''),
             initials: me.initials,
             authorId: me.id,
           },
@@ -295,7 +295,7 @@ export function withPoolMoves(
         joint: false,
         author: me.initials,
         authorId: me.id,
-        column: kind === 'swimmers' ? me.id : column,
+        column: kind === 'members' ? me.id : column,
         menu: { pin: true, delete: true },
       };
     }

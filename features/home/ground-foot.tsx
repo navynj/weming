@@ -20,7 +20,7 @@ import { UnseenDot, useStripPools } from '@/features/pool/activity';
  * square, so a pool never reads as a person (review). The place I am in wears
  * a white border; the others sit back, faded — the image only, so a pool's
  * dot for something new since my last visit stays at full strength. Tapping a place goes there; tapping the one
- * I am in walks its views (Home: Lane ↔ Date; a pool: Swimmers → Lane →
+ * I am in walks its views (Home: Lane ↔ Date; a pool: Members → Lane →
  * Date). The strip scrolls sideways, one axis per gesture.
  *
  * Two slots, CSS showing one per breakpoint so nothing moves after load: on

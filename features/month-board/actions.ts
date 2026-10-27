@@ -21,7 +21,7 @@ const Write = z.object({
   patch: BoardLayout,
   clear: z.array(z.string().min(1).max(600)).max(64),
   /** The view the layout is for (0045); the Calendar's unless said. */
-  view: z.enum(['calendar', 'lane', 'swimmers']).default('calendar'),
+  view: z.enum(['calendar', 'lane', 'members']).default('calendar'),
 });
 
 function revalidate(poolId: string | null): void {

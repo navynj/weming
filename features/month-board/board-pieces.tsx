@@ -320,7 +320,7 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 }
 
 /**
- * "Add your side" hanging from a band (review: Swimmers): the slot's own
+ * "Add your side" hanging from a band (review: Members): the slot's own
  * look — dashed white note, tilted down about its corner — under the tape in
  * my column, there only while I am one it waits for. It opens the splash to
  * write my ripple.

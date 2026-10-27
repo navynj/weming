@@ -5,13 +5,14 @@ import type { PoolViewKind } from './pool-cards';
 // remembered keys and the tests' names, the labels what the hand reads.
 export const POOL_VIEWS = [
   { value: 'board', label: 'Calendar' },
-  // Its key stays 'swimmers'; the hand reads Members (review).
-  { value: 'swimmers', label: 'Members' },
+  { value: 'members', label: 'Members' },
   { value: 'lane', label: 'Lane' },
   { value: 'date', label: 'List' },
 ] as const satisfies readonly { value: PoolViewKind; label: string }[];
 
 /** `?view=`: a pool lane page's tabs send the pool back on that view (review); anything else, the Calendar. */
 export function poolViewParam(value: string | undefined): PoolViewKind {
-  return value === 'swimmers' || value === 'lane' || value === 'date' ? value : 'board';
+  // An old link's ?view=swimmers opens Members (renamed, 0048).
+  if (value === 'swimmers') return 'members';
+  return value === 'members' || value === 'lane' || value === 'date' ? value : 'board';
 }

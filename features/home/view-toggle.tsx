@@ -39,7 +39,7 @@ export function homeViewName(view: HomeView): string {
   return HOME_VIEWS.find((v) => v.value === view)?.label ?? view;
 }
 
-/** The same toggle with any segments: a pool's Lane | Date | Swimmers (H23). */
+/** The same toggle with any segments: a pool's Lane | Date | Members (H23). */
 export function SegmentedToggle<V extends string>({
   view,
   onChange,

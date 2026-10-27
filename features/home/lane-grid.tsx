@@ -141,7 +141,7 @@ export const LaneGrid = forwardRef<
     onAvatar?: () => void;
     /**
      * A joint splash as a band across every column (H23): in a pool's
-     * Swimmers view only (review). Off, it is a mark in its own column.
+     * Members view only (review). Off, it is a mark in its own column.
      */
     bands?: boolean;
     /**
@@ -153,7 +153,7 @@ export const LaneGrid = forwardRef<
     /**
      * The Lane view drawn with the Calendar's pieces (0045): labels, stickers,
      * photo cards, faces, "Add your side" and waves, in their lane columns,
-     * a row per day. Off, a post is its mark (the Swimmers view keeps those).
+     * a row per day. Off, a post is its mark (the Members view keeps those).
      */
     pieces?: boolean;
     /** The recipe each piece is drawn with, whenever it changes: the Layout panel shows it. */
@@ -207,7 +207,7 @@ export const LaneGrid = forwardRef<
   const plusColumn = onCreateLane !== undefined;
   const drawPieces = pieces && view === 'lane';
   // A full-width band where columns are people (H23): with pieces, every
-  // joint record — a translucent tape across Swimmers, its "Add your side" in
+  // joint record — a translucent tape across Members, its "Add your side" in
   // my column (review) — and a member's own record shared with Everyone on.
   // Any other is one piece in its column (0045).
   const banded = (card: Card): boolean =>
@@ -306,7 +306,7 @@ export const LaneGrid = forwardRef<
     : share;
   const namedKey = rows.flatMap((r) => (r.kind === 'day' ? [r.day] : [])).join(',');
   // A day's segments, drawn with pieces: runs of pieces, and the bands between
-  // them in Swimmers, newest first as the stack reads (review).
+  // them in Members, newest first as the stack reads (review).
   const segmentsOf = useMemo(() => {
     const map = new Map<IsoDate, PieceSegment[]>();
     if (!drawPieces) return map;
@@ -828,7 +828,7 @@ export const LaneGrid = forwardRef<
 
 /**
  * A column's header: a lane's emoji over its name, opening its page on
- * Home; in a pool's Swimmers view a member's initials on a disc over their
+ * Home; in a pool's Members view a member's initials on a disc over their
  * name (H23). A pool's lane opens its page in the pool, as a lane's does on
  * Home (review); a member's column opens nothing.
  */
@@ -1107,7 +1107,7 @@ function markSelector(id: string): string {
 
 const NO_PIECES: [] = [];
 
-/** A day drawn with pieces: a run of pieces, or a full-width band (Swimmers, Everyone). */
+/** A day drawn with pieces: a run of pieces, or a full-width band (Members, Everyone). */
 type PieceSegment =
   { kind: 'pieces'; key: string; ids: Set<string> } | { kind: 'band'; card: Card };
 

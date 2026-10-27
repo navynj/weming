@@ -26,7 +26,7 @@ export type Card = {
   ripples: CardRipple[];
   /**
    * In a pool (H23), where the mark sits — the pool lane in the Lane view,
-   * the author in Swimmers — and what the card names as its lane. Absent on
+   * the author in Members — and what the card names as its lane. Absent on
    * Home, where both come from the post's own lane.
    */
   column?: string;
@@ -55,12 +55,12 @@ export type Card = {
   /**
    * In a pool's Calendar, Lane and List (review): its author's face after the
    * title — on every record that is not joint, mine included. Never on Home;
-   * never in Swimmers, whose column says who.
+   * never in Members, whose column says who.
    */
   authorFace?: boolean;
   /**
    * In a pool, with Everyone (review): a joint record with Everyone on, or a
-   * member's own record shared here with Everyone on. In Swimmers, drawn with
+   * member's own record shared here with Everyone on. In Members, drawn with
    * pieces, it spans every column as a band.
    */
   everyone?: boolean;
@@ -89,8 +89,8 @@ export type Card = {
     layoutSource?: LayoutSource;
     poolLayout?: BoardLayoutJson | null;
   };
-  /** In a pool, its Swimmers layout (0047): the same three, apart from both above. */
-  swimmersLayout?: {
+  /** In a pool, its Members layout (0047): the same three, apart from both above. */
+  membersLayout?: {
     layout?: BoardLayoutJson;
     layoutSource?: LayoutSource;
     poolLayout?: BoardLayoutJson | null;

@@ -1283,7 +1283,7 @@ export type LaneRow = { key: string; day: IsoDate };
  * each row as tall as its tallest lane. A ranged post is one piece on its
  * day in its column, never a band. `columnOf` places a card: its lane, or
  * its pool's column on Home; a card with none is not drawn. A row may be
- * part of a day — Swimmers sets full-width bands between — and `rowOf` then
+ * part of a day — Members sets full-width bands between — and `rowOf` then
  * says which row a card is in (its day, unless said).
  */
 export function layoutLaneBoard(
