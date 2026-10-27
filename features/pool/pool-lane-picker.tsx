@@ -92,10 +92,10 @@ export function PoolLanePicker({
           <span className="text-pool-500 flex items-center justify-between gap-3 text-xs">
             With
             <label data-together-everyone className="flex items-center gap-2">
-              <span className={everyone ? 'text-main-900 font-semibold' : ''}>Everyone</span>
+              <span className={everyone ? 'text-main-900 font-semibold' : ''}>@everyone</span>
               <Switch
                 on={everyone}
-                label="Everyone"
+                label="@everyone"
                 size="sm"
                 disabled={fixedEveryone || togetherLocked !== null}
                 onChange={() => change(toggleEveryone(together, otherIds))}

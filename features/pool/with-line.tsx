@@ -31,10 +31,10 @@ export function WithLine({
       <span className="text-pool-500 flex items-center justify-between gap-3 text-xs">
         With
         <label data-audience-everyone className="flex items-center gap-2">
-          <span className={together.everyone ? 'text-main-900 font-semibold' : ''}>Everyone</span>
+          <span className={together.everyone ? 'text-main-900 font-semibold' : ''}>@everyone</span>
           <Switch
             on={together.everyone}
-            label="Everyone"
+            label="@everyone"
             size="sm"
             onChange={() => onChange(toggleEveryone(together, ids))}
           />

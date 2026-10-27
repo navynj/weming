@@ -602,7 +602,7 @@ describe('compose from a pool (H23, 0033)', () => {
     const together = view.container.querySelector('[data-together]')!;
     expect(together.textContent).toContain('With');
     expect(together.textContent).not.toContain('Together');
-    expect(view.container.querySelector('[data-together-everyone]')!.textContent).toBe('Everyone');
+    expect(view.container.querySelector('[data-together-everyone]')!.textContent).toBe('@everyone');
     expect(everyone(view).getAttribute('aria-checked')).toBe('false');
     expect(face(view, 'a1')).toBeNull();
     expect(pressed(face(view, 'u-mina'))).toBe('false');
