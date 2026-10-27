@@ -54,7 +54,8 @@ export const WaveLayout = z
  * they meet, higher on top. Each part keeps its own offset on top of this.
  */
 export const PieceLayout = z
-  .object({ x, y, layer: z.number().int().min(0).max(5) })
+  // Under 0 goes beneath the pieces left unset (0051): the layer buttons' back.
+  .object({ x, y, layer: z.number().int().min(-20).max(20) })
   .partial()
   .strict();
 export const BoardLayout = z
