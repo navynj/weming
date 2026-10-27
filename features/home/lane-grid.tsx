@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
-import { BoardPieceView, BoardTapeView } from '@/features/month-board/board-pieces';
+import { BoardPieceView, BoardTapeView, TapeSlot } from '@/features/month-board/board-pieces';
 import { boardPhotos } from '@/features/month-board/board-layout';
 import {
   layoutLaneBoard,
@@ -206,12 +206,13 @@ export const LaneGrid = forwardRef<
 
   const plusColumn = onCreateLane !== undefined;
   const drawPieces = pieces && view === 'lane';
-  // A full-width band: with marks, a joint splash where columns are people
-  // (H23); with pieces, a record with Everyone on where columns are people —
-  // a joint one, or a member's own shared here with Everyone (review). Any
-  // other is one piece in its column (0045).
+  // A full-width band where columns are people (H23): with pieces, every
+  // joint record — a translucent tape across Swimmers, its "Add your side" in
+  // my column (review) — and a member's own record shared with Everyone on.
+  // Any other is one piece in its column (0045).
   const banded = (card: Card): boolean =>
-    bands && (drawPieces ? card.everyone === true : card.branches !== undefined);
+    bands &&
+    (drawPieces ? card.joint === true || card.everyone === true : card.branches !== undefined);
   const orphans = cards.some((card) => !banded(card) && isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
   const even = dateView || columns <= EVEN_COLUMNS_MAX;
@@ -663,8 +664,14 @@ export const LaneGrid = forwardRef<
                 <Fragment key={day}>
                   {pieceSegments.map((segment, at) => {
                     if (segment.kind === 'band') {
-                      // Everyone (review): the whole width, as the Calendar's band, with its faces.
+                      // The whole width, as the Calendar's band, with its faces (review);
+                      // when it waits for me, "Add your side" hangs from it in my column.
                       const size = laneBoard.metrics.caption.size;
+                      const myColumn = me ? columnIds.indexOf(me) : -1;
+                      const waitsForMe =
+                        myColumn >= 0 &&
+                        (segment.card.awaiting ?? []).some((face) => face.authorId === me);
+                      const tapeY = waitsForMe ? 6 : (ROW_PX - TAPE_PX) / 2;
                       return (
                         <DayRow
                           key={`band-${segment.card.splash.id}`}
@@ -689,7 +696,7 @@ export const LaneGrid = forwardRef<
                                 endsHere: true,
                                 muted: false,
                                 x: 0,
-                                y: (ROW_PX - TAPE_PX) / 2,
+                                y: tapeY,
                                 w: columnPx * Math.max(columns, 1),
                                 h: TAPE_PX,
                                 size,
@@ -699,6 +706,15 @@ export const LaneGrid = forwardRef<
                               onPick={onPick}
                               ripple={ringAt?.id === segment.card.splash.id ? ringAt.seq : null}
                             />
+                            {waitsForMe ? (
+                              <TapeSlot
+                                card={segment.card}
+                                x={myColumn * columnPx + 6}
+                                y={tapeY + TAPE_PX - 2}
+                                narrow={laneBoard.metrics.narrow}
+                                onWrite={onWrite}
+                              />
+                            ) : null}
                           </div>
                           {plusColumn ? <Cell lane="+" /> : null}
                         </DayRow>

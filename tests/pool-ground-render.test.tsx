@@ -253,13 +253,46 @@ describe('a joint splash on the grid (H23)', () => {
     expect(container.querySelector('[data-lane-band="s-joint"]')!.textContent).toContain('🏛️');
   });
 
-  it('with picked invitees, stays a piece in its maker’s column in Swimmers (review)', () => {
+  it('with picked invitees too, is a band across Swimmers, never a piece (review)', () => {
     setView('swimmers');
     const { container } = ground(A);
-    expect(container.querySelector('[data-lane-band]')).toBeNull();
-    expect(
-      container.querySelector(`[data-lane-piece="s-joint"][data-cell="${MINA}"]`),
-    ).not.toBeNull();
+    expect(container.querySelectorAll('[data-lane-band="s-joint"]')).toHaveLength(1);
+    expect(container.querySelector('[data-lane-piece="s-joint"]')).toBeNull();
+  });
+
+  it('hangs "Add your side" from its band in my column while it waits for me', () => {
+    setView('swimmers');
+    const waiting: PoolView = {
+      ...A,
+      // Mina wrote; I am picked and have not.
+      ripples: A.ripples.filter((r) => r.id !== 'r-j2'),
+      together: { 's-joint': [MINA, ME] },
+    };
+    // As the shell gives it: who I am.
+    const { container } = render(
+      <PeopleProvider me={ME} people={{}}>
+        <PoolActivityProvider activity={ACTIVITY} pools={POOLS}>
+          <InputSheetProvider>
+            <PoolGround
+              view={waiting}
+              me={ME}
+              today="2026-10-23"
+              timeZone={TZ}
+              initialView={startView}
+            />
+          </InputSheetProvider>
+        </PoolActivityProvider>
+      </PeopleProvider>,
+    );
+    const band = container.querySelector('[data-lane-band="s-joint"]')!;
+    const slot = band.querySelector<HTMLElement>('[data-tape-slot="s-joint"]')!;
+    expect(slot).not.toBeNull();
+    expect(slot.textContent).toMatch(/Add/);
+    // My column is the first (me first): it starts there.
+    expect(parseFloat(slot.style.left)).toBeLessThan(20);
+    cleanup();
+    // Written already: no note.
+    expect(ground(A).container.querySelector('[data-tape-slot]')).toBeNull();
   });
   it('shows who wrote on it on its band, each once, with no branches', () => {
     setView('swimmers');
@@ -719,7 +752,7 @@ describe('a conversion shows at once (0022)', () => {
     return null;
   }
 
-  it('my placed splash made joint, with picked invitees, stays in my column at once', () => {
+  it('my placed splash made joint is a band across Swimmers at once', () => {
     setView('swimmers');
     const { container } = render(
       <InputSheetProvider>
@@ -727,8 +760,8 @@ describe('a conversion shows at once (0022)', () => {
         <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
-    expect(container.querySelector('[data-lane-band="s-mine"]')).toBeNull();
-    expect(container.querySelector(`[data-lane-piece="s-mine"][data-cell="${ME}"]`)).not.toBeNull();
+    expect(container.querySelector('[data-lane-band="s-mine"]')).not.toBeNull();
+    expect(container.querySelector('[data-lane-piece="s-mine"]')).toBeNull();
   });
   it('a joint splash made mine is a mark under my name at once', () => {
     setView('swimmers');

@@ -316,6 +316,41 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 }
 
 /**
+ * "Add your side" hanging from a band (review: Swimmers): the slot's own
+ * look — dashed white note, tilted down about its corner — under the tape in
+ * my column, there only while I am one it waits for. It opens the splash to
+ * write my ripple.
+ */
+export function TapeSlot({
+  card,
+  x,
+  y,
+  narrow,
+  onWrite,
+}: {
+  card: Card;
+  x: number;
+  y: number;
+  narrow: boolean;
+  onWrite: (card: Card) => void;
+}) {
+  const { me } = usePeople();
+  if (me === null || !(card.awaiting ?? []).some((face) => face.authorId === me)) return null;
+  return (
+    <button
+      type="button"
+      data-tape-slot={card.splash.id}
+      aria-label={`Add your side to ${captionOf(card)}`}
+      onClick={() => onWrite(card)}
+      className="absolute z-0 flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none whitespace-nowrap text-white/80"
+      style={{ left: x, top: y, transform: 'rotate(3.5deg)', transformOrigin: 'top left' }}
+    >
+      {narrow ? 'Add' : 'Add your side'}
+    </button>
+  );
+}
+
+/**
  * An open joint splash's slot (review): a note stuck on the label after the
  * fact — a small rounded rectangle, dashed 1.5px white outline, no fill,
  * white at 80% — holding the faded faces of the current members who have
