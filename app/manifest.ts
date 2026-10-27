@@ -3,9 +3,10 @@ import type { MetadataRoute } from 'next';
 /**
  * Enough of a manifest to install, and nothing more.
  *
- * No service worker and no offline cache in P1 (v2): a diary that shows a
- * stale day is worse than one that says it cannot reach the network, and
- * getting that right is its own piece of work rather than a line here.
+ * No offline cache: a diary that shows a stale day is worse than one that
+ * says it cannot reach the network, and getting that right is its own piece
+ * of work rather than a line here. The one service worker (public/sw.js,
+ * H32) is for Web Push and has no fetch handler.
  *
  * `standalone` is the whole point — the phone's browser chrome is what makes
  * a bookmarked web page feel like a bookmarked web page.

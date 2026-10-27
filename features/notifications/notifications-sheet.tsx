@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
+import { offerInstall } from '@/features/install/install-state';
 import { Avatar } from '@/features/people/avatar';
 import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
 import { EMPTY } from '@/lib/empty-states';
@@ -59,6 +60,7 @@ export function NotificationsSheet({ onClose }: { onClose: () => void }) {
     if (!item.read) void mark([item.id]);
     onClose();
     router.push(notificationPath(item));
+    if (item.type === 'new_post' && item.invited) offerInstall();
   }
 
   const anyUnread = (items ?? []).some((n) => !n.read);
