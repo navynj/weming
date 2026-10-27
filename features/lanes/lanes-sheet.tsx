@@ -160,7 +160,7 @@ export function LanesSheet({
         role="dialog"
         aria-label="Edit lanes"
         data-lanes-sheet
-        className={`sheet-rise relative mx-auto flex max-h-[calc(100dvh-env(safe-area-inset-top,0px)-2rem)] w-full ${COLUMN_MAX_WIDTH} flex-col overflow-hidden rounded-t-[32px] bg-white`}
+        className={`surface sheet-rise relative mx-auto flex max-h-[calc(100dvh-env(safe-area-inset-top,0px)-2rem)] w-full ${COLUMN_MAX_WIDTH} flex-col overflow-hidden rounded-t-[32px] bg-white`}
       >
         <div
           className="flex min-h-0 flex-col gap-4 overflow-y-auto px-7 pt-8"

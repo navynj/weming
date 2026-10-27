@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 
 import { saveProfile } from './actions';
 import { AVATAR_ACCEPT, decodePhoto, encodeAvatar, sourceRect, type CropView } from './crop';
+import { ThemePicker } from './theme-picker';
 import { CropFrame, FRAME_PX } from './crop-frame';
 import { displayName, NAME_MAX } from './name';
 import { usePeople } from './people-provider';
@@ -23,7 +24,11 @@ type Photo =
   { kind: 'keep' } | { kind: 'remove' } | { kind: 'new'; image: HTMLImageElement; view: CropView };
 
 /**
- * My profile (0018): a bottom sheet from my avatar on Home, at every width.
+ * Settings (0018, 0032): a bottom sheet from the strip's gear, before my
+ * face, at every width — my photo and name, then my theme. The theme applies
+ * the moment it is picked and saves on its own; Save is for the profile.
+ *
+ * My profile (0018): a bottom sheet, at every width.
  * Tap the large avatar to pick a photo, crop it square; "Remove photo" goes
  * back to initials; the name is 1–40 characters. Save shows the new face on
  * every surface at once and the upload and save run behind it; a refusal
@@ -113,9 +118,10 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
       />
       <section
         role="dialog"
-        aria-label="Profile"
+        aria-label="Settings"
         data-profile-sheet
-        className={`sheet-rise relative mx-auto flex w-full ${COLUMN_MAX_WIDTH} ${SHEET_MAX_HEIGHT} flex-col overflow-hidden rounded-t-[32px] bg-white`}
+        data-settings-sheet
+        className={`surface sheet-rise relative mx-auto flex w-full ${COLUMN_MAX_WIDTH} ${SHEET_MAX_HEIGHT} flex-col overflow-hidden rounded-t-[32px] bg-white`}
       >
         <div
           className="flex min-h-0 flex-col items-center gap-5 overflow-y-auto px-7 pt-8"
@@ -193,6 +199,8 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
               </span>
             )}
           </label>
+
+          <ThemePicker />
 
           <div className="flex w-full gap-3">
             <button

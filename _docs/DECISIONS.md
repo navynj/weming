@@ -555,3 +555,11 @@ A member's column in Swimmers opens nothing.
 - **Unchanged:** the peeking cards on the upper and lower stair; the unseen dot beside a thread avatar; the pool's *new since last visit* dot.
 - **Removed with the board's:** the 0030 functions `splash_reaction_summary` and `splash_reply_preview` are no longer called by the app. They stay in the database, unread, on the drop list of the next migration (Sharing model v2, ROADMAP), where their removal asks for approval.
 
+**H26. A theme: one colour and a mode (0032, 2026-10-26).** Asked by Yoonji; each part:
+- **Colour:** one of eleven, chosen in Settings and kept on the account (`profiles.theme_color`): red, orange, yellow, green, lime, sky, blue (the default and the old water), purple, pink, brown, black. Each is deep enough that white on it reads at 3:1 at least, so dark mode's white labels hold on every one; yellow is a mustard and lime a leaf green for that reason. Indigo was asked for and then removed; black was added.
+- **Mode** (`profiles.theme_mode`): **dark** is the colour as the water ground with white on it, the ground as it always was; **light** is a white ground where what was white on it (labels, marks, text, ropes) takes the colour, and the colour inside those labels turns white.
+- **How:** the main ramp is mixed from the colour (`--theme-900`), worn on `<html>` from the server's first paint. Light mode swaps `--color-white` and `--color-main-900` inside `.water-ground` alone. A white card, menu or sheet on the ground carries `surface` to stay white with ink, its edge a hairline in light mode. Pages and sheets above the water are untouched.
+- **Settings:** the strip's gear, before my face, opens one sheet: my photo, my name, then the theme. The theme applies the moment it is picked and saves on its own. The header gear on Home and on my lane page goes; a pool's header gear still opens its settings.
+- **Supersedes:** SPEC 7's "dark mode must be a night pool, never inverted": light mode is an inversion of the ground, chosen.
+- **Black and selection:** with the black theme, the action colour and ink (the selection fill, H20f) are nearly the same. Accepted for now; a selected chip still reads by its fill against the white sheet.
+

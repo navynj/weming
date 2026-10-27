@@ -346,17 +346,18 @@ describe('Swimmers (H23)', () => {
 });
 
 describe('switching pools (H23)', () => {
-  it('lists my face then my pools on the strip, the current one ringed, news dotted', () => {
+  it('lists settings, my face, then my pools on the strip, the current one ringed, news dotted', () => {
     const { container } = ground(A);
     const strip = container.querySelector('[data-home-foot="phone"] [data-place-strip]')!;
     const order = [...strip.children].map(
       (el) =>
+        (el.hasAttribute('data-strip-settings') && 'settings') ||
         (el.hasAttribute('data-strip-home') && 'home') ||
         el.getAttribute('data-strip-pool') ||
         (el.hasAttribute('data-strip-new') && 'new'),
     );
     // The order I joined them in, newest first; the `+` closes the strip.
-    expect(order).toEqual(['home', 'p-a', 'p-b', 'new']);
+    expect(order).toEqual(['settings', 'home', 'p-a', 'p-b', 'new']);
     const current = strip.querySelector('[data-strip-pool="p-a"]')!;
     expect(current.getAttribute('aria-current')).toBe('page');
     // Selected: a white border, and a pool is a rounded square, not a circle.

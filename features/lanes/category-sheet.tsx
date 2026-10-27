@@ -58,7 +58,7 @@ export function CategorySheet({
       <section
         role="dialog"
         aria-label={category ? 'Edit this lane' : 'New lane'}
-        className="sheet-rise relative flex flex-col gap-4 rounded-t-3xl bg-white px-5 pt-5"
+        className="surface sheet-rise relative flex flex-col gap-4 rounded-t-3xl bg-white px-5 pt-5"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <div className="flex items-center gap-3">
