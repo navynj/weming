@@ -132,6 +132,8 @@ type Edit = {
   }[];
   /** My pool record: With in its pool, when it changed (0035). */
   ownTogether: { everyone: boolean; picked: string[] } | null;
+  /** A joint record I made: its whole With, when it changed (0043). */
+  jointTogether: { everyone: boolean; picked: string[] } | null;
   /** A joint record: members added in Together (0033), and Everyone turned on. */
   invite: string[];
   /** The description when it changed (0037); empty takes it off. */
@@ -382,6 +384,7 @@ function EditForm({
           : [],
       invite: lanes.invite,
       ownTogether: lanes.ownTogether ?? null,
+      jointTogether: lanes.jointTogether ?? null,
       inviteEveryone: lanes.inviteEveryone,
       poolId: initial.poolId,
       poolLaneId: null,

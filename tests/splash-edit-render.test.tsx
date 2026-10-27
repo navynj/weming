@@ -30,6 +30,8 @@ const JOINT = {
   othersWrote: true,
   invitees: [],
   inviteAll: false,
+  isMaker: false,
+  writerIds: ['me', 'u-mina'],
   laneNames: {
     'l-games': { name: 'Games', icon: '🎲', poolId: 'p-ours' },
     'l-media': { name: 'Media', icon: '🎬', poolId: 'p-ours' },
@@ -440,6 +442,35 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     expect(everyone(view).getAttribute('aria-checked')).toBe('true');
     expect(everyone(view).disabled).toBe(true);
     expect(face(view, 'u-jae').disabled).toBe(true);
+  });
+
+  it('from a pool: its maker turns Everyone off and keeps some; a writer taken off is named (0043)', async () => {
+    const view = await sheet({ othersWrote: true, inviteAll: true, isMaker: true }, SCOPE);
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
+    expect(everyone(view).disabled).toBe(false);
+    // Deselecting a face turns Everyone off and keeps the rest.
+    fireEvent.click(face(view, 'u-mina'));
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
+    expect(warnings(view).join(' ')).toContain('Mina has written here. What they wrote stays.');
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      kind: 'joint',
+      jointTogether: { everyone: false, picked: ['u-jae'] },
+      invite: [],
+      inviteEveryone: false,
+    });
+  });
+
+  it('from a pool: its maker takes off someone picked who has not written, with no note', async () => {
+    const view = await sheet(
+      { othersWrote: true, invitees: ['me', 'u-jae'], isMaker: true },
+      SCOPE,
+    );
+    expect(face(view, 'u-jae').disabled).toBe(false);
+    fireEvent.click(face(view, 'u-jae'));
+    expect(warnings(view).join(' ')).not.toContain('written here');
+    await save(view);
+    expect(saved[0]).toMatchObject({ jointTogether: { everyone: false, picked: [] } });
   });
 
   it('from a pool: a joint record offers no Make it mine — that is done from Home', async () => {

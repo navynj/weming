@@ -1298,6 +1298,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_joint_together: {
+        Args: { p_everyone: boolean; p_splash: string; p_users: string[] }
+        Returns: undefined
+      }
       set_lane_links: {
         Args: { p_links: Json; p_pool: string }
         Returns: undefined

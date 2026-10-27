@@ -33,6 +33,8 @@ type Loaded = Extract<SplashEditState, { ok: true }>;
 export type EditLanes = {
   /** My pool record: With in its pool, when it changed (0035). */
   ownTogether?: Together | null;
+  /** A joint record I made: its whole With, when it changed (0043). */
+  jointTogether?: Together | null;
   conversion: Conversion;
   /** Mine from Home: the lane chosen (its declaration). */
   laneId: string | null;
@@ -63,7 +65,7 @@ export function useEditLanes(
   pool: PoolScope | null,
 ): EditLanes {
   const { categories, links, pools } = context;
-  const { me } = usePeople();
+  const { me, people } = usePeople();
   const poolName = (id: string): string => pools.find((p) => p.id === id)?.name ?? 'its Pool';
   const current: Current = {
     kind: initial.kind,
@@ -82,11 +84,16 @@ export function useEditLanes(
 
   // From a pool: the chosen pool lane and Together.
   const [chosenLane, setChosenLane] = useState<string | null>(null);
+  // A joint record its maker edits: its whole With, Everyone included (0043).
+  const makerWith: Together | null =
+    initial.kind === 'joint' && initial.isMaker
+      ? { everyone: initial.inviteAll, picked: initial.invitees.filter((id) => id !== me) }
+      : null;
   // A joint record: people added. My pool record: With in its pool (0035).
   const [together, setTogether] = useState<Together>(
     initial.kind === 'own' && initial.ownTogether
       ? initial.ownTogether
-      : { everyone: false, picked: [] },
+      : (makerWith ?? { everyone: false, picked: [] }),
   );
   const poolLane = chosenLane ?? hereLane;
   // From Home: my lane, the Audience, or (a joint someone else wrote in) a pool lane.
@@ -101,14 +108,28 @@ export function useEditLanes(
 
   if (pool && inPool) {
     const joint = initial.kind === 'joint';
-    const fixed = joint ? initial.invitees.filter((id) => id !== me) : [];
-    // My own record: With is not offered, so it never becomes joint here;
-    // a joint record's With only adds people (Yoonji, in the session).
+    // My own record: With is not offered, so it never becomes joint here.
+    // A joint record's With only adds people, unless I made it: then it is
+    // mine to change, Everyone and all (0043, Yoonji, in the session).
+    const fixed = joint && !makerWith ? initial.invitees.filter((id) => id !== me) : [];
     const conversion = poolLane
       ? planFromPool(current, pool, poolLane, [], false)
       : ({ op: 'none' } as const);
     const removed = removedFrom(current, pool.poolId).map(poolName);
-    const adding = joint && !initial.inviteAll;
+    const adding = joint && !makerWith && !initial.inviteAll;
+    const sorted = (t: Together): string =>
+      JSON.stringify({ everyone: t.everyone, picked: [...t.picked].sort() });
+    const jointChanged = makerWith !== null && sorted(together) !== sorted(makerWith);
+    // Taken off: their slot goes; what they wrote stays, and their face (0043).
+    const dropped = makerWith
+      ? (makerWith.everyone ? [...initial.writerIds] : makerWith.picked).filter(
+          (id) =>
+            id !== me &&
+            initial.writerIds.includes(id) &&
+            !together.everyone &&
+            !together.picked.includes(id),
+        )
+      : [];
     const inviteEveryone = adding && together.everyone;
     const invite =
       adding && !together.everyone ? together.picked.filter((id) => !fixed.includes(id)) : [];
@@ -128,7 +149,13 @@ export function useEditLanes(
       invite,
       inviteEveryone,
       ownTogether: ownChanged ? together : null,
-      changed: conversion.op !== 'none' || invite.length > 0 || inviteEveryone || ownChanged,
+      jointTogether: jointChanged ? together : null,
+      changed:
+        conversion.op !== 'none' ||
+        invite.length > 0 ||
+        inviteEveryone ||
+        ownChanged ||
+        jointChanged,
       confirm:
         conversion.op === 'to_joint' && initial.kind !== 'joint'
           ? { pool: pool.poolName, removed }
@@ -142,15 +169,29 @@ export function useEditLanes(
             together={together}
             onTogether={setTogether}
             fixed={fixed}
-            fixedEveryone={joint && initial.inviteAll}
+            fixedEveryone={joint && !makerWith && initial.inviteAll}
             withTogether={joint || initial.kind === 'own'}
           />
           <Notes
-            lines={
-              conversion.op === 'to_joint' && removed.length > 0
+            lines={[
+              ...(conversion.op === 'to_joint' && removed.length > 0
                 ? [`It will be removed from ${removed.join(', ')}.`]
-                : []
-            }
+                : []),
+              ...(dropped.length > 0
+                ? [
+                    `${dropped
+                      .map(
+                        (id) =>
+                          pool.members.find((m) => m.id === id)?.name ??
+                          people[id]?.name ??
+                          'Someone',
+                      )
+                      .join(', ')} ${
+                      dropped.length === 1 ? 'has' : 'have'
+                    } written here. What they wrote stays.`,
+                  ]
+                : []),
+            ]}
           />
         </div>
       ),

@@ -45,6 +45,10 @@ export type SplashEditState =
       invitees: string[];
       /** A joint record: together with everyone (0033). */
       inviteAll: boolean;
+      /** A joint record: I made it, so I may take people off its With (0043). */
+      isMaker: boolean;
+      /** Who has a ripple on it, for "has written here" when taken off (0043). */
+      writerIds: string[];
       /** Every pool lane of my pools, for the sheet's warnings: "It will move to <lane>". */
       laneNames: Record<string, { name: string; icon: string | null; poolId: string }>;
     }
@@ -73,7 +77,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     supabase
       .from('splashes')
       .select(
-        'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, description, declared_start, declared_end, declared_lane_id, joint_invite_all',
+        'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, description, declared_start, declared_end, declared_lane_id, joint_invite_all, created_by',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -135,6 +139,8 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     othersWrote: (writers ?? []).some((w) => w.author_id !== user.id),
     invitees: joint ? (invited[id] ?? []) : [],
     inviteAll: splash.joint_invite_all,
+    isMaker: joint && splash.created_by === user.id,
+    writerIds: [...new Set((writers ?? []).map((w) => w.author_id))],
     laneNames: Object.fromEntries(
       (allLanes ?? []).map((l) => [l.id, { name: l.name, icon: l.icon, poolId: l.pool_id }]),
     ),
@@ -243,6 +249,11 @@ const Edit = z.object({
   /** A joint record: members added in Together (0033), or Everyone turned on. */
   invite: z.array(z.uuid()).max(64).default([]),
   inviteEveryone: z.boolean().default(false),
+  /** Its maker's whole With (0043): replaces the list, Everyone on or off. */
+  jointTogether: z
+    .object({ everyone: z.boolean(), picked: z.array(z.uuid()).max(64) })
+    .nullable()
+    .default(null),
   poolId: z.uuid().nullable(),
   /** A pool's own splash: the pool lane it moves to, when it moved (0020). */
   poolLaneId: z.uuid().nullable(),
@@ -275,7 +286,14 @@ export async function saveSplashEdit(
       })
       .eq('id', edit.id);
     if (error) return { ok: false, message: error.message };
-    if (edit.invite.length > 0 || edit.inviteEveryone) {
+    if (edit.jointTogether) {
+      const { error: setError } = await supabase.rpc('set_joint_together', {
+        p_splash: edit.id,
+        p_users: edit.jointTogether.picked,
+        p_everyone: edit.jointTogether.everyone,
+      });
+      if (setError) return refused(setError);
+    } else if (edit.invite.length > 0 || edit.inviteEveryone) {
       const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
         p_splash: edit.id,
         p_users: edit.invite,
