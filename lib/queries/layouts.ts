@@ -19,26 +19,19 @@ export async function getPoolLayouts(
   poolId: string,
   view: BoardView = 'calendar',
 ): Promise<Record<string, BoardLayoutJson>> {
-  // Members was stored as 'swimmers' before 0048: until 0049 moves those
-  // rows, one is read where no 'members' row stands for its splash.
-  const views = view === 'members' ? ['members', 'swimmers'] : [view];
   const { data, error } = await supabase
     .from('board_layouts')
-    .select('splash_id, layout, view')
+    .select('splash_id, layout')
     .eq('scope', 'pool')
     .eq('pool_id', poolId)
-    .in('view', views);
+    .eq('view', view);
   if (error) throw error;
-  const out: Record<string, BoardLayoutJson> = {};
-  // The old name first, so the new one wins where both stand.
-  const rows = [...(data ?? [])].sort(
-    (a, b) => (a.view === view ? 1 : 0) - (b.view === view ? 1 : 0),
+  return Object.fromEntries(
+    (data ?? []).flatMap((row) => {
+      const layout = parsed(row.layout);
+      return layout ? [[row.splash_id, layout]] : [];
+    }),
   );
-  for (const row of rows) {
-    const layout = parsed(row.layout);
-    if (layout) out[row.splash_id] = layout;
-  }
-  return out;
 }
 
 /**
