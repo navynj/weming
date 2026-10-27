@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { saveLane } from '@/features/lanes/actions';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { PoolView } from '@/lib/queries/pools';
+import type { PoolNotificationPrefs } from '@/lib/queries/notifications';
+import { PoolNotifications } from '@/features/notifications/pool-notifications';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { PoolPhotoField, previewOf, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
@@ -19,17 +21,19 @@ import { PrimaryButton, StepPage } from './step-page';
 
 /**
  * Pool settings (H23): the invite link, the creator's name and photo (0021,
- * 0024), and under Advanced, Connect your lanes (0033): links and their two
+ * 0024), notifications (H32), and under Advanced, Connect your lanes (0033): links and their two
  * defaults. Unlinking switches nothing off and moves no record.
  */
 export function PoolSettings({
   view,
   categories,
   me,
+  notifications,
 }: {
   view: PoolView;
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   me: string;
+  notifications: PoolNotificationPrefs;
 }) {
   const router = useRouter();
   const poolId = view.pool.id;
@@ -160,6 +164,12 @@ export function PoolSettings({
           </p>
         ) : null}
       </section>
+
+      <PoolNotifications
+        poolId={poolId}
+        isCreator={view.pool.ownerId === me}
+        prefs={notifications}
+      />
 
       <section data-settings-advanced className="mt-12 flex flex-1 flex-col">
         <button
