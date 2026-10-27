@@ -16,7 +16,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
+import { ON_PIECE } from '@/features/month-board/board-handles';
 import { BoardPieceView, BoardTapeView, TapeSlot } from '@/features/month-board/board-pieces';
+import type { BoardEditing } from '@/features/month-board/use-board-editing';
 import { boardPhotos } from '@/features/month-board/board-layout';
 import {
   layoutLaneBoard,
@@ -158,6 +160,8 @@ export const LaneGrid = forwardRef<
     pieces?: boolean;
     /** The recipe each piece is drawn with, whenever it changes: the Layout panel shows it. */
     onDrawn?: (recipes: Record<string, Recipe>) => void;
+    /** Direct manipulation on the pieces (review): taps go through it. */
+    editing?: BoardEditing | null;
   }
 >(function LaneGrid(
   {
@@ -175,6 +179,7 @@ export const LaneGrid = forwardRef<
     view = 'lane',
     pieces = false,
     onDrawn,
+    editing = null,
   },
   ref,
 ) {
@@ -509,6 +514,12 @@ export const LaneGrid = forwardRef<
       ref={scroller}
       data-lane-grid
       data-columns={even ? 'even' : 'fixed'}
+      // A tap anywhere off the pieces lets the active one go (review).
+      onClick={(event) => {
+        if (!editing?.activeId) return;
+        if ((event.target as Element).closest(ON_PIECE)) return;
+        editing.deactivate();
+      }}
       className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
     >
       {/* The avatar: large, centred, scrolling away with the days. */}
@@ -703,6 +714,7 @@ export const LaneGrid = forwardRef<
                               metrics={laneBoard.metrics}
                               onPick={onPick}
                               ripple={ringAt?.id === segment.card.splash.id ? ringAt.seq : null}
+                              editing={editing}
                             />
                             {waitsForMe ? (
                               <TapeSlot
@@ -768,6 +780,7 @@ export const LaneGrid = forwardRef<
                                     onWrite={onWrite}
                                     ripple={ringAt?.id === piece.id ? ringAt.seq : null}
                                     plunge={false}
+                                    editing={editing}
                                   />
                                 </div>
                               ))}

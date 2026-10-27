@@ -32,6 +32,8 @@ const UP = 1;
  */
 export const SIDEWAYS = false;
 
+/** Collapsed while a piece is edited on a phone (review): the top card's title strip alone. */
+export const COLLAPSED_PX = 44;
 /** Low (the Board view on a phone): a shorter top card and one step, so the board above gets the height (review). */
 const LOW_CARD_PX = 128;
 const LOW_DOWN = 1;
@@ -176,6 +178,7 @@ export function StairBoard({
   onDelete,
   hrefFor,
   low = false,
+  collapsed = false,
 }: {
   /** Newest first, in the order `flip.ids` follows. */
   cards: Card[];
@@ -189,6 +192,12 @@ export function StairBoard({
   hrefFor?: (id: string) => string;
   /** On a phone: a shorter card and one step, giving the room above to the Board view. */
   low?: boolean;
+  /**
+   * On a phone, while a piece on the board is edited by hand (review): the
+   * stack folds to its top card's title strip so the board gets the room,
+   * and comes back whole when the piece is let go.
+   */
+  collapsed?: boolean;
 }) {
   const { ids, n, next, bringForward } = flip;
   const byId = new Map(cards.map((card) => [card.splash.id, card]));
@@ -319,6 +328,26 @@ export function StairBoard({
   const last = Math.min(ids.length - 1, Math.max(n, next) + stair.down);
   const pages: number[] = [];
   for (let i = first; i <= last; i += 1) pages.push(i);
+
+  const top = flip.heading ? byId.get(flip.heading) : undefined;
+  if (collapsed && !wide && top) {
+    const lane = laneOfCard(top, categories);
+    return (
+      <div ref={box} data-diving-board data-board="stair" className="relative z-10 shrink-0 px-4">
+        <div
+          data-stack-collapsed={top.splash.id}
+          // A white card on the ground stays white with ink (0032).
+          className="surface surface-edge text-ink flex items-center gap-2 overflow-hidden rounded-[22px] bg-white px-4 text-sm font-semibold"
+          style={{ height: COLLAPSED_PX }}
+        >
+          {lane?.icon ? <span aria-hidden>{lane.icon}</span> : null}
+          <span className="min-w-0 truncate">
+            {top.splash.title.trim() || top.splash.ghostTitle || 'Untitled'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -23,6 +23,8 @@ import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { LayoutPanel } from '@/features/month-board/layout-panel';
+import { LayoutSheet } from '@/features/month-board/layout-sheet';
+import { useBoardEditing, useLayoutHistory } from '@/features/month-board/use-board-editing';
 import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
@@ -171,7 +173,9 @@ export function PoolGround({
   const { heading, bringForward } = flip;
   // The calendar's hand-set layouts as the panel edits them (review): drawn
   // at once, saved when the sliders rest; the pool's here.
-  const drafts = useLayoutDrafts(shown, poolId);
+  // Each save the database takes, kept to undo per piece and view until I leave (review).
+  const history = useLayoutHistory();
+  const drafts = useLayoutDrafts(shown, poolId, 'calendar', history.recorders.calendar);
   // The Lane view's own (0045): the pool's Lane layouts, read as the card's and
   // saved as the Lane view's. Members has none: its posts draw by the recipe.
   const laneShown = useMemo(
@@ -184,7 +188,7 @@ export function PoolGround({
       })),
     [shown],
   );
-  const laneDrafts = useLayoutDrafts(laneShown, poolId, 'lane');
+  const laneDrafts = useLayoutDrafts(laneShown, poolId, 'lane', history.recorders.lane);
   // Members' own (0047), the same way: apart from the Calendar's and the Lane view's.
   const membersShown = useMemo(
     () =>
@@ -196,7 +200,7 @@ export function PoolGround({
       })),
     [shown],
   );
-  const membersDrafts = useLayoutDrafts(membersShown, poolId, 'members');
+  const membersDrafts = useLayoutDrafts(membersShown, poolId, 'members', history.recorders.members);
   // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
@@ -234,6 +238,22 @@ export function PoolGround({
     return monthKey(top ? top.day : today);
   });
   const boardView = kind === 'board';
+  // Direct manipulation (review): a second tap on the top card's piece edits
+  // it by hand — for a current member alone, as the pool's layouts are theirs
+  // (0025). More opens the panel on a desktop and the sheet on a phone.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const member = view.members.some((m) => m.userId === me && !m.former);
+  const editing = useBoardEditing({
+    drafts: viewDrafts,
+    history,
+    view: laneKind ? 'lane' : membersKind ? 'members' : 'calendar',
+    topId: heading,
+    canEdit: member && (boardView || laneKind || membersKind),
+    onPick: bringForward,
+    onMore: () => (wide ? setPanelOpen(true) : setSheetOpen(true)),
+  });
+  if (sheetOpen && editing.activeId === null) setSheetOpen(false);
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
   const current = view.members.filter((m) => !m.former);
   const laneNames = view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }));
@@ -353,6 +373,7 @@ export function PoolGround({
                 onPick={bringForward}
                 lanes={laneNames}
                 onDrawn={setRecipes}
+                editing={editing}
               />
             </BoardFrame>
           ) : (
@@ -371,6 +392,7 @@ export function PoolGround({
               onPick={bringForward}
               // A joint splash spans every column only where columns are people.
               bands={kind === 'members'}
+              editing={laneKind || membersKind ? editing : null}
             />
           )}
         </div>
@@ -389,6 +411,7 @@ export function PoolGround({
             onPin={pin}
             onDelete={remove}
             low={boardView}
+            collapsed={editing.activeId !== null}
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
           {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
@@ -404,6 +427,22 @@ export function PoolGround({
               message={viewDrafts.message}
               onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
               onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}
+              open={panelOpen}
+              onOpenChange={setPanelOpen}
+            />
+          ) : null}
+          {sheetOpen && !wide && topCard ? (
+            <LayoutSheet
+              card={topCard}
+              recipe={recipes[topCard.splash.id] ?? null}
+              layout={viewDrafts.shown(topCard.splash.id).layout}
+              source={viewDrafts.shown(topCard.splash.id).source}
+              home={false}
+              view={laneKind ? 'lane' : membersKind ? 'members' : 'calendar'}
+              message={viewDrafts.message}
+              onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
+              onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}
+              onClose={() => setSheetOpen(false)}
             />
           ) : null}
           <GroundFoot
