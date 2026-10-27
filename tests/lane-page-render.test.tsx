@@ -153,7 +153,7 @@ describe('the views’ tabs on a lane’s page (review)', () => {
     const tabs = container.querySelector('[data-lane-tabs]')!;
     expect([...tabs.querySelectorAll('[data-view-option]')].map((o) => o.textContent)).toEqual([
       'Calendar',
-      'Swimmers',
+      'Members',
       'Lane',
       'List',
     ]);

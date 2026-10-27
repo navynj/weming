@@ -257,7 +257,7 @@ export function LayoutPanel({
         {view === 'lane'
           ? 'Layout · Lane'
           : view === 'swimmers'
-            ? 'Layout · Swimmers'
+            ? 'Layout · Members'
             : 'Layout · Calendar'}
         <ChevronDown aria-hidden size={16} className={open ? 'rotate-180' : ''} />
       </button>

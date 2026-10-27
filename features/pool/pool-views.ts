@@ -1,11 +1,12 @@
 import type { PoolViewKind } from './pool-cards';
 
-// Calendar | Swimmers | Lane | List (review): the calendar first, then its
+// Calendar | Members | Lane | List (review): the calendar first, then its
 // people; re-tapping Pool walks them in this order. The values are the
 // remembered keys and the tests' names, the labels what the hand reads.
 export const POOL_VIEWS = [
   { value: 'board', label: 'Calendar' },
-  { value: 'swimmers', label: 'Swimmers' },
+  // Its key stays 'swimmers'; the hand reads Members (review).
+  { value: 'swimmers', label: 'Members' },
   { value: 'lane', label: 'Lane' },
   { value: 'date', label: 'List' },
 ] as const satisfies readonly { value: PoolViewKind; label: string }[];
