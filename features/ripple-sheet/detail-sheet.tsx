@@ -17,6 +17,7 @@ import { rippleDurationMinutes, rippleKind } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
 
 import { deleteRipple, setRippleLock } from './actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * The Ripple detail half-sheet (SPEC 6, H17): category · note, the
@@ -91,7 +92,11 @@ export function DetailSheet({
               {splashTitle ? <span className="text-ink">· {splashTitle}</span> : null}
             </p>
             <p className="text-ink text-base">
-              {ripple.note ?? <span className="text-pool-500">No note</span>}
+              {ripple.note ? (
+                <LinkedText text={ripple.note} />
+              ) : (
+                <span className="text-pool-500">No note</span>
+              )}
             </p>
           </div>
 

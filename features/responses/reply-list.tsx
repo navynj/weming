@@ -7,6 +7,7 @@ import { usePeople } from '@/features/people/people-provider';
 
 import { relativeTime, type ReplyRow } from './model';
 import { ReplyInput } from './reply-input';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /** A reply's face: small, beside its words. */
 const FACE_PX = 16;
@@ -90,7 +91,9 @@ export function ReplyList({
                 ) : reply.body === null ? (
                   <p className="text-pool-500 text-sm italic">Hidden by the author</p>
                 ) : (
-                  <p className="text-ink text-sm break-words whitespace-pre-wrap">{reply.body}</p>
+                  <p className="text-ink text-sm break-words whitespace-pre-wrap">
+                    <LinkedText text={reply.body} />
+                  </p>
                 )}
                 {reply.hidden && reply.body !== null ? (
                   <p className="text-pool-500 text-[11px] italic">Hidden by the author</p>

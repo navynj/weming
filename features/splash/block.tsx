@@ -9,6 +9,7 @@ import type { IsoDate } from '@/lib/time';
 
 import { blockDay, isRange } from './block-day';
 import type { DateRange } from './summary';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /** `Aug 17`, from an ISO date. */
 export function shortDay(date: IsoDate): string {
@@ -70,7 +71,7 @@ export function BlockView({
 
       {block.note ? (
         <p data-block-body className="text-ink text-[15px]/[1.65] whitespace-pre-wrap">
-          {block.note}
+          <LinkedText text={block.note} />
         </p>
       ) : null}
 

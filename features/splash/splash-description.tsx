@@ -1,6 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A splash's description (0037, Yoonji, in the session): optional, so it
@@ -77,7 +78,7 @@ export function SplashDescription({
           </button>
         ) : (
           <p data-splash-description className="text-ink/80 text-sm/relaxed whitespace-pre-wrap">
-            {value}
+            <LinkedText text={value} />
           </p>
         )
       ) : (

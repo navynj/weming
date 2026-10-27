@@ -16,6 +16,7 @@ import { useRippleResponses } from '@/features/responses/use-ripple-responses';
 
 import { CardPhotos } from './card-photos';
 import { cardDate, postIcon, type Card, type CardLane, type CardPhoto } from './grid';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /** The top card's height, fixed so the grid above never moves when the stack changes. */
 export const CARD_PX = 200;
@@ -228,7 +229,7 @@ export function CardFace({
                 <span data-card-ripple={ripple.id} className="flex flex-col">
                   {ripple.note ? (
                     <span className="text-ink/80 text-[13px]/relaxed whitespace-pre-wrap">
-                      {ripple.note}
+                      <LinkedText text={ripple.note} />
                     </span>
                   ) : null}
                   <CardPhotos
