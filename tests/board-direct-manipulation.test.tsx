@@ -201,6 +201,39 @@ async function drag(
   if (release) fireEvent.pointerUp(window, at(...to));
 }
 
+/** Waits out `n` frames: a release that holds a corner settles over a few before it saves. */
+async function frames(n: number): Promise<void> {
+  for (let i = 0; i < n; i += 1)
+    await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+}
+
+/**
+ * jsdom draws nothing: the frame's corner markers read the part's box as
+ * the browser would — its side from its style, centred at (50, 50) plus its
+ * translate — so a size change grows it from the middle, as the engine
+ * draws it, and a held corner has to be put back.
+ */
+function drawCorners(): () => void {
+  const real = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function rect(this: Element): DOMRect {
+    const corner = (this as HTMLElement).dataset?.editCorner;
+    if (!corner) return real.call(this);
+    const part = this.closest<HTMLElement>('[data-board-photo-card], [data-board-sticker]')!;
+    const side = parseFloat(part.style.width);
+    const shift = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(part.style.transform ?? '');
+    const cx = 50 + (shift ? Number(shift[1]) : 0);
+    const cy = 50 + (shift ? Number(shift[2]) : 0);
+    const half = corner === 'tl' ? -side / 2 : side / 2;
+    const x = cx + half;
+    const y = cy + half;
+    return { left: x, top: y, x, y, right: x, bottom: y, width: 0, height: 0 } as DOMRect;
+  };
+  return () => {
+    Element.prototype.getBoundingClientRect = real;
+  };
+}
+let undraw: (() => void) | null = null;
+
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -213,6 +246,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  undraw?.();
+  undraw = null;
 });
 
 describe('direct manipulation: which tap does what (review, 2026-10-27)', () => {
@@ -226,8 +261,8 @@ describe('direct manipulation: which tap does what (review, 2026-10-27)', () => 
     fireEvent.click(label(container, 's1'));
     expect(q(container, '[data-board-piece="s1"] [data-edit-frame="label"]')).not.toBeNull();
     expect(q(container, '[data-board-piece="s1"] [data-edit-toolbar]')).not.toBeNull();
-    // The label moves and turns; its size is the toolbar's stepper.
-    expect(q(container, '[data-edit-frame="label"]').dataset.editTools).toBe('move rotate');
+    // The label moves, turns and widens; its text size is the toolbar's stepper.
+    expect(q(container, '[data-edit-frame="label"]').dataset.editTools).toBe('move rotate width');
     expect(q(container, '[data-edit-text-value]').textContent).toBe('10');
   });
 
@@ -318,7 +353,8 @@ describe('direct manipulation: handles write layout units, once on release', () 
     expect(saved).toHaveLength(2);
   });
 
-  it('sizes a sticker from its corner, in the board’s line heights', async () => {
+  it('sizes a sticker from its corner, one to one, the opposite corner held in place', async () => {
+    undraw = drawCorners();
     const { container } = home([
       card('s2', 'Lynn Canyon', '2026-10-22', { layout: { icon: { inline: false } } }),
       card('s1', 'Grand Austria Hotel', '2026-10-21'),
@@ -328,12 +364,118 @@ describe('direct manipulation: handles write layout units, once on release', () 
     const px = parseFloat(sticker.style.width);
     fireEvent.click(sticker);
     expect(q(container, '[data-edit-frame="icon"]').dataset.editTools).toBe('move rotate size');
-    // Twice as far from the centre: twice the size.
-    await drag(q(container, '[data-edit-handle="size"]'), [10, 10], [20, 20]);
+    const corner = 50 + px / 2;
+    await drag(
+      q(container, '[data-edit-handle="size"]'),
+      [corner, corner],
+      [corner + 10, corner + 10],
+    );
+    await frames(12);
     await settle();
-    expect(saved.at(-1)!.patch).toEqual({
-      icon: { size: Number(((px * 2) / LINE).toFixed(2)) },
+    expect(saved).toHaveLength(1);
+    const icon = (saved[0].patch as { icon: { size: number; x: number; y: number } }).icon;
+    // Ten pixels more on each side, in the board's line heights.
+    expect(icon.size).toBeCloseTo((px + 10) / LINE, 2);
+    // Drawn from its middle, it grew 5px up and left: moved back, so its top-left stayed put.
+    expect(icon.x * COLUMN).toBeCloseTo(5, 0);
+    expect(icon.y * LINE).toBeCloseTo(5, 0);
+  });
+
+  it('a 20px corner drag on a 100px photo makes it about 120px, not a multiple', async () => {
+    undraw = drawCorners();
+    const path = 'a1/s2-0.webp';
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22', {
+        photos: [{ rippleId: 's2-b', path }],
+        layout: { photos: { [path]: { size: 100 / COLUMN } } },
+      }),
+      card('s1', 'Grand Austria Hotel', '2026-10-21'),
+    ]);
+    const photo = () => q(container, `[data-board-photo-card="${path}"]`);
+    expect(parseFloat(photo().style.width)).toBe(100);
+    fireEvent.click(label(container, 's2'));
+    fireEvent.click(photo());
+    expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
+    // The bottom-right corner is at (100, 100); the finger takes it 20px out.
+    await drag(q(container, '[data-edit-handle="size"]'), [100, 100], [120, 120], {
+      release: false,
     });
+    const drawn = parseFloat(photo().style.width);
+    expect(Math.abs(drawn - 120)).toBeLessThanOrEqual(1);
+    fireEvent.pointerUp(window, { clientX: 120, clientY: 120, pointerId: 1 });
+    await frames(12);
+    await settle();
+    expect(saved).toHaveLength(1);
+    const set = (
+      saved[0].patch as { photos: Record<string, { size: number; x: number; y: number }> }
+    ).photos[path];
+    expect(set.size).toBeCloseTo(120 / COLUMN, 2);
+    // The top-left corner held where it was: the 10px the middle-drawn box grew by, taken back.
+    expect(set.x * COLUMN).toBeCloseTo(10, 0);
+    expect(set.y * LINE).toBeCloseTo(10, 0);
+  });
+
+  it('ignores a corner’s first 4px, then follows it', async () => {
+    undraw = drawCorners();
+    const path = 'a1/s2-0.webp';
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22', {
+        photos: [{ rippleId: 's2-b', path }],
+        layout: { photos: { [path]: { size: 100 / COLUMN } } },
+      }),
+    ]);
+    fireEvent.click(label(container, 's2'));
+    fireEvent.click(q(container, `[data-board-photo-card="${path}"]`));
+    await drag(q(container, '[data-edit-handle="size"]'), [100, 100], [102, 102]);
+    await frames(12);
+    await settle();
+    expect(saved).toHaveLength(0);
+  });
+
+  it('widens a label from its right edge, the words rewrapping as it goes, once on release', async () => {
+    const { container } = home();
+    fireEvent.click(label(container, 's2'));
+    const before = parseFloat(label(container, 's2').style.width);
+    await drag(q(container, '[data-edit-handle="width"]'), [0, 0], [70, 0], { release: false });
+    const width = Number(((before + 70) / COLUMN).toFixed(2));
+    // Laid out again at the new width as the finger moves.
+    expect(parseFloat(label(container, 's2').style.width)).toBe(Math.round(width * COLUMN));
+    expect(saved).toHaveLength(0);
+    fireEvent.pointerUp(window, { clientX: 70, clientY: 0, pointerId: 1 });
+    await settle();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].patch).toEqual({ label: { width } });
+  });
+
+  it('tucks the width bar inside a label that reaches the board’s edge, where it would be clipped', () => {
+    const edge = render(<Board cards={[card('sat', 'Saturday', '2026-10-24')]} canEdit />);
+    fireEvent.click(label(edge.container, 'sat'));
+    expect(q(edge.container, '[data-edit-handle="width"]').hasAttribute('data-inside')).toBe(true);
+    edge.unmount();
+    const mid = render(<Board cards={[card('wed', 'Wednesday', '2026-10-21')]} canEdit />);
+    fireEvent.click(label(mid.container, 'wed'));
+    expect(q(mid.container, '[data-edit-handle="width"]').hasAttribute('data-inside')).toBe(false);
+  });
+
+  it('gives a band along its days no width handle', () => {
+    const { container } = render(
+      <Board
+        cards={[
+          card('r1', 'Island trip', '2026-10-20', {
+            splash: {
+              ...card('r1', 'Island trip', '2026-10-20').splash,
+              range: { start: '2026-10-20', end: '2026-10-22' },
+            },
+          }),
+        ]}
+        canEdit
+      />,
+    );
+    const band = q(container, '[data-board-tape="r1"] [data-board-band]');
+    fireEvent.click(band);
+    expect(q(container, '[data-edit-frame="label"]').dataset.editTools).toBe('');
+    expect(container.querySelector('[data-edit-handle="width"]')).toBeNull();
+    expect(q(container, '[data-edit-text-value]')).not.toBeNull();
   });
 
   it('steps the text size from the toolbar, saved after the rest like a slider', async () => {
