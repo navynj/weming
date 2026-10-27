@@ -64,7 +64,7 @@ A pool whose creator's account is gone (`owner_id` null) cannot be deleted for n
 - Splash pool-wide (H20d): the compound pool pill, the joint ripples filter, the sharing record carrying `pool_lane_id`; participants on ripples
 - Swim: FAB entry + lane long-press, live intruding card, focus screen = enlarged lane card + my timer, nothing more. **The dormant live modules (Timer, now band, focus screen, Break, inner ripples) wake here** (H20b)
 
-## Next migration: Sharing model v2 contract (0035) — drop list
+## Next migration: Sharing model v2 contract (0036) — drop list
 
 Destructive DDL waits for this migration, and each line needs Yoonji's explicit approval there, quoted in the migration and its commit (CLAUDE.md, "Data is real now"). The full list with reasons is `_docs/SHARING-V2.md` §3; these are the ones added since it was drafted.
 
@@ -80,7 +80,7 @@ Until then each stays in the database, unread by the app.
 ## Sharing v2, after the switch
 
 - **"Make it joint…" from Home** (SHARING-V2 §5, Home record edit sheet): pick the pool, a pool lane and Together without opening the pool. Today a Home record becomes joint from its edit sheet opened in the pool it is shared to. Needs each pool's members on Home.
-- **Per-pool invitees on my records (0036)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
+- **Per-pool invitees on my records (0035)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
 
 ## Later, unscheduled
 

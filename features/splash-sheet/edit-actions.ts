@@ -320,3 +320,85 @@ async function movePoolSplash(
   });
   return error ? { ok: false, message: error.message } : null;
 }
+
+export type MakeJointPreview =
+  | { ok: true; poolName: string; poolLaneId: string; removed: string[] }
+  | { ok: false; message: string };
+
+/**
+ * "Make it a joint record of <Pool>…" (the `…` menu, the only way my record
+ * becomes joint; Yoonji, in the session): what the confirm says first —
+ * the pool, the pool lane it lands on (where it sits there now), and the
+ * other pools it leaves.
+ */
+export async function previewMakeJoint(
+  splashId: string,
+  poolId: string,
+): Promise<MakeJointPreview> {
+  const ids = z.object({ splashId: z.uuid(), poolId: z.uuid() }).safeParse({ splashId, poolId });
+  if (!ids.success) return { ok: false, message: 'No such splash.' };
+  const supabase = await createClient();
+  const [
+    {
+      data: { user },
+    },
+    { data: splash },
+    { data: placements },
+    { data: pools },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('splashes').select('owner_id, own_pool_id').eq('id', splashId).maybeSingle(),
+    supabase
+      .from('splash_placements')
+      .select('pool_id, pool_lane_id, shared')
+      .eq('splash_id', splashId),
+    supabase.from('pools').select('id, name'),
+  ]);
+  if (!user || !splash || splash.owner_id !== user.id) {
+    return { ok: false, message: 'Only its author makes it joint.' };
+  }
+  const here = (placements ?? []).find((p) => p.pool_id === poolId && p.shared);
+  if (!here) return { ok: false, message: 'It is not in that Pool.' };
+  const nameOf = (id: string) => pools?.find((p) => p.id === id)?.name ?? 'A pool you left';
+  return {
+    ok: true,
+    poolName: nameOf(poolId),
+    poolLaneId: here.pool_lane_id,
+    removed: (placements ?? [])
+      .filter((p) => p.shared && p.pool_id !== poolId)
+      .map((p) => nameOf(p.pool_id)),
+  };
+}
+
+/**
+ * Makes my record the pool's joint record on the pool lane it sits on there.
+ * Everyone starts as composing does: on where the pool invites everyone by
+ * default, and in a pool of one.
+ */
+export async function makeJointRecord(
+  splashId: string,
+  poolId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const preview = await previewMakeJoint(splashId, poolId);
+  if (!preview.ok) return preview;
+  const supabase = await createClient();
+  const [{ data: pool }, { count: members }] = await Promise.all([
+    supabase.from('pools').select('invite_all_by_default').eq('id', poolId).maybeSingle(),
+    supabase
+      .from('pool_members')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('pool_id', poolId)
+      .is('left_at', null),
+  ]);
+  const { error } = await supabase.rpc('splash_to_together', {
+    p_splash: splashId,
+    p_pool_lane: preview.poolLaneId,
+    p_invite_all: Boolean(pool?.invite_all_by_default) || (members ?? 0) <= 1,
+  });
+  if (error) return refused(error);
+  revalidatePath('/');
+  revalidatePath(`/splash/${splashId}`);
+  revalidatePath(`/pool/${poolId}`);
+  revalidatePath(`/pool/${poolId}/splash/${splashId}`);
+  return { ok: true };
+}

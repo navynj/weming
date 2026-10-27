@@ -745,10 +745,10 @@ describe('together (0033)', () => {
     for (const id of [OLD, MINE]) await asUser(ben).rpc('delete_joint_splash', { p_splash: id });
   });
 
-  it('holds per-pool invitees on my record beside a joint record’s own (0034 shape, 0036 use)', async () => {
+  it('holds per-pool invitees on my record beside a joint record’s own (0034 shape, 0035 use)', async () => {
     const admin = asAdmin();
     const mine = { splash_id: ANA_OLD_POST, pool_id: pool, user_id: ben };
-    // Nothing writes these yet (0036): the shape alone, as the service role.
+    // Nothing writes these yet (0035): the shape alone, as the service role.
     // A per-pool row hangs off a placement: none, refused.
     const loose = await admin
       .from('joint_invitees')
@@ -757,7 +757,7 @@ describe('together (0033)', () => {
     expect((await admin.from('joint_invitees').insert(mine)).error).toBeNull();
     // Once per pool and person.
     expect((await admin.from('joint_invitees').insert(mine)).error?.code).toBe('23505');
-    // Who reads these rows is 0036's to settle, with the key that lets one
+    // Who reads these rows is 0035's to settle, with the key that lets one
     // person be invited in two pools.
     // It is not a joint record's: "together" reads joint rows alone.
     expect((await asUser(ben).rpc('joint_together', { p_splashes: [ANA_OLD_POST] })).data).toEqual(
