@@ -97,7 +97,7 @@
 }
 [data-theme='pink'] {
   --theme-900: #c2307a;
-  --theme-pastel: #f3b6cf;
+  --theme-pastel: #f9cfe0;
 }
 [data-theme='brown'] {
   --theme-900: #8a5a2b;
@@ -316,23 +316,30 @@ body {
 }
 
 /*
- * Pastel mode (0036): the ground is the colour's pastel, and what was white
- * on it takes a soft grey (--pastel-ink), not pure black (Yoonji, in the
- * session). The same one swap as light mode, inside the ground only.
+ * Pastel mode (0036, Yoonji, in the session): a white ground, as in light
+ * mode, with the colour's pastel as the accent — what was white on the
+ * ground (selected chips, the compose disc, marks, waves) takes the pastel —
+ * and every word on the ground a soft grey (--pastel-ink), on the white and
+ * on the pastel alike: a pastel never carries white or pastel words.
  */
 [data-mode='pastel'] .water-ground {
   --pastel-ink: #45424d;
-  --color-white: var(--pastel-ink);
-  --color-main-900: var(--theme-pastel);
-  --color-main-400: color-mix(in srgb, var(--pastel-ink) 40%, var(--theme-pastel));
-  /* As in light mode, the pale tint turns strong, so a tile in it (a pool's
-     monogram) keeps its letters readable. */
-  --color-main-100: color-mix(in srgb, var(--pastel-ink) 85%, var(--theme-pastel));
-  --color-joint: color-mix(in srgb, #ffffff 45%, var(--theme-pastel));
+  --color-white: var(--theme-pastel);
+  --color-main-900: #ffffff;
+  --color-main-400: color-mix(in srgb, var(--pastel-ink) 30%, var(--theme-pastel));
+  --color-main-100: var(--theme-pastel);
+  --color-joint: color-mix(in srgb, var(--theme-pastel) 55%, #ffffff);
   --color-joint-face: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
-  background-color: var(--theme-pastel);
+  background-color: #ffffff;
   color: var(--pastel-ink);
-  --wave-ink: var(--pastel-ink);
+  --wave-ink: var(--theme-pastel);
+}
+/* Words on the ground, in either of its colours, are the soft grey; an ink
+   fill (a Black label, a menu) keeps its white words, and cards set their own. */
+[data-mode='pastel']
+  .water-ground
+  :is([class*='text-white'], [class*='text-main-900']):not(.bg-ink):not(.surface *) {
+  color: var(--pastel-ink);
 }
 
 /*
@@ -346,6 +353,28 @@ body {
   --color-main-100: color-mix(in srgb, var(--theme-900) 17%, #ffffff);
   --color-joint: color-mix(in srgb, #ffffff 20%, var(--theme-900));
   --wave-ink: var(--theme-900);
+}
+/* Pastel mode's cards: soft grey words, the pastel for accents. */
+[data-mode='pastel'] .water-ground .surface {
+  --color-main-900: var(--pastel-ink);
+  --color-main-100: var(--theme-pastel);
+  --color-joint: var(--theme-pastel);
+  --wave-ink: var(--pastel-ink);
+}
+/* A card's edge on the white ground: a hairline in the pastel. */
+[data-mode='pastel'] .water-ground .surface-edge {
+  box-shadow: 0 0 0 1px var(--theme-pastel);
+}
+/* A filled label's second style, in pastel mode: nearly white, a pastel edge. */
+[data-mode='pastel'] .water-ground .label-ink {
+  background-color: color-mix(in srgb, var(--theme-pastel) 15%, #ffffff);
+  box-shadow: inset 0 0 0 1px var(--theme-pastel);
+  color: var(--pastel-ink);
+}
+/* A filled label in its first style takes the pastel, grey words on it. */
+[data-mode='pastel'] .water-ground .label-fill {
+  background-color: var(--theme-pastel);
+  color: var(--pastel-ink);
 }
 [data-mode='light'] .water-ground .surface-edge {
   box-shadow: 0 0 0 1px var(--color-pool-200);
