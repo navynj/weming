@@ -361,7 +361,7 @@ describe('converting from the edit sheet (0022, 0033)', () => {
   const face = (view: ReturnType<typeof render>, id: string) =>
     view.container.querySelector(`[data-together-face="${id}"]`) as HTMLButtonElement;
   const everyone = (view: ReturnType<typeof render>) =>
-    view.container.querySelector('[data-together-everyone]') as HTMLButtonElement;
+    view.container.querySelector('[data-together-everyone] [role="switch"]') as HTMLButtonElement;
   const hint = (view: ReturnType<typeof render>) =>
     view.container.querySelector('[data-landing-hint]')!.textContent;
   const warnings = (view: ReturnType<typeof render>) =>
@@ -399,7 +399,7 @@ describe('converting from the edit sheet (0022, 0033)', () => {
       SCOPE,
     );
     fireEvent.click(everyone(view));
-    expect(everyone(view).getAttribute('aria-pressed')).toBe('true');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
     expect(face(view, 'u-mina').getAttribute('aria-pressed')).toBe('true');
     expect(face(view, 'u-jae').getAttribute('aria-pressed')).toBe('true');
     expect(hint(view)).toBe('Together with everyone');
@@ -443,7 +443,7 @@ describe('converting from the edit sheet (0022, 0033)', () => {
 
   it('from a pool: a joint record with everyone has Everyone fixed on', async () => {
     const view = await sheet({ othersWrote: true, inviteAll: true }, SCOPE);
-    expect(everyone(view).getAttribute('aria-pressed')).toBe('true');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
     expect(everyone(view).disabled).toBe(true);
     expect(face(view, 'u-jae').disabled).toBe(true);
   });

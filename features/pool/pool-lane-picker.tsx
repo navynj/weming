@@ -3,6 +3,7 @@
 import { usePeople } from '@/features/people/people-provider';
 
 import type { PoolScope } from './compose-scope';
+import { Switch } from './lane-match';
 import {
   landingHint,
   resolvePick,
@@ -16,9 +17,9 @@ export type { PoolPick } from './pool-pick';
 
 /**
  * Composing from a pool (review, 0033): this pool's lane chips, the one
- * filled element; under them, **Together** — "Together · Everyone" on its
- * label line, Everyone an underlined text button (muted, the primary colour
- * when on), then the other members' faces, the only round items — and one
+ * filled element; under them, **Together** — a "With" line with Everyone
+ * and its switch at the right (the primary colour when on), then the other
+ * members' faces, the only round items — and one
  * line saying what Drop makes: "Yours · in <Pool>", "Together with
  * everyone", or "Together with Mina, Jae". There is no audience here: what
  * is written in a pool is in that pool.
@@ -81,20 +82,18 @@ export function PoolLanePicker({
       </div>
       {others.length > 0 ? (
         <div data-together className="flex flex-col gap-2">
-          <span className="text-pool-500 flex items-center gap-1 text-xs">
-            Together ·
-            <button
-              type="button"
-              aria-pressed={everyone}
-              data-together-everyone
-              disabled={fixedEveryone || togetherLocked !== null}
-              onClick={() => change(toggleEveryone(together, otherIds))}
-              className={`underline underline-offset-2 disabled:cursor-default ${
-                everyone ? 'text-main-900 font-semibold' : 'text-pool-500'
-              }`}
-            >
-              Everyone
-            </button>
+          <span className="text-pool-500 flex items-center justify-between gap-3 text-xs">
+            With
+            <label data-together-everyone className="flex items-center gap-2">
+              <span className={everyone ? 'text-main-900 font-semibold' : ''}>Everyone</span>
+              <Switch
+                on={everyone}
+                label="Everyone"
+                size="sm"
+                disabled={fixedEveryone || togetherLocked !== null}
+                onChange={() => change(toggleEveryone(together, otherIds))}
+              />
+            </label>
           </span>
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
             {others.map((member) => {

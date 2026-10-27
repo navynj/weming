@@ -580,7 +580,7 @@ describe('compose from a pool (H23, 0033)', () => {
   const face = (view: View, id: string) =>
     view.container.querySelector(`[data-together-face="${id}"]`) as HTMLButtonElement | null;
   const everyone = (view: View) =>
-    view.container.querySelector('[data-together-everyone]') as HTMLButtonElement;
+    view.container.querySelector('[data-together-everyone] [role="switch"]') as HTMLButtonElement;
   const pressed = (el: Element | null) => el?.getAttribute('aria-pressed');
   const hint = (view: View) => view.container.querySelector('[data-landing-hint]')!.textContent;
 
@@ -594,13 +594,13 @@ describe('compose from a pool (H23, 0033)', () => {
     expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
   });
 
-  it('offers Together: Everyone as a text button, then the other members’ faces, never mine', () => {
+  it('offers With: Everyone with its switch, then the other members’ faces, never mine', () => {
     const view = poolSheet();
     const together = view.container.querySelector('[data-together]')!;
-    expect(together.textContent).toContain('Together ·');
-    expect(everyone(view).textContent).toBe('Everyone');
-    expect(everyone(view).className).toContain('underline');
-    expect(pressed(everyone(view))).toBe('false');
+    expect(together.textContent).toContain('With');
+    expect(together.textContent).not.toContain('Together');
+    expect(view.container.querySelector('[data-together-everyone]')!.textContent).toBe('Everyone');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
     expect(face(view, 'a1')).toBeNull();
     expect(pressed(face(view, 'u-mina'))).toBe('false');
     expect(pressed(face(view, 'u-jae'))).toBe('false');
@@ -654,7 +654,7 @@ describe('compose from a pool (H23, 0033)', () => {
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Game night' } });
     pickLane(view, 'pl-notes');
     fireEvent.click(everyone(view));
-    expect(pressed(everyone(view))).toBe('true');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
     expect(pressed(face(view, 'u-mina'))).toBe('true');
     expect(pressed(face(view, 'u-jae'))).toBe('true');
     expect(hint(view)).toBe('Together with everyone');
@@ -669,7 +669,7 @@ describe('compose from a pool (H23, 0033)', () => {
     pickLane(view, 'pl-trips');
     fireEvent.click(everyone(view));
     fireEvent.click(face(view, 'u-mina')!);
-    expect(pressed(everyone(view))).toBe('false');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
     expect(pressed(face(view, 'u-mina'))).toBe('false');
     expect(pressed(face(view, 'u-jae'))).toBe('true');
     expect(hint(view)).toBe('Together with Jae');
@@ -684,7 +684,7 @@ describe('compose from a pool (H23, 0033)', () => {
     pickLane(view, 'pl-trips');
     fireEvent.click(face(view, 'u-mina')!);
     fireEvent.click(face(view, 'u-jae')!);
-    expect(pressed(everyone(view))).toBe('false');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
     expect(hint(view)).toBe('Together with Mina, Jae');
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
@@ -706,7 +706,7 @@ describe('compose from a pool (H23, 0033)', () => {
 
   it('starts on Everyone where the pool invites all by default, and again after a drop', async () => {
     const view = poolSheet({ ...SCOPE, inviteAllByDefault: true });
-    expect(pressed(everyone(view))).toBe('true');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
     expect(pressed(face(view, 'u-mina'))).toBe('true');
     expect(pressed(face(view, 'u-jae'))).toBe('true');
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Rematch' } });
@@ -715,7 +715,7 @@ describe('compose from a pool (H23, 0033)', () => {
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
     expect(joints[0]).toMatchObject({ invitees: [], everyone: true });
-    expect(pressed(everyone(view))).toBe('true');
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
   });
 
   it('seats a record on a pool lane with a home lane in that lane’s column on Home', async () => {
