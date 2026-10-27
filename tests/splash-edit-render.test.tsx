@@ -367,51 +367,30 @@ describe('converting from the edit sheet (0022, 0033)', () => {
   const warnings = (view: ReturnType<typeof render>) =>
     [...view.container.querySelectorAll('[data-edit-warning]')].map((w) => w.textContent);
 
-  it('from a pool: picking a face in Together asks first, lists the other pools, then makes it joint at once', async () => {
-    const view = await sheet(MINE_SHARED, SCOPE);
-    // No Just mine switch: with nobody picked it stays as it is.
-    expect(view.queryByRole('switch', { name: 'Just mine' })).toBeNull();
-    // My own face is never offered.
-    expect(face(view, 'me')).toBeNull();
-    expect(hint(view)).toBe('Yours · in Our Pool');
-    fireEvent.click(face(view, 'u-mina'));
-    expect(hint(view)).toBe('Together with Mina');
-    fireEvent.click(view.container.querySelector('[data-edit-save]')!);
-    const confirm = view.container.querySelector('[data-joint-confirm]')!;
-    expect(confirm.textContent).toContain(
-      'Make this a joint splash in Our Pool? Everyone in Our Pool can add to it and edit its title. You keep your ripples.',
-    );
-    expect(confirm.textContent).toContain('It will be removed from Other Pool.');
-    expect(saved).toHaveLength(0);
-    await act(async () => {
-      fireEvent.click(view.container.querySelector('[data-joint-confirm-go]')!);
-    });
-    expect(saved[0]).toMatchObject({
-      conversion: { op: 'to_joint', poolLaneId: 'l-games', invitees: ['u-mina'], everyone: false },
-    });
-    const pending = JSON.parse(view.container.querySelector('[data-pending]')!.textContent!);
-    expect(pending['s-1']).toMatchObject({ kind: 'joint', poolLane: { id: 'l-games' } });
+  it('from a pool: my own records offer no With — they never become joint here', async () => {
+    for (const record of [
+      MINE_SHARED,
+      {
+        ...MINE_SHARED,
+        kind: 'own' as const,
+        poolId: 'p-ours',
+        poolLaneId: 'l-media',
+        sharedIn: [],
+      },
+    ]) {
+      const view = await sheet(record, SCOPE);
+      expect(view.container.querySelector('[data-together]')).toBeNull();
+      expect(view.container.querySelector('[data-together-face]')).toBeNull();
+      view.unmount();
+    }
   });
 
-  it('from a pool: Everyone makes my pool record joint with everyone', async () => {
-    const view = await sheet(
-      { ...MINE_SHARED, kind: 'own', poolId: 'p-ours', poolLaneId: 'l-media', sharedIn: [] },
-      SCOPE,
-    );
-    fireEvent.click(everyone(view));
-    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
-    expect(face(view, 'u-mina').getAttribute('aria-pressed')).toBe('true');
-    expect(face(view, 'u-jae').getAttribute('aria-pressed')).toBe('true');
-    expect(hint(view)).toBe('Together with everyone');
-    fireEvent.click(view.container.querySelector('[data-edit-save]')!);
-    // Nothing else to leave: the confirm names no other pool.
-    expect(view.container.querySelector('[data-joint-removed]')).toBeNull();
-    await act(async () => {
-      fireEvent.click(view.container.querySelector('[data-joint-confirm-go]')!);
-    });
-    expect(saved[0]).toMatchObject({
-      conversion: { op: 'to_joint', poolLaneId: 'l-media', invitees: [], everyone: true },
-    });
+  it('from a pool: moving my Home record to another pool lane places it there, nothing more', async () => {
+    const view = await sheet(MINE_SHARED, SCOPE);
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="l-media"]')!);
+    await save(view);
+    expect(saved[0]).toMatchObject({ conversion: { op: 'set_lane', placeOn: 'l-media' } });
+    expect(view.container.querySelector('[data-joint-confirm]')).toBeNull();
   });
 
   it('from a pool: with nobody picked, moves my pool record among the pool lanes', async () => {

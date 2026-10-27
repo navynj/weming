@@ -46,7 +46,9 @@ export type EditLanes = {
 
 /**
  * The edit sheet's lanes (0022, 0033). Opened from a pool the record is in:
- * that pool's lane chips and Together; nothing becomes mine there. Opened
+ * that pool's lane chips; With only on a joint record, to add people — my
+ * own record never becomes joint here (the menu's "Make it a joint record
+ * of…" does that), and nothing becomes mine there. Opened
  * from Home: my lanes — with the Audience for my Home record; for a pool or
  * joint record only I wrote in, picking a lane makes it mine, its Audience
  * set anew as a new record's; a joint record someone else wrote in keeps to
@@ -92,14 +94,10 @@ export function useEditLanes(
   if (pool && inPool) {
     const joint = initial.kind === 'joint';
     const fixed = joint ? initial.invitees.filter((id) => id !== me) : [];
+    // My own record: With is not offered, so it never becomes joint here;
+    // a joint record's With only adds people (Yoonji, in the session).
     const conversion = poolLane
-      ? planFromPool(
-          current,
-          pool,
-          poolLane,
-          joint ? [] : together.picked,
-          !joint && together.everyone,
-        )
+      ? planFromPool(current, pool, poolLane, [], false)
       : ({ op: 'none' } as const);
     const removed = removedFrom(current, pool.poolId).map(poolName);
     const adding = joint && !initial.inviteAll;
@@ -127,6 +125,7 @@ export function useEditLanes(
             onTogether={setTogether}
             fixed={fixed}
             fixedEveryone={joint && initial.inviteAll}
+            withTogether={joint}
           />
           <Notes
             lines={
