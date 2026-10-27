@@ -459,7 +459,7 @@ function PhotoCardView({
     <span
       data-board-photo-card={photo.path}
       data-size={photo.size}
-      className="absolute block"
+      className="pointer-events-auto absolute block cursor-pointer"
       style={{
         left: 0,
         top: area.h - photo.dy - photo.size,
@@ -563,10 +563,19 @@ export function BoardPieceView({
         onClick={() => onPick(card.splash.id)}
         aria-label={caption}
         data-board-pick={piece.id}
-        className={`absolute inset-0 z-[1] block ${moving}`}
+        // Keyboard and screen readers: a pointer taps what is drawn, wherever a
+        // layout moved it (review: taps on a moved label missed).
+        className={`pointer-events-none absolute inset-0 z-[1] block ${moving}`}
         style={lifted(1, stack)}
       />
-      <div aria-hidden className="pointer-events-none absolute inset-0">
+      {/* What is drawn takes the tap, where a layout put it (review): the
+          label, the sticker and each photo; the gaps between them do not. */}
+      <div
+        aria-hidden
+        data-board-hits
+        className="pointer-events-none absolute inset-0"
+        onClick={() => onPick(card.splash.id)}
+      >
         {piece.photoBox ? (
           <span
             data-board-photos
@@ -601,7 +610,7 @@ export function BoardPieceView({
         ) : null}
         <span
           data-board-label
-          className={`absolute z-[1] block ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
+          className={`pointer-events-auto absolute z-[1] block cursor-pointer ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
           data-reading-outline={reading && still ? '' : undefined}
           style={{
             ...placed(label),
@@ -659,22 +668,20 @@ export function BoardPieceView({
         </span>
         {reading && !still ? (
           // Out from the sticker, or the front of the label when the icon is inline.
+          // Moved and turned exactly as what it rings: the sticker, or the label
+          // whose front holds an inline icon.
           <ReadingRipple
             key={ripple}
-            box={
-              piece.stickerBox && icon
-                ? piece.stickerBox
-                : {
-                    x: label.x + piece.pad.left,
-                    y: label.y + piece.pad.top,
-                    w: piece.type.line,
-                    h: piece.type.line,
-                  }
-            }
+            box={piece.stickerBox && icon ? piece.stickerBox : label}
             transform={
               piece.stickerBox && icon
                 ? moveOf(nudge(layout.icon, layout.piece), metrics.column, line)
                 : moveOf(nudge(layout.label, layout.piece), metrics.column, line)
+            }
+            ring={
+              piece.stickerBox && icon
+                ? { x: 0, y: 0, w: piece.stickerBox.w, h: piece.stickerBox.h }
+                : { x: piece.pad.left, y: piece.pad.top, w: piece.type.line, h: piece.type.line }
             }
             z={lifted(3, stack)?.zIndex ?? 3}
           />
@@ -686,7 +693,7 @@ export function BoardPieceView({
             data-size={piece.stickerSize ?? undefined}
             data-at={piece.stickerAt ?? undefined}
             // Over its own label and any other (review).
-            className={`absolute z-[2] flex items-center justify-center leading-none ${fade} ${moving}`}
+            className={`pointer-events-auto absolute z-[2] flex cursor-pointer items-center justify-center leading-none ${fade} ${moving}`}
             style={{
               ...placed(piece.stickerBox),
               fontSize: piece.stickerBox.w,
@@ -793,10 +800,14 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
 function ReadingRipple({
   box,
   transform,
+  ring: at,
   z,
 }: {
+  /** The box of what it rings, and that part's own move: the ring rides with it. */
   box: Box;
   transform: string | undefined;
+  /** The ring within that box. */
+  ring: Box;
   z: number | string;
 }) {
   const [done, setDone] = useState(false);
@@ -811,14 +822,22 @@ function ReadingRipple({
     return () => el.removeEventListener('animationend', end);
   }, []);
   if (done) return null;
+  // The move on the outer box, the growth on the inner ring: a scale on the
+  // same element would scale the move too, and the ring would fly off.
   return (
     <span
-      ref={ring}
       aria-hidden
-      data-reading-ripple
-      className="board-ripple pointer-events-none absolute rounded-full border-[1.5px] border-white"
+      data-reading-ripple-at
+      className="pointer-events-none absolute"
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, transform, zIndex: z }}
-    />
+    >
+      <span
+        ref={ring}
+        data-reading-ripple
+        className="board-ripple absolute rounded-full border-[1.5px] border-white"
+        style={{ left: at.x, top: at.y, width: at.w, height: at.h }}
+      />
+    </span>
   );
 }
 

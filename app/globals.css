@@ -531,8 +531,8 @@ body {
   }
 }
 .board-bob {
-  /* For as long as the post is the one being read (review), gently. */
-  animation: board-bob 1.4s ease-in-out infinite;
+  /* Twice, then still (review: a bob that never stops reads as a fault). */
+  animation: board-bob 1.4s ease-in-out 2;
 }
 /* One ring out from the post's icon each time it becomes the one read (review):
    1.5px of white, from the icon's size to three times it, gone in 900ms. */

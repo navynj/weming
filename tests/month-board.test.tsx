@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -885,6 +886,42 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     fireEvent.click(container.querySelector('[data-board-pick="lynn"]')!);
     fireEvent.click(container.querySelector('[data-board-pick="trip"]')!);
     expect(picked).toEqual(['lynn', 'trip']);
+  });
+
+  it('takes a tap on what is drawn, where a layout moved it; never on the empty place it left', () => {
+    const picked: string[] = [];
+    const moved = OCTOBER.map((c) =>
+      c.splash.id === 'lynn' ? { ...c, layout: { piece: { x: 2, y: 6 } } } : c,
+    );
+    const { container } = board(moved, { onPick: (id) => picked.push(id) });
+    const piece = container.querySelector('[data-board-piece="lynn"]')!;
+    // The whole-piece button is for keyboard and screen readers: a pointer passes through it.
+    expect(piece.querySelector('[data-board-pick]')!.className).toContain('pointer-events-none');
+    const label = piece.querySelector<HTMLElement>('[data-board-label]')!;
+    expect(label.className).toContain('pointer-events-auto');
+    expect(label.style.transform).toContain('translate(');
+    fireEvent.click(label);
+    expect(picked).toEqual(['lynn']);
+  });
+
+  it('rides the ring on the moved part: the move outside, the growth inside', () => {
+    media(false);
+    const moved = OCTOBER.map((c) =>
+      c.splash.id === 'lynn' ? { ...c, layout: { piece: { x: 1, y: 2 }, label: { tilt: 8 } } } : c,
+    );
+    const { container } = board(moved, { ring: { id: 'lynn', seq: 0 } });
+    const ring = container.querySelector<HTMLElement>('[data-reading-ripple]')!;
+    const at = ring.closest<HTMLElement>('[data-reading-ripple-at]')!;
+    expect(at.style.transform).toContain('translate(');
+    // The growing ring carries no move of its own, so the move is never scaled.
+    expect(ring.style.transform).toBe('');
+    expect(ring.className).toContain('board-ripple');
+    expect(at.className).not.toContain('board-ripple');
+  });
+
+  it('bobs twice, then is still', () => {
+    const css = readFileSync('app/globals.css', 'utf8');
+    expect(css).toMatch(/\.board-bob \{[^}]*animation: board-bob [^;]* 2;/);
   });
 
   it('bobs the heading post on the water, once per ring', () => {
