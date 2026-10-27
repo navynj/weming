@@ -1,27 +1,41 @@
 # Sharing model v2 (design, 2026-10-26)
 
-Status: **design for review. No code, no migration.** Every number below was read on 2026-10-26, with ids as their first eight characters and no content.
+Status: **design for review. No code, no migration.** This replaces the first v2 draft and its amendment. Every number below was read on 2026-10-26, with ids as their first eight characters and no content.
 
 ## 0. The model in one page
 
-**Two kinds of record.**
-- **My record.** It lives in one of my lanes, and may be shared to zero or more pools: one placement per pool, each on one pool lane.
-- **Joint record.** A pool owns it, and it is started inside that pool. Members add their side.
+**Two places, and no links by default.**
+
+| | Home record | Pool record |
+| --- | --- | --- |
+| Where it is written | on Home, in one of my lanes | inside a pool, on one of its lanes |
+| Whose | mine | mine, or joint: the pool's, with members' sides |
+| Its lane | one of mine | the pool lane; no lane of mine |
+| Who reads it | me, plus each pool I share it to, record by record | the pool |
+| Default when writing | Audience "Only me", for every lane | my pool record; **Together** (pick member faces) makes it joint |
+
+**Sharing a Home record is per record.** In Audience, turn on a pool and pick one of its lanes (emoji chips). Nothing carries over to the next record, unless an advanced link says so.
+
+**Home shows everything I wrote:**
+- my lanes as columns;
+- one column per pool, with its monogram and name, holding my pool records and the joint records I took part in, shown only while that pool has any;
+- a pool I left reads "A pool you left".
+
+**Links are advanced only.** They live under Pool settings → Advanced → "Connect your lanes", and are never part of joining or composing. Links connect my lanes and a pool's lanes, many to many, with two optional defaults:
+
+| Default | Scope | Means |
+| --- | --- | --- |
+| **Share by default** (off when created) + **default pool lane** | per (my lane, pool) | a Home record in that lane preselects that pool and pool lane in Audience |
+| **Home lane** (optional) | per (pool lane, me) | pool records and joint records on that pool lane show in that lane's column on Home instead of the pool's column. Display only |
+
+Unlinking moves nothing: it changes defaults and display, never a record or a placement.
 
 **Retired:**
-- Just mine (`splashes.own_pool_id`).
-- Link directions (`lane_mappings.direction`: out, both, in).
-- Any per-ripple stored lane for joint ripples. H24 already cleared these: production has 0.
-- Three conversions. Only *my record ↔ joint record* stays.
-
-**Links connect my lanes and a pool's lanes, many to many, with two defaults.**
-
-| Default | Scope | Means | Stored as |
-| --- | --- | --- | --- |
-| **Outbound default** | per (my lane, pool) | "Share by default" on or off, plus the one default pool lane a new record of that lane lands on | a marker on one link row, which also carries the on/off switch |
-| **Home lane** | per (pool lane, me) | which of my linked lanes shows that pool lane's joint records on my Home | a marker on one link row |
-
-Display is derived, as H24 made it, and nothing is stored on ripples. Several of my lanes linked to one pool lane all send there, with no per-record choice. When one lane of mine links to several lanes of a pool, composing offers those pool lanes as chips, with the default preselected.
+- lane matching when joining (gone already, hotfix `d300d18`) and when creating (optional since the same hotfix);
+- link directions (out, both, in);
+- Just mine as a separate kind: a pool record of mine is now simply the default when writing in a pool;
+- the stored lane on pool and joint ripples (already none since 0029);
+- the conversions except my record ↔ joint (§6, decision 3).
 
 ---
 
@@ -33,115 +47,112 @@ Read-only, run on 2026-10-26.
 
 | Question | Answer |
 | --- | --- |
-| Links (total / owners) | 8, all one person's |
-| … by direction | **out 4** `63b3fcd5 34a400b5 b1d2d720 7f892f49`; **both 1** `cb442d62`; **in 3** `ccd9471c 102bcccc 6dac439e` |
-| Pools / current members | 3 (`6bb14a03 15b2cc7c d1c664e1`) / 3 memberships |
+| Links, by direction, with the shared posts placed on each | **out 4** (`63b3fcd5 34a400b5 b1d2d720 7f892f49`): **0** shared posts. **both 1** (`cb442d62`): **0**. **in 3** (`ccd9471c` 0, `102bcccc` 1, `6dac439e` 4): **5** |
 | Just-mine splashes | **0** |
-| Joint splashes / joint ripples | 10 / 10. Each has one writer out of one member; `32aba650` has no ripple yet |
-| Joint ripples with a stored lane | 0 (cleared by 0029) |
-| Placements (shared / off) | 5 / 0 |
-| Records shared to more than one pool | **0** |
-| Pool lanes with more than one of a person's lanes linked | **0**. The schema forbids it today: `lane_mappings_one_per_pool_lane` (0009) |
-| (my lane, pool) with more than one pool lane linked | 0 |
-| Placements whose post's own lane is linked to the placement's pool lane | 5 of 5 |
-| Board layouts (pool / home) | 10 / 6 |
-
-The links, by pool:
-
-| Link | My lane | Pool | Pool lane | Direction | Made |
-| --- | --- | --- | --- | --- | --- |
-| `ccd9471c` | `807f7a07` | `15b2cc7c` | `894e8b3e` | in | 10-23 |
-| `102bcccc` | `cd29bb11` | `15b2cc7c` | `ec2cafc4` | in | 10-23 |
-| `6dac439e` | `bf3b6526` | `15b2cc7c` | `2bb440f5` | in | 10-23 |
-| `cb442d62` | `60274235` | `15b2cc7c` | `b3ead86b` | both | 10-23 |
-| `34a400b5` | `bf3b6526` | `d1c664e1` | `eceed62c` | out | 10-27 |
-| `b1d2d720` | `807f7a07` | `d1c664e1` | `d7cdf62d` | out | 10-27 |
-| `7f892f49` | `cd29bb11` | `d1c664e1` | `f91afb86` | out | 10-27 |
-| `63b3fcd5` | `8e7270e4` | `d1c664e1` | `b885b126` | out | 10-27 |
+| Joint splashes / joint ripples | 10 / 10 |
+| Shared Home records placed through a link's default (`out`/`both`) | **0** |
+| Shared Home records placed by hand (Audience, under an `in` link) | **5**: `9da6839e 48ab5d89 1744f47c f106dac1 fc15c5d9` |
+| Shared Home records with no link at all | 0 (RLS requires one today) |
+| Placements switched off | 0 |
+| Home records in a lane with an `out`/`both` link (these would default to shared, for new records only) | 23 posts' lanes |
+| Joint records shown in a linked lane on Home today (`both`/`in`) | 9: `150d67ae 234f041a 32aba650 3a5be98e 5e6df9ae 8caf3bed 991c1e0e a011c9c7 af869785` |
+| Joint records in a pool's column today (`out`-only or unlinked) | 1: `673226e9` |
 
 ### Local
 
 | Question | Answer |
 | --- | --- |
-| Links | 6, all **both**, 3 owners |
-| Just-mine splashes | **1** (`e5f67252`), whose pool lane none of its author's lanes links to |
-| Joint splashes / ripples | 2 / 2 (`f2000000` with 2 writers out of 2 members; `defd8048` with none out of 1) |
-| Placements (shared / off) | 4 / 0 |
-| Shared to more than one pool / pool lanes with several lanes linked | 0 / 0 |
+| Links | 6, all **both**: `dfc00a0f`:1 `7f0b264c`:1 `d3df5ec6`:0 `dae73936`:0 `ac9c05c7`:1 `c11de421`:0 shared posts |
+| Just-mine splashes | 1 (`e5f67252`), with its one placement |
+| Joint splashes / ripples | 2 / 2 |
+| Shared Home records through a link's default / by hand / no link | 3 (`831f34b1 7f210d88 f1000000`) / 0 / 0 |
+| Joint records in a linked lane / in a pool's column | 2 (`defd8048 f2000000`) / 0 |
 
 ### What the survey says
 
-- **No production record needs a new lane.** Just mine is empty there. Local's one needs a lane made from its pool lane (§2).
-- **No many-to-many link exists yet,** so the two defaults are unambiguous for all current data: every link is its own (my lane, pool) default and its own (pool lane, me) home lane.
-- **Two production behaviours change under the mapping you specified:**
-  1. **Joint `673226e9`** (pool `d1c664e1`, pool lane `eceed62c`, linked **out** to `bf3b6526`). After H24 an `out` link *did* have an inbound meaning: it kept joint records **out** of my lane, in the pool's column (`jointLaneFor` reads only both and in). Under v2 every link is inbound-capable, so this record **moves from the pool's column into `bf3b6526`'s column** on Home. That is the one record that moves. You asked me to confirm "out had no inbound meaning after H24". It did, and this is its only current effect.
-  2. **The 5 shared placements** `9da6839e 48ab5d89 1744f47c f106dac1 fc15c5d9` sit on lanes whose link to that pool is `in`. They were shared by hand through the Audience chip. Mapped as in → share by default off, they **stay shared**: placements are records, and a default only decides new ones. Nothing un-shares.
+- **Nothing on production was shared by a default.** Every shared Home record was shared by hand, so "Only me by default" matches how the app has actually been used.
+- **No Just-mine record exists on production,** so retiring the kind changes no production record.
+- **Display survives intact** if the home lane is optional (decision 1):
+  - the 9 joint records shown in a lane keep their lane, through a home lane taken from `both`/`in`;
+  - `673226e9` stays in its pool's column, because `out` sets no home lane.
 
 ---
 
 ## 2. Mapping current data
 
-| Today | v2 | Notes |
-| --- | --- | --- |
-| Link `in` | link; **share by default off** | 3 links on production |
-| Link `both` | link; **share by default on** | 1 on production, 6 on local |
-| Link `out` | link; **share by default on** | 4 on production. Its inbound meaning (joint records kept out of my lane) goes: see §1, record `673226e9` |
-| Outbound default per (my lane, pool) | the link that sends today (`out`/`both`, at most one per (my lane, pool) by 0019); else the oldest link (`created_at`, then `id`) | Deterministic. Unique today: no (my lane, pool) has two links |
-| Home lane per (pool lane, me) | the link `_joint_lane_for` picks today (`both`, then `in`, oldest first); else the oldest link | Preserves every joint record's Home column except `673226e9` (§1) |
-| Just-mine splash | **my record** in the author's lane linked to its pool lane (the home lane if several); else **a new lane** named after the pool lane, with its emoji, suffixed `(<Pool>)` when the name is taken (delete_pool's rule). Its placement stays: shared, same pool lane. A link from that lane to that pool lane is made: share by default off, marked default and home | Production 0; local 1 (`e5f67252` gets a new lane) |
-| Joint splash | unchanged | Its Home column is derived from the home lane |
-| Joint ripples' stored lane | already none (0029) | — |
-| Placements | unchanged, every row | 5 of 5 already fit the tighter rule in §4 |
+| Today | v2 |
+| --- | --- |
+| Link `in` | advanced link: share by default **off**; **home lane** for its pool lane |
+| Link `both` | advanced link: share by default **on**, as the default pool lane for (my lane, pool); **home lane** for its pool lane |
+| Link `out` | advanced link: share by default **on**, as the default pool lane for (my lane, pool); **no home lane** (it never brought records in) |
+| Default pool lane per (my lane, pool) | the sending link (`out`/`both`; at most one per (my lane, pool) by 0019); with none, the oldest link, with share off |
+| Home lane per (pool lane, me) | the `both`/`in` link (at most one per (me, pool lane) by 0009); none for an `out`-only pool lane |
+| Shared placements | **unchanged**, every row (5 on production, 4 on local). Still shared, same pool lane |
+| Just mine | **a pool record of mine**. The same row: owner me, its pool, its placement, no lane of mine. Nothing moves |
+| Joint records | unchanged. Their Home column follows the home lane (above) |
+| Joint ripples' stored lane | none (0029) |
+
+**What does not change for anyone:**
+- **Visible stays visible:** every shared placement, every joint record and every pool record keeps its readers.
+- **Private stays private:** defaults act only on records written after the switch. No existing record gains a placement, and no unlinking or re-mapping creates one.
+- **My Home's columns:** the same for every record on production.
 
 ---
 
 ## 3. Schema (expand, switch, contract)
 
-### Link table: `lane_mappings`, kept and widened
+The theme work (in progress) takes 0032, so v2 is **0033** (expand) and **0034** (contract).
+
+### Links: `lane_mappings`, kept and widened
 
 ```
 lane_mappings(
   id, user_id, my_category_id, pool_lane_id, pool_id, created_at,   -- as now
-  direction            -- FROZEN in 0032, dropped in the contract
-  is_default  boolean not null default false,   -- outbound default for (my_category_id, pool_id)
-  share_by_default boolean,                     -- set only on the default row: the (my lane, pool) switch
-  is_home     boolean not null default false    -- home lane for (user_id, pool_lane_id)
+  direction            -- frozen in 0033, dropped in 0034
+  is_default       boolean not null default false,  -- the default pool lane for (my_category_id, pool_id)
+  share_by_default boolean,                         -- on the default row only; false when created
+  is_home          boolean not null default false   -- the home lane for (user_id, pool_lane_id); optional
 )
-unique (my_category_id, pool_lane_id)                                  -- as now: one link per pair
-unique (my_category_id, pool_id) where is_default                      -- one outbound default
-unique (user_id, pool_lane_id)   where is_home                         -- one home lane
-check  (share_by_default is null) = (not is_default)                   -- the switch lives on the default row
+unique (my_category_id, pool_lane_id)                         -- as now
+unique (my_category_id, pool_id) where is_default             -- at most one default
+unique (user_id, pool_lane_id)   where is_home                -- at most one home lane
+check  ((share_by_default is null) = (not is_default))
 ```
 
-**Exactly one default and one home where any link exists.** A deferred constraint trigger enforces this at commit:
-- every (my lane, pool) with a link has one `is_default` row;
-- every (person, pool lane) with a link has one `is_home` row.
+A (my lane, pool) with links always has one default row, kept by a deferred trigger; when that row goes, the oldest remaining link takes it. The home lane is optional, and none means the pool's column.
 
-When the marked row goes, its successor is the oldest remaining link, the same rule as the mapping.
+### Joint invitees, for "Together"
 
-Rejected: a separate defaults table. It holds the same facts in two places, and deleting a link would have to repair both.
+```
+joint_invitees(splash_id → splashes on delete cascade, user_id → profiles, invited_at)
+primary key (splash_id, user_id)
+```
+
+"Add your side" waits for invitees who have not written; this replaces "every current member". RLS: readable by the pool's current members, written by joint-splash functions only. Backfill: decision 4.
+
+### Pool records
+
+A pool record **is** today's Just-mine row: `splashes.own_pool_id` and its placement, with its holds (`hold_own_pool`, `hold_own_pool_placement`, `check_own_pool_placed`). Only the name of the idea changes; the column keeps its name (a rename is destructive and buys nothing). Writing from a pool makes one by default.
 
 ### Expand, switch, contract
 
-| Step | Migration | Contents |
-| --- | --- | --- |
-| **Expand** | 0032 | Add `is_default`, `share_by_default` and `is_home`, and backfill them by §2. Convert Just-mine splashes (§2) with the 0028 bypass pattern. Add the deferred one-default and one-home trigger. Add the new functions (§4) beside the old ones. Old app and new app both work against it. |
-| **Switch** | app | Composer, edit sheet, pool link settings and Home columns move to v2 (§5). Nothing writes `direction`, `own_pool_id` or the retired functions any more. |
-| **Contract** | 0033 | Destructive; needs your approval quoted there (§6). See the list below. |
+| Step | Contents |
+| --- | --- |
+| **0033 expand** | Add the three markers and `joint_invitees`, and backfill them by §2 and decision 4. Add the deferred one-default trigger. Add the new functions beside the old (§4). Relax the placement policy's helper as in §4. Old app and new app both work. |
+| **Switch (app)** | Audience per record; pool compose with Together; Home pool columns; Advanced links. Nothing writes `direction`, calls the retired functions, or reads Just mine as a separate kind. |
+| **0034 contract** | Destructive; needs your quoted approval (§6, decision 8). See the list below. |
 
-**0033 contract steps:**
-- **Freeze `direction`:** a trigger refuses any write that changes it.
-- **Drop:**
+**0034 contract steps:**
+- **Freeze `direction`,** then drop it with its enum `lane_link_direction`.
+- **Drop the indexes that block v2:**
   - `lane_mappings_one_per_pool_lane` (0009), which forbids many-to-many;
-  - `lane_mappings_one_sender` (0019);
-  - `direction` and its enum;
-  - `splashes.own_pool_id`, with `splashes_own_pool_shape`, the triggers `splashes_hold_own_pool`, `splashes_own_pool_placed` and `splash_placements_hold_own_pool`, and their functions;
-  - `create_own_pool_splash`, `splash_to_just_mine`, `_sending_lane` and `_joint_lane_for` (replaced, see §4);
-  - `splash_reaction_summary` and `splash_reply_preview` (on the drop list since 2026-10-26).
-
-Many-to-many only becomes possible at the contract, when `one_per_pool_lane` goes. Until then, the switch app treats each pool lane as linked to at most one of my lanes.
-
-Optional: drop `ripples.category_id` in the same contract, if you approve H24's release 2 there. Otherwise it stays on its own.
+  - `lane_mappings_one_sender` (0019).
+- **Drop the retired functions:**
+  - `splash_to_just_mine`, `_sending_lane` and `_joint_lane_for`;
+  - `_place_history` (decision 5);
+  - `invite_lanes` (nothing reads it since the hotfix);
+  - `splash_reaction_summary` and `splash_reply_preview`.
+- **Optional:** H24's release 2 (`ripples.category_id`), if you approve it there.
 
 ---
 
@@ -149,79 +160,72 @@ Optional: drop `ripples.category_id` in the same contract, if you approve H24's 
 
 | Object | Today | v2 |
 | --- | --- | --- |
-| `_set_links` | links with direction; switches placements off on unlink or on losing `out` | links with defaults; unlinking switches the placements on it off, as now; **no direction comparison**. Changing a default or the share switch never re-shares or un-shares existing records |
-| `_place_history` ("include my earlier records" on join) | places from `out`/`both` links | places each of my posts whose lane has **share by default on**, on that (lane, pool)'s **default pool lane** |
-| `placeNewSplash` / `poolLaneFor` (app) | the pool lane my post's lane is linked to | the **default pool lane**, unless the composer chose another linked one for this record |
-| `set_splash_lane` | placements follow the new lane where it sends (`_sending_lane`), else switch off | placements move to the new lane's **default pool lane** in that pool; with no link there, they switch off (kept), as now |
-| `splash_to_joint` | mine (personal or Just mine) → joint | **kept**: my record → joint (the Just-mine branch goes) |
-| `splash_to_mine` | joint or Just mine → mine | **kept**: joint → my record, into my **home lane** for its pool lane, else a lane I choose (the Just-mine branch goes) |
-| `splash_to_just_mine`, `create_own_pool_splash` | — | **retired** (dropped in 0033) |
-| `move_pool_splash` | joint or Just mine within its pool | **joint only**; my record's pool lane changes through its placement (the Audience pool-lane chip, §5) |
-| `delete_pool` | Just mine → made lane; joint → each author's post in `_joint_lane_for`, else a made lane | Just-mine branch goes; joint → each author's post in their **home lane** for that pool lane, else a made lane (unchanged naming) |
-| `_joint_lane_for` / `jointLaneFor` | link that brings in (both, in) | **`_home_lane_for(pool_lane, me)`**: the `is_home` link, else null (the pool's column). The app reads the same marker from `getMyLinks` |
-| Placement RLS (`lane_is_mine_in`) | a placement on any pool lane any of my lanes links | **tightened:** a placement of my post on a pool lane that **the post's own lane** links. All 5 current placements already satisfy it |
-| Link RLS | owner-only; the linked lane mine; the pool mine | unchanged, plus the markers are owner-written like the rest |
-| Board layouts (0025) | pool scope keyed (splash, pool) | unchanged. A converted Just-mine splash keeps its pool layout (same splash, same pool) |
-| Joint "Add your side" (`awaiting`) | every current member who has not written | **the members chosen in "Together"** who have not written (§5); needs `joint_invitees` (§6, decision 4) |
-| `_ripple_pools`, `can_see_ripple`, reactions (0030) | through joint pool or shared placements | unchanged: a converted Just-mine record keeps its placement, so its readers and responses stay |
+| Placement policies (`lane_is_mine_in`) | a placement on a pool lane any of my lanes links | a placement of my record on **any lane of a pool I am a current member of**, needed because Audience picks a pool lane per record with no link. Same author-only rules as now. Not a widening of who reads: only the author places, and only into their own pools |
+| `_set_links` | writes links with directions; switches placements off on unlink and on losing `out` | writes links and markers; **switches nothing off.** Unlinking changes defaults and display only |
+| `set_lane_links` (settings) | the full link set with directions | the Advanced screen's links and markers |
+| `join_pool` / `create_pool` | take links and "include earlier records" | links ignored; the UI sends none since the hotfix (`p_links` stays in the signature until 0034) |
+| `_place_history` | places earlier posts from `out`/`both` links on join | **retired** with join-time matching (decision 5) |
+| `placeNewSplash` / `poolLaneFor` (app) | the pool lane my record's lane links | the pool lane chosen in Audience for this record |
+| `set_splash_lane` | a lane change moves my record's placements to where the new lane sends | a lane change **moves no placement**: sharing is per record |
+| `create_own_pool_splash` | makes a Just-mine record | kept: makes **my pool record** (the default from a pool) |
+| `create_joint_splash` | joint, awaiting every member | joint with **invitees** (Together) |
+| `splash_to_joint` / `splash_to_mine` | personal or Just mine ↔ joint | kept for my record ↔ joint (decision 3 sets the pairs) |
+| `splash_to_just_mine` | personal or joint → Just mine | **retired** |
+| `move_pool_splash` | joint or Just mine within its pool | joint or pool record within its pool (unchanged) |
+| `delete_pool` | Just mine → a made lane; joint → the author's `_joint_lane_for` lane, else a made lane | pool records → a made lane (as Just mine); joint → the author's **home lane** for its pool lane, else a made lane |
+| Home columns (`jointLaneFor`, `home-badge`) | joint in my linked lane (`both`/`in`), else the pool's column; Just mine in the pool's column | pool records and joint records in the **home lane** if marked, else the pool's column |
+| `_ripple_pools`, `can_see_ripple`, reactions (0030) | via joint pool or shared placements | unchanged |
+| Board layouts (0025) | (splash, pool) and (splash, me) | unchanged |
 
 ---
 
 ## 5. UI per screen
 
-### Home compose
-- My lane chips, as now.
-- **Audience** shows that lane's default pools: "Only me", "<Pool>", or "2 pools".
-  - Tap to add or remove pools for this record.
-  - Each shared pool shows a small chip of its linked pool lanes when the lane links to several, with the default preselected; one tap picks another.
-  - Sharing to a pool the lane has no link in asks once: **"Which lane in <Pool>?"** It lists that pool's lanes and saves the link (share by default off, marked default; home lane if the pool lane had none).
-- No joint records from Home.
+No "lane" on compose or join: emoji chips and names only. Settings carry the word, with a one-line explanation.
 
-### Pool compose
-- **Pool lane chips are the one choice.** No *Pool lanes | My lanes* tabs, no *Just mine* switch.
-- **Summary line, derived:** "Yours · <my lane> · shared to <Pool>", where my lane is the chosen pool lane's **home lane**. Tapping it opens Audience for this record.
-- If the pool lane has no link to my lanes, an inline question appears once: **"Keep this in which of your lanes?"** It offers my lanes and "+ New lane", and saves the link (marked home; default for (lane, pool) if that lane had none).
-- **Shared to this pool only,** even when my lane shares elsewhere by default.
-- **"Together":** member faces under the summary, none selected by default.
-  - Selecting anyone makes a **joint record** of this pool, with "Add your side" for those members.
-  - Selecting none makes **my record**.
+### Home compose and Audience
+- My lane chips, as now.
+- Audience reads **"Only me"** unless an advanced link shares the chosen lane by default; then it preselects that pool and pool lane ("Our Pool · 🎲 Games").
+- **The Audience sheet:** one row per pool I'm in, each with a switch. Turned on, the row shows that pool's lane chips, and one must be picked (preselected only by a link's default). Nothing is remembered for the next record.
+
+### Pool compose with Together
+- That pool's lane chips (emoji and name) are the one choice. No tabs, no *Just mine* switch.
+- **Together:** member faces under the chips, none selected.
+  - With none selected, the summary reads "Yours · in <Pool>", and Drop makes **my pool record**.
+  - Selecting faces reads "Together with Mina, Jae", and Drop makes a **joint record** whose "Add your side" slots are those members.
 
 ### Edit sheets
-- **My record:** lane, title, icon and dates as now. Audience lists each shared pool with its pool-lane chip. **"Make it joint…"** (my record → joint, choosing the pool and pool lane) replaces today's three-way conversion.
-- **Joint:** title and icon for any member; pool lane within the pool (`move_pool_splash`). **"Make it mine"** appears only while every ripple on it is mine.
+- **Home record:** lane, title, icon and dates; Audience per pool with its lane chip. **Make it joint…** picks the pool, a pool lane and who's together.
+- **Pool record (mine):** title, icon, dates and pool lane chip. **Make it joint…** (Together) and **Move to Home…** (decision 3).
+- **Joint:** title and icon for any member; pool lane; **Together** to add people (decision 6). **Make it mine** appears only while every ripple is mine.
 
-### Pool link settings (and join and create matching)
-- One row per pool lane, listing my linked lanes. Add a link with "+".
-- The row marked **Home** shows the pool lane's joint records on my Home; tap another to move the marker.
-- Under each of my lanes in this pool: **"Share by default"** (a switch) and its **default pool lane** (one tap among its linked pool lanes).
-- The direction arrow (↔ ← →) and its caption are removed.
-- **Join and create:** matching proposes links as now. A matched lane gets share by default **on**, the default and home markers by order.
+### Home pool columns
+- After my lanes: one column per pool with any of my pool records or joint records in it, headed by the pool's monogram and name.
+- A pool lane with a **home lane** sends its records to that lane's column instead.
+- A pool I left reads "A pool you left", with the neutral tile, as now.
 
-### Home columns
-- **My records:** in their lane.
-- **Joint records:** in the column of my **home lane** for their pool lane; with no link, in the pool's column (as today's unlinked case).
-- **Just-mine columns go:** converted records sit in their lane.
-- The pool's column remains only for joint records on pool lanes I have not linked.
+### Pool settings → Advanced → "Connect your lanes"
+- A one-line explanation: "Lanes are your own columns on Home. Connecting one to this pool can preselect sharing and show this pool's records in it."
+- **Per lane of mine:** its connected pool lanes (chips, + to add), **Share by default** (a switch, off when created), and its **default pool lane** (one chip).
+- **Per pool lane:** its **Home** marker among my connected lanes, or none.
+- No arrows, no captions about directions.
 
 ---
 
 ## 6. Decisions I need from you
 
-1. **Record `673226e9` moves on Home:** from pool `d1c664e1`'s column into `bf3b6526`'s column, because `out` loses its inbound meaning. Accept? Alternative: map `out` links to `is_home = false` and leave the pool lane with no home lane. But the model says a linked pool lane always has one, so I recommend accepting.
-2. **Where the defaults live:** marker columns on `lane_mappings`, with the switch on the default row and a deferred exactly-one trigger, as in §3. Or a separate defaults table? I recommend the markers.
-3. **New links made from a compose prompt:** "Which lane in <Pool>?" from Home and "Keep this in which of your lanes?" from a pool. Should **share by default** start **off** (this record is shared; future ones are not) or **on**? I recommend **off**: a default should be set on purpose, in link settings.
-4. **"Together" for joint records** needs a new table, `joint_invitees(splash_id, user_id)`, so "Add your side" waits only for those chosen. What do the 10 production and 2 local joint splashes get?
-   - **(a)** All current members as invitees, which keeps today's slots. **I recommend (a).**
-   - **(b)** Only the members who have already written, which leaves no open slots.
-5. **Tightened placement rule:** a post may be shared only onto a pool lane **its own lane** links (§4). All current data fits it. Approve?
-6. **`set_splash_lane` stays as a plain lane change,** not a conversion. Your brief retired "the four conversion functions except one". I read the four as to_joint, to_mine, to_just_mine and set_splash_lane. Confirm that changing a record's lane stays. I'm also keeping to_joint and to_mine as the one my ↔ joint pair.
-7. **The contract (0033) drops are destructive DDL.** I'll ask for your quoted approval there, listing:
-   - `lane_mappings_one_per_pool_lane` and `lane_mappings_one_sender`;
-   - `direction` and its enum;
-   - `own_pool_id`, its constraint, three triggers and their functions;
-   - `create_own_pool_splash`, `splash_to_just_mine`, `_sending_lane` and `_joint_lane_for`;
-   - `splash_reaction_summary` and `splash_reply_preview`.
+1. **Home lane optional per (pool lane, me)?** With it optional, every production record keeps its Home column, including `673226e9` in its pool's column. I recommend optional.
+2. **Where defaults live:** marker columns on `lane_mappings` (§3), or a separate defaults table? I recommend the markers.
+3. **Which conversions stay?** I read "my record ↔ joint" as two pairs and recommend keeping both:
+   - Home record ↔ joint;
+   - pool record ↔ joint.
 
-   Fold H24's release 2 (`ripples.category_id`) into it, or keep it separate?
-8. **Local Just-mine `e5f67252`** becomes a record in a new lane named after its pool lane. It's local only; nothing on production is affected. Fine?
-9. **Decision number:** this would be **H26** in DECISIONS.md once approved.
+   Also: should a pool record be able to move to Home (into a lane of mine, leaving it shared to that pool)? Today `splash_to_mine` does this for Just mine. I recommend yes, as **Move to Home…**.
+4. **Joint invitees backfill** for the 10 production and 2 local joint records:
+   - **(a)** All current members, which keeps today's "Add your side" slots. **I recommend (a).**
+   - **(b)** Only those who have written, which leaves no open slots.
+5. **Retire "include my earlier records"** (`_place_history`) with join-time matching? With no links at join, it has nothing to place. I recommend retiring it.
+6. **Can any member add people to a joint record's Together later,** or only the person who started it? I recommend any current member, matching who may edit its title.
+7. **Placement policy:** my record may be placed on any lane of a pool I'm a current member of, with no link required (§4). Approve?
+8. **0034 contract:** the drops in §3 are destructive DDL, and I'll ask for your quoted approval there. Fold H24's release 2 (`ripples.category_id`) into it, or keep it separate?
+9. **Numbering:** theme is 0032 and H26; v2 is 0033/0034 and **H27** once approved.
