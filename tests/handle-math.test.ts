@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { clearLayout, mergeLayout } from '@/features/month-board/board-layout';
 import {
   alongTilt,
+  cornerSized,
+  heldAt,
+  pointOn,
+  shareOf,
+  widened,
   moved,
   nudged,
   partPatch,
@@ -51,6 +56,37 @@ describe('handles, in layout units (review, direct manipulation)', () => {
     expect(spannedFromLeft({ span: 1 }, -50, 100, 100, 13)).toEqual({ x: -0.5, y: 0, span: 1.5 });
     // Along a wave turned 90°, a drag down is a drag along it.
     expect(alongTilt(0, 10, 90)).toBeCloseTo(10);
+  });
+
+  it('sizes from a corner one to one, the opposite corner held: a 20px pull on 100px is 120px', () => {
+    const tl = { x: 0, y: 0 };
+    const br = { x: 100, y: 100 };
+    expect(cornerSized(100, tl, br, { x: 20, y: 20 })).toBeCloseTo(120);
+    expect(cornerSized(100, tl, br, { x: -20, y: -20 })).toBeCloseTo(80);
+    // Read along the diagonal: a pull straight across counts half.
+    expect(cornerSized(100, tl, br, { x: 20, y: 0 })).toBeCloseTo(110);
+    // Turned 90°, the diagonal turns with it.
+    expect(cornerSized(100, tl, { x: -100, y: 100 }, { x: -20, y: 20 })).toBeCloseTo(120);
+  });
+
+  it('finds a point of a turned square box and back, and takes its drift off the offset', () => {
+    const tl = { x: 10, y: 10 };
+    const br = { x: 10, y: 10 + 100 * Math.SQRT2 };
+    const mid = pointOn(tl, br, { x: 0.5, y: 0.5 });
+    expect(mid.x).toBeCloseTo(10);
+    expect(mid.y).toBeCloseTo(10 + 50 * Math.SQRT2);
+    const share = shareOf(tl, br, { x: 30, y: 60 });
+    const back = pointOn(tl, br, share);
+    expect(back.x).toBeCloseTo(30);
+    expect(back.y).toBeCloseTo(60);
+    // Drifted 14px right and 13px down: 0.1 lane and a line back.
+    expect(heldAt({ x: 0.5, y: 2 }, { x: 14, y: 13 }, 140, 13)).toEqual({ x: 0.4, y: 1 });
+  });
+
+  it('widens a label by its right edge, in column widths, 0.3 to 4', () => {
+    expect(widened(140, 70, 140)).toBe(1.5);
+    expect(widened(140, 1000, 140)).toBe(4);
+    expect(widened(140, -1000, 140)).toBe(0.3);
   });
 
   it('nudges by a slider’s step on the arrows, ten with Shift, and turns a degree on [ and ]', () => {

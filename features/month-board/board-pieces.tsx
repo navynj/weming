@@ -607,6 +607,9 @@ export function BoardPieceView({
     labelW: label.w,
   };
   const period = isPeriod(card.splash);
+  // Where the label's right edge is drawn: at the board's edge its width bar would be clipped.
+  const labelRight =
+    piece.x + label.x + (nudge(layout.label, layout.piece)?.x ?? 0) * metrics.column + label.w;
   const frameOf = (part: BoardPart): ReactNode =>
     selected &&
     selected.kind === part.kind &&
@@ -617,6 +620,7 @@ export function BoardPieceView({
         units={units}
         tools={period ? NO_TOOLS : TOOLS[selected.kind]}
         editing={editing!}
+        widthInside={labelRight > metrics.width - 22}
       />
     ) : null;
   return (
@@ -866,7 +870,8 @@ export function BoardTapeView({
           sizePx: iconSet?.size ? Math.round(iconSet.size * line) : size,
           labelW: tape.w,
         }}
-        tools={period ? NO_TOOLS : TOOLS[kind]}
+        // A band's width is its days' or the row's (review): no width handle.
+        tools={period ? NO_TOOLS : { ...TOOLS[kind], width: false }}
         editing={editing!}
         origin={kind === 'label' ? 'left' : 'center'}
       />
@@ -938,12 +943,12 @@ export function BoardTapeView({
   );
 }
 
-/** Which handles each part has (review): the label moves and turns, its size the toolbar's. */
+/** Which handles each part has (review): the label moves, turns and widens, its text size the toolbar's. */
 const TOOLS: Record<BoardPart['kind'], Tools> = {
-  label: { move: true, rotate: true, size: false, ends: false },
-  icon: { move: true, rotate: true, size: true, ends: false },
-  photo: { move: true, rotate: true, size: true, ends: false },
-  wave: { move: true, rotate: false, size: false, ends: true },
+  label: { move: true, rotate: true, size: false, ends: false, width: true },
+  icon: { move: true, rotate: true, size: true, ends: false, width: false },
+  photo: { move: true, rotate: true, size: true, ends: false, width: false },
+  wave: { move: true, rotate: false, size: false, ends: true, width: false },
 };
 
 /** Lifts the piece being edited over every other, moved ones included. */

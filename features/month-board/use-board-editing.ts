@@ -130,14 +130,20 @@ export function useBoardEditing({
   );
   const deactivate = useCallback((): void => setActive(null), []);
 
+  // The piece a handle holds: a release still settling saves it even if it was let go meanwhile.
+  const held = useRef<string | null>(null);
   const hold = useCallback(
     (patch: BoardLayoutJson): void => {
-      if (activeId) drafts.edit(activeId, patch, [], { hold: true });
+      if (!activeId) return;
+      held.current = activeId;
+      drafts.edit(activeId, patch, [], { hold: true });
     },
     [activeId, drafts],
   );
   const commit = useCallback((): void => {
-    if (activeId) drafts.commit(activeId);
+    const id = held.current ?? activeId;
+    held.current = null;
+    if (id) drafts.commit(id);
   }, [activeId, drafts]);
   const edit = useCallback(
     (patch: BoardLayoutJson): void => {

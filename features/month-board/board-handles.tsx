@@ -9,22 +9,40 @@ import {
   alongTilt,
   angleOf,
   clamp,
+  cornerSized,
+  heldAt,
   LIMITS,
   moved,
   partPatch,
+  pointOn,
   resized,
+  shareOf,
   spanned,
   spannedFromLeft,
   stepFont,
   turned,
+  widened,
   type BoardPart,
   type PartValues,
 } from './handle-math';
 import type { BoardEditing } from './use-board-editing';
 
 /** Which handles a part has (review): the panel's own fields, no more. */
-export type Tools = { move: boolean; rotate: boolean; size: boolean; ends: boolean };
-export const NO_TOOLS: Tools = { move: false, rotate: false, size: false, ends: false };
+export type Tools = {
+  move: boolean;
+  rotate: boolean;
+  size: boolean;
+  ends: boolean;
+  /** A label's right edge: its width, the words rewrapping as it moves. */
+  width: boolean;
+};
+export const NO_TOOLS: Tools = {
+  move: false,
+  rotate: false,
+  size: false,
+  ends: false,
+  width: false,
+};
 
 /** What a part's frame needs to turn pixels into its layout's units. */
 export type FrameUnits = {
@@ -36,11 +54,11 @@ export type FrameUnits = {
   sizeUnit: number;
   /** The part's size now, in pixels, a corner's pull starts from. */
   sizePx: number;
-  /** The wave's length is a share of the label's width. */
+  /** The label's width in pixels: the wave's length is a share of it, and a width pull starts from it. */
   labelW: number;
 };
 
-type Kind = 'move' | 'rotate' | 'size' | 'end-left' | 'end-right';
+type Kind = 'move' | 'rotate' | 'size' | 'width' | 'end-left' | 'end-right';
 type Point = { x: number; y: number };
 type Gesture = {
   kind: Kind;
@@ -51,7 +69,19 @@ type Gesture = {
   /** Two fingers: where they began, apart and at what angle. */
   pinch: { dist: number; angle: number } | null;
   moved: boolean;
+  /** The box's corners on screen as the gesture began. */
+  box: { tl: Point; br: Point };
+  /**
+   * A size change holds a point of the box still on screen (review): the
+   * opposite corner for a corner pulled, the fingers' midpoint for a pinch.
+   */
+  pin: { share: Point; target: Point } | null;
 };
+
+/** A corner pull or a width pull begins after this much travel, then tracks the finger exactly. */
+const SIZE_DEAD_PX = 4;
+/** How many frames a release waits for the held point to settle before it saves. */
+const SETTLE_FRAMES = 4;
 
 const HANDLE = 'absolute flex h-11 w-11 items-center justify-center';
 const DOT = 'block h-3 w-3 rounded-full border border-main-900 bg-white';
@@ -85,6 +115,7 @@ export function PartFrame({
   tools,
   editing,
   origin = 'center',
+  widthInside = false,
 }: {
   part: BoardPart;
   /** The part's hand-set values as drawn now. */
@@ -94,8 +125,12 @@ export function PartFrame({
   editing: Pick<BoardEditing, 'hold' | 'commit'>;
   /** The part's transform origin: its centre, or (a band, a wave) its left edge's middle. */
   origin?: 'center' | 'left';
+  /** The label reaches the board's edge, which clips past it: its width bar sits just inside. */
+  widthInside?: boolean;
 }) {
   const pivotRef = useRef<HTMLSpanElement>(null);
+  const tlRef = useRef<HTMLSpanElement>(null);
+  const brRef = useRef<HTMLSpanElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const frame = useRef<number | null>(null);
   const pending = useRef<PartValues | null>(null);
@@ -126,9 +161,35 @@ export function PartFrame({
     if (out) latest.current.editing.hold(partPatch(latest.current.part, out));
   };
 
-  const pivotNow = (): Point => {
-    const r = pivotRef.current?.getBoundingClientRect();
+  const at = (el: HTMLElement | null): Point => {
+    const r = el?.getBoundingClientRect();
     return r ? { x: r.left, y: r.top } : { x: 0, y: 0 };
+  };
+  const pivotNow = (): Point => at(pivotRef.current);
+  const boxNow = (): { tl: Point; br: Point } => ({ tl: at(tlRef.current), br: at(brRef.current) });
+
+  /** How far the held point has drifted as drawn, taken back from the part's offset; null when still. */
+  const pinFix = (g: Gesture): { x: number; y: number } | null => {
+    if (!g.pin) return null;
+    const { tl, br } = boxNow();
+    const now = pointOn(tl, br, g.pin.share);
+    const drift = { x: now.x - g.pin.target.x, y: now.y - g.pin.target.y };
+    if (Math.hypot(drift.x, drift.y) < 0.5) return null;
+    const { values: v, units: u } = latest.current;
+    return heldAt(v, drift, u.column, u.line);
+  };
+
+  /** A size change let go: the held point settled over a frame or two, then one save. */
+  const settle = (g: Gesture, left: number): void => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const fix = left > 0 ? pinFix(g) : null;
+        if (fix) {
+          latest.current.editing.hold(partPatch(latest.current.part, fix));
+          settle(g, left - 1);
+        } else latest.current.editing.commit();
+      }),
+    );
   };
 
   const onMove = (event: PointerEvent): void => {
@@ -142,8 +203,11 @@ export function PartFrame({
       const dist = Math.hypot(b.x - a.x, b.y - a.y);
       const ratio = g.pinch.dist > 0 ? dist / g.pinch.dist : 1;
       const next: PartValues = { tilt: turned(g.start.tilt, g.pinch.angle, angleOf(a, b)) };
-      if (t.size && (p.kind === 'icon' || p.kind === 'photo'))
+      // By the fingers' distance, around their midpoint as they began.
+      if (t.size && (p.kind === 'icon' || p.kind === 'photo')) {
         next.size = resized(p.kind, u.sizePx, ratio, u.sizeUnit);
+        Object.assign(next, pinFix(g));
+      }
       if (p.kind === 'wave')
         next.span = clamp(Number(((g.start.span ?? 1) * ratio).toFixed(2)), LIMITS.span);
       g.moved = true;
@@ -153,7 +217,8 @@ export function PartFrame({
     const at = { x: event.clientX, y: event.clientY };
     const dx = at.x - g.from.x;
     const dy = at.y - g.from.y;
-    if (!g.moved && Math.hypot(dx, dy) < AXIS_LOCK_PX) return;
+    const dead = g.kind === 'size' || g.kind === 'width' ? SIZE_DEAD_PX : AXIS_LOCK_PX;
+    if (!g.moved && Math.hypot(dx, dy) < dead) return;
     g.moved = true;
     switch (g.kind) {
       case 'move':
@@ -163,12 +228,16 @@ export function PartFrame({
         send({ tilt: turned(g.start.tilt, angleOf(g.pivot, g.from), angleOf(g.pivot, at)) });
         break;
       case 'size': {
-        const was = Math.hypot(g.from.x - g.pivot.x, g.from.y - g.pivot.y);
-        const now = Math.hypot(at.x - g.pivot.x, at.y - g.pivot.y);
-        if (p.kind === 'icon' || p.kind === 'photo')
-          send({ size: resized(p.kind, u.sizePx, was > 0 ? now / was : 1, u.sizeUnit) });
+        // The opposite corner held, the pulled one under the finger: no smoothing.
+        if (p.kind === 'icon' || p.kind === 'photo') {
+          const px = cornerSized(u.sizePx, g.box.tl, g.box.br, { x: dx, y: dy });
+          send({ size: resized(p.kind, px, 1, u.sizeUnit), ...pinFix(g) });
+        }
         break;
       }
+      case 'width':
+        send({ width: widened(u.labelW, alongTilt(dx, dy, g.start.tilt), u.column) });
+        break;
       case 'end-right':
         send({ span: spanned(g.start.span ?? 1, alongTilt(dx, dy, g.start.tilt), u.labelW) });
         break;
@@ -191,10 +260,10 @@ export function PartFrame({
     if (!g || !g.pointers.has(event.pointerId)) return;
     // A finger lifted ends the gesture, pinch or not: one save a release.
     stop.current();
-    if (g.moved) {
-      flush();
-      latest.current.editing.commit();
-    }
+    if (!g.moved) return;
+    flush();
+    if (g.pin) settle(g, SETTLE_FRAMES);
+    else latest.current.editing.commit();
   };
 
   // A second finger, wherever it lands, makes the drag a pinch and a twist.
@@ -208,6 +277,13 @@ export function PartFrame({
     g.pinch = { dist: Math.hypot(b.x - a.x, b.y - a.y), angle: angleOf(a, b) };
     // From where the first finger has taken it so far.
     g.start = { ...latest.current.values };
+    const { tools: t, part: p } = latest.current;
+    if (t.size && (p.kind === 'icon' || p.kind === 'photo')) {
+      const box = boxNow();
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      g.box = box;
+      g.pin = { share: shareOf(box.tl, box.br, mid), target: mid };
+    } else g.pin = null;
   };
 
   const begin = (kind: Kind, event: React.PointerEvent): void => {
@@ -218,6 +294,7 @@ export function PartFrame({
       return;
     }
     if (event.button !== 0 && event.pointerType === 'mouse') return;
+    const box = boxNow();
     gesture.current = {
       kind,
       start: { ...latest.current.values },
@@ -226,6 +303,9 @@ export function PartFrame({
       pointers: new Map([[event.pointerId, { x: event.clientX, y: event.clientY }]]),
       pinch: null,
       moved: false,
+      box,
+      // A corner pulled holds the opposite one where it is.
+      pin: kind === 'size' ? { share: { x: 0, y: 0 }, target: box.tl } : null,
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -262,6 +342,21 @@ export function PartFrame({
         className="absolute h-0 w-0"
         style={origin === 'left' ? { left: 3, top: '50%' } : { left: '50%', top: '50%' }}
       />
+      {/* The part's own corners (the outline sits 3px out): what a size change is read against. */}
+      <span
+        ref={tlRef}
+        aria-hidden
+        data-edit-corner="tl"
+        className="absolute h-0 w-0"
+        style={{ left: 3, top: 3 }}
+      />
+      <span
+        ref={brRef}
+        aria-hidden
+        data-edit-corner="br"
+        className="absolute h-0 w-0"
+        style={{ right: 3, bottom: 3 }}
+      />
       {tools.rotate ? (
         <span
           data-edit-handle="rotate"
@@ -289,6 +384,19 @@ export function PartFrame({
           style={still}
         >
           <span className="border-main-900 block h-3 w-3 border bg-white" />
+        </span>
+      ) : null}
+      {tools.width ? (
+        <span
+          data-edit-handle="width"
+          data-inside={widthInside ? '' : undefined}
+          aria-hidden
+          onClick={swallow}
+          onPointerDown={(event) => begin('width', event)}
+          className={`${HANDLE} top-1/2 ${widthInside ? 'right-0' : '-right-[22px]'} -translate-y-1/2 cursor-ew-resize`}
+          style={still}
+        >
+          <span className="border-main-900 block h-4 w-1.5 rounded-full border bg-white" />
         </span>
       ) : null}
       {tools.ends ? (

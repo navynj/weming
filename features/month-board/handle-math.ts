@@ -26,6 +26,7 @@ export const LIMITS = {
   photoSize: [0.2, 2],
   span: [0.2, 4],
   fontSize: [10, 18],
+  width: [0.3, 4],
 } as const satisfies Record<string, readonly [number, number]>;
 
 /** A turn within this many degrees of straight is straight. */
@@ -42,12 +43,25 @@ function round(v: number, places: number): number {
 }
 
 /** A part's hand-set values, whichever part it is. */
-export type PartValues = { x?: number; y?: number; tilt?: number; size?: number; span?: number };
+export type PartValues = {
+  x?: number;
+  y?: number;
+  tilt?: number;
+  size?: number;
+  span?: number;
+  /** A label's width, in column widths (0027, 0050). */
+  width?: number;
+};
 
 export function partValues(layout: BoardLayoutJson, part: BoardPart): PartValues {
   switch (part.kind) {
     case 'label':
-      return { x: layout.label?.x, y: layout.label?.y, tilt: layout.label?.tilt };
+      return {
+        x: layout.label?.x,
+        y: layout.label?.y,
+        tilt: layout.label?.tilt,
+        width: layout.label?.width,
+      };
     case 'icon':
       return { ...layout.icon };
     case 'photo':
@@ -70,7 +84,7 @@ export function partPatch(part: BoardPart, values: PartValues): BoardLayoutJson 
     ) as Pick<PartValues, K>;
   switch (part.kind) {
     case 'label':
-      return { label: pick(['x', 'y', 'tilt']) };
+      return { label: pick(['x', 'y', 'tilt', 'width']) };
     case 'icon':
       return { icon: pick(['x', 'y', 'tilt', 'size']) };
     case 'photo':
@@ -127,6 +141,79 @@ export function resized(
     round((startPx * ratio) / unitPx, 2),
     kind === 'icon' ? LIMITS.iconSize : LIMITS.photoSize,
   );
+}
+
+type Point = { x: number; y: number };
+
+/**
+ * A sticker's or photo's corner pulled (review): the opposite corner held,
+ * the pulled one following the finger one to one. The finger's travel is
+ * added to where the corner was, projected on the box's diagonal from the
+ * held corner, and read against that diagonal: so a 20px pull on a 100px
+ * photo makes it 120px, not a multiple of the pull.
+ */
+export function cornerSized(startPx: number, anchor: Point, corner: Point, travel: Point): number {
+  const dx = corner.x - anchor.x;
+  const dy = corner.y - anchor.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return startPx;
+  const along = (corner.x + travel.x - anchor.x) * dx + (corner.y + travel.y - anchor.y) * dy;
+  return Math.max(0, (startPx * along) / len2);
+}
+
+/**
+ * A point of a square box given as a share of it from its top-left — (0, 0)
+ * the corner itself, (0.5, 0.5) its middle — the box read from its top-left
+ * and bottom-right corners on screen, turned however it is.
+ */
+export function pointOn(topLeft: Point, bottomRight: Point, at: Point): Point {
+  const dx = bottomRight.x - topLeft.x;
+  const dy = bottomRight.y - topLeft.y;
+  const side = Math.hypot(dx, dy) / Math.SQRT2;
+  const turn = Math.atan2(dy, dx) - Math.PI / 4;
+  const u = { x: Math.cos(turn), y: Math.sin(turn) };
+  const v = { x: -Math.sin(turn), y: Math.cos(turn) };
+  return {
+    x: topLeft.x + side * (at.x * u.x + at.y * v.x),
+    y: topLeft.y + side * (at.x * u.y + at.y * v.y),
+  };
+}
+
+/** Where a point on screen lies in such a box, as a share of it: pointOn's inverse. */
+export function shareOf(topLeft: Point, bottomRight: Point, p: Point): Point {
+  const dx = bottomRight.x - topLeft.x;
+  const dy = bottomRight.y - topLeft.y;
+  const side = Math.hypot(dx, dy) / Math.SQRT2;
+  if (side === 0) return { x: 0, y: 0 };
+  const turn = Math.atan2(dy, dx) - Math.PI / 4;
+  const rx = p.x - topLeft.x;
+  const ry = p.y - topLeft.y;
+  return {
+    x: (rx * Math.cos(turn) + ry * Math.sin(turn)) / side,
+    y: (-rx * Math.sin(turn) + ry * Math.cos(turn)) / side,
+  };
+}
+
+/**
+ * The part's offset taken back by how far the point it is held at has
+ * drifted on screen (review): a size change draws the box from its own
+ * place, so the held corner — or a pinch's midpoint — would move without it.
+ */
+export function heldAt(
+  values: PartValues,
+  drift: Point,
+  column: number,
+  line: number,
+): { x: number; y: number } {
+  return {
+    x: clamp(round((values.x ?? 0) - drift.x / column, 3), LIMITS.x),
+    y: clamp(round((values.y ?? 0) - drift.y / line, 2), LIMITS.y),
+  };
+}
+
+/** A label's right edge pulled `along` pixels on its own axis: its width in column widths. */
+export function widened(startPx: number, along: number, column: number): number {
+  return clamp(round((startPx + along) / column, 2), LIMITS.width);
 }
 
 /** The wave's right end pulled `along` pixels on its own axis: its length a share of the label. */
