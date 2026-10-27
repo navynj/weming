@@ -274,6 +274,61 @@ done, on the device it was built for:
 every push.** The free tier keeps no backups; these are the only copies. See
 § Backups below.
 
+## Migrations: the pipeline
+
+**The rule.** Every migration works with both the app in production and the app
+being deployed. A breaking change is split into **expand** (add only), deploy,
+and **contract** (remove only, after the new app is live); a contract ships in
+a later release, never with the code that stops using the old objects.
+
+**On a pull request** that adds or changes a migration,
+`.github/workflows/migrations-compat.yml` starts a local Supabase with every
+migration, finds the commit Vercel last deployed to Production (GitHub's
+deployment records), and runs that commit's database tests against it. A
+failure blocks the PR: "this migration breaks the running app; split it into
+expand and contract".
+
+**On a push to main** that changes `supabase/migrations`,
+`.github/workflows/migrate.yml`:
+
+1. backs up the database and storage, encrypted (`backup-run.yml`, the weekly
+   job's steps);
+2. waits in the **`production-db`** environment for Yoonji's approval in
+   GitHub (Actions → the run → Review deployments);
+3. runs `scripts/db-push.sh` against `SUPABASE_DB_URL`, the approval for each
+   destructive migration read from the quote in its file (one without it is
+   refused);
+4. calls the Vercel deploy hook.
+
+**Vercel's Ignored Build Step** (`scripts/vercel-ignore.mjs`) builds production
+only when CI passed for the commit and production has applied every migration
+in it, asked through `applied_migrations()` (0046) with the build's service
+key. Otherwise it skips with "Waiting for migration <name> approval", so an app
+commit landing while a migration awaits approval waits too, and the deploy
+hook's build is the one that goes live.
+
+**Emergency path.** `pnpm backup` then `pnpm db:push` (with
+`DURING_DDL_APPROVED='…'` for destructive DDL) still work by hand; then
+redeploy main in Vercel.
+
+### Settings and secrets
+
+GitHub → Settings → Environments → **New environment** `production-db`:
+required reviewers: Yoonji; deployment branches: `main` only.
+
+GitHub → Settings → Secrets and variables → Actions:
+
+| Name | Kind | What |
+| --- | --- | --- |
+| `SUPABASE_DB_URL` | secret | already set for the weekly backup (Session pooler URL) |
+| `SUPABASE_SERVICE_ROLE_KEY` | secret | already set for the weekly backup |
+| `SUPABASE_URL`, `BACKUP_AGE_PUBLIC_KEY` | variables | already set for the weekly backup |
+| `VERCEL_DEPLOY_HOOK_URL` | secret | Vercel → Settings → Git → Deploy Hooks → name "migrations", branch `main` |
+
+Vercel needs nothing new: the Ignored Build Step reads
+`NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which Production
+already has.
+
 ## Backups
 
 Two copies, the same contents: the database dump (schema, then data), every
