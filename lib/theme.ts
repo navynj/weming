@@ -2,8 +2,8 @@
  * A person's theme (0032, 0036): one colour of eleven and a mode. Dark mode
  * is the colour as the water ground, white on it — the ground as it always
  * was; light mode is a white ground where what was white on it (labels,
- * marks, text) takes the colour; pastel mode is the colour's pastel as the
- * ground with a soft grey on it. Every hex keeps white at 3:1 or better
+ * marks, text) takes the colour; pastel mode is a white ground with a soft
+ * grey on it and the colour's pastel as its fills. Every hex keeps white at 3:1 or better
  * (dark and light swap the same pair); every pastel keeps the grey at 4.5:1
  * (tests/theme.test.tsx).
  *
@@ -20,7 +20,8 @@ export const THEMES = [
   { key: 'blue', name: 'Blue', hex: '#0507C9', pastel: '#AFB8F0' },
   // A step toward blue (Yoonji, in the session): it read reddish.
   { key: 'purple', name: 'Purple', hex: '#6338D8', pastel: '#C2B8F2' },
-  { key: 'pink', name: 'Pink', hex: '#C2307A', pastel: '#F3B6CF' },
+  // Baby pink (Yoonji, in the session): the first pastel read too strong.
+  { key: 'pink', name: 'Pink', hex: '#C2307A', pastel: '#F9CFE0' },
   { key: 'brown', name: 'Brown', hex: '#8A5A2B', pastel: '#D6BC9F' },
   { key: 'black', name: 'Black', hex: '#161621', pastel: '#D3D3DA' },
 ] as const;
