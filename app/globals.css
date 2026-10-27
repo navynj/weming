@@ -65,47 +65,111 @@
 :root,
 [data-theme='blue'] {
   --theme-900: #0507c9;
-  --theme-pastel: #afb8f0;
+  --pastel-tone: #8ba6ff;
+  --theme-pastel: #d1ddff;
+  --pastel-card: #f8fafe;
+  --pastel-stack-1: #e6ecfe;
+  --pastel-stack-2: #cddafe;
+  --pastel-rule: #edf2fe;
 }
 [data-theme='red'] {
   --theme-900: #d92d20;
-  --theme-pastel: #f2a7a0;
+  --pastel-tone: #f58880;
+  --theme-pastel: #ffd1cd;
+  --pastel-card: #fef9f8;
+  --pastel-stack-1: #ffe6e4;
+  --pastel-stack-2: #ffcdc8;
+  --pastel-rule: #ffedeb;
 }
 [data-theme='orange'] {
   --theme-900: #d9480f;
-  --theme-pastel: #f7c59b;
+  --pastel-tone: #e29942;
+  --theme-pastel: #fed6ad;
+  --pastel-card: #fff9f3;
+  --pastel-stack-1: #fde9d5;
+  --pastel-stack-2: #fbd3aa;
+  --pastel-rule: #fbf0e4;
 }
 [data-theme='yellow'] {
   --theme-900: #b07c00;
-  --theme-pastel: #f3de8a;
+  --pastel-tone: #d0a535;
+  --theme-pastel: #f2dca9;
+  --pastel-card: #fefaf1;
+  --pastel-stack-1: #f7ecd3;
+  --pastel-stack-2: #efd9a6;
+  --pastel-rule: #f8f1e3;
 }
 [data-theme='green'] {
   --theme-900: #14804a;
-  --theme-pastel: #a9dbb8;
+  --pastel-tone: #5cc486;
+  --theme-pastel: #baecca;
+  --pastel-card: #f4fdf7;
+  --pastel-stack-1: #dbf4e3;
+  --pastel-stack-2: #b7e9c7;
+  --pastel-rule: #e8f6ec;
 }
 [data-theme='lime'] {
   --theme-900: #4e8a1a;
-  --theme-pastel: #cbe79b;
+  --pastel-tone: #93bb5a;
+  --theme-pastel: #d1e8b6;
+  --pastel-card: #f8fcf3;
+  --pastel-stack-1: #e6f2d9;
+  --pastel-stack-2: #cde4b3;
+  --pastel-rule: #eef5e6;
 }
 [data-theme='sky'] {
   --theme-900: #0b7fc2;
-  --theme-pastel: #a8d5f0;
+  --pastel-tone: #59b5ef;
+  --theme-pastel: #90c5ea;
+  --pastel-card: #f6fafd;
+  --pastel-stack-1: #e3f0fa;
+  --pastel-stack-2: #c8e2f4;
+  --pastel-rule: #eef6fc;
+}
+[data-theme='mint'] {
+  --theme-900: #14857f;
+  --pastel-tone: #4dbcbe;
+  --theme-pastel: #a6e3e3;
+  --pastel-card: #f8fdfd;
+  --pastel-stack-1: #e9f8f8;
+  --pastel-stack-2: #d2f1f1;
+  --pastel-rule: #f2fbfb;
 }
 [data-theme='purple'] {
   --theme-900: #6338d8;
-  --theme-pastel: #c2b8f2;
+  --pastel-tone: #ae9bf9;
+  --theme-pastel: #ded8ff;
+  --pastel-card: #faf9ff;
+  --pastel-stack-1: #edeafe;
+  --pastel-stack-2: #dbd5ff;
+  --pastel-rule: #f2f0ff;
 }
 [data-theme='pink'] {
   --theme-900: #c2307a;
-  --theme-pastel: #f9cfe0;
+  --pastel-tone: #de8acf;
+  --theme-pastel: #fbcdf2;
+  --pastel-card: #fff8fd;
+  --pastel-stack-1: #fce5f7;
+  --pastel-stack-2: #f8caef;
+  --pastel-rule: #fbedf8;
 }
 [data-theme='brown'] {
   --theme-900: #8a5a2b;
-  --theme-pastel: #d6bc9f;
+  --pastel-tone: #b4967a;
+  --theme-pastel: #dcc8b4;
+  --pastel-card: #faf7f4;
+  --pastel-stack-1: #f1e9e1;
+  --pastel-stack-2: #e6d8cb;
+  --pastel-rule: #f6f1ec;
 }
 [data-theme='black'] {
   --theme-900: #161621;
-  --theme-pastel: #d3d3da;
+  --pastel-tone: #a6a6a6;
+  --theme-pastel: #dadada;
+  --pastel-card: #f9f9f9;
+  --pastel-stack-1: #f0f0f0;
+  --pastel-stack-2: #e5e5e5;
+  --pastel-rule: #f6f6f6;
 }
 
 /* No pinch or double-tap zoom on a phone (layout.tsx's viewport says why);
@@ -316,29 +380,32 @@ body {
 }
 
 /*
- * Pastel mode (0036, Yoonji, in the session): a white ground, as in light
- * mode, with the colour's pastel as the accent — what was white on the
- * ground (selected chips, the compose disc, marks, waves) takes the pastel —
- * and every word on the ground a soft grey (--pastel-ink), on the white and
- * on the pastel alike: a pastel never carries white or pastel words.
+ * Pastel mode (0036, Yoonji's mockups): a white ground. What was white on
+ * it splits in two: words and marks take the colour's soft tone
+ * (--pastel-tone), and fills — selected chips, the compose disc, a label's
+ * fill — take its pastel (--theme-pastel), with grey words on them
+ * (--pastel-ink). Lane rules are the faintest tint (--pastel-rule).
  */
 [data-mode='pastel'] .water-ground {
   --pastel-ink: #45424d;
   --color-white: var(--theme-pastel);
   --color-main-900: #ffffff;
-  --color-main-400: color-mix(in srgb, var(--pastel-ink) 30%, var(--theme-pastel));
+  --color-main-400: var(--pastel-tone);
   --color-main-100: var(--theme-pastel);
-  --color-joint: color-mix(in srgb, var(--theme-pastel) 55%, #ffffff);
-  --color-joint-face: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
+  --color-joint: var(--pastel-stack-1);
+  --color-joint-face: var(--theme-pastel);
+  --color-pool-200: var(--pastel-rule);
   background-color: #ffffff;
-  color: var(--pastel-ink);
-  --wave-ink: var(--theme-pastel);
+  color: var(--pastel-tone);
+  --wave-ink: var(--pastel-tone);
 }
-/* Words on the ground, in either of its colours, are the soft grey; an ink
-   fill (a Black label, a menu) keeps its white words, and cards set their own. */
-[data-mode='pastel']
-  .water-ground
-  :is([class*='text-white'], [class*='text-main-900']):not(.bg-ink):not(.surface *) {
+/* Words and marks on the ground: the soft tone; an ink fill (a menu) keeps
+   its white words, and cards set their own. */
+[data-mode='pastel'] .water-ground [class*='text-white']:not(.bg-ink):not(.surface *) {
+  color: var(--pastel-tone);
+}
+/* Words on a fill (a selected chip, the compose disc): the soft grey. */
+[data-mode='pastel'] .water-ground [class*='text-main-900']:not(.surface *) {
   color: var(--pastel-ink);
 }
 
@@ -354,20 +421,21 @@ body {
   --color-joint: color-mix(in srgb, #ffffff 20%, var(--theme-900));
   --wave-ink: var(--theme-900);
 }
-/* Pastel mode's cards: soft grey words, the pastel for accents. */
+/* Pastel mode's cards: title and date in the tone, body text dark, the
+   pastel for their accents; the cards beneath deepen through the stack. */
 [data-mode='pastel'] .water-ground .surface {
-  --color-main-900: var(--pastel-ink);
+  --color-main-900: var(--pastel-tone);
   --color-main-100: var(--theme-pastel);
   --color-joint: var(--theme-pastel);
-  --wave-ink: var(--pastel-ink);
+  --wave-ink: var(--pastel-tone);
 }
-/* A card's edge on the white ground: a hairline in the pastel. */
+/* A card's edge on the white ground: a hairline in the faintest tint. */
 [data-mode='pastel'] .water-ground .surface-edge {
-  box-shadow: 0 0 0 1px var(--theme-pastel);
+  box-shadow: 0 0 0 1px var(--pastel-rule);
 }
 /* A filled label's second style, in pastel mode: nearly white, a pastel edge. */
 [data-mode='pastel'] .water-ground .label-ink {
-  background-color: color-mix(in srgb, var(--theme-pastel) 15%, #ffffff);
+  background-color: var(--pastel-card);
   box-shadow: inset 0 0 0 1px var(--theme-pastel);
   color: var(--pastel-ink);
 }
