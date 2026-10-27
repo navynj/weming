@@ -288,6 +288,34 @@ deployment records), and runs that commit's database tests against it. A
 failure blocks the PR: "this migration breaks the running app; split it into
 expand and contract".
 
+**Expected failures: only for an intended change to validation or limits.**
+A migration that deliberately changes what the database accepts — a range
+widened, a value newly allowed or refused — can break a production test that
+pins the old rule, while the running app is fine. Such a migration lists each
+of those tests in a header comment block, by its full name (the describe
+titles and the test's own, joined by `" > "`, exactly as vitest prints them),
+with the reason:
+
+```sql
+-- compat-expected-failures:
+--   "a pool layout > refuses values outside the ranges, unknown keys, and a font size between whole pixels": 0050 widens label.width to 4 on purpose
+```
+
+`scripts/compat-expected.mjs` judges the run from vitest's JSON results. It
+reads the blocks of the **pending** migrations only (in the PR, not in
+production's commit). The check passes when every failing production test is
+listed; it fails on any unlisted failure, on a test file that did not run, and
+on a listed test that passed or no longer exists, so a stale entry is cleaned
+up rather than carried. The listed expectations that matched are printed in
+the log and the job summary, so the PR shows what was knowingly broken.
+
+**Never use it to work around an app incompatibility.** If a production test
+fails because the running app would break — a column it reads is gone, a
+function it calls changed shape, a policy it relies on is narrower — the
+migration is split into expand and contract, not listed. Update the test in the
+same PR so the next production commit carries the new rule. Never merge past a
+red check.
+
 **On a push to main** that changes `supabase/migrations`,
 `.github/workflows/migrate.yml`:
 
