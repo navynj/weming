@@ -81,6 +81,23 @@ Until then each stays in the database, unread by the app.
 
 - **"Make it joint…" from Home** (SHARING-V2 §5, Home record edit sheet): pick the pool, a pool lane and Together without opening the pool. Today a Home record becomes joint from its edit sheet opened in the pool it is shared to. Needs each pool's members on Home.
 - **Per-pool invitees on my records (0035)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
+- **After 0035, what remains for sharing:**
+  - the 0036 contract (drop list above, with quoted approval);
+  - H24 release 2 (`ripples.category_id`), its own migration after 0036 is verified;
+  - whether "Make it joint…" on Home is still needed now that the `…` menu offers it in a pool, and on Home for pool records.
+
+## Queued (Yoonji, 2026-10-26), in this order after 0035
+
+1. **Leave pool:** a member who isn't the pool's creator gets "Leave pool" where "Delete pool" is.
+2. **Layout:** move a record's whole position on the Y axis, not only its label.
+3. **Theme colours:**
+   - yellow closer to yellow;
+   - lime, sky and pink lighter, and all less muddy;
+   - keep 3:1 against white text: a shade that fails is shown beside the nearest passing one, not shipped.
+4. **Splash detail:** an optional description on a splash, added above the divider when tapped.
+5. **Saved toast:** a change that applies without Save, such as the theme colour, shows a success toast.
+6. **Bob z-order:** stacking is wrong while cards bob.
+7. **Layout's stacking:** put stacking order on the position slider, with a label a non-developer reads, not "z-index".
 
 ## Later, unscheduled
 
