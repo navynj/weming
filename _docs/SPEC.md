@@ -176,8 +176,8 @@ ripples(author, category?, note?, media[],    -- a block (H21a); category frozen
   -- H20c: the exclusion constraint is dropped; overlapping spans are legitimate records
 ripple_audience(ripple, target: list|pool|lock)
 ripple_views(ripple, viewer, viewed_at)       -- witness counts; readable by the ripple's author only
-ripple_reactions(ripple, user, emoji)         -- H24: one of each emoji per person; whoever can see the ripple; none on a locked one
-ripple_replies(ripple, author, body 1-500,    -- H24: not a ripple (no lane, no date, never on the board); one level;
+ripple_reactions(ripple, user, emoji)         -- H25: one of each emoji per person; whoever can see the ripple; none on a locked one
+ripple_replies(ripple, author, body 1-500,    -- H25: not a ripple (no lane, no date, never on the board); one level;
                edited_at?, hidden_at?,        -- hidden by the ripple's author: its text reaches only its writer and that author;
                hidden_by?)                    -- hard delete; read and written only through functions (0030)
 splashes(owner, title,                        -- a post (H21a); owner-only RLS

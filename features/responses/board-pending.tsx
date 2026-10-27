@@ -8,7 +8,7 @@ import type { BoardResponses } from './model';
 
 /**
  * The board under an open splash shows a reaction or reply the moment it is
- * made (CLAUDE.md, the principle; H24): the page hands its splash's new
+ * made (CLAUDE.md, the principle; H25): the page hands its splash's new
  * numbers here, and the board draws them until a re-read newer than the
  * change arrives with the server's own.
  */

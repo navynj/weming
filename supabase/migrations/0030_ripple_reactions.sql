@@ -1,4 +1,4 @@
--- 0030: reactions and replies on a ripple (H24, 2026-10-26).
+-- 0030: reactions and replies on a ripple (H25, 2026-10-26).
 --
 -- Two small things a reader can leave under a block: an emoji (several per
 -- person, one of each) and a short reply (text, one level, no replies to
@@ -44,7 +44,7 @@ create table public.ripple_reactions (
 create index ripple_reactions_user_idx on public.ripple_reactions (user_id);
 
 comment on table public.ripple_reactions is
-  'An emoji left on a ripple by someone who can see it (H24). One of each emoji per person.';
+  'An emoji left on a ripple by someone who can see it (H25). One of each emoji per person.';
 
 create table public.ripple_replies (
   id uuid primary key default gen_random_uuid(),
@@ -66,7 +66,7 @@ create index ripple_replies_ripple_idx on public.ripple_replies (ripple_id, crea
 create index ripple_replies_author_idx on public.ripple_replies (author_id);
 
 comment on table public.ripple_replies is
-  'A short reply under one ripple (H24). Not a ripple: no lane, no date. Read and written only through the reply functions.';
+  'A short reply under one ripple (H25). Not a ripple: no lane, no date. Read and written only through the reply functions.';
 
 alter table public.ripple_reactions enable row level security;
 alter table public.ripple_replies enable row level security;

@@ -92,7 +92,7 @@ const SLOT_WORDS = { wide: 'Add your side', narrow: 'Add' } as const;
 export const TAPE_PX = 24;
 
 /**
- * Reactions and replies on the board (H24). The badge: a white pill on the
+ * Reactions and replies on the board (H25). The badge: a white pill on the
  * label's top-right corner, over its edge by half its height, like a
  * sticker; the label keeps this much more top padding while it has one, so
  * the badge never covers its words. The reply lines: under the label,
@@ -155,9 +155,9 @@ export type BoardMetrics = {
   /** Each photo card behind the top one peeks this much above the one before. */
   fanMin: number;
   fanMax: number;
-  /** The reactions badge (H24): 18px tall, 14 on a phone; its type never under 10. */
+  /** The reactions badge (H25): 18px tall, 14 on a phone; its type never under 10. */
   badge: { h: number; size: number; emoji: number };
-  /** A reply line (H24): the face, the words' size, the line's height. */
+  /** A reply line (H25): the face, the words' size, the line's height. */
   reply: { face: number; size: number; line: number };
 };
 
@@ -249,13 +249,13 @@ export type BoardPiece = {
   slotAt: 'right' | 'left' | null;
   slotRotate: number;
   /**
-   * Its reactions' badge (H24): on the label's top-right corner, else — a
+   * Its reactions' badge (H25): on the label's top-right corner, else — a
    * sticker set there by hand — its top-left, after the sticker; in the
    * label's own frame, so it follows the label's offset and tilt.
    */
   badgeBox: Box | null;
   badgeAt: 'right' | 'left' | null;
-  /** Its first replies under the label (H24), then "+n": one box per line, in the label's frame too. */
+  /** Its first replies under the label (H25), then "+n": one box per line, in the label's frame too. */
   replyLines: Box[];
   /** Replies past the lines shown: the last line's "+n". */
   replyMore: number;
@@ -564,14 +564,14 @@ type Shape = Omit<
 
 /**
  * A label's vertical padding: shallow with no fill, where it would only make
- * gaps; with a reactions badge, room at the top so it never covers the words (H24).
+ * gaps; with a reactions badge, room at the top so it never covers the words (H25).
  */
 function padY(label: LabelStyle, m: BoardMetrics, card: Card): { top: number; bottom: number } {
   const v = label === 'none' ? m.pad.none : m.pad.filled;
   return hasBadge(card) ? { ...v, top: v.top + BADGE_ROOM_PX } : v;
 }
 
-/** A splash with reactions carries the badge (H24). */
+/** A splash with reactions carries the badge (H25). */
 function hasBadge(card: Card): boolean {
   return (card.responses?.reactions ?? 0) > 0;
 }
@@ -684,7 +684,7 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   );
   const label = shape.labelBox;
   // Up onto the label (review), by all of its bottom padding: over its edge, never its words;
-  // under its reply lines when it has them (H24), which are part of the item.
+  // under its reply lines when it has them (H25), which are part of the item.
   const last = shape.replyLines.at(-1);
   const y = last ? last.y + last.h + REPLY_GAP_PX : label.y + label.h - shape.pad.bottom;
   const tilt = SLOT_TILT_MIN + unit(card.splash.id, 'slot') * (SLOT_TILT_MAX - SLOT_TILT_MIN);
@@ -709,7 +709,7 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   };
 }
 
-/** The badge's width: its emoji overlapping a little, then the count (H24). */
+/** The badge's width: its emoji overlapping a little, then the count (H25). */
 function badgeWidth(emoji: number, count: number, m: BoardMetrics): number {
   const glyph = m.badge.size + 4;
   const shown = Math.max(1, Math.min(emoji, m.badge.emoji));
@@ -752,7 +752,7 @@ function shiftedDown(shape: Shape, dy: number): Shape {
 }
 
 /**
- * Reactions and replies on the board (H24): the badge on the label's
+ * Reactions and replies on the board (H25): the badge on the label's
  * top-right corner, over its edge by half its height — top-left, after the
  * sticker, where a sticker set by hand sits on that corner — and the first
  * two replies as lines under the label, then "+n". Both are part of the

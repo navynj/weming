@@ -26,7 +26,7 @@ export function RippleThread({
     meta?: ReactNode;
     initials?: string;
     authorId?: string;
-    /** New reactions or replies from someone else on my ripple since I last opened it (H24). */
+    /** New reactions or replies from someone else on my ripple since I last opened it (H25). */
     dot?: boolean;
   }[];
   initials: string;

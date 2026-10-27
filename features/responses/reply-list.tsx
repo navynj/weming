@@ -19,7 +19,7 @@ export type ReplyHandlers = {
 };
 
 /**
- * A block's replies (H24): the first two, oldest first, then "+n more
+ * A block's replies (H25): the first two, oldest first, then "+n more
  * replies"; each its author's face, name, age and text — "edited" once
  * edited, "Hidden by the author" once hidden. Mine I edit and delete; on my
  * ripple I hide anyone's. The one-line input sits at the bottom and grows

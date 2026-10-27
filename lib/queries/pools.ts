@@ -82,9 +82,9 @@ export type PoolView = {
   invites: PoolInvite[];
   /** The calendar's layouts its members set, by splash (0025). */
   layouts?: Record<string, BoardLayoutJson>;
-  /** Each splash's reactions and first replies, for the board (H24). */
+  /** Each splash's reactions and first replies, for the board (H25). */
   responses?: Record<string, BoardResponses>;
-  /** By splash then ripple of mine: the newest response someone else left (H24). */
+  /** By splash then ripple of mine: the newest response someone else left (H25). */
   respondedAt?: Record<string, Record<string, string>>;
   respondedAsOf?: string;
 };
@@ -169,7 +169,7 @@ export async function getMyPools(supabase: DuringClient, me: string): Promise<My
 /**
  * What happened in each pool: the newest ripple someone else wrote on
  * anything placed or joint there, or the newest reaction or reply someone
- * else left on a ripple of mine there (H24), by pool (for the "new since my
+ * else left on a ripple of mine there (H25), by pool (for the "new since my
  * last visit" dots).
  */
 export async function getPoolActivity(
@@ -206,7 +206,7 @@ export async function getPoolActivity(
     if (!seen || at > seen) latest.set(pool, at);
   };
   for (const r of ripples) note(r.splash_id, r.created_at);
-  // Reactions and replies on my ripples there count too (H24).
+  // Reactions and replies on my ripples there count too (H25).
   const responded = await latestResponseOnMine(supabase, me, [...poolOf.keys()]);
   for (const [splashId, at] of responded) note(splashId, at);
   return latest;

@@ -14,14 +14,14 @@ function within(box: Box, label: Box): CSSProperties {
 }
 
 /**
- * A splash's reactions and first replies on the board (H24), drawn in the
+ * A splash's reactions and first replies on the board (H25), drawn in the
  * label's own frame — the same box and the same transform — so they follow
  * its offset and tilt. The badge: a white pill on its top-right corner (or
  * top-left, after a sticker set there by hand), up to three emoji and the
  * count, one emoji on a phone. The reply lines: a face and one line of
  * words each, under the label, a thin thread from the label to the last,
  * then "+n". White at 85% and 70% means "secondary", never time: the reply
- * fade is not the ripples' opacity channel (H24, SPEC 7 law 1). Each opens
+ * fade is not the ripples' opacity channel (H25, SPEC 7 law 1). Each opens
  * the splash at what it shows.
  */
 export function BoardResponsesView({

@@ -11,7 +11,7 @@ import { boardFrom, toggled, type ReplyRow, type RippleResponsesValue } from './
 import type { ReplyHandlers } from './reply-list';
 
 /**
- * A splash page's reactions and replies (H24), every change optimistic
+ * A splash page's reactions and replies (H25), every change optimistic
  * (CLAUDE.md, the principle): shown on the page and on the board beneath it
  * the moment it is made, the action behind it, a refusal taking both back.
  */
@@ -113,7 +113,7 @@ function subscribeHash(onChange: () => void): () => void {
 
 /**
  * The reply or block the page was opened at (`#reply-<id>`, `#block-<id>`),
- * from a tap on the board (H24); empty on the server.
+ * from a tap on the board (H25); empty on the server.
  */
 export function useOpenedAt(): string {
   return useSyncExternalStore(

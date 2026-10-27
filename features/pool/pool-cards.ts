@@ -147,7 +147,7 @@ export function poolCards(
         const layout = layouts[card.splash.id];
         return layout ? { ...card, layout, layoutSource: 'pool' as const } : card;
       })
-      // What readers left, for the board and the unseen dots (H24).
+      // What readers left, for the board and the unseen dots (H25).
       .map((card) => ({
         ...card,
         respondedAsOf: view.respondedAsOf,

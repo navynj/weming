@@ -115,9 +115,9 @@ export function SplashPage({
   pool?: PoolContext | null;
   /** Opened to write: the next block's editor is up from the start (Board view's "Add your side"). */
   writing?: boolean;
-  /** What readers left under its blocks (H24). */
+  /** What readers left under its blocks (H25). */
   responses?: RippleResponsesValue;
-  /** Someone besides me can see it, so its blocks take reactions and replies (H24). */
+  /** Someone besides me can see it, so its blocks take reactions and replies (H25). */
   respondable?: boolean;
 }) {
   // Mine to edit: everything off a pool; in one, my own ripples only.
@@ -131,12 +131,12 @@ export function SplashPage({
   const closeSheet = useCloseSplash();
   const { me } = usePeople();
   const answered = useRippleResponses(splash.id, responses);
-  // Opened at a reply from the board: its block's replies open in full (H24).
+  // Opened at a reply from the board: its block's replies open in full (H25).
   const openedAt = useOpenedAt();
   const [expanded, setExpanded] = useState<string[]>([]);
   const openedRipple = answered.value.replies.find((r) => `reply-${r.id}` === openedAt)?.ripple_id;
   const isExpanded = (id: string): boolean => expanded.includes(id) || id === openedRipple;
-  // Seen as of this open, on this device; its dots stay until the next (H24).
+  // Seen as of this open, on this device; its dots stay until the next (H25).
   const seenBefore = useSeenBefore(splash.id);
   const fromOthers = latestFromOthers(answered.value, me ?? '', (id) =>
     blocks.some((b) => b.id === id && b.author_id === me),
@@ -144,7 +144,7 @@ export function SplashPage({
   useEffect(() => rememberSeen(splash.id), [splash.id]);
   useEffect(() => {
     if (!openedAt) return;
-    // The badge opens at the first block anyone reacted or replied to (H24).
+    // The badge opens at the first block anyone reacted or replied to (H25).
     const target =
       openedAt === 'responded'
         ? document.querySelector('[data-reaction], [data-reply]')?.closest('[data-block-entry]')
@@ -373,7 +373,7 @@ export function SplashPage({
               // Each ripple keeps its author in a pool (H23).
               initials: pool ? (pool.initialsOf[block.author_id] ?? '') : undefined,
               authorId: block.author_id,
-              // Something new from someone else on my ripple since I last opened it (H24).
+              // Something new from someone else on my ripple since I last opened it (H25).
               dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
               body: (
                 <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">

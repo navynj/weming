@@ -92,7 +92,7 @@ export async function PoolSplash({
     <PoolEditScope scope={poolScopeOf(view)}>
       <SplashPage
         writing={writing}
-        // Every member reads it here, so its blocks take reactions and replies (H24).
+        // Every member reads it here, so its blocks take reactions and replies (H25).
         responses={responses}
         respondable
         splash={summary}

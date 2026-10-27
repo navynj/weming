@@ -6,14 +6,14 @@ import { usePeople } from '@/features/people/people-provider';
 
 import { isOneEmoji, lastGrapheme, QUICK_EMOJI, type ReactionChip } from './model';
 
-/** Held this long, a chip says who reacted instead of toggling (H24). */
+/** Held this long, a chip says who reacted instead of toggling (H25). */
 const LONG_PRESS_MS = 450;
 
 const CHIP =
   'inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs leading-none tabular-nums';
 
 /**
- * Under a block (H24): each emoji left on it as a small chip — the emoji and
+ * Under a block (H25): each emoji left on it as a small chip — the emoji and
  * how many, mine filled in ink, the selection channel (H20f) — then a "+"
  * chip that opens the picker. A tap toggles mine; a long press, or a hover
  * on a desktop, says who.
@@ -117,7 +117,7 @@ export function ReactionChips({
   );
 }
 
-/** Six quick ones, then a field the native keyboard fills with any emoji (H24). */
+/** Six quick ones, then a field the native keyboard fills with any emoji (H25). */
 function Picker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
   const [draft, setDraft] = useState('');
   return (

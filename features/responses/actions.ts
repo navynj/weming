@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isOneEmoji, REPLY_MAX } from './model';
 
 /**
- * Reactions and replies (H24). Each is one call the database checks in full
+ * Reactions and replies (H25). Each is one call the database checks in full
  * (0030: can_see_ripple, the lock, who wrote what); these only shape the
  * input and say a refusal in words.
  */
