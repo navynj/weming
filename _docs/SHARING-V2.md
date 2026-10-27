@@ -198,8 +198,8 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 
 ### Pool compose with Together
 - That pool's lane chips (emoji and name) are the one choice. No tabs, no *Just mine* switch.
-- **Together:** under the chips, a label line "Together · Everyone", then the member faces, none selected.
-  - **Everyone** is an underlined text button at the end of the label line, not a chip. It is muted when off and in the primary colour, with weight, when on, staying underlined. The faces are the only round items in the row.
+- **Together:** under the chips, a line reading "With", then the member faces, none selected.
+  - **Everyone** sits at the right of the "With" line as a word and a small switch, so it reads as an option that turns on and off. When on, the switch and the word are in the primary colour. It is not a chip: the faces are the only round items in the row.
   - **How it selects:** Everyone selects every face; deselecting any face turns it off and keeps the rest. Selecting every face one by one does not turn it on.
   - **Default:** off, unless the pool's setting "Invite everyone to new posts by default" is on.
   - With none selected, the summary reads "Yours · in <Pool>", and Drop makes **my pool record**.
