@@ -55,9 +55,11 @@ export function DetailSheet({
     let live = true;
     // Signed on open, not stored: `ripples.media` holds paths, and a signed
     // URL is a short-lived credential rather than part of the record.
-    void signRippleMedia(ripple.id).then((urls) => {
-      if (live) setMedia(urls);
-    });
+    signRippleMedia(ripple.id)
+      .then((urls) => {
+        if (live) setMedia(urls);
+      })
+      .catch((error: unknown) => console.error('[during] ripple media not signed', error));
     return () => {
       live = false;
     };

@@ -110,8 +110,10 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
       };
       const joint = jointOf.get(summary.id);
       if (joint) {
-        // Filled once someone besides its maker is invited (0033).
-        const filled = (together[joint.id] ?? []).some((uid) => uid !== joint.created_by);
+        // Filled with Everyone on, or once anyone besides its maker is picked (0033).
+        const filled =
+          joint.joint_invite_all ||
+          (together[joint.id] ?? []).some((uid) => uid !== joint.created_by);
         return withPoolBadge(
           { ...card, together: filled },
           {

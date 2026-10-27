@@ -718,6 +718,28 @@ describe('compose from a pool (H23, 0033)', () => {
     expect(everyone(view).getAttribute('aria-checked')).toBe('true');
   });
 
+  it('in a pool of one, shows With and starts on Everyone, with no faces (0033)', async () => {
+    const view = poolSheet({ ...SCOPE, members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }] });
+    expect(view.container.querySelector('[data-together]')).not.toBeNull();
+    expect(view.container.querySelectorAll('[data-together-face]')).toHaveLength(0);
+    expect(everyone(view).getAttribute('aria-checked')).toBe('true');
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Alone' } });
+    pickLane(view, 'pl-trips');
+    expect(hint(view)).toBe('Together with everyone');
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(joints[0]).toMatchObject({ invitees: [], everyone: true });
+  });
+
+  it('in a pool of one, Everyone turned off drops my pool record', async () => {
+    const view = poolSheet({ ...SCOPE, members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }] });
+    fireEvent.click(everyone(view));
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Mine alone' } });
+    pickLane(view, 'pl-trips');
+    expect(hint(view)).toBe('Yours · in Our Pool');
+  });
+
   it('seats a record on a pool lane with a home lane in that lane’s column on Home', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });

@@ -102,7 +102,13 @@ export function SplashComposer({
   const [laneId, setLaneId] = useState<string | null>(null);
   // From a pool: a pool lane, and Together (0033).
   const [pick, setPick] = useState<PoolPick>(null);
-  const noOne = (): Together => ({ everyone: pool?.inviteAllByDefault ?? false, picked: [] });
+  // Everyone starts on where the pool says so, and always in a pool of one
+  // (Yoonji, in the session).
+  const solo = pool ? pool.members.every((m) => m.id === me) : false;
+  const noOne = (): Together => ({
+    everyone: Boolean(pool?.inviteAllByDefault) || solo,
+    picked: [],
+  });
   const [together, setTogether] = useState<Together>(noOne);
   // Edited by hand, the audience stays as set; untouched, it follows the lane.
   const [audienceEdited, setAudienceEdited] = useState<AudiencePick[] | null>(null);
@@ -118,10 +124,8 @@ export function SplashComposer({
   // lane, else in the pool's column — derived from the marker, never stored
   // on a ripple (H24, 0033).
   const poolLane = pool && pick ? pool.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
-  // Filled once someone besides me is invited (0033): Everyone in a pool of one is not.
-  const invitesOthers = together.everyone
-    ? (pool?.members ?? []).some((m) => m.id !== me)
-    : together.picked.length > 0;
+  // Filled with Everyone on, or once anyone is picked (0033).
+  const invitesOthers = together.everyone || together.picked.length > 0;
   const homeLane = poolLane?.homeLaneId ?? null;
   // Today is in the field from the start (review): the post's date, days
   // only (H24). Removed with its ×, the post rests on today all the same.

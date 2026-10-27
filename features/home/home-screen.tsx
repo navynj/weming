@@ -149,8 +149,8 @@ export async function HomeScreen({
       ];
       const current = (members ?? []).filter((m) => m.pool_id === j.pool_id).map((m) => m.user_id);
       jointFaces.set(j.id, {
-        // Filled once someone besides its maker is invited (0033).
-        together: (together[j.id] ?? []).some((id) => id !== j.created_by),
+        // Filled with Everyone on, or once anyone besides its maker is picked (0033).
+        together: j.joint_invite_all || (together[j.id] ?? []).some((id) => id !== j.created_by),
         writers: writers.map(face),
         // Together's slots (0033): who it is with now, less those who wrote.
         awaiting: (together[j.id] ?? [])
