@@ -52,7 +52,7 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
       for (const file of Array.from(files)) {
         const shrunk = await downscale(file);
         if (isHeic(shrunk)) {
-          reportFailure('upload', 'a HEIC this browser cannot read');
+          reportFailure('upload', 'a HEIC the decoder could not read');
           refused.push(`${file.name}: ${HEIC_UNREADABLE}`);
           continue;
         }
@@ -87,8 +87,8 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
   return { input, busy, failed, previews, attach };
 }
 
-const HEIC_UNREADABLE =
-  'this browser cannot read HEIC photos. Add it from your iPhone, or save it as a JPEG first.';
+// Only when even the decoder could not read it (lib/heic.ts): a rare HEIC variant.
+const HEIC_UNREADABLE = 'this HEIC photo could not be read. Save it as a JPEG and try again.';
 
 /** The type's extension, for a key that is never the file's own name. */
 const EXTENSIONS: Record<string, string> = {

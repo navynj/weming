@@ -1,3 +1,5 @@
+import { readableImage } from '@/lib/heic';
+
 /** The file every photo becomes: a 512px square (0018). */
 export const AVATAR_PX = 512;
 const QUALITY = 0.86;
@@ -44,11 +46,13 @@ export function sourceRect(view: CropView, image: Size, frame: number): SourceRe
 }
 
 /**
- * Decodes the picked file the way the crop canvas will draw it. A format the
- * browser cannot decode (HEIC outside Safari) rejects with the one message
- * the editor shows, instead of failing silently.
+ * Decodes the picked file the way the crop canvas will draw it. A HEIC the
+ * browser cannot read is decoded to a JPEG first (lib/heic.ts); a format that
+ * still will not decode rejects with the one message the editor shows,
+ * instead of failing silently.
  */
-export async function decodePhoto(file: File): Promise<HTMLImageElement> {
+export async function decodePhoto(picked: File): Promise<HTMLImageElement> {
+  const file = await readableImage(picked);
   const url = URL.createObjectURL(file);
   const image = new Image();
   image.src = url;

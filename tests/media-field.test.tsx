@@ -59,14 +59,14 @@ describe('attaching a photo (review: a friend could not)', () => {
     expect(mediaKey('u1', 'application/x-unknown')).toMatch(/\.img$/);
   });
 
-  it('refuses a HEIC the browser cannot read, saying why, and still adds the rest', async () => {
+  it('refuses a HEIC that will not decode, saying why, and still adds the rest', async () => {
     const { attach, changed, view } = harness();
     await attach([file('IMG_0001.HEIC', 'image/heic'), file('screen.png', 'image/png')]);
     expect(uploads.keys).toHaveLength(1);
     expect(changed).toEqual([[uploads.keys[0]]]);
     await waitFor(() =>
       expect(view.container.querySelector('[data-failed]')!.textContent).toContain(
-        'IMG_0001.HEIC: this browser cannot read HEIC photos',
+        'IMG_0001.HEIC: this HEIC photo could not be read',
       ),
     );
   });

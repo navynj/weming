@@ -1,3 +1,5 @@
+import { isHeic, readableImage } from './heic';
+
 /**
  * Shrinks a photo before it leaves the phone.
  *
@@ -9,13 +11,13 @@
 const MAX_EDGE = 2000;
 const QUALITY = 0.82;
 
-/** An iPhone's HEIC: only Safari draws it, so it always leaves as a JPEG. */
-export function isHeic(file: Pick<File, 'type' | 'name'>): boolean {
-  return /^image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
-}
+export { isHeic };
 
-export async function downscale(file: File): Promise<File> {
-  if (!file.type.startsWith('image/') && !isHeic(file)) return file;
+export async function downscale(picked: File): Promise<File> {
+  if (!picked.type.startsWith('image/') && !isHeic(picked)) return picked;
+  // A HEIC this browser cannot draw is decoded first (lib/heic.ts); it always
+  // leaves as a JPEG, so every browser can draw it back.
+  const file = await readableImage(picked);
 
   const bitmap = await createImageBitmap(file).catch(() => null);
   // Unreadable here: the caller decides (a HEIC outside Safari is refused there).
