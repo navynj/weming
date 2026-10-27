@@ -64,4 +64,8 @@ if [ -n "$pending" ]; then
   [ -n "$risky" ] && echo "  ✓ destructive DDL approved: ${DURING_DDL_APPROVED}"
 fi
 
-supabase db push
+# Flags pass through to the CLI, so `pnpm db:push --include-all` can apply a
+# pending migration numbered before the last one already on production (it
+# happened with 0030 after 0031). The checks above have already run on every
+# pending migration, whatever its number.
+supabase db push "$@"
