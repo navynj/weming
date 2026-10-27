@@ -915,8 +915,9 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     expect(at.style.transform).toContain('translate(');
     // The growing ring carries no move of its own, so the move is never scaled.
     expect(ring.style.transform).toBe('');
-    expect(ring.className).toContain('board-ripple');
-    expect(at.className).not.toContain('board-ripple');
+    // The List's own rings grow inside it, never on the moved box.
+    expect(ring.querySelectorAll('.commit-ring')).toHaveLength(3);
+    expect(at.className).not.toContain('commit-ring');
   });
 
   it('bobs twice, then is still', () => {
@@ -952,8 +953,14 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     expect(ripples()[0].closest('[data-board-piece]')!.getAttribute('data-board-piece')).toBe(
       'lynn',
     );
-    expect(ripples()[0].className).toContain('board-ripple');
-    fireEvent.animationEnd(ripples()[0]);
+    // The List's ripple: three staggered rings, once each; gone when the last ends.
+    const rings = [...ripples()[0].querySelectorAll('.commit-ring')];
+    expect(rings).toHaveLength(3);
+    expect(rings.every((r) => (r as HTMLElement).style.animationIterationCount === '1')).toBe(true);
+    fireEvent.animationEnd(rings[0]);
+    fireEvent.animationEnd(rings[1]);
+    expect(ripples()).toHaveLength(1);
+    fireEvent.animationEnd(rings[2]);
     expect(ripples()).toHaveLength(0);
     // Still on top: the bob goes on, no second ripple.
     expect(

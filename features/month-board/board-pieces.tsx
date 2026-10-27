@@ -10,6 +10,7 @@ import {
   type GridColumn,
 } from '@/features/home/grid';
 import { Monogram } from '@/components/ui/monogram';
+import { CommitRing } from '@/components/ui/waves';
 import { Avatar } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 import type { SignedMedia } from '@/lib/media';
@@ -797,9 +798,10 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
 }
 
 /**
- * One ring out from the post being read (review): it grows from the icon's
- * size to three times it and fades over 900ms, once per time the post comes
- * to the top, then is gone. Keyed by that time, so it never loops.
+ * The ring out from the post being read (review): the List's own — the
+ * commit ring's three staggered rings, once — centred on the icon, about
+ * three and a half times its size, once per time the post comes to the top,
+ * then gone. Keyed by that time, so it never loops.
  */
 function ReadingRipple({
   box,
@@ -810,24 +812,29 @@ function ReadingRipple({
   /** The box of what it rings, and that part's own move: the ring rides with it. */
   box: Box;
   transform: string | undefined;
-  /** The ring within that box. */
+  /** The icon within that box, which the ring is centred on. */
   ring: Box;
   z: number | string;
 }) {
   const [done, setDone] = useState(false);
-  const ring = useRef<HTMLSpanElement>(null);
-  // The standard event, listened to directly: React maps its prop to a
+  const host = useRef<HTMLSpanElement>(null);
+  // Each ring ends on its own; the ripple is over once the last has. The
+  // standard event, listened to directly: React maps its prop to a
   // vendor-prefixed name where it guesses the browser lacks it.
   useEffect(() => {
-    const el = ring.current;
+    const el = host.current;
     if (!el) return;
-    const end = (): void => setDone(true);
+    let ended = 0;
+    const end = (): void => {
+      ended += 1;
+      if (ended >= RIPPLE_RINGS) setDone(true);
+    };
     el.addEventListener('animationend', end);
     return () => el.removeEventListener('animationend', end);
   }, []);
   if (done) return null;
-  // The move on the outer box, the growth on the inner ring: a scale on the
-  // same element would scale the move too, and the ring would fly off.
+  const size = Math.round(at.w * RIPPLE_SPREAD);
+  // The move on the outer box, the rings inside: a ring's growth never scales the move.
   return (
     <span
       aria-hidden
@@ -836,14 +843,25 @@ function ReadingRipple({
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, transform, zIndex: z }}
     >
       <span
-        ref={ring}
+        ref={host}
         data-reading-ripple
-        className="board-ripple absolute rounded-full border-[1.5px] border-white"
-        style={{ left: at.x, top: at.y, width: at.w, height: at.h }}
-      />
+        className="absolute flex items-center justify-center"
+        style={{
+          left: at.x + at.w / 2 - size / 2,
+          top: at.y + at.h / 2 - size / 2,
+          width: size,
+          height: size,
+        }}
+      >
+        <CommitRing size={size} contentSize={at.w} gap={6} rings={RIPPLE_RINGS} once />
+      </span>
     </span>
   );
 }
+
+/** As the List's ring: three rings, out to about three and a half times the icon. */
+const RIPPLE_RINGS = 3;
+const RIPPLE_SPREAD = 96 / 28;
 
 /**
  * Whose a record is, in a pool's Calendar, Lane and List (review): their face
