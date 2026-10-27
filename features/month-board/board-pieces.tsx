@@ -154,8 +154,10 @@ function placed(box: Box): CSSProperties {
 /** The words' colour and the fill beneath them: none, unless the splash is joint (review). */
 const LABEL_CLASS: Record<LabelStyle, string> = {
   none: 'text-white',
-  white: 'bg-white text-main-900',
-  ink: 'bg-ink text-white',
+  // label-fill: the colour's pastel in pastel mode (0036, globals.css).
+  white: 'label-fill bg-white text-main-900',
+  // label-ink: a pale fill in pastel mode (0036, globals.css).
+  ink: 'label-ink bg-ink text-white',
 };
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {

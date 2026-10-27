@@ -291,6 +291,14 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Black');
   });
 
+  it('names the fills after what they show in pastel mode: the pastel and Pale (0036)', () => {
+    media(true);
+    const { container } = home([{ ...ONE[0], together: true }], { color: 'pink', mode: 'pastel' });
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Pink');
+    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Pale');
+  });
+
   it('offers no Style for a label with no fill, a joint record with nobody invited included', () => {
     media(true);
     const plain = home(ONE);
