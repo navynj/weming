@@ -5,16 +5,10 @@ import { useRouter } from 'next/navigation';
 
 import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 import { AnnotationControl } from '@/features/input-sheet/annotation-control';
-import {
-  annotationVerdict,
-  spanIsEmpty,
-  spanKeys,
-  type Annotation,
-} from '@/features/input-sheet/draft';
+import { annotationVerdict, type Annotation } from '@/features/input-sheet/draft';
 import { useInputSheet, type PendingEdit } from '@/features/input-sheet/sheet-provider';
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { PoolScope } from '@/features/pool/compose-scope';
-import { wallClockToInstant } from '@/lib/ripple-kind';
 
 import type { Conversion } from './conversion';
 import { loadSplashEdit, saveSplashEdit, type SplashEditState } from './edit-actions';
@@ -128,13 +122,6 @@ type Edit = {
   declaredLaneId: string | null;
   share: { poolId: string; on: boolean }[];
   poolId: string | null;
-  block: {
-    rippleId: string;
-    occurredOn: string | null;
-    occurredTime: string | null;
-    startInstant: string | null;
-    endInstant: string | null;
-  } | null;
   /** Only when it moved: a pool's own splash's new pool lane (0020). */
   poolLaneId: string | null;
   /** A change of kind or lane (0022). */
@@ -185,15 +172,14 @@ function EditForm({
   onCancel: () => void;
   onSave: (edit: Edit) => void;
 }) {
-  const { pools, today, timeZone } = context;
+  const { pools, today } = context;
   const lanes = useEditLanes(initial, context, pool);
   const [confirming, setConfirming] = useState(false);
   const [title, setTitle] = useState(initial.title);
   const [icon, setIcon] = useState(initial.icon ?? '');
-  // The composer's own date control (review), prefilled from where the date
-  // lives: a declaration's days, or the first ripple's annotation.
+  // The composer's own date control (review), prefilled with the splash's
+  // days: its ripples take them (H24).
   const [annotation, setAnnotation] = useState<Annotation | null>(initial.annotation);
-  const declared = initial.date.source === 'declared';
   const mine = initial.kind === 'mine';
   const joint = initial.kind === 'joint';
   const poolName = pools.find((p) => p.id === initial.poolId)?.name ?? 'its pool';
@@ -207,36 +193,15 @@ function EditForm({
     lanes.changed;
   const rangeOk = !annotation || annotationVerdict(annotation) === 'ok';
 
-  /** Where the edited date goes: the declaration, or the first ripple's annotation. */
-  function dates(): Pick<Edit, 'declaredStart' | 'declaredEnd' | 'block'> {
+  /** The splash's days as edited; unchanged, or removed, they stay as they were. */
+  function dates(): Pick<Edit, 'declaredStart' | 'declaredEnd'> {
     const a = annotation;
-    if (joint || sameAnnotation(a, initial.annotation)) {
-      return {
-        declaredStart: initial.declaredStart,
-        declaredEnd: initial.declaredEnd,
-        block: null,
-      };
+    if (joint || !a || sameAnnotation(a, initial.annotation)) {
+      return { declaredStart: initial.declaredStart, declaredEnd: initial.declaredEnd };
     }
-    if (declared || initial.date.source !== 'block') {
-      const end = a?.endDate && a.endDate !== a.date ? a.endDate : null;
-      return { declaredStart: a?.date ?? null, declaredEnd: end, block: null };
-    }
-    const startInstant =
-      a && a.time ? wallClockToInstant(a.date, a.time, timeZone).toISOString() : null;
-    const span = a && !spanIsEmpty(a) ? spanKeys(a) : null;
-    const endInstant = span?.end
-      ? wallClockToInstant(span.end.slice(0, 10), span.end.slice(11), timeZone).toISOString()
-      : null;
     return {
-      declaredStart: initial.declaredStart,
-      declaredEnd: initial.declaredEnd,
-      block: {
-        rippleId: initial.date.rippleId,
-        occurredOn: a?.date ?? null,
-        occurredTime: a?.time ?? null,
-        startInstant,
-        endInstant,
-      },
+      declaredStart: a.date,
+      declaredEnd: a.endDate && a.endDate !== a.date ? a.endDate : null,
     };
   }
 
@@ -265,8 +230,8 @@ function EditForm({
             annotation={annotation}
             today={today}
             onChange={setAnnotation}
-            // A splash's own days have no clock; a ripple's annotation may.
-            clock={!declared}
+            // A splash's own days have no clock (H24).
+            clock={false}
             label="+ Add Date"
           />
         </div>

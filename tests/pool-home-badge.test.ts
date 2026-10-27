@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { placeCard, withEdits } from '@/features/home/grid';
+import { jointLaneFor } from '@/features/pool/direction';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import type { SplashSummary } from '@/features/splash/summary';
 
@@ -24,12 +25,12 @@ function summary(id: string): SplashSummary {
   } as unknown as SplashSummary;
 }
 
-describe('the pool badge on Home (H23, 0016)', () => {
-  it('puts a joint entry whose latest ripple has no lane in its pool’s column, with the badge and tag', () => {
+describe('the pool badge on Home (H23, H24)', () => {
+  it('puts a joint entry whose pool lane no link of mine brings in in its pool’s column, with the badge and tag', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
-      latestLane: null,
+      linkedLane: null,
       poolLane: { name: 'Games', icon: '🎲' },
     });
     expect(card.column).toBe('pool:p-ours');
@@ -42,7 +43,7 @@ describe('the pool badge on Home (H23, 0016)', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
-      latestLane: 'my-media',
+      linkedLane: 'my-media',
       poolLane: { name: 'Games', icon: '🎲' },
     });
     expect(card.joint).toBe(true);
@@ -53,17 +54,17 @@ describe('the pool badge on Home (H23, 0016)', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
-      latestLane: null,
+      linkedLane: null,
       poolLane: { name: 'Games', icon: '🎲' },
     });
     expect(card.lane).toEqual({ icon: '🎲', name: 'Our Pool' });
   });
 
-  it('keeps a joint entry whose latest ripple is linked in that lane’s column', () => {
+  it('keeps a joint entry whose pool lane is brought into my lane in that lane’s column', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
-      latestLane: 'my-media',
+      linkedLane: 'my-media',
       poolLane: { name: 'Games', icon: '🎲' },
     });
     expect(card.column).toBe('my-media');
@@ -85,7 +86,7 @@ describe('a joint splash made mine, on Home (0022)', () => {
     const joint = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
-      latestLane: null,
+      linkedLane: null,
       poolLane: { name: 'Games', icon: '🎲' },
     });
     const [mine] = withEdits([joint], {
@@ -95,5 +96,37 @@ describe('a joint splash made mine, on Home (0022)', () => {
     expect(mine.pools).toBeUndefined();
     expect(mine.href).toBeUndefined();
     expect(mine.splash.declaredLaneId).toBe('my-games');
+  });
+});
+
+describe('where a joint splash shows on my Home, derived from my link (H24)', () => {
+  const links = (direction: 'out' | 'both' | 'in') => [
+    { myCategoryId: 'my-games', poolLaneId: 'l-games', direction },
+  ];
+
+  it('↔ both and → in bring the pool lane into my lane', () => {
+    expect(jointLaneFor('l-games', links('both'))).toBe('my-games');
+    expect(jointLaneFor('l-games', links('in'))).toBe('my-games');
+  });
+
+  it('← out, or no link, leaves it in the pool’s column', () => {
+    expect(jointLaneFor('l-games', links('out'))).toBeNull();
+    expect(jointLaneFor('l-games', [])).toBeNull();
+    expect(jointLaneFor('l-other', links('both'))).toBeNull();
+  });
+
+  it('prefers ↔ both when several of my lanes bring one pool lane in, then the first', () => {
+    expect(
+      jointLaneFor('l-games', [
+        { myCategoryId: 'my-a', poolLaneId: 'l-games', direction: 'in' },
+        { myCategoryId: 'my-b', poolLaneId: 'l-games', direction: 'both' },
+      ]),
+    ).toBe('my-b');
+    expect(
+      jointLaneFor('l-games', [
+        { myCategoryId: 'my-a', poolLaneId: 'l-games', direction: 'in' },
+        { myCategoryId: 'my-c', poolLaneId: 'l-games', direction: 'in' },
+      ]),
+    ).toBe('my-a');
   });
 });

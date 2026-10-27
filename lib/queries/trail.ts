@@ -1,4 +1,4 @@
-import { dayOf, flowInstant, sortNewestFirst } from '@/lib/flow-key';
+import { dayOf, flowInstant } from '@/lib/flow-key';
 import type { DuringClient } from '@/lib/queries/profile';
 import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
@@ -25,19 +25,20 @@ export type TrailDay = { date: IsoDate; ripples: RippleWithCategory[] };
 export async function getMyTrail(
   supabase: DuringClient,
   authorId: string,
-  timeZone: string,
 ): Promise<RippleWithCategory[]> {
+  // Newest written first (H24): a block is placed by its post, and within it
+  // by when it was written; its own date orders nothing.
   const { data, error } = await supabase
     .from('ripples')
     .select(WITH_CATEGORY)
     .eq('author_id', authorId)
     .is('parent_ripple_id', null)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .returns<RippleWithCategory[]>();
 
   if (error) throw error;
-  // Ordered here, not in SQL: the key is a coalesce the database does not
-  // store (H20c, H21f), and the archive is one person's few months.
-  return sortNewestFirst(data, timeZone);
+  return data;
 }
 
 /**

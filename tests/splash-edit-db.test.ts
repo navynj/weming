@@ -4,9 +4,8 @@ import { asAdmin, asUser } from './as-user';
 
 /**
  * The edit sheet's loader and save (review), against the real schema with a
- * throwaway user: a splash dropped from the composer keeps its date on its
- * first ripple, and the sheet reads and writes it there; a declared range
- * stays a declaration.
+ * throwaway user: a splash's days are its own (H24), read and written on
+ * the splash; its ripples carry none.
  *
  * Needs the local stack; excluded from the CI config like every DB test.
  */
@@ -52,22 +51,19 @@ beforeAll(async () => {
   await admin.from('my_categories').insert({ id: LANE, user_id: me, name: 'Day', icon: '🖋' });
   const client = asUser(me);
 
-  // As the composer drops it: no declaration, the date on the first ripple.
-  await client
-    .from('splashes')
-    .insert({ id: DROPPED, owner_id: me, title: 'Coffee', declared_lane_id: LANE });
+  // As the composer drops it (H24): the date and lane on the splash, the
+  // ripple carrying neither.
+  await client.from('splashes').insert({
+    id: DROPPED,
+    owner_id: me,
+    title: 'Coffee',
+    declared_start: '2026-10-20',
+    declared_lane_id: LANE,
+  });
   first = (
     await client
       .from('ripples')
-      .insert({
-        author_id: me,
-        category_id: LANE,
-        note: 'flat white',
-        splash_id: DROPPED,
-        occurred_on: '2026-10-20',
-        occurred_time: '14:30',
-        ended_at: '2026-10-20T21:30:00.000Z',
-      })
+      .insert({ author_id: me, note: 'flat white', splash_id: DROPPED })
       .select('id')
       .single()
   ).data!.id;
@@ -78,6 +74,7 @@ beforeAll(async () => {
     title: 'Whistler',
     declared_start: '2026-10-10',
     declared_end: '2026-10-12',
+    declared_lane_id: LANE,
   });
 
   const made = await client.rpc('create_pool', {
@@ -121,50 +118,39 @@ const base = {
   declaredLaneId: null,
   share: [],
   poolId: null,
-  block: null,
   poolLaneId: null,
 };
 
 describe('the edit sheet’s date', () => {
-  it('reads a dropped splash’s date and time from its first ripple', async () => {
+  it('reads a dropped splash’s day from the splash, days only', async () => {
     const state = await loadSplashEdit(DROPPED);
     expect(state).toMatchObject({
       ok: true,
       kind: 'mine',
-      date: { source: 'block', rippleId: first },
-      annotation: { date: '2026-10-20', time: '14:30', endDate: null, endTime: null },
+      annotation: { date: '2026-10-20', time: null, endDate: null, endTime: null },
     });
+    expect(state).not.toHaveProperty('date');
   });
 
-  it('writes the edited date back onto that ripple, leaving no declaration', async () => {
+  it('saves the edited days onto the splash, touching no ripple (H24)', async () => {
     const done = await saveSplashEdit({
       ...base,
       id: DROPPED,
       kind: 'mine',
       title: 'Coffee',
       declaredLaneId: LANE,
-      declaredStart: null,
+      declaredStart: '2026-10-21',
       declaredEnd: null,
-      block: {
-        rippleId: first,
-        occurredOn: '2026-10-21',
-        occurredTime: '09:00',
-        startInstant: '2026-10-21T16:00:00.000Z',
-        endInstant: null,
-      },
     });
     expect(done).toEqual({ ok: true });
-    const row = (await asUser(me).from('ripples').select('*').eq('id', first).single()).data!;
-    expect(row.occurred_on).toBe('2026-10-21');
-    expect(row.occurred_time).toBe('09:00:00');
-    expect(row.ended_at).toMatch(/^2026-10-21T16:00:00/);
     const splash = (await asUser(me).from('splashes').select('*').eq('id', DROPPED).single()).data!;
-    expect(splash.declared_start).toBeNull();
+    expect(splash.declared_start).toBe('2026-10-21');
+    const row = (await asUser(me).from('ripples').select('*').eq('id', first).single()).data!;
+    expect(row).toMatchObject({ occurred_on: null, occurred_time: null, category_id: null });
   });
 
   it('reads a declared range as its days', async () => {
     expect(await loadSplashEdit(RANGED)).toMatchObject({
-      date: { source: 'declared' },
       annotation: { date: '2026-10-10', time: null, endDate: '2026-10-12', endTime: null },
     });
   });

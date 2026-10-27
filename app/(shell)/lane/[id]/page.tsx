@@ -2,7 +2,10 @@ import { notFound, redirect } from 'next/navigation';
 
 import { byNewest, cardLane, initialsOf, placeCard, type CardRipple } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
+import { jointLaneFor } from '@/features/pool/direction';
+import { withPoolBadge } from '@/features/pool/home-badge';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { getJointSplashes, getMyLinks, getMyPoolNames } from '@/lib/queries/pools';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -19,13 +22,25 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
 
   const { id } = await params;
   const top = (await searchParams).top;
-  const [ripples, categories, boards] = await Promise.all([
-    getMyTrail(supabase, profile.id, profile.timezone),
+  const [ripples, categories, mine, links, pools] = await Promise.all([
+    getMyTrail(supabase, profile.id),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
+    getMyLinks(supabase, profile.id),
+    getMyPoolNames(supabase, profile.id),
   ]);
   const lane = categories.find((c) => c.id === id);
   if (!lane) notFound();
+  // Joint splashes I wrote on are posts here too, in the lane their pool lane
+  // is brought into (H24) — as on Home, never by a ripple's own lane.
+  const mineIds = new Set(mine.map((s) => s.id));
+  const joints = await getJointSplashes(supabase, [
+    ...new Set(
+      ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
+    ),
+  ]);
+  const jointOf = new Map(joints.map((j) => [j.id, j]));
+  const poolName = new Map(pools.map((p) => [p.id, p.name]));
 
   // Each card's ripples, oldest first, for the stack's thread.
   const threads = new Map<string, CardRipple[]>();
@@ -37,8 +52,11 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     if (list) list.push(entry);
     else threads.set(key, [entry]);
   }
-  const cards = summarizeSplashes(boards, ripples, profile.timezone, new Date())
-    .filter((summary) => cardLane(summary) === id)
+  const cards = summarizeSplashes([...mine, ...joints], ripples, profile.timezone, new Date())
+    .filter((summary) => {
+      const joint = jointOf.get(summary.id);
+      return joint ? jointLaneFor(joint.pool_lane_id, links) === id : cardLane(summary) === id;
+    })
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];
       const card = placeCard(
@@ -47,7 +65,16 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
         profile.timezone,
         thread,
       );
-      // My own splash carries the pencil; a post of one has no row to edit yet.
+      const joint = jointOf.get(summary.id);
+      if (joint) {
+        return withPoolBadge(card, {
+          poolId: joint.pool_id!,
+          poolName: poolName.get(joint.pool_id!) ?? null,
+          linkedLane: id,
+          poolLane: null,
+        });
+      }
+      // My own splash carries the pencil; a block read alone has none.
       return summary.orphan ? card : { ...card, editable: true };
     })
     .sort(byNewest);

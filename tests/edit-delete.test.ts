@@ -1,5 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+// Skipped (H24, H20b): Every describe here but the media one: they write a ripple's own date, time, span or
+// parent — fields 0029 freezes: a ripple takes its lane and date from its
+// splash, and nothing writes them again. The machinery they test is the
+// dormant Timer's (inner ripples, timed spans), kept for P3's Swim (H20b);
+// the tests stay, skipped rather than rewritten, until Swim decides what a
+// live record's time belongs to.
+
 import { asAdmin, asUser } from './as-user';
 
 /**
@@ -87,7 +94,7 @@ async function insert(row: {
     .select('id, created_at, started_at, ended_at');
 }
 
-describe('editing revalidates the rules it moves through', () => {
+describe.skip('editing revalidates the rules it moves through', () => {
   it('allows a move onto another record: overlap is two true statements (H20c)', async () => {
     await insert({ time: '09:00', endedAt: utc('10:00') });
     const movable = await insert({ time: '11:00', endedAt: utc('11:00') });
@@ -195,7 +202,7 @@ describe('editing revalidates the rules it moves through', () => {
   });
 });
 
-describe('deleting', () => {
+describe.skip('deleting', () => {
   it('takes the records inside a session with it', async () => {
     const session = await insert({ time: '09:00', endedAt: utc('11:00') });
     const child = await insert({
@@ -260,7 +267,7 @@ describe('media belongs to its owner', () => {
   });
 });
 
-describe('correcting a finished end (H17)', () => {
+describe.skip('correcting a finished end (H17)', () => {
   it('refuses a shrink that would strand a record inside it', async () => {
     const session = await insert({ time: '09:00', endedAt: utc('11:00') });
     await insert({ time: '10:00', endedAt: utc('10:20'), parent: session.data![0].id });
@@ -317,7 +324,7 @@ describe('correcting a finished end (H17)', () => {
   });
 });
 
-describe('inner ripples are records like any other', () => {
+describe.skip('inner ripples are records like any other', () => {
   it('is clamped by the parent when its own time moves', async () => {
     const parent = await insert({ time: '09:00', endedAt: utc('11:00') });
     const inside = await insert({
@@ -386,7 +393,7 @@ describe('inner ripples are records like any other', () => {
   });
 });
 
-describe('a span typed in is a span (H18)', () => {
+describe.skip('a span typed in is a span (H18)', () => {
   it('lands as timed, with the duration its times imply', async () => {
     const { data, error } = await insert({ time: '09:00', endedAt: utc('10:30') });
 
@@ -419,7 +426,7 @@ describe('a span typed in is a span (H18)', () => {
   });
 });
 
-describe('a span typed inside a session', () => {
+describe.skip('a span typed inside a session', () => {
   it('is accepted when it lies within its parent', async () => {
     const parent = await insert({ time: '09:00', endedAt: utc('11:00') });
 

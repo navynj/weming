@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, type ReactNode } from 'react';
-import { MoreHorizontal, Pencil, Pin, PinOff, X } from 'lucide-react';
+import { MoreHorizontal, Pencil, Pin, PinOff } from 'lucide-react';
 
 import { OutlineChip } from '@/components/ui/chips/category-chip';
 import { WaveRule } from '@/components/ui/waves/wave-rule';
@@ -72,9 +72,8 @@ export function SplashHeader({
   const [icon, setIcon] = useState(splash.icon ?? '');
   const [editingDate, setEditingDate] = useState(false);
   const [range, setRange] = useState<{ start: IsoDate; end: IsoDate | null } | null>(
-    splash.declaredRange
-      ? { start: splash.declaredRange.start, end: splash.declaredRange.end }
-      : null,
+    // Every post has a date (H24): its own, else the day it was made.
+    splash.range ? { start: splash.range.start, end: splash.range.end } : null,
   );
   const [editingLane, setEditingLane] = useState(false);
   const [menu, setMenu] = useState<'closed' | 'open' | 'delete'>('closed');
@@ -99,8 +98,7 @@ export function SplashHeader({
   return (
     <header data-splash-header className="flex flex-col gap-2 pb-6">
       <div className="flex items-start justify-between gap-3">
-        {/* Lane tags: the declared lane first, then every lane the blocks
-            took (H21f). Tapping them edits the declared one. */}
+        {/* The post's lane (H24): every block takes it. Tapping it edits it. */}
         {editLevel !== 'all' ? (
           <span data-lane-tags className="flex min-h-5 min-w-0 flex-1 flex-wrap items-center gap-1">
             {laneChip ? (
@@ -361,18 +359,6 @@ export function SplashHeader({
           >
             Done
           </button>
-          <button
-            type="button"
-            aria-label="Remove the declared date"
-            onClick={() => {
-              setRange(null);
-              setEditingDate(false);
-              run(() => onEdit(header({ declaredStart: null, declaredEnd: null })));
-            }}
-            className="text-pool-500"
-          >
-            <X aria-hidden size={12} />
-          </button>
         </div>
       ) : displayRange ? (
         <button
@@ -383,7 +369,6 @@ export function SplashHeader({
           className="text-pool-500 text-left text-xs tabular-nums"
         >
           {formatRange(displayRange)}
-          {splash.declaredRange ? null : <span className="opacity-60"> · derived</span>}
         </button>
       ) : (
         <QuietAffordance onClick={() => setEditingDate(true)} label="+ Add Date" />

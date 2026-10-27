@@ -122,12 +122,11 @@ export type GridColumn = {
 };
 
 /**
- * Where a post sits (H22): on the last day of its display range, else the
- * day it was made — one row, one month, no longer every month its range
- * touches. Within the day it orders by its latest block there, else by
- * when it last received something (review: never the day's end, which put
- * a declared-date post above everything written after it), so the grid and
- * the stack read the same key.
+ * Where a post sits (H22): on the last day of its range, else the day it
+ * was made — one row, one month, no longer every month its range touches.
+ * Within the day it orders by its latest block (H24: by when it was
+ * written; a block's own date places nothing), else by when it last
+ * received something, so the grid and the stack read the same key.
  */
 export function placeCard(
   splash: SplashSummary,
@@ -162,7 +161,7 @@ export function postIcon(
   return splash.icon ?? lane?.icon ?? null;
 }
 
-/** The lane a post's mark sits under: its declared lane, else its representative one. */
+/** The lane a post's mark sits under: its own (H24), else a lone block's. */
 export function cardLane(splash: SplashSummary): string | null {
   return splash.declaredLaneId ?? representativeLane(splash);
 }

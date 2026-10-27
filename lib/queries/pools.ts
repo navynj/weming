@@ -323,7 +323,9 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
     supabase
       .from('lane_mappings')
       .select('my_category_id, pool_id, pool_lane_id, direction')
-      .eq('user_id', me),
+      .eq('user_id', me)
+      // Oldest first, so a joint splash's derived lane (jointLaneFor) is stable.
+      .order('created_at'),
     getMyPoolNames(supabase, me),
   ]);
   if (error) throw error;

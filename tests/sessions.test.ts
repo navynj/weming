@@ -134,7 +134,7 @@ describe('a post sits on at most one custom session (H21e)', () => {
     const runs = await custom('Food runs');
     const { data: splash, error } = await asUser(author)
       .from('splashes')
-      .insert({ owner_id: author, title: 'Whistler', session_id: trips })
+      .insert({ owner_id: author, title: 'Whistler', session_id: trips, declared_lane_id: PLACE })
       .select('id')
       .single();
     expect(error).toBeNull();

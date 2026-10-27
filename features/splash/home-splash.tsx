@@ -4,7 +4,6 @@ import { initialsOf } from '@/features/home/grid';
 import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
-import { flowInstant } from '@/lib/flow-key';
 import { signOwnMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { audienceFor } from '@/features/pool/audience-for';
@@ -28,7 +27,7 @@ export async function HomeSplash({ id }: { id: string }) {
   const today = todayIn(profile.timezone);
 
   const [ripples, categories, boards, links, pools, placements, tags] = await Promise.all([
-    getMyTrail(supabase, profile.id, profile.timezone),
+    getMyTrail(supabase, profile.id),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
     getMyLinks(supabase, profile.id),
@@ -38,15 +37,18 @@ export async function HomeSplash({ id }: { id: string }) {
   ]);
 
   const board = boards.find((b) => b.id === id) ?? null;
-  const lone = board ? null : (ripples.find((r) => r.id === id && r.splash_id === null) ?? null);
+  // A block whose post I cannot read (a joint splash of a pool I left) reads
+  // alone, by its own id, as Home shows it (summarizeAll).
+  const lone = board
+    ? null
+    : (ripples.find((r) => r.id === id && !boards.some((b) => b.id === r.splash_id)) ?? null);
   // Gone (a delete from this very sheet re-reads here as it closes): said,
   // never a 404 (review).
   if (!board && !lone) return <SplashGone />;
 
+  // In the order they were written (H24): a block's own date places nothing.
   const blocks = (board ? ripples.filter((r) => r.splash_id === id) : [lone!]).sort(
-    (a, b) =>
-      flowInstant(a, profile.timezone) - flowInstant(b, profile.timezone) ||
-      a.created_at.localeCompare(b.created_at),
+    (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
   );
   const summary = board
     ? summarizeSplash(board, blocks, profile.timezone, now)

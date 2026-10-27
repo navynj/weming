@@ -3,17 +3,17 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { asAdmin, asUser } from './as-user';
 
 /**
- * Adding a ripple to a joint splash from the pool's splash page (0016,
- * 0017): `commitRipple` files it under my lane linked to the splash's pool
- * lane when the link brings in (↔ both, ← in), and under no lane when it
- * only sends out (→) or there is no link — whatever lane the editor offered.
+ * Adding a ripple to a joint splash from the pool's splash page (H24):
+ * `addBlock` writes no lane at all, whatever the link. Where the splash shows
+ * on my Home is derived from the link (jointLaneFor): my linked lane when it
+ * brings in (↔ both, → in), the pool's column when it only sends out (←) or
+ * there is no link. The glyphs are the ones the app draws (direction.ts).
  *
  * The real action against the real schema, as a throwaway member. Needs the
  * local stack; excluded from the CI config like every DB test.
  */
 // Real v4 ids: the action's zod schema refuses the fixtures' all-zero pattern.
 const ANA_TRIPS = crypto.randomUUID();
-const ANA_OTHER = crypto.randomUUID();
 
 let ana: string;
 let pool: string;
@@ -38,7 +38,8 @@ vi.mock('@/lib/supabase/server', async () => {
   };
 });
 
-import { commitRipple } from '@/features/input-sheet/commit';
+import { jointLaneFor } from '@/features/pool/direction';
+import { addBlock } from '@/features/splash/block-actions';
 
 beforeAll(async () => {
   const admin = asAdmin();
@@ -52,10 +53,9 @@ beforeAll(async () => {
   await admin
     .from('profiles')
     .insert({ id: ana, display_name: 'Ana', timezone: 'America/Vancouver' });
-  await admin.from('my_categories').insert([
-    { id: ANA_TRIPS, user_id: ana, name: 'Trips', icon: '•' },
-    { id: ANA_OTHER, user_id: ana, name: 'Other', icon: '•' },
-  ]);
+  await admin
+    .from('my_categories')
+    .insert([{ id: ANA_TRIPS, user_id: ana, name: 'Trips', icon: '•' }]);
   const made = await asUser(ana).rpc('create_pool', {
     p_name: 'Joint lanes',
     p_kind: null as unknown as 'friends',
@@ -80,8 +80,14 @@ afterAll(async () => {
   if (ana) await admin.auth.admin.deleteUser(ana);
 });
 
-/** Links Trips in `direction`, opens a joint splash on `poolLane`, adds a ripple from its page. */
-async function addTo(poolLane: 'trips' | 'days', direction: 'both' | 'in' | 'out') {
+/**
+ * Links Trips in `direction`, opens a joint splash on `poolLane`, adds a
+ * ripple from its page: the ripple's own lane, and the splash's Home lane.
+ */
+async function addTo(
+  poolLane: 'trips' | 'days',
+  direction: 'both' | 'in' | 'out',
+): Promise<{ ripple: string | null; home: string | null }> {
   const linked = await asUser(ana).rpc('set_lane_links', {
     p_pool: pool,
     p_links: [{ pool_lane_id: trips, my_category_id: ANA_TRIPS, direction }],
@@ -96,15 +102,10 @@ async function addTo(poolLane: 'trips' | 'days', direction: 'both' | 'in' | 'out
     p_title: `${poolLane} ${direction}`,
   });
   expect(opened.error).toBeNull();
-  const done = await commitRipple({
-    // The editor's lane chip: never what files a joint ripple.
-    categoryId: ANA_OTHER,
+  const done = await addBlock({
+    id: crypto.randomUUID(),
     note: 'from the splash page',
     media: [],
-    occurredOn: null,
-    occurredTime: null,
-    startInstant: null,
-    endInstant: null,
     splashId: id,
   });
   expect(done).toMatchObject({ ok: true });
@@ -113,23 +114,36 @@ async function addTo(poolLane: 'trips' | 'days', direction: 'both' | 'in' | 'out
     .select('category_id')
     .eq('id', done.ok ? done.rippleId : '')
     .single();
-  return row.data!.category_id;
+  const links = (
+    await asUser(ana)
+      .from('lane_mappings')
+      .select('my_category_id, pool_lane_id, direction')
+      .eq('pool_id', pool)
+  ).data!.map((l) => ({
+    myCategoryId: l.my_category_id,
+    poolLaneId: l.pool_lane_id,
+    direction: l.direction,
+  }));
+  return {
+    ripple: row.data!.category_id,
+    home: jointLaneFor(poolLane === 'trips' ? trips : days, links),
+  };
 }
 
-describe('a ripple added to a joint splash', () => {
-  it('↔ both: files under my linked lane', async () => {
-    expect(await addTo('trips', 'both')).toBe(ANA_TRIPS);
+describe('a ripple added to a joint splash (H24)', () => {
+  it('↔ both: no lane of its own; the splash shows in my linked lane', async () => {
+    expect(await addTo('trips', 'both')).toEqual({ ripple: null, home: ANA_TRIPS });
   });
 
-  it('← in: files under my linked lane', async () => {
-    expect(await addTo('trips', 'in')).toBe(ANA_TRIPS);
+  it('→ in: no lane of its own; the splash shows in my linked lane', async () => {
+    expect(await addTo('trips', 'in')).toEqual({ ripple: null, home: ANA_TRIPS });
   });
 
-  it('→ out: files under no lane', async () => {
-    expect(await addTo('trips', 'out')).toBeNull();
+  it('← out: no lane of its own; the splash shows in the pool’s column', async () => {
+    expect(await addTo('trips', 'out')).toEqual({ ripple: null, home: null });
   });
 
-  it('unlinked pool lane: files under no lane', async () => {
-    expect(await addTo('days', 'both')).toBeNull();
+  it('unlinked pool lane: no lane of its own; the pool’s column', async () => {
+    expect(await addTo('days', 'both')).toEqual({ ripple: null, home: null });
   });
 });

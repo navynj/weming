@@ -27,7 +27,6 @@ let ana: string;
 let ben: string;
 let cal: string;
 let dee: string | undefined;
-let anaLoneBlock: string;
 let anaPostsBefore: number;
 let pool: string;
 let token: string;
@@ -55,7 +54,7 @@ async function post(owner: string, id: string, lane: string, note: string): Prom
   expect(error).toBeNull();
   const { error: blockError } = await client
     .from('ripples')
-    .insert({ author_id: owner, category_id: lane, note, splash_id: id });
+    .insert({ author_id: owner, note, splash_id: id });
   expect(blockError).toBeNull();
 }
 
@@ -69,13 +68,6 @@ beforeAll(async () => {
   await post(ana, ANA_OLD_POST, ANA_TRIPS, 'Whistler');
   await post(ana, ANA_DAY_POST, ANA_DAY, 'a quiet day');
   await post(ben, BEN_OLD_POST, BEN_TRIPS, 'Squamish');
-  // A lone block in a linked lane: a post of one on Home, but no post row.
-  const lone = await asUser(ana)
-    .from('ripples')
-    .insert({ author_id: ana, category_id: ANA_TRIPS, note: 'a lone line' })
-    .select('id')
-    .single();
-  anaLoneBlock = lone.data!.id;
   const before = await asAdmin()
     .from('splashes')
     .select('id', { count: 'exact', head: true })
@@ -150,20 +142,12 @@ describe('outside the pool', () => {
 
 describe('placement', () => {
   it('never creates or modifies a record of mine when history is on', async () => {
-    // 0012: joining places existing posts only. The lone block stays lone.
+    // 0012: joining places existing posts only, and makes none.
     const posts = await asAdmin()
       .from('splashes')
       .select('id', { count: 'exact', head: true })
       .eq('owner_id', ana);
     expect(posts.count).toBe(anaPostsBefore);
-    const block = await asAdmin()
-      .from('ripples')
-      .select('splash_id')
-      .eq('id', anaLoneBlock)
-      .single();
-    expect(block.data!.splash_id).toBeNull();
-    const seen = await asUser(ben).from('ripples').select('id').eq('id', anaLoneBlock);
-    expect(seen.data).toEqual([]);
   });
 
   it('places earlier posts in linked lanes when history is on, and only those', async () => {
@@ -234,7 +218,7 @@ describe('placement', () => {
   it('never shows a locked block, even on a placed post', async () => {
     const { data: block } = await asUser(ana)
       .from('ripples')
-      .insert({ author_id: ana, category_id: ANA_TRIPS, note: 'only me', splash_id: ANA_OLD_POST })
+      .insert({ author_id: ana, note: 'only me', splash_id: ANA_OLD_POST })
       .select('id')
       .single();
     await asUser(ana).from('ripple_audience').insert({ ripple_id: block!.id, target_type: 'lock' });
@@ -249,7 +233,6 @@ describe('a post’s audience (H23)', () => {
       .from('ripples')
       .insert({
         author_id: ana,
-        category_id: ANA_TRIPS,
         note: 'one more day',
         splash_id: ANA_OLD_POST,
       })
@@ -293,7 +276,7 @@ describe('Just mine (0014)', () => {
     expect(made.error).toBeNull();
     const block = await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: 'mine alone', splash_id: OWN });
+      .insert({ author_id: ben, note: 'mine alone', splash_id: OWN });
     expect(block.error).toBeNull();
 
     const row = await asAdmin()
@@ -337,9 +320,8 @@ describe('Just mine (0014)', () => {
       .from('ripples')
       .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'with a lane', splash_id: OWN });
     expect(laned.error?.code).toBe('23514');
-    const lone = await asUser(ben)
-      .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: 'no lane' });
+    // Every ripple belongs to a splash (H24).
+    const lone = await asUser(ben).from('ripples').insert({ author_id: ben, note: 'no lane' });
     expect(lone.error?.code).toBe('23514');
   });
 
@@ -352,11 +334,11 @@ describe('Just mine (0014)', () => {
   });
 });
 
-describe('a joint ripple with no lane of mine (0016)', () => {
+describe('a ripple carries no lane of its own (H24)', () => {
   const DAYS_JOINT = '0e400000-0000-0000-0000-000000000001';
   let days: string;
 
-  it('saves on an unlinked pool lane with no lane, and linking later moves it in; unlinking moves nothing', async () => {
+  it('saves on a joint splash with no lane, and a link moves nothing either way', async () => {
     days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single()).data!.id;
     await asUser(ben).rpc('create_joint_splash', {
       p_id: DAYS_JOINT,
@@ -366,12 +348,17 @@ describe('a joint ripple with no lane of mine (0016)', () => {
     });
     const saved = await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: 'unlinked day', splash_id: DAYS_JOINT })
+      .insert({ author_id: ben, note: 'unlinked day', splash_id: DAYS_JOINT })
       .select('id, category_id')
       .single();
     expect(saved.error).toBeNull();
     expect(saved.data!.category_id).toBeNull();
 
+    const lane = async (): Promise<string | null> =>
+      (await asUser(ben).from('ripples').select('category_id').eq('id', saved.data!.id).single())
+        .data!.category_id;
+    // → in: where the joint splash shows on Home is derived from this link;
+    // the ripple itself stays as it is.
     const linked = await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
       p_links: [
@@ -381,30 +368,31 @@ describe('a joint ripple with no lane of mine (0016)', () => {
       ],
     });
     expect(linked.error).toBeNull();
-    const moved = await asUser(ben)
-      .from('ripples')
-      .select('category_id')
-      .eq('id', saved.data!.id)
-      .single();
-    expect(moved.data!.category_id).toBe(BEN_TRIPS);
+    expect(await lane()).toBeNull();
 
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
       p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
     });
-    const kept = await asUser(ben)
-      .from('ripples')
-      .select('category_id')
-      .eq('id', saved.data!.id)
-      .single();
-    expect(kept.data!.category_id).toBe(BEN_TRIPS);
+    expect(await lane()).toBeNull();
   });
 
-  it('is still refused on an ordinary personal splash', async () => {
-    const { error } = await asUser(ben)
+  it('refuses a lane or a date of a ripple’s own, on any splash', async () => {
+    const laned = await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: 'no lane', splash_id: BEN_OLD_POST });
-    expect(error?.code).toBe('23514');
+      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'my lane', splash_id: BEN_OLD_POST });
+    expect(laned.error?.code).toBe('23514');
+    const dated = await asUser(ben).from('ripples').insert({
+      author_id: ben,
+      occurred_on: '2026-10-20',
+      note: 'my day',
+      splash_id: BEN_OLD_POST,
+    });
+    expect(dated.error?.code).toBe('23514');
+    const plain = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, note: 'the post’s lane and day', splash_id: BEN_OLD_POST });
+    expect(plain.error).toBeNull();
   });
 });
 
@@ -420,7 +408,7 @@ describe('a link’s direction (0017)', () => {
     expect(data!.every((l) => l.direction === 'both')).toBe(true);
   });
 
-  it('moves earlier lane-less joint ripples in when out becomes both', async () => {
+  it('moves no ripple when ← out becomes ↔ both: the link alone places the joint splash (H24)', async () => {
     const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
       .data!.id;
     // A lane of Ben's own for Days: Trips already sends BEN_TRIPS (0019).
@@ -438,10 +426,10 @@ describe('a link’s direction (0017)', () => {
     });
     const ripple = await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: 'under out', splash_id: OUT_JOINT })
+      .insert({ author_id: ben, note: 'under out', splash_id: OUT_JOINT })
       .select('id')
       .single();
-    // Out brings nothing in: it stays lane-less through a save.
+    // ← out brings nothing in: it stays lane-less through a save.
     await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links('out') });
     const still = await asUser(ben)
       .from('ripples')
@@ -450,13 +438,15 @@ describe('a link’s direction (0017)', () => {
       .single();
     expect(still.data!.category_id).toBeNull();
 
+    // ↔ both brings the pool lane into Ben's Days on Home — derived, so the
+    // ripple is not rewritten.
     await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links('both') });
-    const moved = await asUser(ben)
+    const after = await asUser(ben)
       .from('ripples')
       .select('category_id')
       .eq('id', ripple.data!.id)
       .single();
-    expect(moved.data!.category_id).toBe(BEN_DAYS);
+    expect(after.data!.category_id).toBeNull();
     // Back to Trips alone for what follows.
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
@@ -469,9 +459,7 @@ describe('a link’s direction (0017)', () => {
     await asUser(ben)
       .from('splashes')
       .insert({ id: post, owner_id: ben, title: 'trip', declared_lane_id: BEN_TRIPS });
-    await asUser(ben)
-      .from('ripples')
-      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'trip', splash_id: post });
+    await asUser(ben).from('ripples').insert({ author_id: ben, note: 'trip', splash_id: post });
     await asUser(ben)
       .from('splash_placements')
       .insert({ splash_id: post, pool_id: pool, pool_lane_id: tripsLane });
@@ -553,7 +541,7 @@ describe('writing', () => {
   it('refuses a block written into another member’s post', async () => {
     const { error } = await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'mine?', splash_id: ANA_OLD_POST });
+      .insert({ author_id: ben, note: 'mine?', splash_id: ANA_OLD_POST });
     expect(error?.code).toBe('42501');
   });
 
@@ -567,18 +555,15 @@ describe('writing', () => {
     });
     expect(made.error).toBeNull();
 
-    for (const [who, lane] of [
-      [ana, ANA_TRIPS],
-      [ben, BEN_TRIPS],
-    ] as const) {
+    for (const who of [ana, ben]) {
       const { error } = await asUser(who)
         .from('ripples')
-        .insert({ author_id: who, category_id: lane, note: `${who} in`, splash_id: joint });
+        .insert({ author_id: who, note: `${who} in`, splash_id: joint });
       expect(error).toBeNull();
     }
     const outsider = await asUser(cal)
       .from('ripples')
-      .insert({ author_id: cal, category_id: CAL_TRIPS, note: 'let me in', splash_id: joint });
+      .insert({ author_id: cal, note: 'let me in', splash_id: joint });
     expect(outsider.error?.code).toBe('42501');
 
     const both = await asUser(ana).from('ripples').select('author_id').eq('splash_id', joint);
@@ -676,7 +661,7 @@ describe('the creator’s account', () => {
     });
     await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'Ben reads', splash_id: joint });
+      .insert({ author_id: ben, note: 'Ben reads', splash_id: joint });
 
     await asAdmin().auth.admin.deleteUser(dee);
     dee = undefined;

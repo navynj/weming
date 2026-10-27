@@ -60,9 +60,7 @@ async function anas(shareTo: [string, string][], pinned = false): Promise<string
       declared_lane_id: CHURCH,
       pinned_at: pinned ? new Date().toISOString() : null,
     });
-  await asUser(ana)
-    .from('ripples')
-    .insert({ author_id: ana, category_id: CHURCH, note: 'Ana wrote', splash_id: id });
+  await asUser(ana).from('ripples').insert({ author_id: ana, note: 'Ana wrote', splash_id: id });
   for (const [pool, poolLane] of shareTo) {
     const { error } = await asUser(ana)
       .from('splash_placements')
@@ -151,7 +149,7 @@ const placementsOf = async (id: string) =>
   ).data!;
 
 describe('Just mine off in a pool: my splash becomes joint', () => {
-  it('keeps my authorship, takes my lane by direction, and leaves every other pool', async () => {
+  it('keeps my authorship and leaves every other pool; my ripple keeps no lane of its own (H24)', async () => {
     as.user = ana;
     const id = await anas(
       [
@@ -177,12 +175,13 @@ describe('Just mine off in a pool: my splash becomes joint', () => {
       created_by: ana,
       pinned_at: null,
     });
-    // Word is linked both ways: the ripple keeps Ana's Church.
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: CHURCH }]);
+    // Word is linked ↔ both: Ana's Home shows it in Church, derived from the
+    // link (jointLaneFor); the ripple itself carries no lane.
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);
     expect(await placementsOf(id)).toEqual([]);
   });
 
-  it('on an unlinked pool lane, my ripple takes no lane', async () => {
+  it('on an unlinked pool lane too, my ripple carries no lane', async () => {
     as.user = ana;
     const id = await anas([[sarang, lane.Word]]);
     await saveSplashEdit({
@@ -232,9 +231,7 @@ describe('a joint splash back to mine', () => {
 
   it('is refused while another member has a ripple on it', async () => {
     const id = await jointOfAnas();
-    await asUser(ben)
-      .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: 'Ben wrote', splash_id: id });
+    await asUser(ben).from('ripples').insert({ author_id: ben, note: 'Ben wrote', splash_id: id });
     as.user = ana;
     for (const conversion of [
       { op: 'to_mine' as const, myLaneId: CHURCH, placeOn: null },
@@ -264,7 +261,8 @@ describe('a joint splash back to mine', () => {
       declared_lane_id: CHURCH,
       pinned_at: null,
     });
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: CHURCH }]);
+    // The splash takes the lane; the ripple inherits it and carries none (H24).
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);
     // Church sends to Sarang's Word: it stays there, shared.
     expect(await placementsOf(id)).toEqual([
       { pool_id: sarang, pool_lane_id: lane.Word, shared: true },

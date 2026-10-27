@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+// Skipped (H24, H20b): these dormant Timer tests write a ripple's own date,
+// time and parent — fields 0029 freezes: a ripple takes its lane and date
+// from its splash, and nothing writes them again. The modules stay dormant
+// and untouched for P3's Swim (H20b); the tests stay too, skipped rather than
+// rewritten, until Swim decides what a live record's time belongs to.
+
 import { getInnerRipples, runningBreak } from '@/lib/queries/compose';
 import { asAdmin } from './as-user';
 
@@ -69,7 +75,7 @@ async function insert(row: {
     .select('id, started_at, ended_at, parent_ripple_id');
 }
 
-describe('a break is an inner ripple', () => {
+describe.skip('a break is an inner ripple', () => {
   it('lies within the parent span and keeps off the top-level axis', async () => {
     const session = await insert({ time: '09:00' });
     const inside = await insert({
@@ -148,7 +154,7 @@ describe('a break is an inner ripple', () => {
   });
 });
 
-describe('one running break at a time', () => {
+describe.skip('one running break at a time', () => {
   it('is recognised from the children, so the UI can enforce it', async () => {
     const session = await insert({ time: '09:00' });
     const open = await insert({
@@ -180,7 +186,7 @@ describe('one running break at a time', () => {
   });
 });
 
-describe('stopping during a break', () => {
+describe.skip('stopping during a break', () => {
   it('closes the break first, so the child stays inside the parent', async () => {
     const session = await insert({ time: '09:00' });
     const open = await insert({
@@ -212,7 +218,7 @@ describe('stopping during a break', () => {
   });
 });
 
-describe('the parent keeps gross time', () => {
+describe.skip('the parent keeps gross time', () => {
   it('is untouched by the break inside it', async () => {
     const session = await insert({ time: '09:00', endedAt: utc('10:00') });
     await insert({

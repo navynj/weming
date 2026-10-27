@@ -17,7 +17,6 @@ const JOINT = {
   declaredLaneId: null,
   shared: [],
   poolId: 'p-ours',
-  date: { source: 'declared' },
   annotation: null,
   poolLanes: [
     { id: 'l-games', name: 'Games', icon: '🎲' },
@@ -178,35 +177,23 @@ const save = async (view: ReturnType<typeof render>) => {
 };
 
 describe('a splash’s date in the edit sheet (review)', () => {
-  it('opens with the date and time the composer put on its first ripple, not a range', async () => {
+  it('edits the post’s own days, with no clock: never a ripple’s date (H24)', async () => {
     const view = await open({
       kind: 'mine',
       title: 'Coffee',
-      date: { source: 'block', rippleId: 'r-first' },
-      annotation: { date: '2026-10-20', time: '14:30', endDate: null, endTime: null },
+      declaredStart: '2026-10-20',
+      annotation: { date: '2026-10-20', time: null, endDate: null, endTime: null },
     });
     expect((view.getByLabelText('Date') as HTMLInputElement).value).toBe('2026-10-20');
-    expect((view.getByLabelText('Time') as HTMLInputElement).value).toBe('14:30');
-    expect(view.queryByLabelText('End date')).toBeNull();
-    expect(view.container.textContent).not.toMatch(/From/);
+    expect(view.queryByLabelText('Time')).toBeNull();
     expect((view.container.querySelector('[data-edit-save]') as HTMLButtonElement).disabled).toBe(
       true,
     );
 
     fireEvent.change(view.getByLabelText('Date'), { target: { value: '2026-10-21' } });
     await save(view);
-    expect(saved[0]).toMatchObject({
-      declaredStart: null,
-      declaredEnd: null,
-      block: {
-        rippleId: 'r-first',
-        occurredOn: '2026-10-21',
-        occurredTime: '14:30',
-        // 14:30 in Vancouver.
-        startInstant: '2026-10-21T21:30:00.000Z',
-        endInstant: null,
-      },
-    });
+    expect(saved[0]).toMatchObject({ declaredStart: '2026-10-21', declaredEnd: null });
+    expect(saved[0]).not.toHaveProperty('block');
   });
 
   it('opens a declared range as its days, with no clock, and saves the declaration', async () => {
@@ -225,7 +212,6 @@ describe('a splash’s date in the edit sheet (review)', () => {
     expect(saved[0]).toMatchObject({
       declaredStart: '2026-10-10',
       declaredEnd: '2026-10-13',
-      block: null,
     });
   });
 });

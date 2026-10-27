@@ -97,20 +97,26 @@ export async function reorderLanes(ids: string[]): Promise<LaneResult> {
 export async function deleteLane(id: string): Promise<LaneResult> {
   const supabase = await createClient();
 
+  // A lane holds posts (H24): its blocks take it from them.
   const { count, error: countError } = await supabase
-    .from('ripples')
+    .from('splashes')
     .select('id', { count: 'exact', head: true })
-    .eq('category_id', id);
+    .eq('declared_lane_id', id);
   if (countError) return { ok: false, message: countError.message };
 
   if (count && count > 0) {
     return {
       ok: false,
-      message: `This lane holds ${count} record${count === 1 ? '' : 's'}, so it stays.`,
+      message: `This lane holds ${count} post${count === 1 ? '' : 's'}, so it stays.`,
     };
   }
 
   const { error } = await supabase.from('my_categories').delete().eq('id', id);
+  // A block written here before H24 still names it, frozen, until that
+  // column goes (release 2): the database refuses, and so does the lane.
+  if (error?.code === '23503') {
+    return { ok: false, message: 'Records written in this lane still name it, so it stays.' };
+  }
   if (error) return { ok: false, message: error.message };
 
   revalidatePath('/lanes');

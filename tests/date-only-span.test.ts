@@ -1,5 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+// Skipped (H24, H20b): These tests write a ripple's own date, time, span or
+// parent — fields 0029 freezes: a ripple takes its lane and date from its
+// splash, and nothing writes them again. The machinery they test is the
+// dormant Timer's (inner ripples, timed spans), kept for P3's Swim (H20b);
+// the tests stay, skipped rather than rewritten, until Swim decides what a
+// live record's time belongs to.
+
 import { asAdmin, asUser } from './as-user';
 
 /**
@@ -45,7 +52,7 @@ function insert(row: Record<string, unknown>) {
     .single();
 }
 
-describe('a span by dates alone (migration 0006)', () => {
+describe.skip('a span by dates alone (migration 0006)', () => {
   it('stores an end with a date and no clock, and no start instant', async () => {
     const { data, error } = await insert({
       occurred_on: '2026-08-17',

@@ -21,13 +21,12 @@ vi.mock('@/features/splash/actions', () => ({
   updateSplashHeader: record('updateSplashHeader', { ok: true, splash: {} }),
   setSplashPinned: record('setSplashPinned'),
   deleteSplash: record('deleteSplash'),
-  adoptRipple: record('adoptRipple', { ok: true, splash: { id: 's-adopted' } }),
 }));
-vi.mock('@/features/input-sheet/commit', () => ({
-  commitRipple: record('commitRipple', { ok: true, rippleId: 'r-new' }),
+vi.mock('@/features/splash/block-actions', () => ({
+  addBlock: record('addBlock', { ok: true, rippleId: 'r-new' }),
+  editBlock: record('editBlock', { ok: true, rippleId: 'r' }),
 }));
 vi.mock('@/features/ripple-sheet/actions', () => ({
-  updateRipple: record('updateRipple', { ok: true, rippleId: 'r' }),
   deleteRipple: record('deleteRipple', { ok: true, rippleId: 'r' }),
   setRippleLock: record('setRippleLock', { ok: true, rippleId: 'r' }),
 }));
@@ -180,12 +179,13 @@ describe('the white page above the water (SPEC 5, H21c)', () => {
     expect(container.querySelector('[data-back-chip]')).toBeNull();
   });
 
-  it('stacks the header left-aligned: tags declared first, title, range, wave underline by blocks', () => {
+  it('stacks the header left-aligned: its own lane, title, range, wave underline by blocks', () => {
     const { container } = page();
     const tags = [...container.querySelectorAll('[data-lane-tags] > span')].map(
       (t) => t.textContent,
     );
-    expect(tags).toEqual(['📍Place', '🎬Media']);
+    // The post's lane alone (H24): a block's frozen Media lane adds no tag.
+    expect(tags).toEqual(['📍Place']);
     expect(container.querySelector('[data-splash-title]')!.textContent).toBe(
       'Whistler, two nights',
     );
@@ -261,20 +261,19 @@ describe('writing on the page, in place', () => {
     expect(field.className).toContain('resize-none');
   });
 
-  it('saves a block with the lane it took, keeping it in its post', async () => {
+  it('saves a block’s words and photos, never a lane or a date of its own (H24)', async () => {
     const { container, getByText, getByLabelText } = page();
     fireEvent.click(container.querySelector('[data-block="first"]')!);
-    fireEvent.change(getByLabelText('Block'), { target: { value: 'sea to sky, fog' } });
     const editor = container.querySelector<HTMLElement>('[data-block-editor="first"]')!;
-    fireEvent.click(within(editor).getByText('Media'));
+    expect(editor.querySelector('[role="group"][aria-label="Lane"]')).toBeNull();
+    expect(within(editor).queryByText('+ Add Time')).toBeNull();
+    fireEvent.change(getByLabelText('Block'), { target: { value: 'sea to sky, fog' } });
     fireEvent.click(getByText('Save'));
-    await waitFor(() => expect(calls.some((c) => c.name === 'updateRipple')).toBe(true));
-    const edit = calls.find((c) => c.name === 'updateRipple')!.args[0];
-    expect(edit).toMatchObject({
+    await waitFor(() => expect(calls.some((c) => c.name === 'editBlock')).toBe(true));
+    expect(calls.find((c) => c.name === 'editBlock')!.args[0]).toEqual({
       id: 'first',
       note: 'sea to sky, fog',
-      categoryId: 'c-media',
-      splashId: 's1',
+      media: [],
     });
     expect(router.refresh).toHaveBeenCalled();
   });
@@ -284,27 +283,22 @@ describe('writing on the page, in place', () => {
     expect(container.querySelector('[data-block-editor="new"]')).not.toBeNull();
   });
 
-  it('starts a new block from the add slot at the post’s declared lane and date (H21f)', async () => {
+  it('starts a new block from the add slot with no lane or date to choose: the post’s (H24)', async () => {
     const { container, getByText, getByLabelText } = page();
     fireEvent.click(getByText('Drop your words here'));
     await waitFor(() =>
       expect(container.querySelector('[data-block-editor="new"]')).not.toBeNull(),
     );
-    const row = container.querySelector(
-      '[data-block-editor="new"] [role="group"][aria-label="Lane"]',
-    )!;
-    expect(row.querySelector('[aria-pressed="true"]')!.textContent).toContain('Place');
-    expect(getByText('+ Add Time')).toBeTruthy();
+    const editor = container.querySelector<HTMLElement>('[data-block-editor="new"]')!;
+    expect(editor.querySelector('[role="group"][aria-label="Lane"]')).toBeNull();
+    expect(within(editor).queryByText('+ Add Time')).toBeNull();
     fireEvent.change(getByLabelText('Block'), { target: { value: 'the drive home' } });
     fireEvent.click(getByText('Save'));
-    await waitFor(() => expect(calls.some((c) => c.name === 'commitRipple')).toBe(true));
-    expect(calls.find((c) => c.name === 'commitRipple')!.args[0]).toMatchObject({
-      splashId: 's1',
-      categoryId: 'c-place',
-      note: 'the drive home',
-      occurredOn: null,
-    });
-    expect(calls.some((c) => c.name === 'adoptRipple')).toBe(false);
+    await waitFor(() => expect(calls.some((c) => c.name === 'addBlock')).toBe(true));
+    const added = calls.find((c) => c.name === 'addBlock')!.args[0];
+    expect(added).toMatchObject({ splashId: 's1', note: 'the drive home', media: [] });
+    expect(added).not.toHaveProperty('categoryId');
+    expect(added).not.toHaveProperty('occurredOn');
   });
 
   it('carries the lock beside the block, and deletes a block behind a confirm', async () => {
@@ -389,7 +383,7 @@ describe('the header menu', () => {
   });
 });
 
-describe('a lone block as an untitled post (H21a)', () => {
+describe('a block read alone: its post is a joint splash of a pool I left (H23, H24)', () => {
   const lone = block({
     id: 'r-lone',
     note: 'coffee went cold while I read the whole thing',
@@ -404,17 +398,13 @@ describe('a lone block as an untitled post (H21a)', () => {
     expect(container.querySelectorAll('[data-block]')).toHaveLength(1);
   });
 
-  it('gets a row of its own the first time it is extended, and the page moves to it', async () => {
-    const { getByText, container } = page({
+  it('is read, never written on: no add slot, no header to edit, no pin', () => {
+    const { queryByText, queryByLabelText, container } = page({
       splash: summarizeOrphan(lone, TZ, NOW),
       blocks: [lone],
     });
-    fireEvent.click(getByText('Drop your words here'));
-    await waitFor(() => expect(calls.some((c) => c.name === 'adoptRipple')).toBe(true));
-    expect(calls.find((c) => c.name === 'adoptRipple')!.args).toEqual(['r-lone']);
-    expect(router.replace).toHaveBeenCalledWith(expect.stringMatching(/^\/splash\/s-adopted/));
-    await waitFor(() =>
-      expect(container.querySelector('[data-block-editor="new"]')).not.toBeNull(),
-    );
+    expect(queryByText('Drop your words here')).toBeNull();
+    expect(container.querySelector('[data-add-slot]')).toBeNull();
+    expect(queryByLabelText('Edit the title')).toBeNull();
   });
 });

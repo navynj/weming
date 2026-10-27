@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { draftFrom, type Annotation } from '@/features/input-sheet/draft';
+import type { Annotation } from '@/features/input-sheet/draft';
 import { setPlacement } from '@/features/pool/actions';
 import { updateSplashHeader } from '@/features/splash/actions';
 import { createClient } from '@/lib/supabase/server';
@@ -23,12 +23,7 @@ export type SplashEditState =
       shared: string[];
       /** The pool a Just-mine or joint splash lives in. */
       poolId: string | null;
-      /**
-       * Where the splash's date lives (review): its own declared days, or —
-       * as the composer writes it — the annotation on my first ripple.
-       */
-      date: { source: 'declared' } | { source: 'block'; rippleId: string };
-      /** That date as the composer's control shows it; null when unset. */
+      /** The splash's own range (H24), as the composer's control shows it. */
       annotation: Annotation | null;
       /** A pool's own splash (joint, Just mine): its pool's lanes, and the one it is in (0020). */
       poolLanes: { id: string; name: string; icon: string | null }[];
@@ -63,50 +58,27 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     return { ok: false, message: 'Only its author edits this splash.' };
   }
   const ownPool = splash.pool_id ?? splash.own_pool_id;
-  const [{ data: profile }, { data: first }, { data: lanes }, { data: placed }] = await Promise.all(
-    [
-      supabase.from('profiles').select('timezone').eq('id', user.id).single(),
-      supabase
-        .from('ripples')
-        .select(
-          'id, category_id, note, media, occurred_on, occurred_time, ended_at, started_at, splash_id',
-        )
-        .eq('splash_id', id)
-        .eq('author_id', user.id)
-        .is('parent_ripple_id', null)
-        .order('created_at')
-        .limit(1)
-        .maybeSingle(),
-      ownPool
-        ? supabase
-            .from('pool_lanes')
-            .select('id, name, icon')
-            .eq('pool_id', ownPool)
-            .order('position')
-        : Promise.resolve({ data: [] }),
-      splash.own_pool_id
-        ? supabase
-            .from('splash_placements')
-            .select('pool_lane_id')
-            .eq('splash_id', id)
-            .eq('pool_id', splash.own_pool_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ],
-  );
-  // A declaration wins where there is one; otherwise the date is the first
-  // ripple's, where the composer put it; with no ripple, a declaration to be.
-  const onBlock = !splash.declared_start && first;
+  const [{ data: lanes }, { data: placed }] = await Promise.all([
+    ownPool
+      ? supabase
+          .from('pool_lanes')
+          .select('id, name, icon')
+          .eq('pool_id', ownPool)
+          .order('position')
+      : Promise.resolve({ data: [] }),
+    splash.own_pool_id
+      ? supabase
+          .from('splash_placements')
+          .select('pool_lane_id')
+          .eq('splash_id', id)
+          .eq('pool_id', splash.own_pool_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  // The splash's own days (H24): its ripples take them and carry none.
   const annotation: Annotation | null = splash.declared_start
-    ? {
-        date: splash.declared_start,
-        time: null,
-        endDate: splash.declared_end,
-        endTime: null,
-      }
-    : first
-      ? draftFrom(first, profile?.timezone ?? 'UTC').annotation
-      : null;
+    ? { date: splash.declared_start, time: null, endDate: splash.declared_end, endTime: null }
+    : null;
 
   const [{ data: placements }, { count: others }, { data: allLanes }] = await Promise.all([
     !joint && !splash.own_pool_id
@@ -139,7 +111,6 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     declaredLaneId: splash.declared_lane_id,
     shared,
     poolId: splash.pool_id ?? splash.own_pool_id,
-    date: onBlock ? { source: 'block', rippleId: first.id } : { source: 'declared' },
     annotation,
     poolLanes: lanes ?? [],
     poolLaneId: splash.pool_lane_id ?? placed?.pool_lane_id ?? null,
@@ -198,9 +169,6 @@ async function convert(
   };
 }
 
-const CLOCK = /^\d{2}:\d{2}$/;
-const ISO = /^\d{4}-\d{2}-\d{2}$/;
-
 const Edit = z.object({
   id: z.uuid(),
   kind: z.enum(['mine', 'own', 'joint']),
@@ -218,16 +186,6 @@ const Edit = z.object({
   /** Mine only: switches to flip, pool by pool. */
   share: z.array(z.object({ poolId: z.uuid(), on: z.boolean() })).max(24),
   poolId: z.uuid().nullable(),
-  /** The first ripple's annotation, when that is where the date lives; else untouched. */
-  block: z
-    .object({
-      rippleId: z.uuid(),
-      occurredOn: z.string().regex(ISO).nullable(),
-      occurredTime: z.string().regex(CLOCK).nullable(),
-      startInstant: z.iso.datetime().nullable(),
-      endInstant: z.iso.datetime().nullable(),
-    })
-    .nullable(),
   /** A pool's own splash: the pool lane it moves to, when it moved (0020). */
   poolLaneId: z.uuid().nullable(),
   /** A change of kind or lane, decided by the sheet (0022); absent is none. */
@@ -277,30 +235,6 @@ export async function saveSplashEdit(
   });
   if (!header.ok) return header;
   const supabase = await createClient();
-  if (edit.block) {
-    const b = edit.block;
-    if (b.occurredTime !== null && b.occurredOn === null) {
-      return { ok: false, message: 'A time needs a date.' };
-    }
-    if (
-      b.endInstant !== null &&
-      (b.occurredOn === null ||
-        (b.startInstant !== null && Date.parse(b.endInstant) <= Date.parse(b.startInstant)))
-    ) {
-      return { ok: false, message: 'That end is before the start.' };
-    }
-    // The same write a block's own editor makes (updateRipple), the date only.
-    const { error } = await supabase
-      .from('ripples')
-      .update({
-        occurred_on: b.occurredOn,
-        occurred_time: b.occurredTime,
-        ended_at: b.endInstant ?? b.startInstant,
-      })
-      .eq('id', b.rippleId)
-      .eq('splash_id', edit.id);
-    if (error) return { ok: false, message: error.message };
-  }
   if (edit.conversion) {
     const converted = await convert(supabase, edit.id, edit.conversion);
     if (converted) return converted;

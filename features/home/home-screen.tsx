@@ -14,10 +14,12 @@ import {
 import { HomeGround } from '@/features/home/home-ground';
 import { homeViewParam, scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { jointLaneFor } from '@/features/pool/direction';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import {
   getJointSplashes,
   getMyJointShells,
+  getMyLinks,
   getMyOriginTags,
   getMyPlacements,
   getMyPoolNames,
@@ -63,16 +65,18 @@ export async function HomeScreen({
   const today = todayIn(profile.timezone);
   const month = m ? scopedMonth(m, today) : null;
 
-  const [ripples, categories, mine, pools, originTags] = await Promise.all([
-    getMyTrail(supabase, profile.id, profile.timezone),
+  const [ripples, categories, mine, pools, originTags, links] = await Promise.all([
+    getMyTrail(supabase, profile.id),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
     getMyPoolNames(supabase, profile.id),
     getMyOriginTags(supabase, profile.id),
+    getMyLinks(supabase, profile.id),
   ]);
   // My ripples on joint splashes show here too (H23): the splash, with only
-  // my ripples on it, at my ripple's lane. One I can no longer read (a pool
-  // I left) still shows its ripples, as posts of one.
+  // my ripples on it, in my lane its pool lane is brought into (H24). One I
+  // can no longer read (a pool I left) still shows its ripples, as posts of
+  // one.
   const mineIds = new Set(mine.map((s) => s.id));
   const [written, made] = await Promise.all([
     getJointSplashes(supabase, [
@@ -88,18 +92,9 @@ export async function HomeScreen({
   const summaries = summarizeSplashes(boards, ripples, profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
-  const latestAt = new Map<string, string>();
-  // A joint entry sits where my most recent ripple on it is filed: its lane,
-  // or its pool's column when that ripple has none (0016).
-  const latestLane = new Map<string, string | null>();
-  for (const r of ripples) {
-    if (!r.splash_id || !jointPool.has(r.splash_id)) continue;
-    const seen = latestLane.get(r.splash_id);
-    if (seen === undefined || r.created_at > (latestAt.get(r.splash_id) ?? '')) {
-      latestLane.set(r.splash_id, r.category_id);
-      latestAt.set(r.splash_id, r.created_at);
-    }
-  }
+  // A joint entry sits in my lane its pool lane is brought into (both, in),
+  // else in its pool's column (H24): derived from my links, never a ripple.
+  const linkedLane = new Map(joints.map((j) => [j.id, jointLaneFor(j.pool_lane_id, links)]));
   // Who has written on each joint splash and which current members have not,
   // for its faces and its open slot on the Board. A pool I left shows neither
   // anyone else's ripples nor its members: only my own face, no slot.
@@ -157,9 +152,8 @@ export async function HomeScreen({
   const ownPools = [
     ...new Set([
       ...mine.flatMap((s) => (s.own_pool_id ? [s.own_pool_id] : [])),
-      // A joint entry whose latest ripple of mine has no lane lives there too
-      // (0016), as does one with no ripple of mine at all (review).
-      ...joints.flatMap((j) => ((latestLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
+      // A joint entry whose pool lane no link of mine brings in lives there too (H24).
+      ...joints.flatMap((j) => ((linkedLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
     ]),
   ];
   const ownLaneIcon = new Map<string, string | null>();
@@ -249,7 +243,7 @@ export async function HomeScreen({
               poolId: pool,
               poolName: poolName.get(pool) ?? null,
               poolPhoto: columnPhotos[pool] ?? null,
-              latestLane: latestLane.get(summary.id) ?? null,
+              linkedLane: linkedLane.get(summary.id) ?? null,
               poolLane: jointLane.get(summary.id) ?? null,
             }
           : undefined,

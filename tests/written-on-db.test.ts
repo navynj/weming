@@ -39,6 +39,7 @@ describe('written_on (0013)', () => {
       .insert({
         owner_id: author,
         title: 'late',
+        declared_lane_id: LANE,
         created_at: '2026-10-23T06:30:00.000Z',
         written_on: '1999-01-01',
       })
@@ -49,11 +50,17 @@ describe('written_on (0013)', () => {
 
   it('stays put when the author’s zone changes, and new rows use the new zone', async () => {
     const db = asUser(author);
+    // Every ripple belongs to a splash (H24).
+    const { data: post } = await db
+      .from('splashes')
+      .insert({ owner_id: author, title: 'zones', declared_lane_id: LANE })
+      .select('id')
+      .single();
     const { data: first } = await db
       .from('ripples')
       .insert({
         author_id: author,
-        category_id: LANE,
+        splash_id: post!.id,
         note: 'van',
         created_at: '2026-10-23T06:30:00.000Z',
       })
@@ -77,7 +84,7 @@ describe('written_on (0013)', () => {
       .from('ripples')
       .insert({
         author_id: author,
-        category_id: LANE,
+        splash_id: post!.id,
         note: 'seoul',
         created_at: '2026-10-23T06:30:00.000Z',
       })
