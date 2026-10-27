@@ -1,0 +1,80 @@
+# The migration pipeline (Yoonji, in the session): a migration reaches
+# production only through here, once she approves it in GitHub.
+#
+#   backup  the database and every storage object, encrypted (backup-run.yml);
+#   push    waits on the protected "production-db" environment for her
+#           approval, then scripts/db-push.sh: the approval each destructive
+#           migration quotes is read from its file, and a destructive one
+#           without it is refused;
+#   deploy  calls Vercel's deploy hook, so the app follows within minutes.
+#
+# Vercel's Ignored Build Step skips every production build while the
+# repository holds a migration production has not applied (applied_migrations,
+# 0046), so the hook's build is the one that goes live. The local path
+# (pnpm backup, pnpm db:push) stays for emergencies.
+#
+# The repo is public, so its logs are too: credentials reach the steps only as
+# environment variables, the database password is masked, nothing is traced.
+name: Migrate
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time, never cancelled: a push half-applied is worse than a wait.
+concurrency:
+  group: production-db
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    uses: ./.github/workflows/backup-run.yml
+    secrets: inherit
+
+  push:
+    needs: backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-db
+    env:
+      DURING_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      DURING_BACKUP_RUN: ${{ github.run_id }} (backup ${{ needs.backup.outputs.stamp }})
+      DURING_APPROVAL_FROM_FILES: '1'
+    steps:
+      - name: Mask the database password on its own
+        run: |
+          set +x
+          password="$(python3 -c 'import os, urllib.parse; print(urllib.parse.unquote(urllib.parse.urlsplit(os.environ["DURING_DB_URL"]).password or ""))')"
+          if [ -n "$password" ]; then echo "::add-mask::$password"; fi
+          raw="$(python3 -c 'import os, urllib.parse; print(urllib.parse.urlsplit(os.environ["DURING_DB_URL"]).password or "")')"
+          if [ -n "$raw" ]; then echo "::add-mask::$raw"; fi
+
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Push the pending migrations
+        run: |
+          set +x
+          ./scripts/db-push.sh
+
+  deploy:
+    needs: push
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask Vercel for the production deploy
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          set +x
+          [ -n "$HOOK" ] || { echo "✖ VERCEL_DEPLOY_HOOK_URL is not set"; exit 1; }
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "✓ production deploy requested; it builds once CI has passed for main's head"

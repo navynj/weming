@@ -9,6 +9,8 @@
 // cancelled, or never reported within the wait: unverified code does not
 // reach production. Reads GitHub's API for the public repo; GITHUB_TOKEN in
 // Vercel's env, if set, lifts the anonymous rate limit.
+import { migrationFiles, pendingMigrations } from './pending-migrations.mjs';
+
 const WAIT_MS = Number(process.env.CI_WAIT_MS ?? 12 * 60 * 1000);
 const EVERY_MS = Number(process.env.CI_POLL_MS ?? 15 * 1000);
 
@@ -54,7 +56,9 @@ while (Date.now() - started < WAIT_MS) {
       const run = (await response.json()).workflow_runs?.[0];
       if (run?.status === 'completed') {
         if (run.conclusion === 'success') {
-          console.log(`✓ CI passed for ${sha.slice(0, 7)} (${run.html_url}): building.`);
+          console.log(`✓ CI passed for ${sha.slice(0, 7)} (${run.html_url}).`);
+          await requireMigrationsApplied();
+          console.log('→ building.');
           process.exit(1);
         }
         console.log(
@@ -75,3 +79,34 @@ while (Date.now() - started < WAIT_MS) {
 }
 console.log(`✖ No CI result for ${sha.slice(0, 7)} within the wait: production build skipped.`);
 process.exit(0);
+
+/**
+ * The app never goes live ahead of its schema (Yoonji, in the session): while
+ * the repository holds a migration production has not applied — on the
+ * commit that adds it, or any app commit landing while it awaits approval —
+ * the build is skipped. Once the migration pipeline
+ * (.github/workflows/migrate.yml) applies it, its deploy hook builds again
+ * and this passes.
+ */
+async function requireMigrationsApplied() {
+  const files = migrationFiles();
+  let pending;
+  try {
+    pending = await pendingMigrations(files, {
+      url: env.NEXT_PUBLIC_SUPABASE_URL,
+      key: env.SUPABASE_SERVICE_ROLE_KEY,
+    });
+  } catch (error) {
+    console.log(
+      `✖ Could not read production's migrations (${error instanceof Error ? error.message : error}): production build skipped.`,
+    );
+    process.exit(0);
+  }
+  if (pending.length > 0) {
+    console.log(
+      `✖ Waiting for migration ${pending.map((name) => name.replace(/\.sql$/, '')).join(', ')} approval: production build skipped.`,
+    );
+    process.exit(0);
+  }
+  console.log(`✓ Production has every migration (${files.length}).`);
+}

@@ -1,0 +1,84 @@
+# Every migration works with the app in production and the app being
+# deployed (CLAUDE.md, "Data is real now"). For a pull request that adds or
+# changes one: build a database from every migration, the new ones included,
+# then run the database tests of the commit production is running against it.
+# If they fail, the migration breaks the running app: split it into expand
+# (add only), deploy, then contract (remove only) in a later release.
+name: Migration compatibility
+
+on:
+  pull_request:
+    paths: ['supabase/migrations/**']
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: A database from every migration, the new ones included
+        # Google sign-in is configured from the environment; the tests mint
+        # their own sessions and never use it.
+        env:
+          SUPABASE_AUTH_GOOGLE_CLIENT_ID: unused-in-ci
+          SUPABASE_AUTH_GOOGLE_SECRET: unused-in-ci
+        run: supabase start
+
+      - name: The local stack's keys for the tests (the stack's public demo keys)
+        run: |
+          supabase status -o env > "$RUNNER_TEMP/status.env"
+          . "$RUNNER_TEMP/status.env"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000"
+          } > "$RUNNER_TEMP/test.env"
+
+      - name: The commit production is running
+        id: live
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in $(gh api "repos/${{ github.repository }}/deployments?environment=Production&per_page=20" --jq '.[].id'); do
+            state="$(gh api "repos/${{ github.repository }}/deployments/$id/statuses" --jq '.[0].state')"
+            if [ "$state" = success ]; then
+              sha="$(gh api "repos/${{ github.repository }}/deployments/$id" --jq '.sha')"
+              echo "sha=$sha" >> "$GITHUB_OUTPUT"
+              echo "Production runs ${sha:0:7}"
+              exit 0
+            fi
+          done
+          echo "::error::No successful production deployment found to test against."
+          exit 1
+
+      - name: Its database tests, against this database
+        run: |
+          git worktree add "$RUNNER_TEMP/live" "${{ steps.live.outputs.sha }}"
+          cd "$RUNNER_TEMP/live"
+          cp "$RUNNER_TEMP/test.env" .env.local
+          pnpm install --frozen-lockfile
+          if pnpm exec vitest run --project db; then
+            echo "✓ The app in production still works with these migrations."
+          else
+            echo "::error::This migration breaks the running app; split it into expand and contract."
+            exit 1
+          fi

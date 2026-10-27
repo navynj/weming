@@ -1135,6 +1135,7 @@ export type Database = {
         Args: { p_body: string; p_id?: string; p_ripple: string }
         Returns: string
       }
+      applied_migrations: { Args: never; Returns: string[] }
       board_layout_valid: { Args: { l: Json }; Returns: boolean }
       can_read_responses: { Args: { rid: string }; Returns: boolean }
       can_respond: { Args: { rid: string }; Returns: boolean }
