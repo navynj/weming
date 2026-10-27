@@ -123,6 +123,15 @@ Swimmers / Lanes / Splash
 - **Splash**: boards + **all joint Ripples (participants >= 2)**. The "records of us together" filter; ended Swims are absorbed here as joint-Ripple bundles. For couples this tab is effectively the shared album.
 - **Swim has no tab.** Start: FAB sheet (secondary entry) or long-press on a lane. Live: a large intruding card wherever relevant (carousel peek if multiple). Past: a record card on that day's page + traces in Swimmers (simultaneous bundles).
 
+### 5.9 Notifications (H32)
+
+Three types, set per pool: **New posts** (All · Only when I'm invited · Off), **Replies** (on my ripples, on ripples of my records, in a thread I replied in), **Reactions** (to my ripples; the first in an hour per pool notifies, the rest fold into it silently). Never for my own actions. Effective value = paused ? off : mine ?? the pool's default ?? the app's (Only when I'm invited · on · off). Pool settings → Notifications holds *Defaults for members* (the creator edits) and *Your notifications* (each member, *Use pool default* first). Profile settings hold *Pause all notifications* and *Show titles in notifications* (off).
+
+- **One pool per notification:** the ripple's thread pool (a joint record's own pool); else the pool the actor and I share where the record is placed, the one I joined first. Its settings decide, and it is named in the text.
+- **In the app:** a bell in Home's and each pool's header row with the unread dot; its sheet lists notifications newest first, each opening the record at the ripple or reply and marking it read; *Mark all read*.
+- **Web push:** "Mina replied in Our Pool", "Mina invited you to add your side in Our Pool" — never the words, and the title only with *Show titles* on. A click focuses an open window or opens one at the record. The app badge carries the unread count where supported.
+- **Install:** *Install Weming* on Chromium; on iOS Safari a guide sheet (Share, then Add to Home Screen); permission only after a button press. Offered the first time I open a record I'm invited to, and in profile settings; never on a first visit; dismissed for 14 days.
+
 ## 6. The post sheet, and writing on the page
 
 **One sheet, for new posts only** (H21). Every later word is written on the post's page (section 5). No mockup this round: the geometry below is the authority, built in `home-ground.png`'s visual language.
@@ -199,6 +208,14 @@ splashes(owner, title,                        -- a post (H21a); owner-only RLS
          session_id?,                         -- at most one custom session; on delete set null (H21e)
          pinned_at?,                          -- H21g
          pool?, type free|prompted, prompt?)  -- pool-side seat, reserved for P3
+notifications(recipient, type new_post|reply|reaction, -- H32 (0052): written by triggers only; read by the recipient
+              pool, splash, ripple?, reply?, actor,     -- one pool per notification; cascades with what it points at
+              invited, count, read_at?, pushed_at?)     -- count: reactions folded within the hour
+push_subscriptions(user, endpoint, p256dh, auth,      -- owner-only; 404/410 deletes
+                   user_agent?, last_used_at?)
+pool_notification_defaults(pool, type, value)  -- the creator writes; members read; none = app default
+member_notification_prefs(pool, user, type, value) -- owner-only; none = Use pool default
+notification_settings(user, paused, show_titles) -- owner-only
 sessions(owner, kind monthly|custom, title,   -- a shelf (H21e); owner-only RLS
          month? date,                         -- monthly: the first of the month; unique per owner; a row only once titled
          declared_start?, declared_end?, lane?)   -- custom only
@@ -222,7 +239,7 @@ Scope is cut into **phases**, not versions (H11). The build is solo-first: the a
 
 **P3 — Pool world.** Pool create/join + mapping contract screen, Swimmers (Daily score / Weekly matrix), pool Lanes, **Splash pool-wide** (the compound pool pill, the joint filter, the sharing record carrying `pool_lane_id`), Swim (lane card, live card, FAB entry — the dormant live modules wake here), suggestion row full version.
 
-**Later, unscheduled:** Home Weekly zoom, one year ago today (empty by definition for the first 12 months), background auto-collection (timeline autofill; Spotify first), multi-pool routing UI (category x pool mapping settings), Lists UI, notifications (Splash opened / Swim started / Link request only; <= 2/day), Splash-born ephemeral pools, open/searchable pools, desktop score layout and ambient window, weekly-group view for couples (Splash grouping), recurrence engine, note-convention parsing (scores), photo book export, dark mode (night pool), TTL setting UI.
+**Later, unscheduled:** Home Weekly zoom, one year ago today (empty by definition for the first 12 months), background auto-collection (timeline autofill; Spotify first), multi-pool routing UI (category x pool mapping settings), Lists UI, Splash-born ephemeral pools, open/searchable pools, desktop score layout and ambient window, weekly-group view for couples (Splash grouping), recurrence engine, note-convention parsing (scores), photo book export, dark mode (night pool), TTL setting UI.
 
 ### 5.8 Empty states
 
