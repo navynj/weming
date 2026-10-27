@@ -1,5 +1,5 @@
 import { initialsOf } from '@/features/home/grid';
-import type { LinkDirection } from '@/features/pool/direction';
+import type { LinkMarkers } from '@/features/pool/links';
 import { originTag } from '@/features/pool/origin-tag';
 import type { Splash } from '@/features/splash/summary';
 import type { Database } from '@/lib/database.types';
@@ -67,6 +67,8 @@ export type PoolView = {
   /** `ownerId`: the creator, who alone may delete the pool (0015); null once their account is gone. */
   pool: Pick<PoolRow, 'id' | 'name'> & {
     ownerId: string | null;
+    /** Pool settings: Everyone preselected in this pool's compose (0033). */
+    inviteAllByDefault?: boolean;
     /** Its photo (0024): the version the row names, and the signed URL once the screen signs it. */
     photoVersion?: number | null;
     photo?: string | null;
@@ -74,13 +76,15 @@ export type PoolView = {
   /** Current members, me first then join order (D7), then former members who kept theirs. */
   members: PoolMember[];
   lanes: PoolLane[];
-  /** My links only: a member never reads another's (RLS). */
-  myLinks: { poolLaneId: string; myCategoryId: string; direction: LinkDirection }[];
+  /** My links only: a member never reads another's (RLS); advanced (0033). */
+  myLinks: ({ poolLaneId: string; myCategoryId: string } & LinkMarkers)[];
   placements: (Placement & { ownerId: string })[];
   /** Placed posts and joint splashes, as RLS lets me see them. */
   splashes: Splash[];
   ripples: PoolRipple[];
   invites: PoolInvite[];
+  /** Who each joint record here is together with now (0033). */
+  together?: Record<string, string[]>;
   /** The calendar's layouts its members set, by splash (0025). */
   layouts?: Record<string, BoardLayoutJson>;
   /** What readers left on every ripple here, for the top card (H25), and my locked ones. */
@@ -221,7 +225,7 @@ export async function getPoolView(
 ): Promise<PoolView | null> {
   const { data: pool, error } = await supabase
     .from('pools')
-    .select('id, name, owner_id, photo_version')
+    .select('id, name, owner_id, photo_version, invite_all_by_default')
     .eq('id', poolId)
     .maybeSingle();
   if (error) throw error;
@@ -232,9 +236,10 @@ export async function getPoolView(
     supabase.from('pool_lanes').select('*').eq('pool_id', poolId).order('position'),
     supabase
       .from('lane_mappings')
-      .select('pool_lane_id, my_category_id, direction')
+      .select('pool_lane_id, my_category_id, is_default, share_by_default, is_home')
       .eq('pool_id', poolId)
-      .eq('user_id', me),
+      .eq('user_id', me)
+      .order('created_at'),
     supabase
       .from('splash_placements')
       .select('splash_id, pool_id, pool_lane_id, shared, splash:splashes(*)')
@@ -295,6 +300,7 @@ export async function getPoolView(
       id: pool.id,
       name: pool.name,
       ownerId: pool.owner_id,
+      inviteAllByDefault: pool.invite_all_by_default,
       photoVersion: pool.photo_version,
       photo: null,
     },
@@ -303,7 +309,9 @@ export async function getPoolView(
     myLinks: (links.data ?? []).map((l) => ({
       poolLaneId: l.pool_lane_id,
       myCategoryId: l.my_category_id,
-      direction: l.direction,
+      isDefault: l.is_default,
+      shareByDefault: l.share_by_default === true,
+      isHome: l.is_home,
     })),
     placements: shown.map((p) => ({
       splashId: p.splash_id,
@@ -315,6 +323,10 @@ export async function getPoolView(
     splashes,
     ripples,
     invites: invites.data ?? [],
+    together: await getJointTogether(
+      supabase,
+      (joints.data ?? []).map((j) => j.id),
+    ),
     layouts: await getPoolLayouts(supabase, poolId),
     responded: await getRippleResponses(
       supabase,
@@ -335,18 +347,17 @@ export async function getPoolView(
 }
 
 /**
- * Every link of mine across my pools, with the pool's name: what the
- * composer's Audience chip defaults from (a lane is shared to every pool it
- * is linked in) and what Home's monogram chips name.
+ * Every link of mine across my pools, with the pool's name (advanced, 0033):
+ * what Audience preselects from (a lane's default pool lane, shared only
+ * when that default says so) and where Home shows a pool lane's records
+ * (its home lane).
  */
 export type MyLink = {
   myCategoryId: string;
   poolId: string;
   poolName: string;
   poolLaneId: string;
-  /** out, both or in (0017): whether my lane shares into the pool by default. */
-  direction: LinkDirection;
-};
+} & LinkMarkers;
 
 export async function getMyLinks(supabase: DuringClient, me: string): Promise<MyLink[]> {
   // Two reads: lane_mappings reaches pools only through pool_lanes' composite
@@ -354,9 +365,8 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
   const [{ data: links, error }, pools] = await Promise.all([
     supabase
       .from('lane_mappings')
-      .select('my_category_id, pool_id, pool_lane_id, direction')
+      .select('my_category_id, pool_id, pool_lane_id, is_default, share_by_default, is_home')
       .eq('user_id', me)
-      // Oldest first, so a joint splash's derived lane (jointLaneFor) is stable.
       .order('created_at'),
     getMyPoolNames(supabase, me),
   ]);
@@ -370,28 +380,88 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
       poolId: row.pool_id,
       poolName: nameOf.get(row.pool_id)!,
       poolLaneId: row.pool_lane_id,
-      direction: row.direction,
+      isDefault: row.is_default,
+      shareByDefault: row.share_by_default === true,
+      isHome: row.is_home,
     }));
 }
 
-/** The pools I am in now, by name: the Audience sheet's rows and Home's monograms. */
+/** A pool's lane as Audience offers it: emoji and name (0033). */
+export type PoolLaneChip = { id: string; name: string; icon: string | null };
+
+/**
+ * The pools I am in now, by name, with their lanes in order: the Audience
+ * sheet's rows and chips, and Home's monograms.
+ */
 export async function getMyPoolNames(
   supabase: DuringClient,
   me: string,
-): Promise<{ id: string; name: string; photoVersion: number | null }[]> {
+): Promise<{ id: string; name: string; photoVersion: number | null; lanes: PoolLaneChip[] }[]> {
   const { data, error } = await supabase
     .from('pool_members')
-    .select('pool:pools(id, name, photo_version)')
+    .select('pool:pools(id, name, photo_version, lanes:pool_lanes(id, name, icon, position))')
     .eq('user_id', me)
     .is('left_at', null)
     .order('joined_at', { ascending: false })
-    .returns<{ pool: { id: string; name: string; photo_version: number | null } | null }[]>();
+    .returns<
+      {
+        pool: {
+          id: string;
+          name: string;
+          photo_version: number | null;
+          lanes: (PoolLaneChip & { position: number })[] | null;
+        } | null;
+      }[]
+    >();
   if (error) throw error;
   return data.flatMap((row) =>
     row.pool
-      ? [{ id: row.pool.id, name: row.pool.name, photoVersion: row.pool.photo_version }]
+      ? [
+          {
+            id: row.pool.id,
+            name: row.pool.name,
+            photoVersion: row.pool.photo_version,
+            lanes: [...(row.pool.lanes ?? [])]
+              .sort((a, b) => a.position - b.position)
+              .map(({ id, name, icon }) => ({ id, name, icon })),
+          },
+        ]
       : [],
   );
+}
+
+/**
+ * Who each joint record is together with now (0033, `joint_together`): every
+ * current member under Everyone — later joiners included — else its picked
+ * invitees still in the pool. "Add your side" waits for these, less writers.
+ */
+export async function getJointTogether(
+  supabase: DuringClient,
+  splashIds: string[],
+): Promise<Record<string, string[]>> {
+  if (splashIds.length === 0) return {};
+  const { data, error } = await supabase.rpc('joint_together', { p_splashes: splashIds });
+  if (error) throw error;
+  const by: Record<string, string[]> = {};
+  for (const row of data ?? []) (by[row.splash_id] ??= []).push(row.user_id);
+  return by;
+}
+
+/** A joint record's picked invitees (0033): fixed rows, beside Everyone. */
+export async function getJointInvitees(
+  supabase: DuringClient,
+  splashIds: string[],
+): Promise<Record<string, string[]>> {
+  if (splashIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('joint_invitees')
+    .select('splash_id, user_id')
+    .in('splash_id', splashIds)
+    .order('invited_at');
+  if (error) throw error;
+  const by: Record<string, string[]> = {};
+  for (const row of data) (by[row.splash_id] ??= []).push(row.user_id);
+  return by;
 }
 
 /** My posts' placements in pools I am in now, switched on or off. */

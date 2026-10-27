@@ -94,6 +94,7 @@ function post(id: string, title: string, day: string) {
       pool_id: null,
       pool_lane_id: null,
       own_pool_id: null,
+      joint_invite_all: false,
       created_by: null,
       type: 'free',
       prompt: null,
@@ -145,7 +146,7 @@ describe('the views’ tabs on a lane’s page (review)', () => {
         <LanePage
           lane={{ id: 'l-word', name: 'Word', icon: '📖' }}
           cards={CARDS}
-          pool={{ poolId: 'p-ours', poolName: 'Sarang', lanes: [] }}
+          pool={{ poolId: 'p-ours', poolName: 'Sarang', lanes: [], members: [] }}
         />
       </InputSheetProvider>,
     );
@@ -270,7 +271,8 @@ describe('a pool lane’s page (review)', () => {
   const POOL = {
     poolId: 'p-ours',
     poolName: 'Sarang',
-    lanes: [{ id: 'l-word', name: '말씀', icon: '📖', myCategoryId: null, direction: null }],
+    lanes: [{ id: 'l-word', name: '말씀', icon: '📖', homeLaneId: null }],
+    members: [],
   };
   const page = () =>
     render(
@@ -334,7 +336,7 @@ describe('a post moved to another pool lane (0020, review)', () => {
         <LanePage
           lane={{ id: 'l-word', name: '말씀', icon: '📖' }}
           cards={CARDS}
-          pool={{ poolId: 'p-ours', poolName: 'Sarang', lanes: [] }}
+          pool={{ poolId: 'p-ours', poolName: 'Sarang', lanes: [], members: [] }}
         />
       </InputSheetProvider>,
     );

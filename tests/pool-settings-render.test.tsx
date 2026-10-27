@@ -7,12 +7,17 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
 const renamed: [string, string][] = [];
+const invitedAll: [string, boolean][] = [];
 vi.mock('@/features/pool/actions', () => ({
   renamePool: (poolId: string, name: string) => {
     renamed.push([poolId, name]);
     return Promise.resolve({ ok: true });
   },
   setLaneLinks: () => Promise.resolve({ ok: true }),
+  setPoolInviteAll: (poolId: string, on: boolean) => {
+    invitedAll.push([poolId, on]);
+    return Promise.resolve({ ok: true });
+  },
   createInvite: () => Promise.resolve({ ok: false, message: 'not in tests' }),
   revokeInvite: () => Promise.resolve({ ok: true }),
   deletePool: () => Promise.resolve({ ok: true }),
@@ -25,10 +30,11 @@ import type { PoolView } from '@/lib/queries/pools';
 afterEach(() => {
   cleanup();
   renamed.length = 0;
+  invitedAll.length = 0;
 });
 
-const view = (ownerId: string): PoolView => ({
-  pool: { id: 'p-a', name: 'Our Pool', ownerId },
+const view = (ownerId: string, inviteAllByDefault = false): PoolView => ({
+  pool: { id: 'p-a', name: 'Our Pool', ownerId, inviteAllByDefault },
   members: [],
   lanes: [],
   myLinks: [],
@@ -54,5 +60,43 @@ describe('renaming the pool in settings (0021)', () => {
   it('is not offered to any other member', () => {
     const { container } = render(<PoolSettings view={view('u-other')} categories={[]} me="u-me" />);
     expect(container.querySelector('[data-settings-name]')).toBeNull();
+  });
+});
+
+describe('inviting everyone to new posts by default (0033)', () => {
+  const toggle = (root: HTMLElement) =>
+    root.querySelector('[data-settings-invite-all] [role="switch"]') as HTMLButtonElement;
+
+  it('starts as the pool has it, and saves a flip at once', async () => {
+    const { container } = render(<PoolSettings view={view('u-other')} categories={[]} me="u-me" />);
+    expect(container.textContent).toContain('Invite everyone to new posts by default');
+    expect(toggle(container).getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle(container));
+    expect(toggle(container).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(invitedAll).toEqual([['p-a', true]]));
+  });
+
+  it('turns off a pool that has it on', async () => {
+    const { container } = render(
+      <PoolSettings view={view('u-me', true)} categories={[]} me="u-me" />,
+    );
+    expect(toggle(container).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle(container));
+    expect(toggle(container).getAttribute('aria-checked')).toBe('false');
+    await waitFor(() => expect(invitedAll).toEqual([['p-a', false]]));
+  });
+});
+
+describe('Connect your lanes, under Advanced (0033)', () => {
+  it('stays folded until Advanced is opened', () => {
+    const { container } = render(<PoolSettings view={view('u-me')} categories={[]} me="u-me" />);
+    const advanced = container.querySelector<HTMLButtonElement>('[data-settings-advanced-toggle]')!;
+    expect(advanced.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('[data-lane-match]')).toBeNull();
+    fireEvent.click(advanced);
+    expect(advanced.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('[data-lane-match]')!.textContent).toContain(
+      'Connect your lanes',
+    );
   });
 });

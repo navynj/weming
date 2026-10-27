@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import type { Annotation } from '@/features/input-sheet/draft';
 import { setPlacement } from '@/features/pool/actions';
+import { getJointInvitees } from '@/lib/queries/pools';
 import { updateSplashHeader } from '@/features/splash/actions';
 import { createClient } from '@/lib/supabase/server';
 
@@ -12,7 +13,7 @@ import { createClient } from '@/lib/supabase/server';
 export type SplashEditState =
   | {
       ok: true;
-      /** mine: everything; own: Just mine (title, icon, dates; its pool fixed); joint: title and icon. */
+      /** mine: everything; own: my pool record (title, icon, dates; its pool fixed); joint: title and icon. */
       kind: 'mine' | 'own' | 'joint';
       title: string;
       icon: string | null;
@@ -32,6 +33,10 @@ export type SplashEditState =
       sharedIn: { poolId: string; poolLaneId: string }[];
       /** Someone else has a ripple here I can see: it cannot become mine (0022). */
       othersWrote: boolean;
+      /** A joint record: who it is together with, picked one by one (0033). */
+      invitees: string[];
+      /** A joint record: together with everyone (0033). */
+      inviteAll: boolean;
       /** Every pool lane of my pools, for the sheet's warnings: "It will move to <lane>". */
       laneNames: Record<string, { name: string; icon: string | null; poolId: string }>;
     }
@@ -47,7 +52,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
   const { data: splash } = await supabase
     .from('splashes')
     .select(
-      'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id',
+      'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id, joint_invite_all',
     )
     .eq('id', id)
     .maybeSingle();
@@ -96,6 +101,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     // RLS: the lanes of pools I am a current member of.
     supabase.from('pool_lanes').select('id, name, icon, pool_id'),
   ]);
+  const invitees = joint ? ((await getJointInvitees(supabase, [id]))[id] ?? []) : [];
   const sharedIn = (placements ?? []).map((p) => ({
     poolId: p.pool_id,
     poolLaneId: p.pool_lane_id,
@@ -116,6 +122,8 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     poolLaneId: splash.pool_lane_id ?? placed?.pool_lane_id ?? null,
     sharedIn,
     othersWrote: (others ?? 0) > 0,
+    invitees,
+    inviteAll: splash.joint_invite_all,
     laneNames: Object.fromEntries(
       (allLanes ?? []).map((l) => [l.id, { name: l.name, icon: l.icon, poolId: l.pool_id }]),
     ),
@@ -125,42 +133,67 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
 const CONVERSION = z.discriminatedUnion('op', [
   z.object({ op: z.literal('none') }),
   z.object({ op: z.literal('move_pool'), poolLaneId: z.uuid() }),
-  z.object({ op: z.literal('to_joint'), poolLaneId: z.uuid() }),
-  z.object({ op: z.literal('to_just_mine'), poolLaneId: z.uuid() }),
+  z.object({
+    op: z.literal('to_joint'),
+    poolLaneId: z.uuid(),
+    invitees: z.array(z.uuid()).max(64),
+    everyone: z.boolean(),
+  }),
+  z.object({ op: z.literal('to_pool_record'), poolLaneId: z.uuid() }),
   z.object({ op: z.literal('to_mine'), myLaneId: z.uuid(), placeOn: z.uuid().nullable() }),
-  z.object({ op: z.literal('set_lane'), myLaneId: z.uuid(), placeOn: z.uuid().nullable() }),
+  z.object({
+    op: z.literal('set_lane'),
+    myLaneId: z.uuid().nullable(),
+    placeOn: z.uuid().nullable(),
+  }),
 ]);
 
-/** One conversion act (0022), or a move within the pool (0020); null when done. */
+/** One conversion act (0022, 0033), or a move within the pool (0020); null when done. */
 async function convert(
   supabase: Awaited<ReturnType<typeof createClient>>,
   id: string,
   plan: z.infer<typeof CONVERSION>,
 ): Promise<{ ok: false; message: string } | null> {
+  if (plan.op === 'to_joint') {
+    const { error } = await supabase.rpc('splash_to_joint', {
+      p_splash: id,
+      p_pool_lane: plan.poolLaneId,
+    });
+    if (error) return refused(error);
+    if (plan.invitees.length === 0 && !plan.everyone) return null;
+    const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
+      p_splash: id,
+      p_users: plan.invitees,
+      p_everyone: plan.everyone,
+    });
+    return inviteError ? refused(inviteError) : null;
+  }
+  if (plan.op === 'to_pool_record') {
+    const { error } = await supabase.rpc('splash_to_pool_record', { p_splash: id });
+    if (error) return refused(error);
+    return movePoolSplash(supabase, id, plan.poolLaneId);
+  }
   const { error } =
     plan.op === 'none'
       ? { error: null }
       : plan.op === 'move_pool'
         ? await supabase.rpc('move_pool_splash', { p_splash: id, p_pool_lane: plan.poolLaneId })
-        : plan.op === 'to_joint'
-          ? await supabase.rpc('splash_to_joint', { p_splash: id, p_pool_lane: plan.poolLaneId })
-          : plan.op === 'to_just_mine'
-            ? await supabase.rpc('splash_to_just_mine', {
-                p_splash: id,
-                p_pool_lane: plan.poolLaneId,
-              })
-            : plan.op === 'to_mine'
-              ? await supabase.rpc('splash_to_mine', {
-                  p_splash: id,
-                  p_my_lane: plan.myLaneId,
-                  ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
-                })
-              : await supabase.rpc('set_splash_lane', {
-                  p_splash: id,
-                  p_my_lane: plan.myLaneId,
-                  ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
-                });
-  if (!error) return null;
+        : plan.op === 'to_mine'
+          ? await supabase.rpc('splash_to_mine', {
+              p_splash: id,
+              p_my_lane: plan.myLaneId,
+              ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
+            })
+          : await supabase.rpc('set_splash_lane', {
+              p_splash: id,
+              // Null keeps no lane; the generated type reads the argument as required.
+              p_my_lane: plan.myLaneId as string,
+              ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
+            });
+  return error ? refused(error) : null;
+}
+
+function refused(error: { message: string }): { ok: false; message: string } {
   return {
     ok: false,
     message: /others have written here/.test(error.message)
@@ -183,8 +216,13 @@ const Edit = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
   declaredLaneId: z.uuid().nullable(),
-  /** Mine only: switches to flip, pool by pool. */
-  share: z.array(z.object({ poolId: z.uuid(), on: z.boolean() })).max(24),
+  /** Mine only: the pools that changed, each on a pool lane or off (0033). */
+  share: z
+    .array(z.object({ poolId: z.uuid(), on: z.boolean(), poolLaneId: z.uuid().nullable() }))
+    .max(24),
+  /** A joint record: members added in Together (0033), or Everyone turned on. */
+  invite: z.array(z.uuid()).max(64).default([]),
+  inviteEveryone: z.boolean().default(false),
   poolId: z.uuid().nullable(),
   /** A pool's own splash: the pool lane it moves to, when it moved (0020). */
   poolLaneId: z.uuid().nullable(),
@@ -200,7 +238,7 @@ const Edit = z.object({
  * pool's (H23).
  */
 export async function saveSplashEdit(
-  input: z.infer<typeof Edit>,
+  input: z.input<typeof Edit>,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const parsed = Edit.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That edit is incomplete.' };
@@ -213,6 +251,14 @@ export async function saveSplashEdit(
       .update({ title: edit.title, icon: edit.icon || null })
       .eq('id', edit.id);
     if (error) return { ok: false, message: error.message };
+    if (edit.invite.length > 0 || edit.inviteEveryone) {
+      const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
+        p_splash: edit.id,
+        p_users: edit.invite,
+        p_everyone: edit.inviteEveryone,
+      });
+      if (inviteError) return refused(inviteError);
+    }
     const moved = edit.conversion
       ? await convert(supabase, edit.id, edit.conversion)
       : await movePoolSplash(supabase, edit.id, edit.poolLaneId);
@@ -230,7 +276,7 @@ export async function saveSplashEdit(
     icon: edit.icon,
     declaredStart: edit.declaredStart,
     declaredEnd: edit.declaredEnd,
-    // A Just-mine splash never takes a lane of mine.
+    // My pool record never takes a lane of mine.
     declaredLaneId: edit.kind === 'own' ? null : edit.declaredLaneId,
   });
   if (!header.ok) return header;
@@ -245,12 +291,12 @@ export async function saveSplashEdit(
   revalidatePath('/');
   revalidatePath(`/splash/${edit.id}`);
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
-  // Hand-made sharing applies to a splash that stays mine; a conversion to
-  // joint or Just mine has already let go of every pool but one.
+  // Hand-made sharing applies to a record that stays mine; a conversion to
+  // joint has already let go of every pool.
   const stillMine = !edit.conversion || ['none', 'set_lane'].includes(edit.conversion.op);
   if (edit.kind === 'mine' && stillMine) {
-    for (const { poolId, on } of edit.share) {
-      const done = await setPlacement(edit.id, poolId, on);
+    for (const { poolId, on, poolLaneId } of edit.share) {
+      const done = await setPlacement(edit.id, poolId, on, poolLaneId);
       if (!done.ok) return { ok: false, message: `Saved, but not shared: ${done.message}` };
     }
   }

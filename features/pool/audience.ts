@@ -1,19 +1,18 @@
 /**
- * A post's audience (H23): where it is shared. Ripples have none of their
- * own; they follow their post. Today an audience is a set of pools; the
- * shape leaves room for a Followers row later without changing this one.
+ * A record's audience (H23, 0033): where it is shared, pool by pool, each on
+ * one of that pool's lanes. Ripples have none of their own; they follow
+ * their record. A Home record is "Only me" unless an advanced link of its
+ * lane shares by default. The shape leaves room for a Followers row later.
  */
-import { sharesOut, type LinkDirection } from './direction';
+import { defaultLink, type MarkedLink } from './links';
 
-export type AudienceLink = {
-  myCategoryId: string;
+export type AudienceLink = MarkedLink & {
   poolId: string;
   poolName: string;
-  /** The pool lane it links to (the shell loads it; 0022's warnings name it). */
-  poolLaneId?: string;
-  /** Absent reads as both, the default (0017). */
-  direction?: LinkDirection;
 };
+
+/** One pool a record is shared to, and on which of its lanes. */
+export type AudiencePick = { poolId: string; poolLaneId: string };
 
 /** "Only me", the pool's name, or "N pools". */
 export function audienceLabel(poolNames: string[]): string {
@@ -23,38 +22,41 @@ export function audienceLabel(poolNames: string[]): string {
 }
 
 /**
- * The default: every pool where the chosen lane is linked to share out —
- * out or both (0017). An "in" link shares nothing by default.
+ * The default for a new Home record: every pool where the chosen lane's
+ * default link shares by default, on that link's pool lane. With no such
+ * link, "Only me" (0033): Home is private by default.
  */
-export function defaultAudience(laneId: string | null, links: AudienceLink[]): string[] {
+export function defaultAudience(laneId: string | null, links: AudienceLink[]): AudiencePick[] {
   if (!laneId) return [];
-  return [
-    ...new Set(
-      links
-        .filter((l) => l.myCategoryId === laneId && sharesOut(l.direction ?? 'both'))
-        .map((l) => l.poolId),
-    ),
-  ];
-}
-
-/** Every pool where the lane is linked at all, any direction: each gets a switch. */
-export function linkedPools(laneId: string | null, links: AudienceLink[]): string[] {
-  if (!laneId) return [];
-  return [...new Set(links.filter((l) => l.myCategoryId === laneId).map((l) => l.poolId))];
+  return links
+    .filter((l) => l.myCategoryId === laneId && l.isDefault && l.shareByDefault)
+    .map((l) => ({ poolId: l.poolId, poolLaneId: l.poolLaneId }));
 }
 
 /**
- * The sheet's rows: a switch for each pool where the lane is linked, and a
- * note for each pool I am in where it is not.
+ * The chip a pool's row starts on when it is turned on: the link's default
+ * pool lane, else the one I last picked for this (my lane, pool) on this
+ * device, else none — one must then be picked. It only fills the chip; it
+ * never turns sharing on.
  */
-export function audienceRows(
+export function preselectLane(
   laneId: string | null,
+  poolId: string,
   links: AudienceLink[],
-  pools: { id: string; name: string }[],
-): { linked: { poolId: string; name: string }[]; unlinked: { poolId: string; name: string }[] } {
-  const linked = new Set(linkedPools(laneId, links));
-  return {
-    linked: pools.filter((p) => linked.has(p.id)).map((p) => ({ poolId: p.id, name: p.name })),
-    unlinked: pools.filter((p) => !linked.has(p.id)).map((p) => ({ poolId: p.id, name: p.name })),
-  };
+  lastPicked: string | null,
+  poolLaneIds: string[],
+): string | null {
+  const fromLink = defaultLink(laneId, poolId, links)?.poolLaneId ?? null;
+  if (fromLink && poolLaneIds.includes(fromLink)) return fromLink;
+  return lastPicked && poolLaneIds.includes(lastPicked) ? lastPicked : null;
+}
+
+/** The audience with one pool switched: on a pool lane, or off (null). */
+export function withPick(
+  audience: AudiencePick[],
+  poolId: string,
+  poolLaneId: string | null,
+): AudiencePick[] {
+  const rest = audience.filter((a) => a.poolId !== poolId);
+  return poolLaneId ? [...rest, { poolId, poolLaneId }] : rest;
 }

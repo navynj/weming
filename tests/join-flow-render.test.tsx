@@ -62,8 +62,8 @@ describe('joining a pool asks nothing about lanes (hotfix)', () => {
     fireEvent.click(view.getByText('Join'));
     await waitFor(() => expect(replaced).toEqual(['/pool/p-ours']));
     expect(saved).toEqual([{ name: 'Yoonji', photo: 'keep' }]);
-    // Every pool lane starts unconnected; no earlier records come along.
-    expect(joined).toEqual([{ token: 't-invite', links: [], includeHistory: false }]);
+    // Just the invite: no links, no earlier records — links are advanced only.
+    expect(joined).toEqual([{ token: 't-invite' }]);
   });
 
   it('keeps a name that is already there, and needs one to join', async () => {

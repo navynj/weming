@@ -1,11 +1,10 @@
 import type { PoolScope } from '@/features/pool/compose-scope';
-import { sharesOut } from '@/features/pool/direction';
-import { resolvePick } from '@/features/pool/pool-pick';
 
 /**
- * Converting a splash between personal, Just mine and joint (0022), as the
- * edit sheet decides it. Pure, so the rules are tested here and the sheet
- * only draws them.
+ * Converting a record between my Home record, my pool record and joint
+ * (0022, 0033), as the edit sheet decides it. Pure, so the rules are tested
+ * here and the sheet only draws them. Kept pairs (decision 3): Home record ↔
+ * joint, pool record ↔ joint, and a pool record moved to Home.
  */
 export type SplashKind = 'mine' | 'own' | 'joint';
 
@@ -13,15 +12,15 @@ export type SplashKind = 'mine' | 'own' | 'joint';
 export type Conversion =
   | { op: 'none' }
   | { op: 'move_pool'; poolLaneId: string } // move_pool_splash (0020)
-  | { op: 'to_joint'; poolLaneId: string }
-  | { op: 'to_just_mine'; poolLaneId: string }
+  | { op: 'to_joint'; poolLaneId: string; invitees: string[]; everyone: boolean }
+  | { op: 'to_pool_record'; poolLaneId: string } // splash_to_pool_record (0033)
   | { op: 'to_mine'; myLaneId: string; placeOn: string | null }
-  | { op: 'set_lane'; myLaneId: string; placeOn: string | null };
+  | { op: 'set_lane'; myLaneId: string | null; placeOn: string | null };
 
-/** Where the splash stands now, as the sheet loaded it. */
+/** Where the record stands now, as the sheet loaded it. */
 export type Current = {
   kind: SplashKind;
-  /** Joint: its pool lane; Just mine: its placement's pool lane. */
+  /** Joint: its pool lane; pool record: its placement's pool lane. */
   poolLaneId: string | null;
   /** Mine: its declared lane. */
   declaredLaneId: string | null;
@@ -30,37 +29,43 @@ export type Current = {
 };
 
 /**
- * From a pool screen: the pool's lane chips and Just mine, re-resolved by the
- * compose table (resolvePick): off is joint; on is mine in my lane linked by
- * both or in, placed on that pool lane, else Just mine.
+ * From a pool screen (0033): that pool's lane chips and Together. A joint
+ * record moves among the pool's lanes (Together only adds people); my pool
+ * record becomes joint once anyone is picked, else moves; my Home record
+ * becomes joint once anyone is picked, else is placed on the lane chosen.
+ * `toPoolRecord` is "Make it mine" on a joint record only I wrote in.
  */
 export function planFromPool(
   current: Current,
   scope: PoolScope,
   poolLaneId: string,
-  justMine: boolean,
+  together: string[],
+  toPoolRecord = false,
+  everyone = false,
 ): Conversion {
-  const lane = scope.lanes.find((l) => l.id === poolLaneId);
-  if (!lane) return { op: 'none' };
-  const target = resolvePick(lane, justMine);
+  if (!scope.lanes.some((l) => l.id === poolLaneId)) return { op: 'none' };
+  if (current.kind === 'joint') {
+    if (toPoolRecord) return { op: 'to_pool_record', poolLaneId };
+    return current.poolLaneId === poolLaneId ? { op: 'none' } : { op: 'move_pool', poolLaneId };
+  }
+  if (everyone || together.length > 0) {
+    return { op: 'to_joint', poolLaneId, invitees: everyone ? [] : together, everyone };
+  }
+  if (current.kind === 'own') {
+    return current.poolLaneId === poolLaneId ? { op: 'none' } : { op: 'move_pool', poolLaneId };
+  }
   const here = current.sharedIn.find((s) => s.poolId === scope.poolId)?.poolLaneId ?? null;
-  if (target.kind === 'joint') {
-    if (current.kind !== 'joint') return { op: 'to_joint', poolLaneId };
-    return current.poolLaneId === poolLaneId ? { op: 'none' } : { op: 'move_pool', poolLaneId };
-  }
-  if (target.kind === 'own') {
-    if (current.kind !== 'own') return { op: 'to_just_mine', poolLaneId };
-    return current.poolLaneId === poolLaneId ? { op: 'none' } : { op: 'move_pool', poolLaneId };
-  }
-  if (current.kind === 'mine') {
-    return current.declaredLaneId === target.myCategoryId && here === poolLaneId
-      ? { op: 'none' }
-      : { op: 'set_lane', myLaneId: target.myCategoryId, placeOn: poolLaneId };
-  }
-  return { op: 'to_mine', myLaneId: target.myCategoryId, placeOn: poolLaneId };
+  return here === poolLaneId
+    ? { op: 'none' }
+    : { op: 'set_lane', myLaneId: current.declaredLaneId, placeOn: poolLaneId };
 }
 
-/** From Home: one of my lanes for mine, Just mine and a joint splash only I wrote in. */
+/**
+ * From Home: one of my lanes. My Home record changes lane and moves no
+ * placement (0033); my pool record moves to Home ("Move to Home…"), and a
+ * joint record only I wrote in becomes mine — each staying shared to its
+ * pool on the pool lane it was on.
+ */
 export function planFromHome(current: Current, myLaneId: string | null): Conversion {
   if (!myLaneId) return { op: 'none' };
   if (current.kind === 'mine') {
@@ -71,60 +76,30 @@ export function planFromHome(current: Current, myLaneId: string | null): Convers
   return { op: 'to_mine', myLaneId, placeOn: null };
 }
 
-export type Link = {
-  myCategoryId: string;
-  poolId: string;
-  poolLaneId: string;
-  /** Absent reads as both (0017). */
-  direction?: Parameters<typeof sharesOut>[0];
-};
-export type LaneName = { name: string; poolId: string };
-
-/** The pool lane my lane sends into in a pool (both, out; 0019 keeps it to one), or null. */
-export function sendingLane(links: Link[], poolId: string, myLaneId: string): string | null {
-  return (
-    links.find(
-      (l) => l.poolId === poolId && l.myCategoryId === myLaneId && sharesOut(l.direction ?? 'both'),
-    )?.poolLaneId ?? null
-  );
-}
-
 /**
- * What a Home edit does to each pool, said before saving (review): it moves
- * to the pool lane its new lane sends into, or it stops being shared there
- * (mine), or it leaves the pool (Just mine, joint). A joint splash first says
+ * What a Home edit does, said before saving (review). A lane change of my
+ * Home record says nothing: sharing is per record and stays. A pool or joint
+ * record moved to my lane stays shared to its pool; a joint one first says
  * what becoming mine costs.
  */
 export function homeWarnings(
   current: Current & { poolId: string | null },
   myLaneId: string | null,
-  links: Link[],
   poolName: (id: string) => string,
-  laneName: (id: string) => string,
 ): string[] {
   const plan = planFromHome(current, myLaneId);
-  if (plan.op === 'none' || !myLaneId) return [];
-  if (current.kind === 'mine') {
-    return current.sharedIn.map(({ poolId }) => {
-      const to = sendingLane(links, poolId, myLaneId);
-      return to
-        ? `It will move to ${laneName(to)} in ${poolName(poolId)}.`
-        : `It will stop being shared to ${poolName(poolId)}.`;
-    });
-  }
-  if (!current.poolId) return [];
+  if (plan.op === 'none' || current.kind === 'mine' || !current.poolId) return [];
   const pool = poolName(current.poolId);
-  const to = sendingLane(links, current.poolId, myLaneId);
-  const where = to ? `It will move to ${laneName(to)} in ${pool}.` : `It will leave ${pool}.`;
+  const stays = `It stays shared to ${pool}.`;
   return current.kind === 'joint'
     ? [
         `This is a joint splash in ${pool}. Moving it to your lane makes it yours alone; members can no longer add to it.`,
-        where,
+        stays,
       ]
-    : [where];
+    : [stays];
 }
 
-/** The pools a conversion in one pool takes the splash out of: every other one it is shared to. */
+/** The pools a conversion in one pool takes the record out of: every other one it is shared to. */
 export function removedFrom(current: Current, poolId: string): string[] {
   return current.sharedIn.filter((s) => s.poolId !== poolId).map((s) => s.poolId);
 }

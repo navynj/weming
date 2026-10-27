@@ -12,14 +12,15 @@ export type Made = { ok: true; id: string } | { ok: false; message: string };
 
 const ICON = z.string().trim().max(16).nullable();
 const DESCRIPTION = z.string().trim().max(80).nullable();
-/** A link's direction (0017); absent reads as both. */
-const DIRECTION = z.enum(['out', 'both', 'in']);
+/** An advanced link and its defaults (0033); absent markers are off. */
 const LINKS = z
   .array(
     z.object({
       poolLaneId: z.uuid(),
       myCategoryId: z.uuid().nullable(),
-      direction: DIRECTION.optional(),
+      isDefault: z.boolean().optional(),
+      shareByDefault: z.boolean().optional(),
+      isHome: z.boolean().optional(),
     }),
   )
   .max(24);
@@ -38,10 +39,14 @@ function said(error: { message: string; code?: string } | null): string {
   if (error.code === '42501' && /ripples? by other members/.test(error.message)) {
     return error.message;
   }
-  // 0019: a lane of mine sends into one pool lane per pool.
-  if (error.code === '23505' && /lane_mappings_one_sender/.test(error.message)) {
-    return 'Each of your lanes can share into only one lane of this Pool.';
+  // 0009, until 0034 lifts it: a pool lane connects to one lane of mine.
+  if (error.code === '23505' && /lane_mappings_one_per_pool_lane/.test(error.message)) {
+    return 'Each lane of this Pool connects to one of your lanes for now.';
   }
+  if (error.code === '23505' && /lane_mappings_one_default/.test(error.message)) {
+    return 'Each of your lanes has one default here.';
+  }
+  if (error.code === '42501' && /together here/.test(error.message)) return error.message;
   if (error.code === '42501' && /creator renames/.test(error.message)) {
     return 'Only the Pool’s creator can rename it.';
   }
@@ -57,16 +62,17 @@ const NewPool = z.object({
         name: z.string().trim().min(1).max(40),
         icon: ICON,
         description: DESCRIPTION,
-        myCategoryId: z.uuid().nullable(),
-        direction: DIRECTION.optional(),
       }),
     )
     .min(1)
     .max(12),
-  includeHistory: z.boolean(),
 });
 
-/** "Open a new Pool", steps 1 and 2 as one act (0011 `create_pool`). */
+/**
+ * "Open a new Pool" (0011 `create_pool`): the pool, its lanes and my
+ * membership as one act. No lane of mine is connected: links are advanced
+ * only, in its settings (0033).
+ */
 export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> {
   const parsed = NewPool.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'A Pool needs a name and at least one lane.' };
@@ -82,42 +88,37 @@ export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> 
       name: lane.name,
       icon: lane.icon,
       description: lane.description,
-      my_category_id: lane.myCategoryId,
-      direction: lane.direction ?? 'both',
+      my_category_id: null,
     })),
-    p_include_history: pool.includeHistory,
+    // Retired with matching on create (0033); the argument stays until 0034.
+    p_include_history: false,
   });
   if (error || !data) return { ok: false, message: said(error) };
   revalidatePool(data);
   return { ok: true, id: data };
 }
 
-const Join = z.object({
-  token: z.string().min(1).max(64),
-  links: LINKS,
-  includeHistory: z.boolean(),
-});
+const Join = z.object({ token: z.string().min(1).max(64) });
 
-/** Joining from `/join/[token]`: the token is checked again in the database. */
+/**
+ * Joining from `/join/[token]`: the token is checked again in the database.
+ * Nothing about lanes (2026-10-26, 0033): every pool lane starts unconnected.
+ */
 export async function joinPool(input: z.infer<typeof Join>): Promise<Made> {
   const parsed = Join.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'This invite link is no longer valid.' };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('join_pool', {
     p_token: parsed.data.token,
-    p_links: parsed.data.links.map((l) => ({
-      pool_lane_id: l.poolLaneId,
-      my_category_id: l.myCategoryId,
-      direction: l.direction ?? 'both',
-    })),
-    p_include_history: parsed.data.includeHistory,
+    p_links: [],
+    p_include_history: false,
   });
   if (error || !data) return { ok: false, message: said(error) };
   revalidatePool(data);
   return { ok: true, id: data };
 }
 
-/** Pool settings: change which of my lanes each pool lane takes. */
+/** Pool settings → Advanced: my links here and their defaults, the whole set. */
 export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>): Promise<Done> {
   const parsed = z.object({ poolId: z.uuid(), links: LINKS }).safeParse({ poolId, links });
   if (!parsed.success) return { ok: false, message: 'Those links are not valid.' };
@@ -127,9 +128,21 @@ export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>)
     p_links: parsed.data.links.map((l) => ({
       pool_lane_id: l.poolLaneId,
       my_category_id: l.myCategoryId,
-      direction: l.direction ?? 'both',
+      is_default: l.isDefault ?? false,
+      share_by_default: l.shareByDefault ?? false,
+      is_home: l.isHome ?? false,
     })),
   });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  return { ok: true };
+}
+
+/** Pool settings: "Invite everyone to new posts by default" (0033), any current member. */
+export async function setPoolInviteAll(poolId: string, on: boolean): Promise<Done> {
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_pool_invite_all', { p_pool: poolId, p_on: on });
   if (error) return { ok: false, message: said(error) };
   revalidatePool(poolId);
   return { ok: true };
@@ -249,18 +262,25 @@ export async function savePoolLane(input: z.infer<typeof LaneEdit>): Promise<Don
 }
 
 /**
- * One post's audience in one pool (the Audience sheet). On: placed in the
- * pool lane my lane is linked to — the database refuses a lane I never
- * linked (C5). Off: kept, switched off, so off stays distinct from never.
+ * One record's audience in one pool (Audience, 0033). On: placed on the pool
+ * lane picked — any lane of a pool I am in, my record only (the database
+ * holds both); with none picked, where it was. Off: kept, switched off, so
+ * off stays distinct from never and nothing a pool wrote is orphaned.
  */
 export async function setPlacement(
   splashId: string,
   poolId: string,
   shared: boolean,
+  poolLaneId: string | null = null,
 ): Promise<Done> {
   const parsed = z
-    .object({ splashId: z.uuid(), poolId: z.uuid(), shared: z.boolean() })
-    .safeParse({ splashId, poolId, shared });
+    .object({
+      splashId: z.uuid(),
+      poolId: z.uuid(),
+      shared: z.boolean(),
+      poolLaneId: z.uuid().nullable(),
+    })
+    .safeParse({ splashId, poolId, shared, poolLaneId });
   if (!parsed.success) return { ok: false, message: 'That audience is not valid.' };
   const supabase = await createClient();
   const {
@@ -268,15 +288,15 @@ export async function setPlacement(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: 'Sign in again to change this.' };
 
-  const lane = await poolLaneFor(supabase, user.id, splashId, poolId);
-  if (shared && !lane) return { ok: false, message: 'This lane is not linked in that Pool.' };
-
   const { data: existing } = await supabase
     .from('splash_placements')
-    .select('splash_id')
+    .select('pool_lane_id')
     .eq('splash_id', splashId)
     .eq('pool_id', poolId)
     .maybeSingle();
+  const lane = poolLaneId ?? existing?.pool_lane_id ?? null;
+  if (shared && !lane) return { ok: false, message: 'Pick where it goes in that Pool.' };
+
   const { error } = existing
     ? await supabase
         .from('splash_placements')
@@ -298,37 +318,38 @@ export async function setPlacement(
   return { ok: true };
 }
 
-/** Where a post of mine lands in a pool: the pool lane its lane is linked to there (H24). */
-async function poolLaneFor(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  me: string,
+/** A new record's audience, written right after the record (compose). */
+export async function placeNewSplash(
   splashId: string,
-  poolId: string,
-): Promise<string | null> {
-  const { data: splash } = await supabase
-    .from('splashes')
-    .select('declared_lane_id, owner_id')
-    .eq('id', splashId)
-    .maybeSingle();
-  if (!splash || splash.owner_id !== me) return null;
-  const lane = splash.declared_lane_id;
-  if (!lane) return null;
-  const { data: link } = await supabase
-    .from('lane_mappings')
-    .select('pool_lane_id')
-    .eq('user_id', me)
-    .eq('pool_id', poolId)
-    .eq('my_category_id', lane)
-    .maybeSingle();
-  return link?.pool_lane_id ?? null;
-}
-
-/** A new post's audience, written right after the post (compose). */
-export async function placeNewSplash(splashId: string, poolIds: string[]): Promise<Done> {
-  for (const poolId of poolIds) {
-    const done = await setPlacement(splashId, poolId, true);
+  picks: { poolId: string; poolLaneId: string }[],
+): Promise<Done> {
+  for (const pick of picks) {
+    const done = await setPlacement(splashId, pick.poolId, true, pick.poolLaneId);
     if (!done.ok) return done;
   }
+  return { ok: true };
+}
+
+/** Together (0033): any current member adds members to a joint record, or Everyone. */
+export async function addJointInvitees(
+  poolId: string,
+  splashId: string,
+  users: string[],
+  everyone = false,
+): Promise<Done> {
+  const parsed = z
+    .object({ splashId: z.uuid(), users: z.array(z.uuid()).max(64) })
+    .safeParse({ splashId, users });
+  if (!parsed.success) return { ok: false, message: 'Those people are not valid.' };
+  if (users.length === 0 && !everyone) return { ok: true };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('add_joint_invitees', {
+    p_splash: splashId,
+    p_users: users,
+    p_everyone: everyone,
+  });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
   return { ok: true };
 }
 
@@ -363,10 +384,17 @@ const Joint = z.object({
   declaredEnd: z.string().regex(ISO_DAY).nullable(),
   /** My ripple's own day inside that range (0031). */
   blockDay: z.string().regex(ISO_DAY).nullable().optional(),
+  /** Together (0033): the members picked; I am invited by the database. */
+  invitees: z.array(z.uuid()).max(64).default([]),
+  /** Everyone (0033): every current member, later joiners too. */
+  everyone: z.boolean().default(false),
 });
 
-/** A joint splash, opened by a member on a pool lane, with my first ripple on it. */
-export async function createJointSplash(input: z.infer<typeof Joint>): Promise<Made> {
+/**
+ * A joint record (Together, 0033), opened by a member on a pool lane with
+ * the members picked as its "Add your side" slots, and my first ripple.
+ */
+export async function createJointSplash(input: z.input<typeof Joint>): Promise<Made> {
   const parsed = Joint.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That joint splash is incomplete.' };
   const joint = parsed.data;
@@ -389,6 +417,18 @@ export async function createJointSplash(input: z.infer<typeof Joint>): Promise<M
   if (ended) {
     await supabase.rpc('delete_joint_splash', { p_splash: joint.id });
     return { ok: false, message: ended };
+  }
+  const others = joint.invitees.filter((id) => id !== user.id);
+  if (others.length > 0 || joint.everyone) {
+    const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
+      p_splash: joint.id,
+      p_users: others,
+      p_everyone: joint.everyone,
+    });
+    if (inviteError) {
+      await supabase.rpc('delete_joint_splash', { p_splash: joint.id });
+      return { ok: false, message: said(inviteError) };
+    }
   }
 
   // My ripple takes no lane (H24): where the splash shows on my Home is
@@ -442,7 +482,8 @@ const OwnDrop = z.object({
 });
 
 /**
- * "Just mine" (0014): my splash on a pool lane, linked to no lane of mine.
+ * My pool record (0033; once "Just mine", 0014): my record written in a pool,
+ * on one of its lanes, with no lane of mine — the default from a pool.
  * The splash and its one placement are made together by the database
  * (`create_own_pool_splash`); the first ripple follows with no lane. A
  * ripple that will not land takes the splash back with it.
@@ -494,8 +535,9 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
 /**
  * Delete a pool for everyone (0015), the creator only — the database checks
  * that and refuses a pool whose creator's account is gone. Nobody's words go
- * with it: Just-mine splashes move into a new lane of their author's, each
- * author's joint ripples become one post of theirs, shared splashes stay.
+ * with it: pool records move into a new lane of their author's, each
+ * author's joint ripples become one post of theirs (in their home lane when
+ * marked), shared records stay.
  */
 export async function deletePool(poolId: string): Promise<Done> {
   if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };

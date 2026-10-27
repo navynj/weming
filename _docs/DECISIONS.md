@@ -563,3 +563,13 @@ A member's column in Swimmers opens nothing.
 - **Supersedes:** SPEC 7's "dark mode must be a night pool, never inverted": light mode is an inversion of the ground, chosen.
 - **Black and selection:** with the black theme, the action colour and ink (the selection fill, H20f) are nearly the same. Accepted for now; a selected chip still reads by its fill against the white sheet.
 
+**H27. Sharing model v2: two places, links advanced only (0033, 2026-10-26).** Designed in `_docs/SHARING-V2.md` and approved by Yoonji in the session (§6). Each part:
+- **Home records are private by default** and shared record by record. Audience turns a pool on and picks one of its lanes, with no link needed. A placement may go on any lane of a pool I am a current member of, my record only (decision 7).
+- **The Audience chip:** it starts on the link's default pool lane, else the pool lane I last picked for that (my lane, pool) on this device. It only fills the chip; it never turns sharing on.
+- **Pool records:** a record written in a pool, with no lane of mine, is my pool record (once Just mine). Together makes a joint record.
+- **Together:** member faces, plus Everyone. Everyone is a flag that invites every current member, later joiners included; individual picks are fixed rows. "Add your side" waits for these, less those who wrote. A pool setting preselects Everyone.
+- **Links are advanced only** (Pool settings → Advanced → Connect your lanes), never part of joining or creating. A link carries two optional defaults: the default pool lane with "Share by default", and the home lane, which is display only. Unlinking moves nothing.
+- **Migration:** every migrated link has share by default off, out and both included. Production shows 0 records shared through a default, and turning defaults on would start sharing new Home records in 23 lanes without anyone choosing it. The home lane comes from both/in links, so every joint record keeps its Home column.
+- **Conversions kept:** Home record ↔ joint, pool record ↔ joint ("Make it mine"), and Move to Home. Each keeps a record visible where it was, except into joint.
+- **Retired:** link directions, "include my earlier records" (`_place_history`), and lane matching on join and create. They are dropped in 0034 with quoted approval; H24's release 2 follows as its own migration.
+

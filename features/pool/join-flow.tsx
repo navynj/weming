@@ -50,8 +50,8 @@ export function JoinFlow({
         return;
       }
     }
-    // No links (hotfix): every pool lane starts unconnected for me.
-    const joined = await joinPool({ token, links: [], includeHistory: false });
+    // No links (hotfix, 0033): every pool lane starts unconnected for me.
+    const joined = await joinPool({ token });
     if (!joined.ok) {
       setMessage(joined.message);
       setBusy(false);

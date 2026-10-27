@@ -148,6 +148,7 @@ function post(
       pool_id: null,
       pool_lane_id: null,
       own_pool_id: null,
+      joint_invite_all: false,
       created_by: null,
       type: 'free',
       prompt: null,

@@ -9,18 +9,17 @@ import type { PoolView } from '@/lib/queries/pools';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { PoolPhotoField, previewOf, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
-import { renamePool, setLaneLinks } from './actions';
+import { renamePool, setLaneLinks, setPoolInviteAll } from './actions';
 import { DeletePool } from './delete-pool';
 import { InvitePanel } from './invite-panel';
-import { LaneMatch } from './lane-match';
-import { settleDirections, type Directions, type Links } from './match';
+import { LaneMatch, Switch } from './lane-match';
+import { settleMarkers, type Links, type Markers } from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
- * Pool settings (H23): the invite link, and which of my lanes each pool lane
- * takes — the same rows as step 2, changeable any time. Unlinking a lane
- * switches its posts here off; they stay, so linking it again is a choice
- * per post, never a flood. The creator renames the pool here too (0021).
+ * Pool settings (H23): the invite link, the creator's name and photo (0021,
+ * 0024), and under Advanced, Connect your lanes (0033): links and their two
+ * defaults. Unlinking switches nothing off and moves no record.
  */
 export function PoolSettings({
   view,
@@ -40,19 +39,29 @@ export function PoolSettings({
     ]),
   );
   const [links, setLinks] = useState<Links>(initial);
-  const initialDirections: Directions = Object.fromEntries(
-    view.myLinks.map((l) => [l.poolLaneId, l.direction]),
+  const keys = view.lanes.map((lane) => lane.id);
+  const initialMarkers: Markers = settleMarkers(
+    keys,
+    initial,
+    Object.fromEntries(
+      view.myLinks.map((l) => [
+        l.poolLaneId,
+        { isDefault: l.isDefault, shareByDefault: l.shareByDefault, isHome: l.isHome },
+      ]),
+    ),
   );
-  const [directions, setDirections] = useState<Directions>(initialDirections);
+  const [markers, setMarkers] = useState<Markers>(initialMarkers);
+  const [advanced, setAdvanced] = useState(false);
   const [mine, setMine] = useState(categories);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   // The name shows at once; a refusal takes it back and says why.
   const name = useOptimisticAction(view.pool.name);
   const photo = useOptimisticAction<string | null>(view.pool.photo ?? null);
+  const inviteAll = useOptimisticAction(view.pool.inviteAllByDefault ?? false);
   const changed =
     JSON.stringify(links) !== JSON.stringify(initial) ||
-    JSON.stringify(directions) !== JSON.stringify(initialDirections);
+    JSON.stringify(settleMarkers(keys, links, markers)) !== JSON.stringify(initialMarkers);
 
   return (
     <StepPage step={null} onBack={() => router.push(`/pool/${poolId}`)}>
@@ -92,60 +101,104 @@ export function PoolSettings({
         <InvitePanel poolId={poolId} invites={view.invites} />
       </section>
 
-      <section data-settings-links className="mt-12 flex flex-1 flex-col">
-        <LaneMatch
-          poolName={view.pool.name}
-          lanes={view.lanes.map((lane) => ({
-            key: lane.id,
-            name: lane.name,
-            icon: lane.icon,
-            description: lane.description,
-          }))}
-          categories={mine}
-          links={links}
-          onLinksChange={setLinks}
-          directions={directions}
-          onDirectionsChange={setDirections}
-          onCreateLane={async (lane) => {
-            const made = await saveLane({ id: null, ...lane });
-            if (!made.ok || !made.id) return { message: made.ok ? 'Try again.' : made.message };
-            setMine((current) => [...current, { id: made.id!, name: lane.name, icon: lane.icon }]);
-            return made.id;
-          }}
-          footer={
-            message ? (
-              <p role="alert" className="text-pool-500 text-sm">
-                {message}
-              </p>
-            ) : null
-          }
-          action={
-            <PrimaryButton
-              disabled={busy || !changed}
-              onClick={async () => {
-                setBusy(true);
-                setMessage(null);
-                const done = await setLaneLinks(
-                  poolId,
-                  view.lanes.map((lane) => ({
-                    poolLaneId: lane.id,
-                    myCategoryId: links[lane.id] ?? null,
-                    direction: settleDirections(
-                      view.lanes.map((lane) => lane.id),
-                      links,
-                      directions,
-                    )[lane.id],
-                  })),
-                );
-                setBusy(false);
-                if (!done.ok) return setMessage(done.message);
-                router.push(`/pool/${poolId}`);
+      <section data-settings-invite-all className="mt-10">
+        <label className="flex items-center justify-between gap-4">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-ink text-sm font-medium">
+              Invite everyone to new posts by default
+            </span>
+            <span className="text-pool-500 text-xs">
+              Together starts on Everyone when you write in this Pool.
+            </span>
+          </span>
+          <Switch
+            on={inviteAll.value}
+            label="Invite everyone to new posts by default"
+            onChange={(on) =>
+              inviteAll.run(
+                () => on,
+                () => setPoolInviteAll(poolId, on),
+              )
+            }
+          />
+        </label>
+        {inviteAll.message ? (
+          <p role="alert" className="text-pool-500 mt-2 text-xs">
+            {inviteAll.message}
+          </p>
+        ) : null}
+      </section>
+
+      <section data-settings-advanced className="mt-12 flex flex-1 flex-col">
+        <button
+          type="button"
+          data-settings-advanced-toggle
+          aria-expanded={advanced}
+          onClick={() => setAdvanced((open) => !open)}
+          className="text-ink flex items-center justify-between font-semibold"
+        >
+          Advanced
+          <span aria-hidden className="text-pool-500 text-sm font-normal">
+            {advanced ? 'Hide' : 'Show'}
+          </span>
+        </button>
+        {advanced ? (
+          <div data-settings-links className="mt-6 flex flex-1 flex-col">
+            <LaneMatch
+              poolName={view.pool.name}
+              lanes={view.lanes.map((lane) => ({
+                key: lane.id,
+                name: lane.name,
+                icon: lane.icon,
+                description: lane.description,
+              }))}
+              categories={mine}
+              links={links}
+              onLinksChange={setLinks}
+              markers={markers}
+              onMarkersChange={setMarkers}
+              onCreateLane={async (lane) => {
+                const made = await saveLane({ id: null, ...lane });
+                if (!made.ok || !made.id) return { message: made.ok ? 'Try again.' : made.message };
+                setMine((current) => [
+                  ...current,
+                  { id: made.id!, name: lane.name, icon: lane.icon },
+                ]);
+                return made.id;
               }}
-            >
-              {busy ? 'Saving…' : 'Save lane links'}
-            </PrimaryButton>
-          }
-        />
+              footer={
+                message ? (
+                  <p role="alert" className="text-pool-500 text-sm">
+                    {message}
+                  </p>
+                ) : null
+              }
+              action={
+                <PrimaryButton
+                  disabled={busy || !changed}
+                  onClick={async () => {
+                    setBusy(true);
+                    setMessage(null);
+                    const settled = settleMarkers(keys, links, markers);
+                    const done = await setLaneLinks(
+                      poolId,
+                      view.lanes.map((lane) => ({
+                        poolLaneId: lane.id,
+                        myCategoryId: links[lane.id] ?? null,
+                        ...(settled[lane.id] ?? {}),
+                      })),
+                    );
+                    setBusy(false);
+                    if (!done.ok) return setMessage(done.message);
+                    router.push(`/pool/${poolId}`);
+                  }}
+                >
+                  {busy ? 'Saving…' : 'Save lane links'}
+                </PrimaryButton>
+              }
+            />
+          </div>
+        ) : null}
       </section>
 
       {/* The creator alone deletes the pool (0015). */}

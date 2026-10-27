@@ -9,12 +9,12 @@ vi.mock('@/features/splash/actions', () => ({
     return Promise.resolve({ ok: true, splash: { id: 's-new', title: input.title } });
   },
 }));
-const placed: { splashId: string; pools: string[] }[] = [];
+const placed: { splashId: string; picks: { poolId: string; poolLaneId: string }[] }[] = [];
 const joints: Record<string, unknown>[] = [];
 const owns: Record<string, unknown>[] = [];
 vi.mock('@/features/pool/actions', () => ({
-  placeNewSplash: (splashId: string, pools: string[]) => {
-    placed.push({ splashId, pools });
+  placeNewSplash: (splashId: string, picks: { poolId: string; poolLaneId: string }[]) => {
+    placed.push({ splashId, picks });
     return Promise.resolve({ ok: true });
   },
   createJointSplash: (input: Record<string, unknown>) => {
@@ -39,7 +39,12 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }));
 
-import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { ownPoolColumn } from '@/features/home/grid';
+import { InputSheetProvider, type PendingDrop } from '@/features/input-sheet/sheet-provider';
+import { PeopleProvider } from '@/features/people/people-provider';
+import type { AudienceLink } from '@/features/pool/audience';
+import type { AudiencePool } from '@/features/pool/audience-sheet';
+import type { PoolScope } from '@/features/pool/compose-scope';
 import {
   SHEET_MAX_HEIGHT,
   SplashSheet,
@@ -68,17 +73,64 @@ const LANES = [
   lane('c-mood', 'Mood', '🌤️', 1),
   lane('c-day', 'Day', '🖋', 2),
 ];
-/** Place and Mood are linked in both pools; Day is linked nowhere (H23). */
-const POOLS = [
-  { id: 'p-ours', name: 'Our Pool' },
-  { id: 'p-crew', name: 'Crew' },
+/** The pools I am in, with their lanes: Audience's rows and chips. */
+const POOLS: AudiencePool[] = [
+  {
+    id: 'p-ours',
+    name: 'Our Pool',
+    lanes: [
+      { id: 'pl-trips', name: 'Trips', icon: '🏕' },
+      { id: 'pl-notes', name: 'Notes', icon: '📓' },
+    ],
+  },
+  {
+    id: 'p-crew',
+    name: 'Crew',
+    lanes: [
+      { id: 'cr-out', name: 'Outings', icon: '🚲' },
+      { id: 'cr-chat', name: 'Chat', icon: '💬' },
+    ],
+  },
 ];
-const LINKS = [
-  { myCategoryId: 'c-place', poolId: 'p-ours', poolName: 'Our Pool' },
-  { myCategoryId: 'c-place', poolId: 'p-crew', poolName: 'Crew' },
-  { myCategoryId: 'c-mood', poolId: 'p-ours', poolName: 'Our Pool' },
-  { myCategoryId: 'c-mood', poolId: 'p-crew', poolName: 'Crew' },
+/**
+ * Advanced links (0033): Place shares to Our Pool's Trips by default, and
+ * has Crew's Outings as its default pool lane without sharing by default.
+ * Mood is linked to Notes with no default. Day is linked nowhere.
+ */
+const marks = (isDefault: boolean, shareByDefault: boolean) => ({
+  isDefault,
+  shareByDefault,
+  isHome: false,
+});
+const LINKS: AudienceLink[] = [
+  {
+    myCategoryId: 'c-place',
+    poolId: 'p-ours',
+    poolName: 'Our Pool',
+    poolLaneId: 'pl-trips',
+    ...marks(true, true),
+  },
+  {
+    myCategoryId: 'c-place',
+    poolId: 'p-crew',
+    poolName: 'Crew',
+    poolLaneId: 'cr-out',
+    ...marks(true, false),
+  },
+  {
+    myCategoryId: 'c-mood',
+    poolId: 'p-ours',
+    poolName: 'Our Pool',
+    poolLaneId: 'pl-notes',
+    ...marks(false, false),
+  },
 ];
+
+/** The last Audience picks on this device (0033), kept clean between tests. */
+const LAST_PICK = 'weming.audience.lastPick';
+const store = (picks: Record<string, string>) =>
+  window.localStorage.setItem(LAST_PICK, JSON.stringify(picks));
+const stored = (): unknown => JSON.parse(window.localStorage.getItem(LAST_PICK) ?? 'null');
 
 beforeEach(() => {
   drops.length = 0;
@@ -87,8 +139,12 @@ beforeEach(() => {
   owns.length = 0;
   handoffs.length = 0;
   window.URL.createObjectURL = () => 'blob:preview';
+  window.localStorage.removeItem(LAST_PICK);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.removeItem(LAST_PICK);
+});
 
 /** The handoffs the sheet made: the post as the ground should show it, and its month. */
 const handoffs: { splash: SplashSummary; month: string }[] = [];
@@ -367,16 +423,76 @@ describe('the affordances under the text', () => {
   });
 });
 
-describe('the Audience chip (H23)', () => {
+describe('the Audience chip (H23, 0033)', () => {
   const chip = (view: ReturnType<typeof sheet>) =>
     view.container.querySelector('[data-audience-chip]') as HTMLButtonElement;
+  const crewSwitch = (view: ReturnType<typeof sheet>) =>
+    view.getByRole('switch', { name: 'Shared to Crew' });
+  const laneChip = (view: ReturnType<typeof sheet>, id: string) =>
+    view.container.querySelector(`[data-audience-lane="${id}"]`) as HTMLButtonElement | null;
 
-  it('defaults to every pool where the chosen lane is linked, and says so', () => {
+  it('is Only me for every lane but one whose default link shares by default', () => {
     const view = sheet();
     expect(chip(view).textContent).toBe('Only me');
+    // Place shares to Our Pool's Trips by default; its Crew link does not.
     fireEvent.click(view.getByText('Place'));
-    expect(chip(view).textContent).toBe('2 pools');
+    expect(chip(view).textContent).toBe('Our Pool · 🏕 Trips');
+    // Mood is linked, but not as a default: still Only me.
+    fireEvent.click(view.getByText('Mood'));
+    expect(chip(view).textContent).toBe('Only me');
     fireEvent.click(view.getByText('Day'));
+    expect(chip(view).textContent).toBe('Only me');
+  });
+
+  it('never turns a pool on by itself: a default pool lane without share by default stays off', () => {
+    store({ 'c-place:p-crew': 'cr-chat' });
+    const view = sheet();
+    fireEvent.click(view.getByText('Place'));
+    fireEvent.click(chip(view));
+    expect(crewSwitch(view).getAttribute('aria-checked')).toBe('false');
+    expect(view.container.querySelector('[data-audience-lanes="p-crew"]')).toBeNull();
+    expect(
+      view.getByRole('switch', { name: 'Shared to Our Pool' }).getAttribute('aria-checked'),
+    ).toBe('true');
+  });
+
+  it('turns a pool on at the link’s default pool lane, ahead of the last pick', () => {
+    store({ 'c-place:p-crew': 'cr-chat' });
+    const view = sheet();
+    fireEvent.click(view.getByText('Place'));
+    fireEvent.click(chip(view));
+    fireEvent.click(crewSwitch(view));
+    expect(laneChip(view, 'cr-out')!.getAttribute('aria-pressed')).toBe('true');
+    expect(laneChip(view, 'cr-chat')!.getAttribute('aria-pressed')).toBe('false');
+    expect(chip(view).textContent).toBe('2 pools');
+  });
+
+  it('with no link default, turns a pool on at the pool lane last picked for that lane and pool', () => {
+    store({ 'c-day:p-crew': 'cr-chat', 'c-mood:p-crew': 'cr-out' });
+    const view = sheet();
+    fireEvent.click(view.getByText('Day'));
+    fireEvent.click(chip(view));
+    fireEvent.click(crewSwitch(view));
+    expect(laneChip(view, 'cr-chat')!.getAttribute('aria-pressed')).toBe('true');
+    expect(chip(view).textContent).toBe('Crew · 💬 Chat');
+  });
+
+  it('with nothing to start on, shows the lanes and shares nothing until one is picked, then remembers it', () => {
+    const view = sheet();
+    fireEvent.click(view.getByText('Day'));
+    fireEvent.click(chip(view));
+    fireEvent.click(crewSwitch(view));
+    expect(crewSwitch(view).getAttribute('aria-checked')).toBe('true');
+    expect(view.container.querySelector('[data-audience-lanes="p-crew"]')).not.toBeNull();
+    expect(laneChip(view, 'cr-out')!.getAttribute('aria-pressed')).toBe('false');
+    expect(laneChip(view, 'cr-chat')!.getAttribute('aria-pressed')).toBe('false');
+    expect(chip(view).textContent).toBe('Only me');
+    fireEvent.click(laneChip(view, 'cr-out')!);
+    expect(chip(view).textContent).toBe('Crew · 🚲 Outings');
+    expect(stored()).toEqual({ 'c-day:p-crew': 'cr-out' });
+    // Off again: the row folds and nothing is shared.
+    fireEvent.click(crewSwitch(view));
+    expect(view.container.querySelector('[data-audience-lanes="p-crew"]')).toBeNull();
     expect(chip(view).textContent).toBe('Only me');
   });
 
@@ -384,210 +500,260 @@ describe('the Audience chip (H23)', () => {
     const view = sheet();
     fireEvent.click(view.getByText('Place'));
     fireEvent.click(chip(view));
-    fireEvent.click(view.getByRole('switch', { name: 'Shared to Crew' }));
+    fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
     // The sheet stays open over the composer; the chip already reads the edit.
-    expect(chip(view).textContent).toBe('Our Pool');
-    fireEvent.click(view.getAllByText('Mood')[0]);
-    expect(chip(view).textContent).toBe('Our Pool');
+    expect(chip(view).textContent).toBe('Only me');
+    fireEvent.click(view.getAllByText('Day')[0]);
+    expect(chip(view).textContent).toBe('Only me');
+    fireEvent.click(view.getAllByText('Place')[0]);
+    expect(chip(view).textContent).toBe('Only me');
   });
 
-  it('places the dropped post where the chip says', async () => {
+  it('places the dropped record where the chip says, on its pool lane', async () => {
     const view = sheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
     fireEvent.click(view.getByText('Place'));
     fireEvent.click(view.drop());
     await waitFor(() => expect(placed).toHaveLength(1));
-    expect(placed[0].pools.sort()).toEqual(['p-crew', 'p-ours']);
+    expect(placed[0].picks).toEqual([{ poolId: 'p-ours', poolLaneId: 'pl-trips' }]);
+  });
+
+  it('places nothing for a record that is Only me', async () => {
+    const view = sheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'private' } });
+    fireEvent.click(view.getByText('Day'));
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(drops).toHaveLength(1));
+    expect(placed).toEqual([]);
   });
 });
 
-describe('compose from a pool (H23)', () => {
-  // Our Pool's lanes: Trips is linked to my Place, Notes to nothing.
-  const SCOPE = {
+describe('compose from a pool (H23, 0033)', () => {
+  // Our Pool's lanes: Trips has my Place as its home lane, Notes has none.
+  const SCOPE: PoolScope = {
     poolId: 'p-ours',
     poolName: 'Our Pool',
     lanes: [
-      {
-        id: 'pl-trips',
-        name: 'Trips',
-        icon: '🏕',
-        myCategoryId: 'c-place',
-        direction: 'both' as const,
-      },
-      { id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null, direction: null },
-      // Linked out only: my Mood shares into Moods, nothing comes back (0017).
-      {
-        id: 'pl-moods',
-        name: 'Moods',
-        icon: '🌤️',
-        myCategoryId: 'c-mood',
-        direction: 'out' as const,
-      },
+      { id: 'pl-trips', name: 'Trips', icon: '🏕', homeLaneId: 'c-place' },
+      { id: 'pl-notes', name: 'Notes', icon: '📓', homeLaneId: null },
+    ],
+    members: [
+      { id: 'a1', name: 'Yoonji', initials: 'YL' },
+      { id: 'u-mina', name: 'Mina', initials: 'MK' },
+      { id: 'u-jae', name: 'Jae', initials: 'JP' },
     ],
   };
-  function poolSheet() {
-    const onDrop = vi.fn((drop: DropHandoff) => void drop.commit());
+  /** What the pool sheet handed over, Home's seating included. */
+  const poolDrops: PendingDrop[] = [];
+  beforeEach(() => {
+    poolDrops.length = 0;
+  });
+  function poolSheet(scope: PoolScope = SCOPE) {
+    const onDrop = vi.fn((drop: DropHandoff) => {
+      poolDrops.push(drop as PendingDrop);
+      void drop.commit();
+    });
     const view = render(
-      <InputSheetProvider>
-        <SplashSheet
-          context={{
-            categories: LANES,
-            timeZone: TZ,
-            today: TODAY,
-            links: LINKS,
-            pools: POOLS,
-            initials: 'YL',
-          }}
-          pool={SCOPE}
-          onClose={() => {}}
-          onDrop={onDrop}
-        />
-      </InputSheetProvider>,
+      <PeopleProvider me="a1" people={{}}>
+        <InputSheetProvider>
+          <SplashSheet
+            context={{
+              categories: LANES,
+              timeZone: TZ,
+              today: TODAY,
+              links: LINKS,
+              pools: POOLS,
+              initials: 'YL',
+            }}
+            pool={scope}
+            onClose={() => {}}
+            onDrop={onDrop}
+          />
+        </InputSheetProvider>
+      </PeopleProvider>,
     );
     return { ...view, onDrop, drop: () => view.getByText('Drop') as HTMLButtonElement };
   }
+  type View = ReturnType<typeof poolSheet>;
+  const pickLane = (view: View, id: string) =>
+    fireEvent.click(view.container.querySelector(`[data-pick-pool-lane="${id}"]`)!);
+  const face = (view: View, id: string) =>
+    view.container.querySelector(`[data-together-face="${id}"]`) as HTMLButtonElement | null;
+  const everyone = (view: View) =>
+    view.container.querySelector('[data-together-everyone]') as HTMLButtonElement;
+  const pressed = (el: Element | null) => el?.getAttribute('aria-pressed');
+  const hint = (view: View) => view.container.querySelector('[data-landing-hint]')!.textContent;
 
-  it('opens on Pool lanes and drops a joint splash on the chosen pool lane', async () => {
+  it('shows the pool’s lanes alone, with no My lanes tab, no Audience and no Just mine', () => {
+    const view = poolSheet();
+    expect(view.queryByRole('tab', { name: 'My lanes' })).toBeNull();
+    expect(view.container.querySelectorAll('[data-pick-pool-lane]')).toHaveLength(2);
+    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
+    expect(view.queryByRole('switch', { name: 'Just mine' })).toBeNull();
+    pickLane(view, 'pl-trips');
+    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
+  });
+
+  it('offers Together: Everyone as a text button, then the other members’ faces, never mine', () => {
+    const view = poolSheet();
+    const together = view.container.querySelector('[data-together]')!;
+    expect(together.textContent).toContain('Together ·');
+    expect(everyone(view).textContent).toBe('Everyone');
+    expect(everyone(view).className).toContain('underline');
+    expect(pressed(everyone(view))).toBe('false');
+    expect(face(view, 'a1')).toBeNull();
+    expect(pressed(face(view, 'u-mina'))).toBe('false');
+    expect(pressed(face(view, 'u-jae'))).toBe('false');
+  });
+
+  it('with nobody in Together, drops my pool record on the chosen pool lane', async () => {
+    const view = poolSheet();
+    expect(view.drop().disabled).toBe(true);
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'my notes' } });
+    // A pool lane must be chosen, or it would not land in the pool.
+    expect(view.drop().disabled).toBe(true);
+    pickLane(view, 'pl-notes');
+    expect(hint(view)).toBe('Yours · in Our Pool');
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(owns).toHaveLength(1));
+    expect(owns[0]).toMatchObject({
+      poolId: 'p-ours',
+      poolLaneId: 'pl-notes',
+      body: 'my notes',
+      declaredStart: TODAY,
+    });
+    expect(joints).toEqual([]);
+    expect(drops).toEqual([]);
+    expect(placed).toEqual([]);
+  });
+
+  it('with faces picked, drops a joint record inviting them', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Rematch Friday' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
+    pickLane(view, 'pl-trips');
+    fireEvent.click(face(view, 'u-mina')!);
+    expect(pressed(face(view, 'u-mina'))).toBe('true');
+    expect(hint(view)).toBe('Together with Mina');
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    // The splash carries the pool lane and the date; my ripple carries no
-    // lane (H24) — the link decides where it shows on my Home. Nothing placed.
+    // The record carries the pool lane and the date; my ripple carries no lane (H24).
     expect(joints[0]).toMatchObject({
       poolId: 'p-ours',
       poolLaneId: 'pl-trips',
       declaredStart: TODAY,
+      invitees: ['u-mina'],
+      everyone: false,
     });
     expect(joints[0]).not.toHaveProperty('myCategoryId');
+    expect(owns).toEqual([]);
     expect(placed).toEqual([]);
   });
 
-  it('makes Just mine on a linked pool lane my splash in my linked lane, placed here', async () => {
+  it('Everyone picks every face and drops a joint record with everyone', async () => {
     const view = poolSheet();
-    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
-    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Game night' } });
+    pickLane(view, 'pl-notes');
+    fireEvent.click(everyone(view));
+    expect(pressed(everyone(view))).toBe('true');
+    expect(pressed(face(view, 'u-mina'))).toBe('true');
+    expect(pressed(face(view, 'u-jae'))).toBe('true');
+    expect(hint(view)).toBe('Together with everyone');
     fireEvent.click(view.drop());
-    await waitFor(() => expect(placed).toHaveLength(1));
-    expect(drops[0]).toMatchObject({ declaredLaneId: 'c-place' });
-    expect(placed[0].pools).toEqual(['p-ours']);
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes', invitees: [], everyone: true });
+  });
+
+  it('deselecting a face turns Everyone off and keeps the others picked', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Hike' } });
+    pickLane(view, 'pl-trips');
+    fireEvent.click(everyone(view));
+    fireEvent.click(face(view, 'u-mina')!);
+    expect(pressed(everyone(view))).toBe('false');
+    expect(pressed(face(view, 'u-mina'))).toBe('false');
+    expect(pressed(face(view, 'u-jae'))).toBe('true');
+    expect(hint(view)).toBe('Together with Jae');
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(joints[0]).toMatchObject({ invitees: ['u-jae'], everyone: false });
+  });
+
+  it('picking every face by hand leaves Everyone off', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Hike' } });
+    pickLane(view, 'pl-trips');
+    fireEvent.click(face(view, 'u-mina')!);
+    fireEvent.click(face(view, 'u-jae')!);
+    expect(pressed(everyone(view))).toBe('false');
+    expect(hint(view)).toBe('Together with Mina, Jae');
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(joints[0]).toMatchObject({ invitees: ['u-mina', 'u-jae'], everyone: false });
+  });
+
+  it('turning Everyone off picks nobody: back to my pool record', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'solo' } });
+    pickLane(view, 'pl-notes');
+    fireEvent.click(everyone(view));
+    fireEvent.click(everyone(view));
+    expect(pressed(face(view, 'u-mina'))).toBe('false');
+    expect(hint(view)).toBe('Yours · in Our Pool');
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(owns).toHaveLength(1));
     expect(joints).toEqual([]);
   });
 
-  it('drops a joint ripple with no lane on a pool lane linked ← out only', async () => {
-    const view = poolSheet();
-    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'grey day' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-moods"]')!);
-    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
-      'Joint · pool only',
-    );
+  it('starts on Everyone where the pool invites all by default, and again after a drop', async () => {
+    const view = poolSheet({ ...SCOPE, inviteAllByDefault: true });
+    expect(pressed(everyone(view))).toBe('true');
+    expect(pressed(face(view, 'u-mina'))).toBe('true');
+    expect(pressed(face(view, 'u-jae'))).toBe('true');
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Rematch' } });
+    pickLane(view, 'pl-trips');
+    expect(hint(view)).toBe('Together with everyone');
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-moods' });
-    expect(joints[0]).not.toHaveProperty('myCategoryId');
+    expect(joints[0]).toMatchObject({ invitees: [], everyone: true });
+    expect(pressed(everyone(view))).toBe('true');
   });
 
-  it('makes Just mine on an out-only lane a Just-mine splash with no lane', async () => {
+  it('seats a record on a pool lane with a home lane in that lane’s column on Home', async () => {
     const view = poolSheet();
-    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'mine only' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-moods"]')!);
-    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
-    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
-      'Yours · pool only',
-    );
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
+    pickLane(view, 'pl-trips');
+    fireEvent.click(face(view, 'u-mina')!);
     fireEvent.click(view.drop());
-    await waitFor(() => expect(owns).toHaveLength(1));
-    expect(owns[0]).toMatchObject({ poolLaneId: 'pl-moods' });
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(poolDrops[0].home?.card).toMatchObject({ column: 'c-place', joint: true });
+    // My lane's column already exists on Home: no pool column to add.
+    expect(poolDrops[0].home?.column).toBeUndefined();
+    expect(poolDrops[0].pool).toMatchObject({ poolId: 'p-ours', card: { column: 'pl-trips' } });
   });
 
-  it('says where it lands under the chosen chip', () => {
-    const view = poolSheet();
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
-    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
-      'Joint · also in your Place',
-    );
-    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
-    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
-      'Yours · in Place',
-    );
-  });
-
-  it('shows the pool’s lanes alone: no My lanes tab', () => {
-    const view = poolSheet();
-    expect(view.queryByRole('tab', { name: 'My lanes' })).toBeNull();
-    expect(view.container.querySelectorAll('[data-pick-pool-lane]')).toHaveLength(3);
-  });
-
-  it('has no Audience chip', () => {
-    const view = poolSheet();
-    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
-    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
-    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
-  });
-
-  it('drops a joint ripple on an unlinked pool lane with no lane of mine, asking nothing', async () => {
+  it('seats a record on a pool lane with no home lane in the pool’s column, with the lane’s emoji', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Chapter 3' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
-    expect(view.queryByText('Not linked to your lanes')).toBeNull();
-    expect(view.container.querySelector('[data-link-it]')).toBeNull();
+    pickLane(view, 'pl-notes');
     fireEvent.click(view.drop());
-    await waitFor(() => expect(joints).toHaveLength(1));
-    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes' });
-    expect(joints[0]).not.toHaveProperty('myCategoryId');
+    await waitFor(() => expect(owns).toHaveLength(1));
+    expect(poolDrops[0].home?.card).toMatchObject({
+      column: ownPoolColumn('p-ours'),
+      lane: { icon: '📓', name: 'Our Pool' },
+    });
+    expect(poolDrops[0].home?.column).toMatchObject({
+      id: ownPoolColumn('p-ours'),
+      name: 'Our Pool',
+    });
   });
 
   it('renders one filled row — the lane chips — and no link row', () => {
     const view = poolSheet();
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
+    pickLane(view, 'pl-trips');
     const filled = [...view.container.querySelectorAll('[data-pool-lane-picker] .bg-ink')];
-    // Only the chosen lane chip is filled in ink.
+    // Only the chosen lane chip is filled in ink: faces are off, Everyone is text.
     expect(filled.map((el) => el.getAttribute('data-pick-pool-lane'))).toEqual(['pl-trips']);
     expect(view.container.querySelector('[data-joint-unlinked]')).toBeNull();
-  });
-});
-
-describe('Just mine from a pool (0014)', () => {
-  it('offers Everyone’s | Just mine once a pool lane is picked, and Just mine needs no lane of mine', async () => {
-    const view = render(
-      <InputSheetProvider>
-        <SplashSheet
-          context={{
-            categories: LANES,
-            timeZone: TZ,
-            today: TODAY,
-            links: LINKS,
-            pools: POOLS,
-            initials: 'YL',
-          }}
-          pool={{
-            poolId: 'p-ours',
-            poolName: 'Our Pool',
-            lanes: [
-              { id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null, direction: null },
-            ],
-          }}
-          onClose={() => {}}
-          onDrop={(drop) => void drop.commit()}
-        />
-      </InputSheetProvider>,
-    );
-    // One switch at the tabs' right end, off (everyone's) by default.
-    const justMine = view.getByRole('switch', { name: 'Just mine' });
-    expect(justMine.getAttribute('aria-checked')).toBe('false');
-    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'my notes' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
-    fireEvent.click(justMine);
-    expect(justMine.getAttribute('aria-checked')).toBe('true');
-    // No lane of mine asked for, no link offered, no audience.
-    expect(view.queryByText('Not linked to your lanes')).toBeNull();
-    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
-    fireEvent.click(view.getByText('Drop'));
-    await waitFor(() => expect(owns).toHaveLength(1));
-    expect(owns[0]).toMatchObject({ poolId: 'p-ours', poolLaneId: 'pl-notes', body: 'my notes' });
-    expect(joints).toEqual([]);
+    expect(view.container.querySelector('[data-link-it]')).toBeNull();
   });
 });

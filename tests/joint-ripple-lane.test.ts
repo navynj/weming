@@ -5,9 +5,9 @@ import { asAdmin, asUser } from './as-user';
 /**
  * Adding a ripple to a joint splash from the pool's splash page (H24):
  * `addBlock` writes no lane at all, whatever the link. Where the splash shows
- * on my Home is derived from the link (jointLaneFor): my linked lane when it
- * brings in (↔ both, → in), the pool's column when it only sends out (←) or
- * there is no link. The glyphs are the ones the app draws (direction.ts).
+ * on my Home is derived from the home-lane marker (homeLaneFor, 0033): my
+ * lane marked as its pool lane's home lane, else the pool's column — a link
+ * without the marker, or no link at all. The database agrees (_home_lane_for).
  *
  * The real action against the real schema, as a throwaway member. Needs the
  * local stack; excluded from the CI config like every DB test.
@@ -38,7 +38,7 @@ vi.mock('@/lib/supabase/server', async () => {
   };
 });
 
-import { jointLaneFor } from '@/features/pool/direction';
+import { homeLaneFor } from '@/features/pool/links';
 import { addBlock } from '@/features/splash/block-actions';
 
 beforeAll(async () => {
@@ -81,16 +81,16 @@ afterAll(async () => {
 });
 
 /**
- * Links Trips in `direction`, opens a joint splash on `poolLane`, adds a
- * ripple from its page: the ripple's own lane, and the splash's Home lane.
+ * Links Trips, marked home or not, opens a joint splash on `poolLane`, adds
+ * a ripple from its page: the ripple's own lane, and the splash's Home lane.
  */
 async function addTo(
   poolLane: 'trips' | 'days',
-  direction: 'both' | 'in' | 'out',
+  home: boolean,
 ): Promise<{ ripple: string | null; home: string | null }> {
   const linked = await asUser(ana).rpc('set_lane_links', {
     p_pool: pool,
-    p_links: [{ pool_lane_id: trips, my_category_id: ANA_TRIPS, direction }],
+    p_links: [{ pool_lane_id: trips, my_category_id: ANA_TRIPS, is_home: home }],
   });
   expect(linked.error).toBeNull();
   const id = crypto.randomUUID();
@@ -99,7 +99,7 @@ async function addTo(
     p_id: id,
     p_pool: pool,
     p_pool_lane: poolLane === 'trips' ? trips : days,
-    p_title: `${poolLane} ${direction}`,
+    p_title: `${poolLane} ${home ? 'home' : 'linked'}`,
   });
   expect(opened.error).toBeNull();
   const done = await addBlock({
@@ -117,33 +117,30 @@ async function addTo(
   const links = (
     await asUser(ana)
       .from('lane_mappings')
-      .select('my_category_id, pool_lane_id, direction')
+      .select('my_category_id, pool_lane_id, is_home')
       .eq('pool_id', pool)
   ).data!.map((l) => ({
     myCategoryId: l.my_category_id,
     poolLaneId: l.pool_lane_id,
-    direction: l.direction,
+    isHome: l.is_home,
   }));
-  return {
-    ripple: row.data!.category_id,
-    home: jointLaneFor(poolLane === 'trips' ? trips : days, links),
-  };
+  const shown = homeLaneFor(poolLane === 'trips' ? trips : days, links);
+  // The database's copy (delete_pool reads it) agrees with the app's.
+  const db = await asAdmin().rpc('_home_lane_for' as never, { sid: id, uid: ana } as never);
+  expect((db.data as string | null) ?? null).toBe(shown);
+  return { ripple: row.data!.category_id, home: shown };
 }
 
 describe('a ripple added to a joint splash (H24)', () => {
-  it('↔ both: no lane of its own; the splash shows in my linked lane', async () => {
-    expect(await addTo('trips', 'both')).toEqual({ ripple: null, home: ANA_TRIPS });
+  it('home lane marked: no lane of its own; the splash shows in my home lane', async () => {
+    expect(await addTo('trips', true)).toEqual({ ripple: null, home: ANA_TRIPS });
   });
 
-  it('→ in: no lane of its own; the splash shows in my linked lane', async () => {
-    expect(await addTo('trips', 'in')).toEqual({ ripple: null, home: ANA_TRIPS });
-  });
-
-  it('← out: no lane of its own; the splash shows in the pool’s column', async () => {
-    expect(await addTo('trips', 'out')).toEqual({ ripple: null, home: null });
+  it('linked, no home lane: no lane of its own; the pool’s column', async () => {
+    expect(await addTo('trips', false)).toEqual({ ripple: null, home: null });
   });
 
   it('unlinked pool lane: no lane of its own; the pool’s column', async () => {
-    expect(await addTo('days', 'both')).toEqual({ ripple: null, home: null });
+    expect(await addTo('days', true)).toEqual({ ripple: null, home: null });
   });
 });

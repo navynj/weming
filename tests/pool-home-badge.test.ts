@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { placeCard, withEdits } from '@/features/home/grid';
-import { jointLaneFor } from '@/features/pool/direction';
 import { withPoolBadge } from '@/features/pool/home-badge';
+import { homeLaneFor } from '@/features/pool/links';
 import type { SplashSummary } from '@/features/splash/summary';
 
 function summary(id: string): SplashSummary {
@@ -99,34 +99,25 @@ describe('a joint splash made mine, on Home (0022)', () => {
   });
 });
 
-describe('where a joint splash shows on my Home, derived from my link (H24)', () => {
-  const links = (direction: 'out' | 'both' | 'in') => [
-    { myCategoryId: 'my-games', poolLaneId: 'l-games', direction },
-  ];
+describe('where a joint splash shows on my Home, derived from my Home marker (H24, 0033)', () => {
+  const links = (isHome: boolean) => [{ myCategoryId: 'my-games', poolLaneId: 'l-games', isHome }];
 
-  it('↔ both and → in bring the pool lane into my lane', () => {
-    expect(jointLaneFor('l-games', links('both'))).toBe('my-games');
-    expect(jointLaneFor('l-games', links('in'))).toBe('my-games');
+  it('a link marked Home brings the pool lane into my lane', () => {
+    expect(homeLaneFor('l-games', links(true))).toBe('my-games');
   });
 
-  it('← out, or no link, leaves it in the pool’s column', () => {
-    expect(jointLaneFor('l-games', links('out'))).toBeNull();
-    expect(jointLaneFor('l-games', [])).toBeNull();
-    expect(jointLaneFor('l-other', links('both'))).toBeNull();
+  it('a link not marked Home, or no link, leaves it in the pool’s column', () => {
+    expect(homeLaneFor('l-games', links(false))).toBeNull();
+    expect(homeLaneFor('l-games', [])).toBeNull();
+    expect(homeLaneFor('l-other', links(true))).toBeNull();
   });
 
-  it('prefers ↔ both when several of my lanes bring one pool lane in, then the first', () => {
+  it('takes the one marked Home when several of my lanes link one pool lane', () => {
     expect(
-      jointLaneFor('l-games', [
-        { myCategoryId: 'my-a', poolLaneId: 'l-games', direction: 'in' },
-        { myCategoryId: 'my-b', poolLaneId: 'l-games', direction: 'both' },
+      homeLaneFor('l-games', [
+        { myCategoryId: 'my-a', poolLaneId: 'l-games', isHome: false },
+        { myCategoryId: 'my-b', poolLaneId: 'l-games', isHome: true },
       ]),
     ).toBe('my-b');
-    expect(
-      jointLaneFor('l-games', [
-        { myCategoryId: 'my-a', poolLaneId: 'l-games', direction: 'in' },
-        { myCategoryId: 'my-c', poolLaneId: 'l-games', direction: 'in' },
-      ]),
-    ).toBe('my-a');
   });
 });

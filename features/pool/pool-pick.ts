@@ -1,46 +1,52 @@
-import type { PoolScope } from './compose-scope';
-import { bringsIn } from './direction';
-
 /**
- * The choice when composing from a pool (H23): a pool lane, and whose — a
- * joint splash the pool owns; or, Just mine, my own splash in the lane I
- * linked to it (placed here), or with no lane of mine.
+ * The choice when composing from a pool (H23, 0033): a pool lane, and with
+ * whom. With nobody picked in Together, my pool record — mine, in this pool,
+ * no lane of mine; with members picked, a joint record whose "Add your side"
+ * slots are theirs.
  */
 export type PoolPick =
   | { kind: 'joint'; poolLaneId: string }
-  /** "Just mine" (0014): my splash on that pool lane, linked to no lane of mine. */
+  /** My pool record (once Just mine, 0014): mine, on that pool lane. */
   | { kind: 'own'; poolLaneId: string }
-  | { kind: 'lane'; poolLaneId: string; myCategoryId: string }
   | null;
 
-/**
- * Where a pick lands, by the Just mine switch and the pool lane's link
- * (0017): off, a joint splash — my ripple in my linked lane when the link
- * brings in (both, in), else with no lane; on, my own splash — in my linked
- * lane, placed here, when the link brings in, else a Just-mine splash with
- * no lane of mine.
- */
+/** Where a pick lands, by Together: nobody is my pool record; Everyone or anyone, joint. */
 export function resolvePick(
-  lane: PoolScope['lanes'][number],
-  justMine: boolean,
+  poolLaneId: string,
+  together: string[],
+  everyone = false,
 ): Exclude<PoolPick, null> {
-  const mine = lane.myCategoryId && bringsIn(lane.direction) ? lane.myCategoryId : null;
-  if (!justMine) return { kind: 'joint', poolLaneId: lane.id };
-  return mine
-    ? { kind: 'lane', poolLaneId: lane.id, myCategoryId: mine }
-    : { kind: 'own', poolLaneId: lane.id };
+  return everyone || together.length > 0
+    ? { kind: 'joint', poolLaneId }
+    : { kind: 'own', poolLaneId };
 }
 
 /**
- * "Joint · also in your Games", "Joint · pool only", "Yours · in Games",
- * "Yours · pool only". No "lane" on a compose screen (hotfix 2026-10-26).
+ * Together's state (0033): Everyone — dynamic, every current member, later
+ * joiners too — and the faces picked one by one. Everyone shows every face
+ * picked; deselecting any face turns it off and keeps the rest picked;
+ * picking every face by hand does not turn it on.
  */
-export function landingHint(
-  lane: PoolScope['lanes'][number],
-  justMine: boolean,
-  myLaneName: (id: string) => string | null,
-): string {
-  const mine = lane.myCategoryId && bringsIn(lane.direction) ? myLaneName(lane.myCategoryId) : null;
-  if (!justMine) return mine ? `Joint · also in your ${mine}` : 'Joint · pool only';
-  return mine ? `Yours · in ${mine}` : 'Yours · pool only';
+export type Together = { everyone: boolean; picked: string[] };
+
+export function toggleFace(state: Together, id: string, others: string[]): Together {
+  const shown = state.everyone ? others : state.picked;
+  return shown.includes(id)
+    ? { everyone: false, picked: shown.filter((x) => x !== id) }
+    : { everyone: false, picked: [...shown, id] };
+}
+
+export function toggleEveryone(state: Together, others: string[]): Together {
+  return state.everyone ? { everyone: false, picked: [] } : { everyone: true, picked: others };
+}
+
+/**
+ * "Yours · in Our Pool", "Together with everyone", or "Together with Mina,
+ * Jae". No "lane" on a compose screen (hotfix 2026-10-26).
+ */
+export function landingHint(poolName: string, togetherNames: string[], everyone = false): string {
+  if (everyone) return 'Together with everyone';
+  return togetherNames.length > 0
+    ? `Together with ${togetherNames.join(', ')}`
+    : `Yours · in ${poolName}`;
 }

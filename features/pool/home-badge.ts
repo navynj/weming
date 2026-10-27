@@ -10,7 +10,7 @@ export type JointOnHome = {
   poolName: string | null;
   /** Its photo (0024), while I am in it. */
   poolPhoto?: string | null;
-  /** My lane its pool lane is brought into (jointLaneFor, H24); null: the pool's column. */
+  /** My home lane for its pool lane (homeLaneFor, H24, 0033); null: the pool's column. */
   linkedLane: string | null;
   /** Its pool lane, while I can read it. */
   poolLane: { name: string; icon: string | null } | null;
@@ -20,8 +20,8 @@ export type JointOnHome = {
  * A card on Home, as pools touch it (H23, H24): a joint splash — my
  * ripples on a splash a pool owns — carries the pool's monogram, opens the
  * pool's page, and is neither pinned nor deleted from here. It sits in my
- * lane its pool lane is brought into, else in its pool's column — derived
- * from my link, never from a ripple; and it carries its tag,
+ * home lane for its pool lane, else in its pool's column — derived from my
+ * marker (0033), never from a ripple; and it carries its tag,
  * "<Pool> · <emoji> <pool lane>". My own splash merely shared to a pool
  * carries no badge on Home: its audience shows on its page's Audience chip.
  */

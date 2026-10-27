@@ -96,32 +96,74 @@ export type Database = {
           },
         ]
       }
+      joint_invitees: {
+        Row: {
+          invited_at: string
+          splash_id: string
+          user_id: string
+        }
+        Insert: {
+          invited_at?: string
+          splash_id: string
+          user_id: string
+        }
+        Update: {
+          invited_at?: string
+          splash_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "joint_invitees_splash_id_fkey"
+            columns: ["splash_id"]
+            isOneToOne: false
+            referencedRelation: "splashes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "joint_invitees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lane_mappings: {
         Row: {
           created_at: string
           direction: Database["public"]["Enums"]["lane_link_direction"]
           id: string
+          is_default: boolean
+          is_home: boolean
           my_category_id: string
           pool_id: string
           pool_lane_id: string
+          share_by_default: boolean | null
           user_id: string
         }
         Insert: {
           created_at?: string
           direction?: Database["public"]["Enums"]["lane_link_direction"]
           id?: string
+          is_default?: boolean
+          is_home?: boolean
           my_category_id: string
           pool_id: string
           pool_lane_id: string
+          share_by_default?: boolean | null
           user_id: string
         }
         Update: {
           created_at?: string
           direction?: Database["public"]["Enums"]["lane_link_direction"]
           id?: string
+          is_default?: boolean
+          is_home?: boolean
           my_category_id?: string
           pool_id?: string
           pool_lane_id?: string
+          share_by_default?: boolean | null
           user_id?: string
         }
         Relationships: [
@@ -413,6 +455,7 @@ export type Database = {
           created_at: string
           ephemeral: boolean
           id: string
+          invite_all_by_default: boolean
           invite_code: string | null
           kind: Database["public"]["Enums"]["pool_kind"] | null
           name: string
@@ -426,6 +469,7 @@ export type Database = {
           created_at?: string
           ephemeral?: boolean
           id?: string
+          invite_all_by_default?: boolean
           invite_code?: string | null
           kind?: Database["public"]["Enums"]["pool_kind"] | null
           name: string
@@ -439,6 +483,7 @@ export type Database = {
           created_at?: string
           ephemeral?: boolean
           id?: string
+          invite_all_by_default?: boolean
           invite_code?: string | null
           kind?: Database["public"]["Enums"]["pool_kind"] | null
           name?: string
@@ -907,6 +952,7 @@ export type Database = {
           ends_at: string | null
           icon: string | null
           id: string
+          joint_invite_all: boolean
           own_pool_id: string | null
           owner_id: string | null
           pinned_at: string | null
@@ -927,6 +973,7 @@ export type Database = {
           ends_at?: string | null
           icon?: string | null
           id?: string
+          joint_invite_all?: boolean
           own_pool_id?: string | null
           owner_id?: string | null
           pinned_at?: string | null
@@ -947,6 +994,7 @@ export type Database = {
           ends_at?: string | null
           icon?: string | null
           id?: string
+          joint_invite_all?: boolean
           own_pool_id?: string | null
           owner_id?: string | null
           pinned_at?: string | null
@@ -1018,6 +1066,7 @@ export type Database = {
       _board_layout_clear: { Args: { l: Json; paths: string[] }; Returns: Json }
       _board_layout_merge: { Args: { base: Json; patch: Json }; Returns: Json }
       _board_layout_prune: { Args: { l: Json; media: string[] }; Returns: Json }
+      _home_lane_for: { Args: { sid: string; uid: string }; Returns: string }
       _inherit_backfill: { Args: never; Returns: undefined }
       _inherit_post_title: { Args: { note: string }; Returns: string }
       _inherit_split_from: {
@@ -1026,6 +1075,7 @@ export type Database = {
       }
       _invite_pool: { Args: { p_token: string }; Returns: string }
       _joint_lane_for: { Args: { sid: string; uid: string }; Returns: string }
+      _joint_pool: { Args: { sid: string }; Returns: string }
       _layout_group: { Args: { g: Json; kind: string }; Returns: boolean }
       _layout_number: {
         Args: { hi: number; lo: number; v: Json }
@@ -1051,7 +1101,15 @@ export type Database = {
         Args: { p_links: Json; pid: string; uid: string }
         Returns: undefined
       }
+      _settle_lane_default: {
+        Args: { cid: string; pid: string }
+        Returns: undefined
+      }
       _splash_lane: { Args: { sid: string }; Returns: string }
+      add_joint_invitees: {
+        Args: { p_everyone?: boolean; p_splash: string; p_users: string[] }
+        Returns: undefined
+      }
       add_reply: {
         Args: { p_body: string; p_id?: string; p_ripple: string }
         Returns: string
@@ -1140,6 +1198,13 @@ export type Database = {
         Args: { p_include_history: boolean; p_links: Json; p_token: string }
         Returns: string
       }
+      joint_together: {
+        Args: { p_splashes: string[] }
+        Returns: {
+          splash_id: string
+          user_id: string
+        }[]
+      }
       lane_is_mine_in: { Args: { plid: string }; Returns: boolean }
       leave_pool: {
         Args: { p_keep: boolean; p_pool: string }
@@ -1194,6 +1259,10 @@ export type Database = {
         Args: { p_links: Json; p_pool: string }
         Returns: undefined
       }
+      set_pool_invite_all: {
+        Args: { p_on: boolean; p_pool: string }
+        Returns: undefined
+      }
       set_pool_photo: {
         Args: { p_on: boolean; p_pool: string }
         Returns: undefined
@@ -1238,6 +1307,7 @@ export type Database = {
         Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
         Returns: undefined
       }
+      splash_to_pool_record: { Args: { p_splash: string }; Returns: undefined }
       splash_writable: { Args: { sid: string }; Returns: boolean }
       visible_avatars: { Args: { uids: string[] }; Returns: string[] }
       visible_pool_photos: { Args: { pids: string[] }; Returns: string[] }

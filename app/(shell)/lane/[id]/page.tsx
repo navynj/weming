@@ -9,11 +9,11 @@ import {
   type CardRipple,
 } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
-import { jointLaneFor } from '@/features/pool/direction';
+import { homeLaneFor } from '@/features/pool/links';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { sharedSplashIds, withResponded } from '@/features/home/responded';
-import { getJointSplashes, getMyLinks, getMyPoolNames } from '@/lib/queries/pools';
+import { getJointSplashes, getMyLinks, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
 import { getResponsesOnMine } from '@/lib/queries/responses';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
@@ -40,8 +40,8 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
   ]);
   const lane = categories.find((c) => c.id === id);
   if (!lane) notFound();
-  // Joint splashes I wrote on are posts here too, in the lane their pool lane
-  // is brought into (H24) — as on Home, never by a ripple's own lane.
+  // Joint splashes I wrote on are posts here too, when this lane is the home
+  // lane for their pool lane (H24, 0033) — as on Home, never by a ripple's own lane.
   const mineIds = new Set(mine.map((s) => s.id));
   const joints = await getJointSplashes(supabase, [
     ...new Set(
@@ -49,6 +49,16 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     ),
   ]);
   const jointOf = new Map(joints.map((j) => [j.id, j]));
+  // My pool records whose pool lane has this lane as its home lane (0033).
+  const placements = mine.some((s) => s.own_pool_id)
+    ? await getMyPlacements(supabase, profile.id)
+    : [];
+  const ownHome = new Map(
+    mine.flatMap((s) => {
+      const at = placements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
+      return s.own_pool_id && at ? [[s.id, homeLaneFor(at.poolLaneId, links)] as const] : [];
+    }),
+  );
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
 
   // Each card's ripples with words or photos, oldest first, for the stack's
@@ -72,7 +82,9 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
   const cards = summarizeSplashes([...mine, ...joints], ripples, profile.timezone, new Date())
     .filter((summary) => {
       const joint = jointOf.get(summary.id);
-      return joint ? jointLaneFor(joint.pool_lane_id, links) === id : cardLane(summary) === id;
+      if (joint) return homeLaneFor(joint.pool_lane_id, links) === id;
+      if (summary.ownPoolId) return ownHome.get(summary.id) === id;
+      return cardLane(summary) === id;
     })
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];

@@ -1,35 +1,84 @@
 import { describe, expect, it } from 'vitest';
 
-import { audienceLabel, audienceRows, defaultAudience } from '@/features/pool/audience';
+import { audienceLabel, defaultAudience, type AudienceLink } from '@/features/pool/audience';
+import { chipLabel, type AudiencePool } from '@/features/pool/audience-sheet';
 
-const links = [
-  { myCategoryId: 'place', poolId: 'p1', poolName: 'Our Pool' },
-  { myCategoryId: 'place', poolId: 'p2', poolName: 'Crew' },
-  { myCategoryId: 'food', poolId: 'p1', poolName: 'Our Pool' },
+const links: AudienceLink[] = [
+  {
+    myCategoryId: 'place',
+    poolLaneId: 'l-trips',
+    poolId: 'p1',
+    poolName: 'Our Pool',
+    isDefault: true,
+    shareByDefault: true,
+    isHome: false,
+  },
+  {
+    myCategoryId: 'place',
+    poolLaneId: 'l-crew',
+    poolId: 'p2',
+    poolName: 'Crew',
+    isDefault: true,
+    shareByDefault: false,
+    isHome: true,
+  },
+  {
+    myCategoryId: 'food',
+    poolLaneId: 'l-food',
+    poolId: 'p1',
+    poolName: 'Our Pool',
+    isDefault: true,
+    shareByDefault: true,
+    isHome: false,
+  },
 ];
-const pools = [
-  { id: 'p1', name: 'Our Pool' },
-  { id: 'p2', name: 'Crew' },
-  { id: 'p3', name: 'Study' },
+const pools: AudiencePool[] = [
+  {
+    id: 'p1',
+    name: 'Our Pool',
+    lanes: [
+      { id: 'l-trips', name: 'Trips', icon: '🏕' },
+      { id: 'l-food', name: 'Food', icon: null },
+    ],
+  },
+  { id: 'p2', name: 'Crew', lanes: [{ id: 'l-crew', name: 'Crew', icon: '🎲' }] },
+  { id: 'p3', name: 'Study', lanes: [] },
 ];
 
-describe('the Audience chip (H23)', () => {
+describe('the Audience chip (H23, 0033)', () => {
   it('says Only me, a pool’s name, or N pools — what the placements are', () => {
     expect(audienceLabel([])).toBe('Only me');
     expect(audienceLabel(['Our Pool'])).toBe('Our Pool');
     expect(audienceLabel(['Our Pool', 'Crew'])).toBe('2 pools');
   });
 
-  it('defaults to every pool where the chosen lane is linked', () => {
-    expect(defaultAudience('place', links)).toEqual(['p1', 'p2']);
-    expect(defaultAudience('food', links)).toEqual(['p1']);
+  it('defaults only to pools whose default link shares by default', () => {
+    expect(defaultAudience('place', links)).toEqual([{ poolId: 'p1', poolLaneId: 'l-trips' }]);
+    expect(defaultAudience('food', links)).toEqual([{ poolId: 'p1', poolLaneId: 'l-food' }]);
     expect(defaultAudience('day', links)).toEqual([]);
     expect(defaultAudience(null, links)).toEqual([]);
   });
 
-  it('offers a switch where the lane is linked and a note where it is not', () => {
-    const rows = audienceRows('food', links, pools);
-    expect(rows.linked.map((r) => r.name)).toEqual(['Our Pool']);
-    expect(rows.unlinked.map((r) => r.name)).toEqual(['Crew', 'Study']);
+  it('names one pool with its lane, emoji first when it has one', () => {
+    expect(chipLabel([{ poolId: 'p1', poolLaneId: 'l-trips' }], pools)).toBe('Our Pool · 🏕 Trips');
+    expect(chipLabel([{ poolId: 'p1', poolLaneId: 'l-food' }], pools)).toBe('Our Pool · Food');
+  });
+
+  it('says Only me with none, N pools with several', () => {
+    expect(chipLabel([], pools)).toBe('Only me');
+    expect(
+      chipLabel(
+        [
+          { poolId: 'p1', poolLaneId: 'l-trips' },
+          { poolId: 'p2', poolLaneId: 'l-crew' },
+        ],
+        pools,
+      ),
+    ).toBe('2 pools');
+  });
+
+  it('falls back to the pool’s name, or "A pool", when the lane or pool is unknown', () => {
+    expect(chipLabel([{ poolId: 'p1', poolLaneId: 'gone' }], pools)).toBe('Our Pool');
+    expect(chipLabel([{ poolId: 'gone', poolLaneId: 'x' }], pools)).toBe('A pool');
   });
 });

@@ -54,7 +54,7 @@ type SheetApi = {
   /** From a pool, with that pool as the default (H23); from Home, with none. */
   openSheet: (pool?: PoolScope | null) => void;
   /** The pencil on a card or a splash's page: the sheet in edit mode. */
-  /** From a pool screen, with that pool (0022): its lanes and Just mine; from Home, none. */
+  /** From a pool screen, with that pool (0022): its lanes and Together; from Home, none. */
   openEdit: (splashId: string, pool?: PoolScope | null) => void;
   pendingEdits: Record<string, PendingEdit>;
   markEdited: (splashId: string, edit: PendingEdit) => void;
