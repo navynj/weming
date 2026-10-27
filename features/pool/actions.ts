@@ -361,6 +361,8 @@ const Joint = z.object({
   /** The splash's range, which every ripple on it takes (H24). */
   declaredStart: z.string().regex(ISO_DAY),
   declaredEnd: z.string().regex(ISO_DAY).nullable(),
+  /** My ripple's own day inside that range (0031). */
+  blockDay: z.string().regex(ISO_DAY).nullable().optional(),
 });
 
 /** A joint splash, opened by a member on a pool lane, with my first ripple on it. */
@@ -396,6 +398,7 @@ export async function createJointSplash(input: z.infer<typeof Joint>): Promise<M
       author_id: user.id,
       note: joint.body,
       splash_id: joint.id,
+      ...(joint.blockDay && joint.declaredEnd ? { occurred_on: joint.blockDay } : {}),
     });
     if (blockError) {
       // The band without the words that opened it is not what was dropped.
@@ -434,6 +437,8 @@ const OwnDrop = z.object({
   /** The splash's range, which every ripple on it takes (H24). */
   declaredStart: z.string().regex(ISO_DAY),
   declaredEnd: z.string().regex(ISO_DAY).nullable(),
+  /** My ripple's own day inside that range (0031). */
+  blockDay: z.string().regex(ISO_DAY).nullable().optional(),
 });
 
 /**
@@ -474,6 +479,7 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
       note: drop.body || null,
       media: drop.media,
       splash_id: drop.id,
+      ...(drop.blockDay && drop.declaredEnd ? { occurred_on: drop.blockDay } : {}),
     });
     if (blockError) {
       // Deleting the splash takes its placement with it (0014 allows that).

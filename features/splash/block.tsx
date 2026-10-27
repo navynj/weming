@@ -7,6 +7,9 @@ import type { RippleWithCategory } from '@/lib/queries/ripples';
 import { rippleDurationMinutes, rippleKind } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
 
+import { blockDay, isRange } from './block-day';
+import type { DateRange } from './summary';
+
 /** `Aug 17`, from an ISO date. */
 export function shortDay(date: IsoDate): string {
   const at = new Date(`${date}T00:00:00Z`);
@@ -20,6 +23,7 @@ export function shortDay(date: IsoDate): string {
  */
 export function BlockView({
   block,
+  range = null,
   photos,
   timeZone,
   today,
@@ -27,6 +31,8 @@ export function BlockView({
   clock = null,
 }: {
   block: RippleWithCategory;
+  /** Its post's range: inside one, the block reads by its own day (0031). */
+  range?: DateRange | null;
   photos: (string | null)[];
   timeZone: string;
   today: IsoDate;
@@ -37,11 +43,15 @@ export function BlockView({
 }) {
   const kind = rippleKind(block, timeZone);
   const annotation = draftFrom(block, timeZone).annotation;
-  const label = annotation
-    ? annotation.time || annotation.endDate
-      ? `${shortDay(annotation.date)} · ${annotationLabel(annotation, today)}`
-      : shortDay(annotation.date)
-    : shortDay(dayOf(block, timeZone));
+  // Inside a range, its day and nothing else (0031); elsewhere what an older
+  // block carries, frozen (H24), read back as it was.
+  const label = isRange(range)
+    ? shortDay(blockDay(block.occurred_on, range)!)
+    : annotation
+      ? annotation.time || annotation.endDate
+        ? `${shortDay(annotation.date)} · ${annotationLabel(annotation, today)}`
+        : shortDay(annotation.date)
+      : shortDay(dayOf(block, timeZone));
 
   const body = (
     <>

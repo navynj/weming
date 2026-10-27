@@ -11,14 +11,32 @@ const Block = z.object({
   id: z.uuid(),
   note: z.string().trim().max(2000),
   media: z.array(z.string()).max(8),
+  /**
+   * Its own day, on a range splash only (0031): inside the range, checked
+   * again by the database. Absent: the day is not this edit's to touch.
+   */
+  occurredOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
+
+/** The database's refusals, said plainly. */
+function said(message: string): string {
+  return /outside this splash's range/.test(message)
+    ? 'That day is outside this splash’s range.'
+    : /has no range/.test(message)
+      ? 'This splash has no range to date an entry in.'
+      : message;
+}
 
 const NewBlock = Block.extend({ splashId: z.uuid() });
 
 /**
- * Writes a block onto its post (H24): its words, its photos, its post —
- * nothing else. Its lane and date are the post's; a block carries none of
- * its own, and the database refuses one that tries (0029).
+ * Writes a block onto its post (H24): its words, its photos, its post. Its
+ * lane is the post's, always; on a post with a range it may carry its own
+ * day inside it (0031), and nowhere else — the database refuses one that
+ * tries (0029, 0031).
  */
 export async function addBlock(input: z.infer<typeof NewBlock>): Promise<CommitResult> {
   const parsed = NewBlock.safeParse(input);
@@ -37,8 +55,9 @@ export async function addBlock(input: z.infer<typeof NewBlock>): Promise<CommitR
     note: block.note.length > 0 ? block.note : null,
     media: block.media,
     splash_id: block.splashId,
+    ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
   });
-  if (error) return { ok: false, reason: 'error', message: error.message };
+  if (error) return { ok: false, reason: 'error', message: said(error.message) };
 
   revalidatePath('/');
   revalidatePath(`/splash/${block.splashId}`);
@@ -46,9 +65,9 @@ export async function addBlock(input: z.infer<typeof NewBlock>): Promise<CommitR
 }
 
 /**
- * Corrects a block's words and photos in place (H17). Its lane and date are
- * not its own to edit (H24): an older block's are kept as written, read
- * back, never sent again.
+ * Corrects a block's words and photos in place (H17), and on a range post
+ * its day (0031). Its lane is not its own to edit (H24); elsewhere an older
+ * block's date is kept as written, read back, never sent again.
  */
 export async function editBlock(input: z.infer<typeof Block>): Promise<CommitResult> {
   const parsed = Block.safeParse(input);
@@ -58,11 +77,15 @@ export async function editBlock(input: z.infer<typeof Block>): Promise<CommitRes
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('ripples')
-    .update({ note: block.note.length > 0 ? block.note : null, media: block.media })
+    .update({
+      note: block.note.length > 0 ? block.note : null,
+      media: block.media,
+      ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
+    })
     .eq('id', block.id)
     .select('splash_id')
     .maybeSingle();
-  if (error) return { ok: false, reason: 'error', message: error.message };
+  if (error) return { ok: false, reason: 'error', message: said(error.message) };
   if (!data) return { ok: false, reason: 'error', message: 'That record is gone.' };
 
   revalidatePath('/');

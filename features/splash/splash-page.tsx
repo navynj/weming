@@ -23,6 +23,7 @@ import { usePoolEditScope } from '@/features/pool/edit-scope';
 
 import { deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
 import { addBlock, editBlock } from './block-actions';
+import { orderBlocks } from './block-day';
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
 import { BlockView } from './block';
 import { RippleThread } from './ripple-thread';
@@ -197,12 +198,13 @@ export function SplashPage({
     return Promise.resolve();
   }
 
-  /** The block as the screen should show it: its words and photos; nothing else is its to change. */
+  /** The block as the screen should show it: its words, photos, and its day on a range (0031). */
   function shaped(base: RippleWithCategory, draft: BlockDraft): RippleWithCategory {
     return {
       ...base,
       note: draft.note.trim().length > 0 ? draft.note : null,
       media: draft.media,
+      ...(draft.occurredOn ? { occurred_on: draft.occurredOn } : {}),
     };
   }
 
@@ -216,7 +218,14 @@ export function SplashPage({
           blocks: current.blocks.map((b) => (b.id === block.id ? shaped(b, draft) : b)),
         }),
         async () =>
-          outcome(await editBlock({ id: block.id, note: draft.note, media: draft.media })),
+          outcome(
+            await editBlock({
+              id: block.id,
+              note: draft.note,
+              media: draft.media,
+              ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
+            }),
+          ),
       );
       return;
     }
@@ -259,6 +268,7 @@ export function SplashPage({
             note: draft.note,
             media: draft.media,
             splashId: target.splashId,
+            ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
           }),
         ),
     );
@@ -368,7 +378,8 @@ export function SplashPage({
         <div data-blocks className="py-2">
           <RippleThread
             initials={initials}
-            entries={page.blocks.map((block) => ({
+            // By day inside a range, then as written (0031).
+            entries={orderBlocks(page.blocks, page.splash.declaredRange).map((block) => ({
               id: block.id,
               // Each ripple keeps its author in a pool (H23).
               initials: pool ? (pool.initialsOf[block.author_id] ?? '') : undefined,
@@ -380,6 +391,8 @@ export function SplashPage({
                   {editor?.kind === 'edit' && editor.block.id === block.id ? (
                     <BlockEditor
                       target={editor}
+                      range={page.splash.declaredRange}
+                      today={today}
                       onSubmit={(draft) => saveBlock(editor, draft)}
                       onDelete={() => removeBlock(block)}
                       onLock={(locked) => lockBlock(block, locked)}
@@ -389,6 +402,7 @@ export function SplashPage({
                     <>
                       <BlockView
                         block={block}
+                        range={page.splash.declaredRange}
                         photos={photos[block.id] ?? []}
                         clock={
                           pool
@@ -438,6 +452,8 @@ export function SplashPage({
             {editor?.kind === 'add' ? (
               <BlockEditor
                 target={editor}
+                range={page.splash.declaredRange}
+                today={today}
                 onSubmit={(draft) => saveBlock(editor, draft)}
                 onDelete={() => setEditor(null)}
                 onLock={() => {}}

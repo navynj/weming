@@ -20,6 +20,8 @@ import type { PoolScope } from '@/features/pool/compose-scope';
 import { poolSplashHref } from '@/features/pool/pool-cards';
 import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker';
 import { dropSplash } from '@/features/splash/actions';
+import { defaultBlockDay, isRange } from '@/features/splash/block-day';
+import { DayChip } from '@/features/splash/day-chip';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
@@ -116,6 +118,17 @@ export function SplashComposer({
   // Today is in the field from the start (review): the post's date, days
   // only (H24). Removed with its ×, the post rests on today all the same.
   const [annotation, setAnnotation] = useState<Annotation | null>(fresh);
+  // The first block's own day, when the post's date is a range (0031).
+  const [chosenDay, setChosenDay] = useState<IsoDate | null>(null);
+  const draftRange =
+    annotation?.endDate && annotation.endDate > annotation.date
+      ? { start: annotation.date, end: annotation.endDate }
+      : null;
+  const firstDay = isRange(draftRange)
+    ? chosenDay && chosenDay >= draftRange.start && chosenDay <= draftRange.end
+      ? chosenDay
+      : defaultBlockDay(draftRange, today)
+    : null;
   const [mediaPaths, setMediaPaths] = useState<string[]>([]);
   const media = useMediaAttach(mediaPaths, setMediaPaths);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -151,6 +164,8 @@ export function SplashComposer({
     // The post's range (H24): the chip's days, else today.
     const declaredStart = a?.date ?? today;
     const declaredEnd = a?.endDate && a.endDate !== a.date ? a.endDate : null;
+    // The first block's day, inside the range only (0031).
+    const blockDay = hasBlock && firstDay ? firstDay : null;
     const input = {
       id,
       title,
@@ -162,6 +177,7 @@ export function SplashComposer({
       icon: icon || null,
       today,
       sessionId: null,
+      blockDay,
     };
 
     // The post as the ground should show it, summarised the way the page
@@ -194,7 +210,7 @@ export function SplashComposer({
               id: `${id}-first`,
               category_id: null,
               note: body.length > 0 ? body : null,
-              occurred_on: null,
+              occurred_on: blockDay,
               occurred_time: null,
               created_at: now.toISOString(),
             },
@@ -289,6 +305,7 @@ export function SplashComposer({
               media: mediaPaths,
               declaredStart,
               declaredEnd,
+              blockDay,
             })
         : joint
           ? () =>
@@ -301,6 +318,7 @@ export function SplashComposer({
                 body,
                 declaredStart,
                 declaredEnd,
+                blockDay,
               })
           : async () => {
               const made = await dropSplash(input);
@@ -319,6 +337,7 @@ export function SplashComposer({
     setPick(null);
     setAudienceEdited(null);
     setAnnotation(fresh());
+    setChosenDay(null);
     setMediaPaths([]);
     field.current?.focus();
   }
@@ -389,6 +408,10 @@ export function SplashComposer({
           clock={false}
           label="+ Add Date"
         />
+        {/* The first block's day inside the post's range (0031). */}
+        {firstDay && isRange(draftRange) ? (
+          <DayChip range={draftRange} value={firstDay} onChange={setChosenDay} />
+        ) : null}
         <AddImageAffordance attach={media.attach} busy={media.busy} input={media.input} />
       </div>
       <MediaPreviews

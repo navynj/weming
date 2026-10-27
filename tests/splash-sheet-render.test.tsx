@@ -333,6 +333,27 @@ describe('the affordances under the text', () => {
     expect(handoffs[0].splash.range).toEqual({ start: '2026-08-17', end: '2026-08-17' });
   });
 
+  it('gives the first block a day inside the post’s range, and none without a range (0031)', async () => {
+    const view = sheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'surf' } });
+    expect(view.queryByLabelText('Day')).toBeNull();
+    fireEvent.change(view.getByLabelText('Date'), { target: { value: '2026-09-20' } });
+    fireEvent.click(view.getByText('+ add end date'));
+    fireEvent.change(view.getByLabelText('End date'), { target: { value: '2026-09-28' } });
+    // Today (Sep 25) is inside Sep 20–28: the chip starts there, the range's days only.
+    const day = view.getByLabelText('Day') as HTMLSelectElement;
+    expect(day.value).toBe(TODAY);
+    expect(day.options).toHaveLength(9);
+    fireEvent.change(day, { target: { value: '2026-09-22' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(drops).toHaveLength(1));
+    expect(drops[0]).toMatchObject({
+      declaredStart: '2026-09-20',
+      declaredEnd: '2026-09-28',
+      blockDay: '2026-09-22',
+    });
+  });
+
   it('has no session field: sessions are date-based, a post is shelved by its dates', () => {
     const { queryByText, container } = sheet();
     expect(queryByText('+ Add to Session')).toBeNull();

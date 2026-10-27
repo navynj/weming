@@ -5,6 +5,7 @@ import { audienceFor } from '@/features/pool/audience-for';
 import { originTag } from '@/features/pool/origin-tag';
 import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
+import { orderBlocks } from '@/features/splash/block-day';
 import { summarizeSplash } from '@/features/splash/summary';
 import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -60,9 +61,12 @@ export async function PoolSplash({
   const joint = board.owner_id === null;
   const author = board.owner_id ?? board.created_by;
   const zone = view.members.find((m) => m.userId === author)?.timeZone ?? profile.timezone;
-  // In the order they were written (H24): a ripple's own date places nothing.
-  const blocks = [...ripples.data].sort(
-    (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+  // By day inside a range, else as written (0031): a frozen date places nothing.
+  const blocks = orderBlocks(
+    ripples.data,
+    board.declared_start
+      ? { start: board.declared_start, end: board.declared_end ?? board.declared_start }
+      : null,
   );
   const summary = summarizeSplash(board, blocks, zone, new Date());
 
