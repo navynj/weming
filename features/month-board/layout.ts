@@ -110,6 +110,8 @@ export const LABEL_STYLES: readonly LabelStyle[] = ['none', 'white', 'ink'];
 /** The sizes that follow the board's width. */
 export type BoardMetrics = {
   width: number;
+  /** How many columns: a week's seven days, or the Lane view's lanes. */
+  columns: number;
   column: number;
   /** A phone's lanes (under 80px): side padding halved, so words keep some room. */
   narrow: boolean;
@@ -142,14 +144,15 @@ export type BoardMetrics = {
 };
 
 /** The metrics at a width. */
-export function boardMetrics(width: number): BoardMetrics {
-  const w = Math.max(COLUMNS * 40, Math.round(width));
-  const column = w / COLUMNS;
+export function boardMetrics(width: number, columns: number = COLUMNS): BoardMetrics {
+  const w = Math.max(columns * 40, Math.round(width));
+  const column = w / columns;
   const narrow = column < 80;
   const size = 10;
   const line = size + 3;
   return {
     width: w,
+    columns,
     column,
     narrow,
     rowBase: narrow ? 40 : 48,
@@ -171,7 +174,18 @@ export function boardMetrics(width: number): BoardMetrics {
 }
 
 /** A day of the board: its place, whether it is the month's own (every day of a week is), and how many records it holds. */
-export type BoardCell = { day: IsoDate; inMonth: boolean; col: number; x: number; count: number };
+export type BoardCell = {
+  day: IsoDate;
+  /** What the cell holds: its day on the Calendar; its day and lane in the Lane view. */
+  key: string;
+  inMonth: boolean;
+  col: number;
+  x: number;
+  count: number;
+};
+
+/** A cell to lay out: the key its cards are placed by, and the day it is. */
+export type CellSpec = { key: string; day: IsoDate };
 
 export type BoardWeek = { index: number; y: number; h: number; cells: BoardCell[] };
 
@@ -545,7 +559,7 @@ function spanLabel(
 ): { w: number; span: number; lines: number; h: number } {
   const { m, col } = ctx;
   const own = m.column - x;
-  const most = m.narrow ? Math.min(PHONE_SPAN_MAX, COLUMNS - 1 - col) : 0;
+  const most = m.narrow ? Math.min(PHONE_SPAN_MAX, m.columns - 1 - col) : 0;
   for (let k = most; k > 0; k -= 1) {
     const w = own + k * m.column;
     const fit = heightFor(w);
@@ -692,7 +706,7 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
     const fit = hand(0) ?? spanLabel(0, pad, fitFor, ctx);
     return shape({ x: 0, y: 0, w: fit.w, h: fit.h }, fit.lines, fit.span > 0, fit.span);
   }
-  if (col < COLUMNS - 1) {
+  if (col < m.columns - 1) {
     const x = Math.round(
       m.column * (A_START_MIN + unit(card.splash.id, 'shift') * (A_START_MAX - A_START_MIN)),
     );
@@ -864,32 +878,42 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
  */
 function layoutBoard(
   cards: Card[],
-  rows: IsoDate[][],
+  rows: CellSpec[][],
   scope: { first: IsoDate; last: IsoDate },
   m: BoardMetrics,
-  span: 'week' | 'month',
+  span: 'week' | 'month' | 'lane',
   measured: Measured,
+  {
+    cellOf = (card) => card.day,
+    bands = true,
+  }: {
+    /** The cell a card sits in: its day on the Calendar; its day and lane in the Lane view. */
+    cellOf?: (card: Card) => string | null;
+    /** Ranged posts as bands across their days (the Calendar); else one piece on its day. */
+    bands?: boolean;
+  } = {},
 ): Pick<BoardLayout, 'weeks' | 'pieces' | 'tapes' | 'height'> {
   const inScope = (day: IsoDate): boolean => day >= scope.first && day <= scope.last;
   // Every day on the grid takes its posts — a month's first and last rows
   // carry the days before and after it too, drawn at half strength.
-  const gridFirst = rows[0][0];
-  const gridLast = rows[rows.length - 1][COLUMNS - 1];
-  const onGrid = (day: IsoDate): boolean => day >= gridFirst && day <= gridLast;
+  const gridFirst = rows[0][0].day;
+  const gridLast = rows[rows.length - 1][rows[rows.length - 1].length - 1].day;
+  const keys = new Set(rows.flatMap((row) => row.map((cell) => cell.key)));
 
-  // A day's posts, oldest first; ranged posts set apart as bands.
-  const byDay = new Map<IsoDate, Card[]>();
+  // A cell's posts, oldest first; ranged posts set apart as bands.
+  const byDay = new Map<string, Card[]>();
   const ranged: Card[] = [];
   for (const card of cards) {
-    const range = spanOf(card);
+    const range = bands ? spanOf(card) : null;
     if (range) {
       if (range.start <= gridLast && range.end >= gridFirst) ranged.push(card);
       continue;
     }
-    if (!onGrid(card.day)) continue;
-    const list = byDay.get(card.day);
+    const key = cellOf(card);
+    if (key === null || !keys.has(key)) continue;
+    const list = byDay.get(key);
     if (list) list.push(card);
-    else byDay.set(card.day, [card]);
+    else byDay.set(key, [card]);
   }
   for (const list of byDay.values()) {
     list.sort(
@@ -911,19 +935,22 @@ function layoutBoard(
   const weeks: BoardWeek[] = [];
   // A week's lanes carry their day in the header; a month's cells number themselves.
   const numberBand = span === 'month' ? DAY_NUMBER_PX : 0;
-  let y = span === 'month' ? MONTH_HEADER_PX : HEADER_PX;
-  // A day's records: its posts and every range crossing it, for its waves.
-  const countOf = (day: IsoDate): number =>
-    (byDay.get(day)?.length ?? 0) +
-    ranged.filter((c) => c.splash.range!.start <= day && c.splash.range!.end >= day).length;
+  // The Lane view's headers and date rail are its own: its rows start at the top.
+  let y = span === 'month' ? MONTH_HEADER_PX : span === 'week' ? HEADER_PX : 0;
+  // A cell's records: its posts and every range crossing its day, for its waves.
+  const countOf = (cell: CellSpec): number =>
+    (byDay.get(cell.key)?.length ?? 0) +
+    ranged.filter((c) => c.splash.range!.start <= cell.day && c.splash.range!.end >= cell.day)
+      .length;
 
-  rows.forEach((days, index) => {
-    const cells: BoardCell[] = days.map((day, col) => ({
-      day,
-      inMonth: inScope(day),
+  rows.forEach((specs, index) => {
+    const cells: BoardCell[] = specs.map((spec, col) => ({
+      day: spec.day,
+      key: spec.key,
+      inMonth: inScope(spec.day),
       col,
       x: col * m.column,
-      count: countOf(day),
+      count: countOf(spec),
     }));
 
     // Bands: the range's days within this row and this scope, packed into lanes.
@@ -984,7 +1011,7 @@ function layoutBoard(
     const byCol = new Map<number, BoardPiece[]>();
     let tallest = span === 'month' ? m.rowBase : 0;
     for (const cell of [...cells].reverse()) {
-      const list = byDay.get(cell.day) ?? [];
+      const list = byDay.get(cell.key) ?? [];
       const right = [...byCol.entries()].filter(([c]) => c > cell.col).flatMap(([, ps]) => ps);
       // The lanes to the right are empty at a band when nothing of theirs — label, photo, sticker, slot — is there.
       const room =
@@ -1116,7 +1143,14 @@ export function layoutMonthBoard(
   const rows = monthDays(month, weekStart);
   const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
   // The grid is exactly the weeks holding a day of the month, from the week of the 1st.
-  const natural = layoutBoard(cards, rows, { first: `${month}-01`, last }, m, 'month', measured);
+  const natural = layoutBoard(
+    cards,
+    rows.map((days) => days.map((day) => ({ key: day, day }))),
+    { first: `${month}-01`, last },
+    m,
+    'month',
+    measured,
+  );
   const laid = fill === undefined ? natural : fillRows(natural, fill - MONTH_HEADER_PX);
   return {
     span: 'month',
@@ -1146,7 +1180,14 @@ export function layoutWeekBoard(
   const m = boardMetrics(width);
   const first = weekOf(day, weekStart);
   const days = Array.from({ length: COLUMNS }, (_, i) => addDays(first, i));
-  const laid = layoutBoard(cards, [days], { first, last: days[COLUMNS - 1] }, m, 'week', measured);
+  const laid = layoutBoard(
+    cards,
+    [days.map((d) => ({ key: d, day: d }))],
+    { first, last: days[COLUMNS - 1] },
+    m,
+    'week',
+    measured,
+  );
   return {
     span: 'week',
     metrics: m,
@@ -1160,4 +1201,55 @@ export function layoutWeekBoard(
     width: m.width,
     ...laid,
   };
+}
+
+/** The Lane view drawn with the board's pieces (0045): rows of days, columns of lanes. */
+export type LaneBoardLayout = Pick<BoardLayout, 'weeks' | 'pieces' | 'height'> & {
+  metrics: BoardMetrics;
+};
+
+/**
+ * The Lane view (0045, Yoonji, in the session): the Calendar's pieces and
+ * recipes, a column per lane and a row per day that has posts, newest first,
+ * each row as tall as its tallest lane. A ranged post is one piece on its
+ * day in its column, never a band. `columnOf` places a card: its lane, or
+ * its pool's column on Home; a card with none is not drawn.
+ */
+export function layoutLaneBoard(
+  cards: Card[],
+  days: IsoDate[],
+  columns: string[],
+  {
+    width,
+    measured = {},
+    columnOf,
+  }: { width: number; measured?: Measured; columnOf: (card: Card) => string | null },
+): LaneBoardLayout {
+  const m = boardMetrics(width, Math.max(1, columns.length));
+  if (days.length === 0 || columns.length === 0) {
+    return { metrics: m, weeks: [], pieces: [], height: 0 };
+  }
+  const rows = days.map((day) => columns.map((column) => ({ key: laneCell(day, column), day })));
+  const sorted = [...days].sort();
+  const laid = layoutBoard(
+    cards,
+    rows,
+    { first: sorted[0], last: sorted[sorted.length - 1] },
+    m,
+    'lane',
+    measured,
+    {
+      bands: false,
+      cellOf: (card) => {
+        const column = columnOf(card);
+        return column === null ? null : laneCell(card.day, column);
+      },
+    },
+  );
+  return { metrics: m, weeks: laid.weeks, pieces: laid.pieces, height: laid.height - FOOT_PX };
+}
+
+/** A Lane view cell's key: its day and its column. */
+export function laneCell(day: IsoDate, column: string): string {
+  return `${day}|${column}`;
 }

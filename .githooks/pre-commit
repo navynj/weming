@@ -28,7 +28,7 @@ step 'types'
 pnpm -s exec tsc --noEmit -p .
 
 step 'lint'
-if [ ${#code[@]} -gt 0 ]; then pnpm -s exec eslint "${code[@]}"; fi
+if [ ${#code[@]} -gt 0 ]; then pnpm -s exec eslint --no-warn-ignored "${code[@]}"; fi
 # The token and origin guards read the whole tree; they are greps, and fast.
 ./scripts/check-tokens.sh
 ./scripts/check-origin.sh

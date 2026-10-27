@@ -28,6 +28,8 @@ import {
   layoutMonthBoard,
   measureKey,
   layoutWeekBoard,
+  layoutLaneBoard,
+  laneCell,
   onBoard,
   weekTitle,
   type BoardLayout,
@@ -1289,5 +1291,40 @@ describe('the stacking order (review)', () => {
     const muted = container.querySelector<HTMLElement>('[data-board-piece][data-muted]')!;
     expect(muted.className).not.toContain('opacity-50');
     expect(muted.querySelector('[data-board-label]')!.className).toContain('opacity-50');
+  });
+});
+
+describe('the Lane view drawn with the board’s pieces (0045)', () => {
+  // Three lanes; the busy fortnight's posts spread over them by id.
+  const LANES = ['c-food', 'c-place', 'c-day'];
+  const laneOf = (card: Card): string => LANES[card.splash.id.length % LANES.length];
+  const days = [...new Set(BUSY.map((c) => c.day))].sort().reverse();
+
+  it('places every post in its lane on its day, newest day at the top, as readably as the Calendar', () => {
+    for (const width of [358, 980]) {
+      const layout = layoutLaneBoard(BUSY, days, LANES, { width, columnOf: laneOf });
+      expect(layout.metrics.columns).toBe(3);
+      expect(layout.weeks.map((w) => w.cells[0].day)).toEqual(days);
+      const ranged = BUSY.filter(
+        (c) => c.splash.range && c.splash.range.start !== c.splash.range.end,
+      );
+      // Every post is a piece, ranged ones too: no bands in the Lane view.
+      expect(layout.pieces.map((p) => p.id).sort()).toEqual(BUSY.map((c) => c.splash.id).sort());
+      expect(ranged.length).toBeGreaterThan(0);
+      for (const piece of layout.pieces) {
+        const cell = layout.weeks[piece.week].cells[piece.col];
+        expect(cell.key).toBe(laneCell(piece.card.day, laneOf(piece.card)));
+      }
+      readable({ ...layout, tapes: [] } as unknown as BoardLayout);
+    }
+  });
+
+  it('leaves out a post with no column, and draws nothing with no days', () => {
+    const layout = layoutLaneBoard(BUSY, days, LANES, {
+      width: 358,
+      columnOf: (card) => (card.splash.id === BUSY[0].splash.id ? null : laneOf(card)),
+    });
+    expect(layout.pieces.some((p) => p.id === BUSY[0].splash.id)).toBe(false);
+    expect(layoutLaneBoard(BUSY, [], LANES, { width: 358, columnOf: laneOf }).pieces).toEqual([]);
   });
 });
