@@ -1,3 +1,7 @@
+import * as Sentry from '@sentry/nextjs';
+
+import { sentryOptions } from '@/lib/observability';
+
 /**
  * Runs once when a server instance starts (Next's `instrumentation.ts`
  * convention), before it takes requests. The required environment is checked
@@ -8,10 +12,22 @@
  *
  * Node only: the edge runtime (the proxy) inlines its variables at build and
  * has its own named reads through `lib/env.ts`.
+ *
+ * Error tracking starts here too, on the server and the edge
+ * (lib/observability.ts): scrubbed before anything leaves, off on a local run.
  */
 export async function register(): Promise<void> {
+  Sentry.init(
+    sentryOptions(
+      process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+      process.env.NEXT_PUBLIC_SENTRY_RELEASE,
+    ),
+  );
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { assertServerEnv } = await import('./lib/env');
     assertServerEnv();
   }
 }
+
+/** A server error Next caught — a render, a route, a server action — sent scrubbed. */
+export const onRequestError = Sentry.captureRequestError;

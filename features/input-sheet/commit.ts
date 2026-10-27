@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
+import { reported } from '@/lib/report-failure';
 
 /**
  * What the sheet can tell the author when a write is refused. The collision
@@ -42,6 +43,10 @@ export type Draft = z.infer<typeof Draft>;
  * splashless block that renders as an untitled post of one.
  */
 export async function commitRipple(input: Draft): Promise<CommitResult> {
+  return reported('compose', () => commitRippleWork(input));
+}
+
+async function commitRippleWork(input: Draft): Promise<CommitResult> {
   const parsed = Draft.safeParse(input);
   if (!parsed.success) return { ok: false, reason: 'error', message: 'That draft is incomplete.' };
   const draft = parsed.data;

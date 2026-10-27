@@ -7,6 +7,7 @@ import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
 
 import type { Splash } from './summary';
+import { reported } from '@/lib/report-failure';
 
 export type SplashResult = { ok: true; splash: Splash } | { ok: false; message: string };
 export type Done = { ok: true } | { ok: false; message: string };
@@ -66,6 +67,10 @@ export type Drop = z.infer<typeof Drop>;
  * lane given is the residual one; the block carries neither.
  */
 export async function dropSplash(input: Drop): Promise<SplashResult> {
+  return reported('compose', () => dropSplashWork(input));
+}
+
+async function dropSplashWork(input: Drop): Promise<SplashResult> {
   const parsed = Drop.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That post is incomplete.' };
   const drop = parsed.data;
@@ -140,6 +145,10 @@ async function residualLane(
  * for its title.
  */
 export async function setSplashDescription(id: string, text: string): Promise<Done> {
+  return reported('edit', () => setSplashDescriptionWork(id, text));
+}
+
+async function setSplashDescriptionWork(id: string, text: string): Promise<Done> {
   const parsed = z
     .object({ id: z.uuid(), text: z.string().trim().max(2000) })
     .safeParse({ id, text });
@@ -158,6 +167,10 @@ export async function setSplashDescription(id: string, text: string): Promise<Do
 }
 
 export async function updateSplashHeader(id: string, input: Header): Promise<SplashResult> {
+  return reported('edit', () => updateSplashHeaderWork(id, input));
+}
+
+async function updateSplashHeaderWork(id: string, input: Header): Promise<SplashResult> {
   const parsed = Header.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That header is incomplete.' };
   const header = parsed.data;

@@ -329,6 +329,57 @@ Vercel needs nothing new: the Ignored Build Step reads
 `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which Production
 already has.
 
+## Errors: Sentry
+
+Production and previews report errors to Sentry (org `whaleblue-studio`,
+project `weming`); a local run sends nothing. The setup is
+`lib/observability.ts`, `instrumentation.ts` (server and edge) and
+`instrumentation-client.ts` (browser).
+
+**What is sent, and what never is.** An event keeps the error's type, message
+and stack, the route (its path, no query string), an opaque user id and the
+release (the commit SHA). `sendDefaultPii` is off; request bodies, form data,
+query strings, cookies, headers, breadcrumbs, extra data and stack-frame
+variables are removed; any text that looks like a photo's path or a file's
+name becomes `<path>` / `<file>`. No Session Replay. Errors are sent every
+time; traces a tenth of the time in production, never in a preview.
+
+**Failures with a reason.** A failed upload, compose, edit or join is reported
+even when nothing threw, tagged `op:upload`, `op:compose`, `op:edit` or
+`op:join`, with the reason only (`lib/report-failure.ts`).
+
+**Source maps** are uploaded by Vercel's production build, the one that makes
+the bundle, then deleted, so they are never served. A build without the token
+(a preview, a local run) makes none.
+
+### Settings
+
+- **Vercel → Settings → Environment Variables**: `SENTRY_AUTH_TOKEN`, sensitive,
+  Production only (scopes `project:releases`, `org:read`). Nothing else: the DSN
+  is public by design and lives in `lib/observability.ts`.
+- **GitHub**: nothing.
+- **Sentry → Settings → Projects → weming → Security & Privacy**: Data Scrubber
+  on, Use Default Scrubbers on, Prevent Storing of IP Addresses on — a second
+  net under the app's own scrubbing.
+
+### Alerts (email)
+
+Sentry → Alerts → Create Alert → Issues:
+
+1. **New issue**: "A new issue is created" → action "Send a notification to
+   Member: Yoonji (email)". Environment: production.
+2. **Spike**: "The issue is seen more than 20 times in 1 hour" → the same
+   email action. Environment: production.
+
+### Looking up an error
+
+- From a friend's report: Sentry → Issues, filter `environment:production`,
+  then by time; `op:upload` (or compose, edit, join) narrows to that kind of
+  failure.
+- From a commit: filter `release:<sha>` — the commit Vercel built.
+- The user id on an event is an opaque id: match it to a profile in Supabase
+  only if the person asked for help.
+
 ## Backups
 
 Two copies, the same contents: the database dump (schema, then data), every

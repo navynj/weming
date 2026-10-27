@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { CommitResult } from '@/features/input-sheet/commit';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
+import { reported } from '@/lib/report-failure';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^\d{2}:\d{2}$/;
@@ -37,6 +38,10 @@ export type Edit = z.infer<typeof Edit>;
  * edited (H20g, H21), see `setRippleLock`.
  */
 export async function updateRipple(input: Edit): Promise<CommitResult> {
+  return reported('edit', () => updateRippleWork(input));
+}
+
+async function updateRippleWork(input: Edit): Promise<CommitResult> {
   const parsed = Edit.safeParse(input);
   if (!parsed.success) return { ok: false, reason: 'error', message: 'That edit is incomplete.' };
   const edit = parsed.data;
