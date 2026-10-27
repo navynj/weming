@@ -12,7 +12,7 @@ import { DurationChip } from '@/components/ui/chips/duration-chip';
 import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 import { annotationLabel, draftFrom } from '@/features/input-sheet/draft';
 import { signRippleMedia } from '@/lib/media';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { rippleDurationMinutes, rippleKind } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
 
@@ -37,7 +37,7 @@ export function DetailSheet({
   onClose,
   onEdit,
 }: {
-  ripple: RippleWithCategory;
+  ripple: RippleWithSplash;
   locked: boolean;
   splashTitle: string | null;
   timeZone: string;
@@ -91,7 +91,6 @@ export function DetailSheet({
               {splashTitle ? <span className="text-ink">· {splashTitle}</span> : null}
             </p>
             <p className="text-ink text-base">
-              {ripple.category?.icon ? <span aria-hidden>{ripple.category.icon} </span> : null}
               {ripple.note ?? <span className="text-pool-500">No note</span>}
             </p>
           </div>

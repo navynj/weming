@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({
 
 import { ROW_SURFACE } from '@/features/home-daily/depth';
 import { RippleRow } from '@/features/home-daily/ripple-row';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { wallClockToInstant } from '@/lib/ripple-kind';
 import { written } from './written-on';
 
@@ -35,12 +35,11 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
+function ripple(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
   return written({
     id: 'r1',
     author_id: 'a1',
     thread_pool_id: null,
-    category_id: 'c1',
     note: 'spec rewrite',
     media: [],
     occurred_on: '2026-09-19',
@@ -52,12 +51,11 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     parent_ripple_id: null,
     splash_id: null,
     started_at: null,
-    category: { name: 'Focus', icon: '🔍' },
     ...over,
   });
 }
 
-function row(over: Partial<RippleWithCategory> = {}) {
+function row(over: Partial<RippleWithSplash> = {}) {
   return render(<RippleRow ripple={ripple(over)} timeZone={TZ} now={NOW} />);
 }
 
@@ -81,9 +79,10 @@ describe('a Ripple on the axis', () => {
     expect(container.querySelectorAll('svg')).toHaveLength(1);
   });
 
-  it('carries the category as a badge so the text is pure note (SPEC 7)', () => {
-    const { getByText } = row();
-    expect(getByText('🔍')).toBeTruthy();
+  // A ripple has no lane of its own since 0042, so no badge: the text is pure note.
+  it('shows the note alone (SPEC 7, 0042)', () => {
+    const { getByText, queryByText } = row();
+    expect(queryByText('🔍')).toBeNull();
     expect(getByText('spec rewrite')).toBeTruthy();
   });
 
@@ -177,7 +176,7 @@ describe('the duration tag', () => {
 
 describe('one tone, inverted by surface (H9a, H15c)', () => {
   it('never draws a wave in a second tone, whatever the record', () => {
-    const cases: Partial<RippleWithCategory>[] = [
+    const cases: Partial<RippleWithSplash>[] = [
       {},
       { planned: true, ended_at: null },
       {

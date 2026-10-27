@@ -49,13 +49,13 @@ describe('Lanes after the exclusion constraint (H20c)', () => {
   // Two spans that overlap: dinner, and a call taken halfway through it.
   const overlapping = [
     {
-      category_id: FOOD,
+      lane_id: FOOD,
       occurred_on: '2026-09-24',
       occurred_time: '19:00:00',
       created_at: '2026-09-25T05:00:00Z',
     },
     {
-      category_id: FOOD,
+      lane_id: FOOD,
       occurred_on: '2026-09-24',
       occurred_time: '19:40:00',
       created_at: '2026-09-25T05:05:00Z',
@@ -82,13 +82,13 @@ describe('Lanes after the exclusion constraint (H20c)', () => {
       [
         // 06:30Z on the 26th is still the 25th in Vancouver.
         {
-          category_id: FOOD,
+          lane_id: FOOD,
           occurred_on: null,
           occurred_time: null,
           created_at: '2026-09-26T06:30:00Z',
         },
         {
-          category_id: FOOD,
+          lane_id: FOOD,
           occurred_on: '2026-09-28',
           occurred_time: '19:30:00',
           created_at: '2026-09-25T20:00:00Z',

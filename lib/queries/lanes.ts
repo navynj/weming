@@ -35,16 +35,23 @@ export async function getLaneCounts(
 ): Promise<LaneSpan> {
   const { data, error } = await supabase
     .from('ripples')
-    .select('occurred_on, occurred_time, created_at, category_id, splash:splashes(declared_start)')
+    .select(
+      'occurred_on, occurred_time, created_at, splash:splashes(declared_start, declared_lane_id)',
+    )
     .eq('author_id', authorId)
     .eq('planned', false);
 
   if (error) throw error;
-  return tallyLaneCounts(data, timeZone, today);
+  // A ripple's lane is its post's (H24, 0042).
+  return tallyLaneCounts(
+    data.map((row) => ({ ...row, lane_id: row.splash?.declared_lane_id ?? null })),
+    timeZone,
+    today,
+  );
 }
 
 /** The row shape the tally reads: the key columns and the lane. */
-export type LaneRow = FlowKeyed & { category_id: string | null };
+export type LaneRow = FlowKeyed & { lane_id: string | null };
 
 /**
  * The counting, kept pure. Two spans that overlap are two records and both
@@ -57,10 +64,10 @@ export function tallyLaneCounts(rows: LaneRow[], timeZone: string, today: IsoDat
   for (const row of rows) {
     if (isFutureDated(row, timeZone, today)) continue;
     // No lane of mine (Just mine, 0014): no cell to count it in.
-    if (row.category_id === null) continue;
+    if (row.lane_id === null) continue;
     const date = dayOf(row, timeZone);
     const day = counts.get(date) ?? {};
-    day[row.category_id] = (day[row.category_id] ?? 0) + 1;
+    day[row.lane_id] = (day[row.lane_id] ?? 0) + 1;
     counts.set(date, day);
     if (earliest === null || date < earliest) earliest = date;
   }

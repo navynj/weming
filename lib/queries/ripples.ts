@@ -5,18 +5,15 @@ import type { IsoDate } from '@/lib/time';
 export type Ripple = Database['public']['Tables']['ripples']['Row'];
 
 /**
- * A block with the category it is displayed as — SPEC 7's format is
- * `category · note`, so the badge and the row arrive together — and the
- * post it composes, because an unannotated block rests at its post's
- * declared date (H21f) and the key cannot be computed without it.
+ * A block with the post it composes, because an unannotated block rests at
+ * its post's declared date (H21f) and the key cannot be computed without it.
+ * Its lane is its post's (H24); the block's own went with 0042.
  */
-export type RippleWithCategory = Ripple & {
-  category: { name: string; icon: string | null } | null;
+export type RippleWithSplash = Ripple & {
   splash?: { declared_start: string | null; title: string } | null;
 };
 
-export const WITH_CATEGORY =
-  '*, category:my_categories(name, icon), splash:splashes(declared_start, title)';
+export const WITH_SPLASH = '*, splash:splashes(declared_start, title)';
 
 /**
  * One author's day, top level only. Chronological top to bottom (H2), with
@@ -33,16 +30,16 @@ export async function getRipplesForDate(
   supabase: DuringClient,
   authorId: string,
   occurredOn: IsoDate,
-): Promise<RippleWithCategory[]> {
+): Promise<RippleWithSplash[]> {
   const { data, error } = await supabase
     .from('ripples')
-    .select(WITH_CATEGORY)
+    .select(WITH_SPLASH)
     .eq('author_id', authorId)
     .eq('occurred_on', occurredOn)
     .is('parent_ripple_id', null)
     .order('occurred_time', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: true })
-    .returns<RippleWithCategory[]>();
+    .returns<RippleWithSplash[]>();
 
   if (error) throw error;
   return data;
@@ -51,7 +48,7 @@ export async function getRipplesForDate(
 export async function getMyRipplesForDate(
   supabase: DuringClient,
   occurredOn: IsoDate,
-): Promise<RippleWithCategory[]> {
+): Promise<RippleWithSplash[]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -65,9 +62,9 @@ export async function getMyRipplesForDate(
  * without claiming a position on its axis, so they stack in the Daily Note
  * area (SPEC 5.3, H5) and never appear on the timeline. Dormant (H20b).
  */
-export function splitByRegion(ripples: RippleWithCategory[]): {
-  notes: RippleWithCategory[];
-  timeline: RippleWithCategory[];
+export function splitByRegion(ripples: RippleWithSplash[]): {
+  notes: RippleWithSplash[];
+  timeline: RippleWithSplash[];
 } {
   return {
     notes: ripples.filter((ripple) => ripple.occurred_time === null),

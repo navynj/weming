@@ -69,10 +69,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function block(id: string, day: string, category = 'c-food'): SplashBlock {
+function block(id: string, day: string): SplashBlock {
   return {
     id,
-    category_id: category,
     note: id,
     occurred_on: day,
     occurred_time: null,

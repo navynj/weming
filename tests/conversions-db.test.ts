@@ -140,7 +140,7 @@ afterAll(async () => {
 const row = async (id: string) =>
   (await asAdmin().from('splashes').select('*').eq('id', id).single()).data!;
 const ripplesOf = async (id: string) =>
-  (await asAdmin().from('ripples').select('author_id, category_id').eq('splash_id', id)).data!;
+  (await asAdmin().from('ripples').select('author_id').eq('splash_id', id)).data!;
 const placementsOf = async (id: string) =>
   (
     await asAdmin()
@@ -177,7 +177,7 @@ describe('Together in a pool: my record becomes joint', () => {
       pinned_at: null,
     });
     // The ripple itself carries no lane; Home places it by the home lane.
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana }]);
     expect(await placementsOf(id)).toEqual([]);
     // Together: Ana, who made it, and Ben, picked; not Everyone.
     const invited = (await asAdmin().from('joint_invitees').select('user_id').eq('splash_id', id))
@@ -218,7 +218,7 @@ describe('Together in a pool: my record becomes joint', () => {
       poolId: null,
       conversion: { op: 'to_joint', poolLaneId: lane.Free, invitees: [], everyone: false },
     });
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana }]);
   });
 
   it('keeps a locked ripple locked: a member still cannot read it', async () => {
@@ -293,7 +293,7 @@ describe('a joint splash back to mine', () => {
       description: null,
     });
     // The splash takes the lane; the ripple inherits it and carries none (H24).
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana }]);
     // Sarang lets go of it; Study has it, as its Audience said.
     expect(await placementsOf(id)).toEqual([
       { pool_id: study, pool_lane_id: lane.Play, shared: true },

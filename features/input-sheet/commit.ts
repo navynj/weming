@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { laneRule, resolveCategory } from '@/features/input-sheet/draft';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -56,13 +55,6 @@ export async function commitRipple(input: Draft): Promise<CommitResult> {
   const refusal = checkAnnotation(draft);
   if (refusal) return refusal;
 
-  const lane = await categoryFor(supabase, draft.categoryId, draft.splashId);
-  // A block on a Just-mine splash has no lane of mine (0014); any other needs one.
-  const categoryId = lane === 'none' ? null : lane;
-  if (lane === null) {
-    return { ok: false, reason: 'error', message: 'There is no lane to drop into.' };
-  }
-
   // A point ends where it starts; a span ends where it says — with a clock,
   // or by dates alone; an unannotated fragment has no instant at all (H20c).
   const endedAt = draft.endInstant ?? draft.startInstant;
@@ -72,7 +64,6 @@ export async function commitRipple(input: Draft): Promise<CommitResult> {
     .insert({
       ...(draft.id ? { id: draft.id } : {}),
       author_id: user.id,
-      category_id: categoryId,
       note: draft.note?.length ? draft.note : null,
       media: draft.media,
       occurred_on: draft.occurredOn,
@@ -88,48 +79,6 @@ export async function commitRipple(input: Draft): Promise<CommitResult> {
   revalidatePath('/');
   if (draft.splashId) revalidatePath(`/splash/${draft.splashId}`);
   return { ok: true, rippleId: data.id };
-}
-
-/**
- * The lane a block lands in, with the post's default applied on the server
- * as well as in the editor (H21f): a choice wins; no choice takes the post's
- * declared lane; no declaration falls into the residual lane.
- */
-async function categoryFor(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  chosen: string | null,
-  splashId: string | null,
-): Promise<string | 'none' | null> {
-  const [{ data: categories }, { data: splash }] = await Promise.all([
-    supabase.from('my_categories').select('*').order('position'),
-    splashId
-      ? supabase
-          .from('splashes')
-          .select('declared_lane_id, own_pool_id, owner_id, pool_id, pool_lane_id')
-          .eq('id', splashId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
-  // My pool record (0014, 0033): no lane of mine, and no Day to fall into.
-  if (splash?.own_pool_id) return 'none';
-  // A joint splash (0016, 0033): my home lane for its pool lane, else none
-  // — never a lane I happened to pick.
-  if (splash && splash.owner_id === null && splash.pool_lane_id) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data: link } = await supabase
-      .from('lane_mappings')
-      .select('my_category_id')
-      .eq('user_id', user?.id ?? '')
-      .eq('pool_lane_id', splash.pool_lane_id)
-      .eq('is_home', true)
-      .maybeSingle();
-    return link ? link.my_category_id : 'none';
-  }
-
-  const rule = laneRule(splash ? { declaredLaneId: splash.declared_lane_id } : null);
-  return resolveCategory(chosen, rule, categories ?? []);
 }
 
 /**

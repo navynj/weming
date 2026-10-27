@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ROW_SURFACE } from '@/features/home-daily/depth';
-import { splitByRegion, type RippleWithCategory } from '@/lib/queries/ripples';
+import { splitByRegion, type RippleWithSplash } from '@/lib/queries/ripples';
 import {
   elapsedMinutes,
   minutesIntoDay,
@@ -15,12 +15,11 @@ import { written } from './written-on';
 const VANCOUVER = 'America/Vancouver';
 const SEOUL = 'Asia/Seoul';
 
-function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
+function ripple(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
   return written({
     id: 'r1',
     author_id: 'a1',
     thread_pool_id: null,
-    category_id: 'c1',
     note: 'note',
     media: [],
     occurred_on: '2026-09-19',
@@ -32,7 +31,6 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     parent_ripple_id: null,
     splash_id: null,
     started_at: null,
-    category: { name: 'Focus', icon: '🔍' },
     ...over,
   });
 }

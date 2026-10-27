@@ -13,7 +13,7 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
 }));
 
 import { DetailSheet } from '@/features/ripple-sheet/detail-sheet';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
@@ -21,12 +21,11 @@ const TODAY = '2026-09-19';
 
 afterEach(cleanup);
 
-function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
+function ripple(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
   return written({
     id: 'r1',
     author_id: 'a1',
     thread_pool_id: null,
-    category_id: 'c1',
     note: 'kitsilano beach',
     media: [],
     occurred_on: null,
@@ -38,7 +37,6 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     created_at: '2026-09-19T16:00:00.000Z',
     parent_ripple_id: null,
     splash_id: null,
-    category: { name: 'Place', icon: '📍' },
     ...over,
   });
 }

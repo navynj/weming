@@ -1,6 +1,6 @@
 // DORMANT (H20b): no surface reaches this since the Splash pivot. Kept, with
 // its tests, for P3's Swim. Do not wire it back in; do not delete it.
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 /**
  * Where a retroactively added inner ripple lands by default.
@@ -16,8 +16,8 @@ import type { RippleWithCategory } from '@/lib/queries/ripples';
  * already there is where the next thing goes.
  */
 export function defaultInnerTime(
-  parent: RippleWithCategory,
-  existing: RippleWithCategory[],
+  parent: RippleWithSplash,
+  existing: RippleWithSplash[],
   timeZone: string,
 ): string | undefined {
   if (!parent.started_at) return undefined;

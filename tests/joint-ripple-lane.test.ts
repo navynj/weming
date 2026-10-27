@@ -84,10 +84,7 @@ afterAll(async () => {
  * Links Trips, marked home or not, opens a joint splash on `poolLane`, adds
  * a ripple from its page: the ripple's own lane, and the splash's Home lane.
  */
-async function addTo(
-  poolLane: 'trips' | 'days',
-  home: boolean,
-): Promise<{ ripple: string | null; home: string | null }> {
+async function addTo(poolLane: 'trips' | 'days', home: boolean): Promise<{ home: string | null }> {
   const linked = await asUser(ana).rpc('set_lane_links', {
     p_pool: pool,
     p_links: [{ pool_lane_id: trips, my_category_id: ANA_TRIPS, is_home: home }],
@@ -114,7 +111,7 @@ async function addTo(
   expect(done).toMatchObject({ ok: true });
   const row = await asUser(ana)
     .from('ripples')
-    .select('category_id')
+    .select('splash_id')
     .eq('id', done.ok ? done.rippleId : '')
     .single();
   const links = (
@@ -131,19 +128,20 @@ async function addTo(
   // The database's copy (delete_pool reads it) agrees with the app's.
   const db = await asAdmin().rpc('_home_lane_for' as never, { sid: id, uid: ana } as never);
   expect((db.data as string | null) ?? null).toBe(shown);
-  return { ripple: row.data!.category_id, home: shown };
+  expect(row.data!.splash_id).toBe(id);
+  return { home: shown };
 }
 
 describe('a ripple added to a joint splash (H24)', () => {
   it('home lane marked: no lane of its own; the splash shows in my home lane', async () => {
-    expect(await addTo('trips', true)).toEqual({ ripple: null, home: ANA_TRIPS });
+    expect(await addTo('trips', true)).toEqual({ home: ANA_TRIPS });
   });
 
   it('linked, no home lane: no lane of its own; the pool’s column', async () => {
-    expect(await addTo('trips', false)).toEqual({ ripple: null, home: null });
+    expect(await addTo('trips', false)).toEqual({ home: null });
   });
 
   it('unlinked pool lane: no lane of its own; the pool’s column', async () => {
-    expect(await addTo('days', true)).toEqual({ ripple: null, home: null });
+    expect(await addTo('days', true)).toEqual({ home: null });
   });
 });

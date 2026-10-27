@@ -96,7 +96,6 @@ describe('a ripple’s own day inside a range (0031)', () => {
     const row = (await asUser(me).from('ripples').select('*').eq('id', id).single()).data!;
     expect(row).toMatchObject({
       occurred_on: '2026-10-10',
-      category_id: null,
       occurred_time: null,
     });
   });

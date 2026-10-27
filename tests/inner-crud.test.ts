@@ -2,17 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { defaultInnerTime } from '@/features/ripple-sheet/inner-slot';
 import { parentBoundsMessage } from '@/features/ripple-sheet/end-rules';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 
-function session(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
+function session(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
   return written({
     id: 'sess',
     author_id: 'a1',
     thread_pool_id: null,
-    category_id: 'c1',
     note: 'long afternoon',
     media: [],
     occurred_on: '2027-07-08',
@@ -25,12 +24,11 @@ function session(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     created_at: '2027-07-08T16:00:00.000Z',
     parent_ripple_id: null,
     splash_id: null,
-    category: { name: 'Focus', icon: '🔍' },
     ...over,
   });
 }
 
-function child(from: string, to: string): RippleWithCategory {
+function child(from: string, to: string): RippleWithSplash {
   return session({ id: `c-${from}`, parent_ripple_id: 'sess', started_at: from, ended_at: to });
 }
 

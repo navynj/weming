@@ -1,9 +1,9 @@
 import { dayOf, flowInstant } from '@/lib/flow-key';
 import type { DuringClient } from '@/lib/queries/profile';
-import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
+import { WITH_SPLASH, type RippleWithSplash } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 
-export type TrailDay = { date: IsoDate; ripples: RippleWithCategory[] };
+export type TrailDay = { date: IsoDate; ripples: RippleWithSplash[] };
 
 /**
  * My whole archive, newest first: every top-level block, with its post.
@@ -25,17 +25,17 @@ export type TrailDay = { date: IsoDate; ripples: RippleWithCategory[] };
 export async function getMyTrail(
   supabase: DuringClient,
   authorId: string,
-): Promise<RippleWithCategory[]> {
+): Promise<RippleWithSplash[]> {
   // Newest written first (H24): a block is placed by its post, and within it
   // by when it was written; its own date orders nothing.
   const { data, error } = await supabase
     .from('ripples')
-    .select(WITH_CATEGORY)
+    .select(WITH_SPLASH)
     .eq('author_id', authorId)
     .is('parent_ripple_id', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
-    .returns<RippleWithCategory[]>();
+    .returns<RippleWithSplash[]>();
 
   if (error) throw error;
   return data;
@@ -49,8 +49,8 @@ export async function getMyTrail(
  * the coalesced day (H20c, H21f): the annotation's date, else the post's
  * declared date, else the author-local date the block was written.
  */
-export function groupByDay(ripples: RippleWithCategory[], timeZone: string): TrailDay[] {
-  const byDay = new Map<IsoDate, RippleWithCategory[]>();
+export function groupByDay(ripples: RippleWithSplash[], timeZone: string): TrailDay[] {
+  const byDay = new Map<IsoDate, RippleWithSplash[]>();
   for (const ripple of ripples) {
     const date = dayOf(ripple, timeZone);
     const day = byDay.get(date);

@@ -738,7 +738,6 @@ export type Database = {
       ripples: {
         Row: {
           author_id: string
-          category_id: string | null
           created_at: string
           ended_at: string | null
           id: string
@@ -756,7 +755,6 @@ export type Database = {
         }
         Insert: {
           author_id: string
-          category_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
@@ -774,7 +772,6 @@ export type Database = {
         }
         Update: {
           author_id?: string
-          category_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
@@ -796,13 +793,6 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ripples_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "my_categories"
             referencedColumns: ["id"]
           },
           {

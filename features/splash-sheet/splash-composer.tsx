@@ -223,7 +223,6 @@ export function SplashComposer({
         ? [
             {
               id: `${id}-first`,
-              category_id: null,
               note: body.length > 0 ? body : null,
               occurred_on: blockDay,
               occurred_time: null,

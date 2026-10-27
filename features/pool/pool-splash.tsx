@@ -16,7 +16,7 @@ import {
   getPlacementPicks,
   getPoolView,
 } from '@/lib/queries/pools';
-import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
+import { WITH_SPLASH, type RippleWithSplash } from '@/lib/queries/ripples';
 import { getRippleResponses } from '@/lib/queries/responses';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -54,10 +54,10 @@ export async function PoolSplash({
     // Every ripple on it I may read, with my own lanes where they are mine.
     supabase
       .from('ripples')
-      .select(WITH_CATEGORY)
+      .select(WITH_SPLASH)
       .eq('splash_id', sid)
       .is('parent_ripple_id', null)
-      .returns<RippleWithCategory[]>(),
+      .returns<RippleWithSplash[]>(),
   ]);
   const board = view?.splashes.find((s) => s.id === sid);
   // Gone, or a pool I am not in: said in the sheet, never a 404 (review).

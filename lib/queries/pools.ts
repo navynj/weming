@@ -31,7 +31,6 @@ export type PoolRipple = Pick<
   | 'occurred_time'
   | 'ended_at'
   | 'created_at'
-  | 'category_id'
   | 'written_on'
   | 'started_at'
   | 'thread_pool_id'
@@ -102,7 +101,7 @@ export type PoolView = {
 };
 
 const RIPPLE_COLUMNS =
-  'id, author_id, splash_id, note, media, occurred_on, occurred_time, ended_at, created_at, category_id, written_on, started_at, thread_pool_id';
+  'id, author_id, splash_id, note, media, occurred_on, occurred_time, ended_at, created_at, written_on, started_at, thread_pool_id';
 
 type MemberRow = {
   pool_id: string;

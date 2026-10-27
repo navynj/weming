@@ -112,10 +112,12 @@ const LANES = [
   lane('c-day', 'Day', '🖋', 2),
 ];
 
-function block(id: string, day: string, category = 'c-day', note = id): SplashBlock {
+/** A block, carrying the lane its post is given here (a block has none of its own, 0042). */
+type LanedBlock = SplashBlock & { lane: string };
+function block(id: string, day: string, category = 'c-day', note = id): LanedBlock {
   return {
     id,
-    category_id: category,
+    lane: category,
     note,
     occurred_on: day,
     occurred_time: null,
@@ -129,7 +131,7 @@ function block(id: string, day: string, category = 'c-day', note = id): SplashBl
 function post(
   id: string,
   title: string,
-  blocks: SplashBlock[],
+  blocks: LanedBlock[],
   over: Partial<Splash> = {},
 ): SplashSummary {
   const days = blocks.flatMap((b) => (b.occurred_on ? [b.occurred_on] : [])).sort();
@@ -141,7 +143,7 @@ function post(
       title,
       declared_start: days[0] ?? null,
       declared_end: last && last !== days[0] ? last : null,
-      declared_lane_id: blocks[0]?.category_id ?? null,
+      declared_lane_id: blocks[0]?.lane ?? null,
       session_id: null,
       icon: null,
       pinned_at: null,

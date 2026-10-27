@@ -1,6 +1,6 @@
 import { summarizeAll, type Splash, type SplashSummary } from '@/features/splash/summary';
 import type { DuringClient } from '@/lib/queries/profile';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 /** My posts. RLS makes them mine; the filter makes the intent legible. */
 export async function getMySplashes(supabase: DuringClient, ownerId: string): Promise<Splash[]> {
@@ -17,7 +17,7 @@ export async function getMySplashes(supabase: DuringClient, ownerId: string): Pr
 /** Every post summarised against its blocks, splashless blocks included, recent first. */
 export function summarizeSplashes(
   splashes: Splash[],
-  ripples: RippleWithCategory[],
+  ripples: RippleWithSplash[],
   timeZone: string,
   now: Date,
 ): SplashSummary[] {

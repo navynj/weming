@@ -90,7 +90,6 @@ export function emptyDraft(prefill: Prefill): Draft {
  */
 export function draftFrom(
   ripple: {
-    category_id: string | null;
     note: string | null;
     media: string[];
     occurred_on: string | null;
@@ -119,7 +118,8 @@ export function draftFrom(
   }
 
   return {
-    categoryId: ripple.category_id,
+    // A block's lane is its post's (H24, 0042): none of its own to read back.
+    categoryId: null,
     note: ripple.note ?? '',
     media: ripple.media,
     annotation,

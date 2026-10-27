@@ -146,7 +146,7 @@ describe('the edit sheet’s date', () => {
     const splash = (await asUser(me).from('splashes').select('*').eq('id', DROPPED).single()).data!;
     expect(splash.declared_start).toBe('2026-10-21');
     const row = (await asUser(me).from('ripples').select('*').eq('id', first).single()).data!;
-    expect(row).toMatchObject({ occurred_on: null, occurred_time: null, category_id: null });
+    expect(row).toMatchObject({ occurred_on: null, occurred_time: null });
   });
 
   it('reads a declared range as its days', async () => {

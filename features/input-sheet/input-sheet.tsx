@@ -11,7 +11,7 @@ import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 import { updateRipple } from '@/features/ripple-sheet/actions';
 import type { SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { wallClockToInstant } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
 
@@ -60,7 +60,7 @@ export function InputSheet({
   context: SheetContext;
   prefill: Prefill;
   /** Present in edit mode: the same sheet, correcting instead of composing. */
-  editing?: { ripple: RippleWithCategory } | null;
+  editing?: { ripple: RippleWithSplash } | null;
   onClose: () => void;
   onCommitted: (rippleId: string) => void;
   /** The picker's *New splash*: hands over to the splash editor, note and all. */

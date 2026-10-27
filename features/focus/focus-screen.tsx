@@ -9,7 +9,7 @@ import { DEEP_SCALE, WaveLine } from '@/components/ui/waves';
 import { StopControl } from '@/features/home-daily/stop-control';
 import { formatStopwatch, useElapsedSeconds } from '@/features/home-daily/use-elapsed';
 import { InputSheet, type SheetContext } from '@/features/input-sheet/input-sheet';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 import { endBreak, startBreak } from './break';
 
@@ -40,7 +40,7 @@ export function FocusScreen({
   breakInitialSeconds,
   sheetContext,
 }: {
-  ripple: RippleWithCategory;
+  ripple: RippleWithSplash;
   startedAt: string;
   initialSeconds: number;
   /** The break running inside this session, if one is (H15a2). */
@@ -54,7 +54,8 @@ export function FocusScreen({
   const [pending, startTransition] = useTransition();
   const [addingInner, setAddingInner] = useState(false);
   const seconds = useElapsedSeconds(startedAt, initialSeconds);
-  const category = ripple.category?.name ?? 'Focus';
+  // A ripple has no lane of its own since 0042 (H24): the session's name.
+  const category = 'Focus';
   const onBreak = Boolean(openBreak);
 
   return (
@@ -66,7 +67,6 @@ export function FocusScreen({
         </Link>
 
         <span className="flex max-w-[60%] items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm text-white">
-          {ripple.category?.icon ? <span aria-hidden>{ripple.category.icon}</span> : null}
           <span className="truncate">
             {category}
             {ripple.note ? ` · ${ripple.note}` : ''}

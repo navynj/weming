@@ -59,7 +59,6 @@ afterEach(async () => {
 
 type Row = {
   id?: string;
-  category_id?: string;
   occurred_time: string | null;
   ended_at?: string | null;
   planned?: boolean;
@@ -81,7 +80,6 @@ async function insert(row: Row) {
     .insert({
       id,
       author_id: author,
-      category_id: row.category_id ?? FOCUS,
       note: 'fixture',
       occurred_on: DAY,
       occurred_time: row.occurred_time,
@@ -132,7 +130,7 @@ describe.skip('overlap is allowed (H20c)', () => {
   it('accepts an unannotated fragment: no date, no time', async () => {
     const { data, error } = await asAdmin()
       .from('ripples')
-      .insert({ author_id: author, category_id: FOCUS, note: 'posted, not placed' })
+      .insert({ author_id: author, note: 'posted, not placed' })
       .select('id, occurred_on, started_at');
     written.push(data![0].id);
 
@@ -144,7 +142,7 @@ describe.skip('overlap is allowed (H20c)', () => {
   it('refuses a time without a date', async () => {
     const { error } = await asAdmin()
       .from('ripples')
-      .insert({ author_id: author, category_id: FOCUS, occurred_time: '09:00' });
+      .insert({ author_id: author, occurred_time: '09:00' });
     expect(error?.message).toMatch(/ripples_time_needs_date/);
   });
 });
@@ -185,7 +183,6 @@ describe.skip('inner ripples on the axis (dormant, H20b)', () => {
       occurred_time: '09:40',
       ended_at: utc('09:40'),
       parent_ripple_id: parent,
-      category_id: LISTENING,
     });
     expect(inner.error).toBeNull();
 

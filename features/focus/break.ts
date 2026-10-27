@@ -43,19 +43,13 @@ export async function startBreak(sessionId: string): Promise<CommitResult> {
   }).formatToParts(new Date());
   const at = Object.fromEntries(local.map((part) => [part.type, part.value]));
 
-  const { data: parent } = await supabase
-    .from('ripples')
-    .select('category_id')
-    .eq('id', sessionId)
-    .single();
+  const { data: parent } = await supabase.from('ripples').select('id').eq('id', sessionId).single();
   if (!parent) return { ok: false, reason: 'error', message: 'That session is gone.' };
 
   const { data, error } = await supabase
     .from('ripples')
     .insert({
       author_id: user.id,
-      // Inherited, so a break is identified by its shape rather than a label.
-      category_id: parent.category_id,
       note: null,
       occurred_on: `${at.year}-${at.month}-${at.day}`,
       occurred_time: `${at.hour}:${at.minute}`,

@@ -27,8 +27,8 @@ const Edit = z.object({
 export type Edit = z.infer<typeof Edit>;
 
 /**
- * Corrects a block in place (H17). Editable: note, category, media, the
- * annotation, the post. Not editable:
+ * Corrects a block in place (H17). Editable: note, media, the annotation,
+ * the post; its lane is its post's (H24, 0042). Not editable:
  * `created_at`, because the occurred/created separation exists so a
  * correction edits when it happened while the diary remembers when you wrote
  * it. Removing the annotation moves the fragment back to where it was posted.
@@ -66,14 +66,10 @@ export async function updateRipple(input: Edit): Promise<CommitResult> {
 
   const { data: before } = await supabase
     .from('ripples')
-    .select('category_id, splash_id')
+    .select('splash_id')
     .eq('id', edit.id)
     .single();
   if (!before) return { ok: false, reason: 'error', message: 'That record is gone.' };
-
-  // A block may take any lane (H21f): a declaration is a default for a new
-  // block, never an override of an edited one.
-  const categoryId = edit.categoryId ?? before.category_id;
 
   // A point ends where it starts; a span ends where it says — with a clock,
   // or by dates alone; an unannotated fragment has no instant at all (H20c).
@@ -82,7 +78,6 @@ export async function updateRipple(input: Edit): Promise<CommitResult> {
   const { error } = await supabase
     .from('ripples')
     .update({
-      category_id: categoryId,
       note: edit.note?.length ? edit.note : null,
       media: edit.media,
       occurred_on: edit.occurredOn,

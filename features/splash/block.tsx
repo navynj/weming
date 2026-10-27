@@ -3,7 +3,7 @@
 import { DurationChip } from '@/components/ui/chips/duration-chip';
 import { annotationLabel, draftFrom } from '@/features/input-sheet/draft';
 import { dayOf } from '@/lib/flow-key';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { rippleDurationMinutes, rippleKind } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
 
@@ -30,7 +30,7 @@ export function BlockView({
   onEdit,
   clock = null,
 }: {
-  block: RippleWithCategory;
+  block: RippleWithSplash;
   /** Its post's range: inside one, the block reads by its own day (0031). */
   range?: DateRange | null;
   photos: (string | null)[];
@@ -63,7 +63,6 @@ export function BlockView({
             · {clock.theirs}
           </span>
         ) : null}
-        {block.category?.icon ? <span aria-hidden>{block.category.icon}</span> : null}
         {kind === 'timed' ? (
           <DurationChip minutes={rippleDurationMinutes(block, timeZone)} />
         ) : null}

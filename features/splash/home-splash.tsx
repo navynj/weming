@@ -17,7 +17,7 @@ import {
 } from '@/lib/queries/pools';
 import { getRippleResponses } from '@/lib/queries/responses';
 import { getMySplashes } from '@/lib/queries/splashes';
-import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
+import { WITH_SPLASH, type RippleWithSplash } from '@/lib/queries/ripples';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -61,12 +61,12 @@ export async function HomeSplash({ id }: { id: string }) {
   const { data: theirs } = board
     ? await supabase
         .from('ripples')
-        .select(WITH_CATEGORY)
+        .select(WITH_SPLASH)
         .eq('splash_id', id)
         .neq('author_id', profile.id)
         .is('parent_ripple_id', null)
-        .returns<RippleWithCategory[]>()
-    : { data: [] as RippleWithCategory[] };
+        .returns<RippleWithSplash[]>()
+    : { data: [] as RippleWithSplash[] };
   const others = theirs ?? [];
   const { data: names } = others.length
     ? await supabase

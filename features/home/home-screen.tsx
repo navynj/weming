@@ -35,7 +35,7 @@ import { getHomeLayouts } from '@/lib/queries/layouts';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getResponsesOnMine } from '@/lib/queries/responses';
 import { sharedSplashIds, withResponded } from '@/features/home/responded';
-import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
+import { WITH_SPLASH, type RippleWithSplash } from '@/lib/queries/ripples';
 import { getMyTrail } from '@/lib/queries/trail';
 import { originTag } from '@/features/pool/origin-tag';
 import { poolSplashHref } from '@/features/pool/pool-cards';
@@ -123,12 +123,12 @@ export async function HomeScreen({
     mine.length + friendIds.length > 0
       ? await supabase
           .from('ripples')
-          .select(WITH_CATEGORY)
+          .select(WITH_SPLASH)
           .in('splash_id', [...mine.map((s) => s.id), ...friendIds])
           .neq('author_id', profile.id)
           .is('parent_ripple_id', null)
-          .returns<RippleWithCategory[]>()
-      : { data: [] as RippleWithCategory[] };
+          .returns<RippleWithSplash[]>()
+      : { data: [] as RippleWithSplash[] };
   const theirs = (theirRows ?? []).filter((r) => {
     const friend = r.splash_id ? threadOf.get(r.splash_id) : undefined;
     return !friend || !r.thread_pool_id || r.thread_pool_id === friend.poolId;

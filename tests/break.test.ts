@@ -56,7 +56,6 @@ async function insert(row: {
   time: string | null;
   endedAt?: string | null;
   parent?: string | null;
-  category?: string;
 }) {
   const id = crypto.randomUUID();
   written.push(id);
@@ -66,7 +65,6 @@ async function insert(row: {
     .insert({
       id,
       author_id: author,
-      category_id: row.category ?? FOCUS,
       occurred_on: DAY,
       occurred_time: row.time,
       ended_at: row.endedAt ?? null,
@@ -104,23 +102,6 @@ describe.skip('a break is an inner ripple', () => {
     });
 
     expect(outside.error?.message).toMatch(/within its parent/i);
-  });
-
-  it("carries the parent session's category, having none of its own", async () => {
-    const session = await insert({ time: '09:00' });
-    const child = await insert({
-      time: '09:20',
-      endedAt: utc('09:35'),
-      parent: session.data![0].id,
-    });
-
-    const { data } = await asAdmin()
-      .from('ripples')
-      .select('category_id')
-      .eq('id', child.data![0].id)
-      .single();
-
-    expect(data!.category_id).toBe(FOCUS);
   });
 
   it('leaves no Break category behind anywhere', async () => {

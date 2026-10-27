@@ -150,7 +150,6 @@ describe('the annotation chip (H20c)', () => {
 
 describe('the draft that edits a record', () => {
   const base = {
-    category_id: 'c-place',
     note: 'peak chair',
     media: [] as string[],
     occurred_on: null as string | null,
