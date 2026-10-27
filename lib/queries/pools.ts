@@ -457,6 +457,8 @@ export async function getJointInvitees(
     .from('joint_invitees')
     .select('splash_id, user_id')
     .in('splash_id', splashIds)
+    // A joint record's own; rows with a pool are per-pool invitees on my record (0035).
+    .is('pool_id', null)
     .order('invited_at');
   if (error) throw error;
   const by: Record<string, string[]> = {};

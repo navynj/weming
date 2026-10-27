@@ -217,16 +217,30 @@ alter table public.pools
 comment on column public.pools.invite_all_by_default is
   'Pool settings: "Invite everyone to new posts by default" (0033). Preselects Everyone in this pool''s compose. Off when a pool is made.';
 
+-- Two uses, one table (Yoonji, in the session): pool_id is null for a joint
+-- record's invitees (its pool is the record's own), and set for invitees on
+-- my Home record in one pool it is shared to — per-pool invitees, built in
+-- 0035; nothing writes those rows yet. Such a row hangs off its placement.
 create table public.joint_invitees (
+  id uuid primary key default gen_random_uuid(),
   splash_id uuid not null references public.splashes (id) on delete cascade,
+  pool_id uuid references public.pools (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   invited_at timestamptz not null default now(),
-  primary key (splash_id, user_id)
+  constraint joint_invitees_placement_fkey
+    foreign key (splash_id, pool_id)
+    references public.splash_placements (splash_id, pool_id) on delete cascade
 );
 
 comment on table public.joint_invitees is
-  'Who a joint record is together with, picked one by one (0033): fixed rows beside Everyone (splashes.joint_invite_all). Written by the joint functions only.';
+  'Who a record is together with, picked one by one (0033). pool_id null: a joint record''s invitees, beside Everyone (splashes.joint_invite_all). pool_id set: invitees on my record in one pool it is shared to (0035). Written by functions only.';
+comment on column public.joint_invitees.pool_id is
+  'Null for a joint record (its pool is its own); set for per-pool invitees on my record, tied to that placement (0035).';
 
+create unique index joint_invitees_joint_key
+  on public.joint_invitees (splash_id, user_id) where pool_id is null;
+create unique index joint_invitees_pool_key
+  on public.joint_invitees (splash_id, pool_id, user_id) where pool_id is not null;
 create index joint_invitees_user_idx on public.joint_invitees (user_id);
 
 create function public._joint_pool(sid uuid)
@@ -241,9 +255,14 @@ $$;
 
 alter table public.joint_invitees enable row level security;
 
+-- A joint record's invitees: its pool's current members. Per-pool invitees
+-- on my record: that pool's current members, and me, its author.
 create policy "invitees are readable by the pool's current members"
   on public.joint_invitees for select
-  using (public.is_current_member(public._joint_pool(splash_id)));
+  using (
+    public.is_current_member(coalesce(pool_id, public._joint_pool(splash_id)))
+    or (pool_id is not null and public.splash_owner(splash_id) = auth.uid())
+  );
 
 -- Everyone stays on once on: nobody is taken off. A conversion out of joint
 -- (reshape) resets it with the rest.
@@ -322,7 +341,7 @@ as $$
        s.joint_invite_all
        or exists (
          select 1 from public.joint_invitees i
-          where i.splash_id = s.id and i.user_id = m.user_id
+          where i.splash_id = s.id and i.pool_id is null and i.user_id = m.user_id
        )
      );
 $$;
@@ -547,7 +566,7 @@ begin
 
   perform set_config('weming.reshape', 'on', true);
   delete from public.splash_placements where splash_id = p_splash;
-  delete from public.joint_invitees where splash_id = p_splash;
+  delete from public.joint_invitees where splash_id = p_splash and pool_id is null;
   update public.splashes
      set owner_id = uid,
          pool_id = null,

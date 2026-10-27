@@ -79,7 +79,7 @@ Until then each stays in the database, unread by the app.
 ## Sharing v2, after the switch
 
 - **"Make it joint…" from Home** (SHARING-V2 §5, Home record edit sheet): pick the pool, a pool lane and Together without opening the pool. Today a Home record becomes joint from its edit sheet opened in the pool it is shared to. Needs each pool's members on Home.
-- **Open splashes** (SHARING-V2 §7).
+- **Per-pool invitees on my records (0035)** (SHARING-V2 §7): With per pool my record is shared to. Unsharing hides members' ripples, never deletes them.
 
 ## Later, unscheduled
 
