@@ -6,6 +6,9 @@
 -- Yoonji, in the session: labels get a width handle on the board (H31),
 -- dragged to rewrap the title; it writes the existing label.width, the
 -- panel's Width slider, rather than a second width field.
+--
+-- compat-expected-failures:
+--   "a pool layout > refuses values outside the ranges, unknown keys, and a font size between whole pixels": 0050 widens label.width to 4 on purpose; production's test still expects 2.5 refused
 
 create or replace function public._layout_group(g jsonb, kind text)
  returns boolean
