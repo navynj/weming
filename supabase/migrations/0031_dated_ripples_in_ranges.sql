@@ -12,9 +12,12 @@
 --
 -- A splash's range may not shrink past a dated ripple: "Some entries are
 -- dated outside this range." Widening is always allowed. Only a date that
--- counts is guarded — one inside the range as it was; a frozen date from
--- before H24 on a one-day splash, which never placed anything, holds
--- nothing back when that splash becomes a range.
+-- counts is guarded — one inside the range as it was. When a one-day splash
+-- with frozen ripple dates is widened into a range (Yoonji, in the session):
+-- a frozen date inside the new range counts as that ripple's day from then
+-- on — shown, ordered by, holding the range from shrinking past it, and
+-- editable; one outside it is ignored, the ripple read as undated (at the
+-- start), and may take a day or be cleared like any undated ripple.
 --
 -- Additive: one trigger function replaced (it only relaxes), one function
 -- and one trigger added. Nothing dropped, no data changed. Production has no

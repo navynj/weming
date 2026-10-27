@@ -544,6 +544,6 @@ A member's column in Swimmers opens nothing.
 - **Where it is set:** on a range splash only, the composer's first block and the block editor carry a small day chip ("Oct 8"), defaulting to today when today is inside the range, else the range's last day; its picker offers only the range's days. No time, no duration.
 - **Order inside a splash:** by the ripple's day (an undated one takes the splash's start), then by when it was written.
 - **Editing a range:** a change that would leave a dated ripple outside it is refused — "Some entries are dated outside this range." Widening is always allowed. Only a day that counts holds a range back: one inside the range as it was.
-- **Older dates:** a frozen date on a ripple of a range splash becomes editable under these rules; on a splash with no end date it stays frozen (H24) and orders nothing.
+- **Older dates:** a frozen date on a ripple of a range splash becomes editable under these rules; on a splash with no end date it stays frozen (H24) and orders nothing. When a one-day post with frozen ripple dates is widened into a range, a frozen date inside the new range counts as that ripple's day — shown on it, used for ordering, and holding the range from shrinking past it; one outside is ignored and the ripple is treated as undated (placed at the start).
 - **The board** keeps showing the range as one band; a ripple's day shows only in the detail.
 - **Schema:** 0031 relaxes 0029's freeze for exactly this, and adds a check on a splash's range; it is additive and lands after 0030.
