@@ -9,6 +9,7 @@ import { getJointInvitees, getPlacementPicks } from '@/lib/queries/pools';
 import { updateSplashHeader } from '@/features/splash/actions';
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
+import { pushAfter } from '@/lib/notifications/after';
 
 /** What the edit sheet opens with, read fresh so the Audience is exact wherever it opened. */
 export type SplashEditState =
@@ -278,6 +279,7 @@ export async function saveSplashEdit(
 async function saveSplashEditWork(
   input: z.input<typeof Edit>,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  pushAfter();
   const parsed = Edit.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That edit is incomplete.' };
   const edit = parsed.data;
@@ -469,6 +471,7 @@ export async function makeJointRecord(
   splashId: string,
   poolId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  pushAfter();
   const preview = await previewMakeJoint(splashId, poolId);
   if (!preview.ok) return preview;
   const supabase = await createClient();
