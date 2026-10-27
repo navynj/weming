@@ -44,6 +44,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           user_id: string | null
+          view: string
         }
         Insert: {
           id?: string
@@ -54,6 +55,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           user_id?: string | null
+          view?: string
         }
         Update: {
           id?: string
@@ -64,6 +66,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           user_id?: string | null
+          view?: string
         }
         Relationships: [
           {
@@ -1295,6 +1298,7 @@ export type Database = {
           p_patch: Json
           p_pool: string
           p_splash: string
+          p_view?: string
         }
         Returns: Json
       }

@@ -38,22 +38,29 @@ async function person(name: string): Promise<string> {
 function set(
   who: string,
   patch: Record<string, unknown>,
-  { pool: p = pool, clear = [] as string[] }: { pool?: string | null; clear?: string[] } = {},
+  {
+    pool: p = pool,
+    clear = [] as string[],
+    view,
+  }: { pool?: string | null; clear?: string[]; view?: 'calendar' | 'lane' } = {},
 ) {
+  // No view is the call as the app before 0045 made it: the Calendar's.
   return asUser(who).rpc('set_board_layout', {
     p_splash: splash,
     p_pool: p as string,
     p_patch: patch as never,
     p_clear: clear,
+    ...(view ? { p_view: view } : {}),
   });
 }
 
-async function read(who: string, scope: 'pool' | 'home') {
+async function read(who: string, scope: 'pool' | 'home', view: 'calendar' | 'lane' = 'calendar') {
   const { data } = await asUser(who)
     .from('board_layouts')
     .select('layout, scope, user_id, pool_id')
     .eq('splash_id', splash)
-    .eq('scope', scope);
+    .eq('scope', scope)
+    .eq('view', view);
   return (data ?? []) as unknown as {
     layout: BoardLayoutJson & { photos: Record<string, Record<string, number>> } & {
       label: { x: number; tilt: number };
@@ -286,6 +293,44 @@ describe('a Home layout', () => {
       .eq('scope', 'home')
       .select();
     expect(moved.error ?? (moved.data?.length === 0 ? 'refused' : null)).not.toBeNull();
+  });
+});
+
+describe('a layout per view (0045)', () => {
+  it('keeps the Lane view’s apart from the Calendar’s, both ways', async () => {
+    const calendar = (await read(ana, 'pool'))[0].layout;
+    expect((await set(ana, { label: { y: 4 } }, { view: 'lane' })).error).toBeNull();
+    expect((await read(ana, 'pool', 'lane'))[0].layout).toEqual({ label: { y: 4 } });
+    expect((await read(ana, 'pool'))[0].layout).toEqual(calendar);
+    expect((await set(ana, { icon: { tilt: 9 } })).error).toBeNull();
+    expect((await read(ana, 'pool', 'lane'))[0].layout).toEqual({ label: { y: 4 } });
+  });
+
+  it('starts a Home override from the pool’s layout in the same view, and reverts per view', async () => {
+    expect((await set(ben, { icon: { size: 2 } }, { pool: null, view: 'lane' })).error).toBeNull();
+    expect((await read(ben, 'home', 'lane'))[0].layout).toEqual({
+      label: { y: 4 },
+      icon: { size: 2 },
+    });
+    // "Use pool layout" in the Lane view leaves my Calendar override.
+    await asUser(ben)
+      .from('board_layouts')
+      .delete()
+      .eq('splash_id', splash)
+      .eq('scope', 'home')
+      .eq('view', 'lane');
+    expect(await read(ben, 'home', 'lane')).toHaveLength(0);
+    expect(await read(ben, 'home')).toHaveLength(1);
+  });
+
+  it('refuses a view it does not know', async () => {
+    const bad = await asUser(ana).rpc('set_board_layout', {
+      p_splash: splash,
+      p_pool: pool,
+      p_patch: {} as never,
+      p_view: 'week',
+    });
+    expect(bad.error).not.toBeNull();
   });
 });
 

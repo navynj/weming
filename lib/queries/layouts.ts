@@ -1,6 +1,9 @@
 import { BoardLayout, type BoardLayoutJson } from '@/features/month-board/board-layout';
 import type { DuringClient } from '@/lib/queries/profile';
 
+/** Which view a layout is for (0045): each keeps its own values. */
+export type BoardView = 'calendar' | 'lane';
+
 /** A row's layout, read through the shape the database holds it to; anything else is no layout. */
 function parsed(raw: unknown): BoardLayoutJson | null {
   const result = BoardLayout.safeParse(raw);
@@ -14,12 +17,14 @@ function parsed(raw: unknown): BoardLayoutJson | null {
 export async function getPoolLayouts(
   supabase: DuringClient,
   poolId: string,
+  view: BoardView = 'calendar',
 ): Promise<Record<string, BoardLayoutJson>> {
   const { data, error } = await supabase
     .from('board_layouts')
     .select('splash_id, layout')
     .eq('scope', 'pool')
-    .eq('pool_id', poolId);
+    .eq('pool_id', poolId)
+    .eq('view', view);
   if (error) throw error;
   return Object.fromEntries(
     (data ?? []).flatMap((row) => {
@@ -38,19 +43,22 @@ export async function getHomeLayouts(
   supabase: DuringClient,
   me: string,
   joints: { splashId: string; poolId: string }[],
+  view: BoardView = 'calendar',
 ): Promise<{ home: Record<string, BoardLayoutJson>; pool: Record<string, BoardLayoutJson> }> {
   const [mine, pooled] = await Promise.all([
     supabase
       .from('board_layouts')
       .select('splash_id, layout')
       .eq('scope', 'home')
-      .eq('user_id', me),
+      .eq('user_id', me)
+      .eq('view', view),
     joints.length === 0
       ? Promise.resolve({ data: [], error: null })
       : supabase
           .from('board_layouts')
           .select('splash_id, pool_id, layout')
           .eq('scope', 'pool')
+          .eq('view', view)
           .in(
             'splash_id',
             joints.map((j) => j.splashId),
