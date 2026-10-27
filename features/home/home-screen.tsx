@@ -8,6 +8,7 @@ import {
   type CardFace,
   type CardPhoto,
   type CardRipple,
+  inLeftPool,
   ownPoolColumn,
   type GridColumn,
 } from '@/features/home/grid';
@@ -19,6 +20,7 @@ import { withPoolBadge } from '@/features/pool/home-badge';
 import {
   getJointSplashes,
   getMyJointShells,
+  getMyLeftPoolRipples,
   getMyLinks,
   getMyOriginTags,
   getJointTogether,
@@ -101,7 +103,11 @@ export async function HomeScreen({
   // Friends' records I added my side to (0035): each in the pool I wrote it
   // in, as that pool sees it; the record row read while it is shared there,
   // else kept from my side's own reading, "no longer shared".
-  const myThreads = await getMyThreadRipples(supabase);
+  const [myThreads, leftPool] = await Promise.all([
+    getMyThreadRipples(supabase),
+    // Ones on a joint splash of a pool I left (0041): that pool's column.
+    getMyLeftPoolRipples(supabase),
+  ]);
   const threadOf = new Map(myThreads.map((t) => [t.splashId, t]));
   const friendIds = [...threadOf.keys()];
   const { data: friendRows } = friendIds.length
@@ -242,6 +248,7 @@ export async function HomeScreen({
       ...joints.flatMap((j) => ((linkedLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
       // A friend's record sits in the pool's column, or my home lane (0035).
       ...myThreads.flatMap((t) => (homeLaneFor(t.poolLaneId, links) === null ? [t.poolId] : [])),
+      ...leftPool.values(),
     ]),
   ];
   const ownLaneIcon = new Map<string, string | null>();
@@ -345,6 +352,8 @@ export async function HomeScreen({
         ...(filledMine.has(summary.id) ? { together: true } : {}),
         ...(sidesOf.has(summary.id) ? { sides: sidesOf.get(summary.id) } : {}),
       };
+      const left = summary.orphan ? leftPool.get(summary.id) : undefined;
+      if (left) return inLeftPool(card, left);
       const friend = friendIdSet.has(summary.id) ? threadOf.get(summary.id) : undefined;
       if (friend) {
         // Someone's record I wrote on in one pool (0035): that pool's, read as
