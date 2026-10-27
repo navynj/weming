@@ -1,5 +1,6 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
 import type { BoardLayoutJson, LayoutSource } from '@/features/month-board/board-layout';
+import type { BoardResponses } from '@/features/responses/model';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -69,6 +70,12 @@ export type Card = {
   writers?: CardFace[];
   /** A joint splash (Board view): the current members who have not written on it yet. */
   awaiting?: CardFace[];
+  /** Its reactions and first replies, for the board's badge and reply lines (H24); absent when none. */
+  responses?: BoardResponses;
+  /** When `responses` was read: a change made on the page after it is drawn over it (H24). */
+  respondedAsOf?: string;
+  /** The newest reaction or reply someone else left on each ripple of mine on it: the unseen dot (H24). */
+  respondedAt?: Record<string, string>;
 };
 
 /** A person as a face on the board: their id finds their photo; the initials stand in. */

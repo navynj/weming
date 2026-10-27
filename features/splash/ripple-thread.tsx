@@ -26,6 +26,8 @@ export function RippleThread({
     meta?: ReactNode;
     initials?: string;
     authorId?: string;
+    /** New reactions or replies from someone else on my ripple since I last opened it (H24). */
+    dot?: boolean;
   }[];
   initials: string;
   /** Whose face the entries without their own author show (0018): mine, on my own pages. */
@@ -44,13 +46,20 @@ export function RippleThread({
             style={{ gridTemplateColumns: `${AVATAR_PX}px minmax(0, 1fr)` }}
           >
             <span className="relative flex flex-col items-center">
-              <span data-thread-avatar className="flex shrink-0">
+              <span data-thread-avatar className="relative flex shrink-0">
                 <Avatar
                   id={entry.authorId ?? (entry.initials === undefined ? authorId : undefined)}
                   initials={entry.initials ?? initials}
                   className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
                   style={{ width: AVATAR_PX, height: AVATAR_PX }}
                 />
+                {entry.dot ? (
+                  <span
+                    aria-label="New reactions or replies"
+                    data-responses-unseen
+                    className="bg-main-900 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-white"
+                  />
+                ) : null}
               </span>
               {last ? null : (
                 // The thread: from under this avatar down to the next one.

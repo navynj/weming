@@ -27,6 +27,7 @@ import {
 import { effectiveLayout } from '@/features/month-board/board-layout';
 import { getHomeLayouts } from '@/lib/queries/layouts';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
+import { getBoardResponses, getResponsesOnMine } from '@/lib/queries/responses';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -264,7 +265,31 @@ export async function HomeScreen({
     profile.id,
     joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! })),
   );
-  const laid = cards.map((card) => {
+  // What readers left (H24), only where someone besides me can see the post:
+  // a pool's own, or one shared to a pool.
+  const sharedIds = new Set([
+    ...joints.map((j) => j.id),
+    ...mine.flatMap((s) => (s.own_pool_id ? [s.id] : [])),
+    ...(await getMyPlacements(supabase, profile.id)).flatMap((p) => (p.shared ? [p.splashId] : [])),
+  ]);
+  const respondedAsOf = new Date().toISOString();
+  const [boardResponses, respondedAt] = await Promise.all([
+    getBoardResponses(supabase, [...sharedIds]),
+    getResponsesOnMine(
+      supabase,
+      profile.id,
+      ripples.flatMap((r) =>
+        r.splash_id && sharedIds.has(r.splash_id) ? [{ id: r.id, splashKey: r.splash_id }] : [],
+      ),
+    ),
+  ]);
+  const laid = cards.map((read) => {
+    const card: Card = {
+      ...read,
+      respondedAsOf,
+      responses: boardResponses[read.splash.id],
+      respondedAt: respondedAt[read.splash.id],
+    };
     const pooled = layouts.pool[card.splash.id] ?? null;
     const { layout, source } = effectiveLayout(layouts.home[card.splash.id], pooled);
     return source

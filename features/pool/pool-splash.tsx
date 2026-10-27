@@ -10,6 +10,7 @@ import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { getMyLinks, getMyPlacements, getMyPoolNames, getPoolView } from '@/lib/queries/pools';
 import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
+import { getRippleResponses } from '@/lib/queries/responses';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 import { poolScopeOf } from '@/features/pool/compose-scope';
@@ -65,7 +66,7 @@ export async function PoolSplash({
   );
   const summary = summarizeSplash(board, blocks, zone, new Date());
 
-  const [photoLists, { data: lockRows }] = await Promise.all([
+  const [photoLists, { data: lockRows }, responses] = await Promise.all([
     Promise.all(blocks.map((r) => (r.media.length > 0 ? signRippleMedia(r.id) : []))),
     supabase
       .from('ripple_audience')
@@ -75,6 +76,10 @@ export async function PoolSplash({
         'ripple_id',
         blocks.length ? blocks.map((r) => r.id) : ['00000000-0000-0000-0000-000000000000'],
       ),
+    getRippleResponses(
+      supabase,
+      blocks.map((r) => r.id),
+    ),
   ]);
   const photos = Object.fromEntries(blocks.map((r, at) => [r.id, photoLists[at]]));
 
@@ -87,6 +92,9 @@ export async function PoolSplash({
     <PoolEditScope scope={poolScopeOf(view)}>
       <SplashPage
         writing={writing}
+        // Every member reads it here, so its blocks take reactions and replies (H24).
+        responses={responses}
+        respondable
         splash={summary}
         blocks={blocks}
         photos={photos}

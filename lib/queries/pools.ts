@@ -6,6 +6,12 @@ import type { Database } from '@/lib/database.types';
 import type { BoardLayoutJson } from '@/features/month-board/board-layout';
 import { getPoolLayouts } from '@/lib/queries/layouts';
 import type { DuringClient } from '@/lib/queries/profile';
+import type { BoardResponses } from '@/features/responses/model';
+import {
+  getBoardResponses,
+  getResponsesOnMine,
+  latestResponseOnMine,
+} from '@/lib/queries/responses';
 
 export type PoolRow = Database['public']['Tables']['pools']['Row'];
 export type PoolLane = Database['public']['Tables']['pool_lanes']['Row'];
@@ -76,6 +82,11 @@ export type PoolView = {
   invites: PoolInvite[];
   /** The calendar's layouts its members set, by splash (0025). */
   layouts?: Record<string, BoardLayoutJson>;
+  /** Each splash's reactions and first replies, for the board (H24). */
+  responses?: Record<string, BoardResponses>;
+  /** By splash then ripple of mine: the newest response someone else left (H24). */
+  respondedAt?: Record<string, Record<string, string>>;
+  respondedAsOf?: string;
 };
 
 const RIPPLE_COLUMNS =
@@ -157,8 +168,9 @@ export async function getMyPools(supabase: DuringClient, me: string): Promise<My
 
 /**
  * What happened in each pool: the newest ripple someone else wrote on
- * anything placed or joint there, by pool (for the "new since my last
- * visit" dots).
+ * anything placed or joint there, or the newest reaction or reply someone
+ * else left on a ripple of mine there (H24), by pool (for the "new since my
+ * last visit" dots).
  */
 export async function getPoolActivity(
   supabase: DuringClient,
@@ -187,12 +199,16 @@ export async function getPoolActivity(
     .in('splash_id', [...poolOf.keys()])
     .neq('author_id', me);
   if (error) throw error;
-  for (const r of ripples) {
-    const pool = r.splash_id ? poolOf.get(r.splash_id) : undefined;
-    if (!pool) continue;
+  const note = (splashId: string | null, at: string) => {
+    const pool = splashId ? poolOf.get(splashId) : undefined;
+    if (!pool) return;
     const seen = latest.get(pool);
-    if (!seen || r.created_at > seen) latest.set(pool, r.created_at);
-  }
+    if (!seen || at > seen) latest.set(pool, at);
+  };
+  for (const r of ripples) note(r.splash_id, r.created_at);
+  // Reactions and replies on my ripples there count too (H24).
+  const responded = await latestResponseOnMine(supabase, me, [...poolOf.keys()]);
+  for (const [splashId, at] of responded) note(splashId, at);
   return latest;
 }
 
@@ -299,6 +315,18 @@ export async function getPoolView(
     ripples,
     invites: invites.data ?? [],
     layouts: await getPoolLayouts(supabase, poolId),
+    respondedAsOf: new Date().toISOString(),
+    responses: await getBoardResponses(
+      supabase,
+      splashes.map((s) => s.id),
+    ),
+    respondedAt: await getResponsesOnMine(
+      supabase,
+      me,
+      ripples.flatMap((r) =>
+        r.author_id === me && r.splash_id ? [{ id: r.id, splashKey: r.splash_id }] : [],
+      ),
+    ),
   };
 }
 
