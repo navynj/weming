@@ -367,11 +367,14 @@ describe('a ripple carries no lane of its own (H24)', () => {
 
   it('saves on a joint splash with no lane, and a link moves nothing either way', async () => {
     days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single()).data!.id;
-    await asUser(ben).rpc('create_joint_splash', {
+    await asUser(ben).rpc('create_together_splash', {
       p_id: DAYS_JOINT,
       p_pool: pool,
       p_pool_lane: days,
       p_title: 'Daily',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     const saved = await asUser(ben)
       .from('ripples')
@@ -390,8 +393,7 @@ describe('a ripple carries no lane of its own (H24)', () => {
       p_pool: pool,
       p_links: [
         { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS },
-        // Trips already sends Ben's lane into Trips (0019): Days only brings in.
-        { pool_lane_id: days, my_category_id: BEN_TRIPS, direction: 'in' },
+        { pool_lane_id: days, my_category_id: BEN_TRIPS },
       ],
     });
     expect(linked.error).toBeNull();
@@ -430,7 +432,7 @@ describe('links and their markers (0033)', () => {
     (
       await asUser(who)
         .from('lane_mappings')
-        .select('pool_lane_id, my_category_id, direction, is_default, share_by_default, is_home')
+        .select('pool_lane_id, my_category_id, is_default, share_by_default, is_home')
         .eq('pool_id', pool)
     ).data!;
 
@@ -440,7 +442,6 @@ describe('links and their markers (0033)', () => {
       {
         pool_lane_id: tripsLane,
         my_category_id: BEN_TRIPS,
-        direction: 'in',
         is_default: true,
         share_by_default: false,
         is_home: false,
@@ -459,11 +460,14 @@ describe('links and their markers (0033)', () => {
     expect(
       (await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links(false) })).error,
     ).toBeNull();
-    await asUser(ben).rpc('create_joint_splash', {
+    await asUser(ben).rpc('create_together_splash', {
       p_id: HOME_JOINT,
       p_pool: pool,
       p_pool_lane: days,
       p_title: 'Home days',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     const ripple = await asUser(ben)
       .from('ripples')
@@ -504,7 +508,7 @@ describe('links and their markers (0033)', () => {
 
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
-      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'in' }],
+      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
     });
     expect(await placement()).toEqual({ shared: true, pool_lane_id: tripsLane });
     await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: [] });
@@ -516,49 +520,10 @@ describe('links and their markers (0033)', () => {
     });
   });
 
-  it('reads the old shape until the switch: both/in mark home, out/both the default, sharing kept', async () => {
-    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
-      .data!.id;
-    await asUser(ben).rpc('set_lane_links', {
-      p_pool: pool,
-      p_links: [
-        {
-          pool_lane_id: tripsLane,
-          my_category_id: BEN_TRIPS,
-          is_default: true,
-          share_by_default: true,
-        },
-      ],
-    });
-    const { error } = await asUser(ben).rpc('set_lane_links', {
-      p_pool: pool,
-      p_links: [
-        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'both' },
-        { pool_lane_id: days, my_category_id: BEN_DAYS, direction: 'out' },
-      ],
-    });
-    expect(error).toBeNull();
-    const links = await markers(ben);
-    expect(links.find((l) => l.pool_lane_id === tripsLane)).toMatchObject({
-      is_home: true,
-      is_default: true,
-      share_by_default: true,
-    });
-    expect(links.find((l) => l.pool_lane_id === days)).toMatchObject({
-      is_home: false,
-      is_default: true,
-      share_by_default: false,
-    });
-    await asUser(ben).rpc('set_lane_links', {
-      p_pool: pool,
-      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
-    });
-  });
-
   it('keeps one default per lane and pool: the oldest link takes over when it goes', async () => {
     const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
       .data!.id;
-    // Two links from Trips (in, so 0019 allows it); Days is the default.
+    // Two links from Trips; Days is the default.
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
       p_links: [
@@ -600,11 +565,14 @@ describe('together (0033)', () => {
   it('invites the maker, then any current member adds members, and nobody else', async () => {
     const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
       .data!.id;
-    const made = await asUser(ben).rpc('create_joint_splash', {
+    const made = await asUser(ben).rpc('create_together_splash', {
       p_id: TOGETHER,
       p_pool: pool,
       p_pool_lane: days,
       p_title: 'Together',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     expect(made.error).toBeNull();
     const invitees = async () =>
@@ -709,23 +677,8 @@ describe('together (0033)', () => {
     }
   });
 
-  it('keeps the old app inviting everyone until the deploy; my own record never is', async () => {
-    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
-      .data!.id;
-    const OLD = '0e500000-0000-0000-0000-000000000006';
+  it('makes a record of my own never together, whatever the column’s default (0033)', async () => {
     const MINE = '0e500000-0000-0000-0000-000000000007';
-    // The old app's call: the column's default, Everyone.
-    await asUser(ben).rpc('create_joint_splash', {
-      p_id: OLD,
-      p_pool: pool,
-      p_pool_lane: days,
-      p_title: 'From the old app',
-    });
-    const flag = async (id: string) =>
-      (await asAdmin().from('splashes').select('joint_invite_all').eq('id', id).single()).data!
-        .joint_invite_all;
-    expect(await flag(OLD)).toBe(true);
-    // A record of my own, inserted with the default: never together.
     expect(
       (
         await asUser(ben)
@@ -733,16 +686,11 @@ describe('together (0033)', () => {
           .insert({ id: MINE, owner_id: ben, title: 'mine', declared_lane_id: BEN_TRIPS })
       ).error,
     ).toBeNull();
-    expect(await flag(MINE)).toBe(false);
-    // The old app's conversion too: Everyone.
-    await asUser(ben)
-      .from('splash_placements')
-      .insert({ splash_id: MINE, pool_id: pool, pool_lane_id: tripsLane });
-    expect(
-      (await asUser(ben).rpc('splash_to_joint', { p_splash: MINE, p_pool_lane: days })).error,
-    ).toBeNull();
-    expect(await flag(MINE)).toBe(true);
-    for (const id of [OLD, MINE]) await asUser(ben).rpc('delete_joint_splash', { p_splash: id });
+    const flag = (
+      await asAdmin().from('splashes').select('joint_invite_all').eq('id', MINE).single()
+    ).data!.joint_invite_all;
+    expect(flag).toBe(false);
+    await asAdmin().from('splashes').delete().eq('id', MINE);
   });
 
   it('holds per-pool invitees on my record beside a joint record’s own (0034 shape, 0035 use)', async () => {
@@ -785,11 +733,14 @@ describe('together (0033)', () => {
 describe('editing a joint splash (review)', () => {
   it('lets any current member change its title and icon, and nobody outside', async () => {
     const joint = '0e600000-0000-0000-0000-000000000001';
-    await asUser(ana).rpc('create_joint_splash', {
+    await asUser(ana).rpc('create_together_splash', {
       p_id: joint,
       p_pool: pool,
       p_pool_lane: tripsLane,
       p_title: 'Opened by Ana',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     // Ben did not open it, and edits it all the same.
     const edited = await asUser(ben)
@@ -820,11 +771,14 @@ describe('writing', () => {
 
   it('lets members write into a joint splash, and only members', async () => {
     const joint = '0e200000-0000-0000-0000-000000000001';
-    const made = await asUser(ben).rpc('create_joint_splash', {
+    const made = await asUser(ben).rpc('create_together_splash', {
       p_id: joint,
       p_pool: pool,
       p_pool_lane: tripsLane,
       p_title: 'Tofino plan',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     expect(made.error).toBeNull();
 
@@ -855,11 +809,14 @@ describe('writing', () => {
       p_include_history: false,
     });
     pools.push(other.data!);
-    const { error } = await asUser(cal).rpc('create_joint_splash', {
+    const { error } = await asUser(cal).rpc('create_together_splash', {
       p_id: '0e200000-0000-0000-0000-000000000003',
       p_pool: other.data!,
       p_pool_lane: tripsLane,
       p_title: 'stolen lane',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     expect(error?.code).toBe('42501');
   });
@@ -926,11 +883,14 @@ describe('the creator’s account', () => {
       p_include_history: false,
     });
     const joint = '0e200000-0000-0000-0000-000000000002';
-    await asUser(ben).rpc('create_joint_splash', {
+    await asUser(ben).rpc('create_together_splash', {
       p_id: joint,
       p_pool: deePool,
       p_pool_lane: lanes.data![0].id,
       p_title: 'Reading list',
+      p_icon: '',
+      p_declared_start: null as unknown as string,
+      p_invite_all: false,
     });
     await asUser(ben)
       .from('ripples')
@@ -981,32 +941,30 @@ describe('leaving', () => {
   });
 });
 
-describe('one sender per lane of mine (0019)', () => {
-  it('refuses a second pool lane taking the same lane as a sender', async () => {
+describe('many-to-many links (0040)', () => {
+  it('lets one lane of mine link several pool lanes, and one pool lane take several lanes of mine', async () => {
     const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
       .data!.id;
     const { error } = await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
       p_links: [
-        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'both' },
-        { pool_lane_id: days, my_category_id: BEN_TRIPS, direction: 'out' },
-      ],
-    });
-    expect(error?.code).toBe('23505');
-    expect(error?.message).toMatch(/lane_mappings_one_sender/);
-  });
-
-  it('lets the same lane bring in from several pool lanes', async () => {
-    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
-      .data!.id;
-    const { error } = await asUser(ben).rpc('set_lane_links', {
-      p_pool: pool,
-      p_links: [
-        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'both' },
-        { pool_lane_id: days, my_category_id: BEN_TRIPS, direction: 'in' },
+        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS },
+        { pool_lane_id: days, my_category_id: BEN_TRIPS },
+        { pool_lane_id: tripsLane, my_category_id: BEN_DAYS },
       ],
     });
     expect(error).toBeNull();
+    const links = (
+      await asUser(ben)
+        .from('lane_mappings')
+        .select('pool_lane_id, my_category_id')
+        .eq('pool_id', pool)
+    ).data!;
+    expect(links).toHaveLength(3);
+    await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
+    });
   });
 });
 
