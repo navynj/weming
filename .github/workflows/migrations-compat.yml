@@ -3,7 +3,9 @@
 # changes one: build a database from every migration, the new ones included,
 # then run the database tests of the commit production is running against it.
 # If they fail, the migration breaks the running app: split it into expand
-# (add only), deploy, then contract (remove only) in a later release.
+# (add only), deploy, then contract (remove only) in a later release. A test a
+# migration changes on purpose — validation or a limit — is listed in that
+# migration's compat-expected-failures block (scripts/compat-expected.mjs).
 name: Migration compatibility
 
 on:
@@ -71,14 +73,16 @@ jobs:
           exit 1
 
       - name: Its database tests, against this database
+        # A failing test fails the check unless a pending migration lists it,
+        # by full name, in a compat-expected-failures block: an intended change
+        # to validation or limits, never an app incompatibility (_docs/DEPLOY.md).
+        # The judge is this pull request's script, the tests production's own.
         run: |
           git worktree add "$RUNNER_TEMP/live" "${{ steps.live.outputs.sha }}"
           cd "$RUNNER_TEMP/live"
           cp "$RUNNER_TEMP/test.env" .env.local
           pnpm install --frozen-lockfile
-          if pnpm exec vitest run --project db; then
-            echo "✓ The app in production still works with these migrations."
-          else
-            echo "::error::This migration breaks the running app; split it into expand and contract."
-            exit 1
-          fi
+          pnpm exec vitest run --project db --reporter=default --reporter=json \
+            --outputFile.json="$RUNNER_TEMP/db-results.json" || true
+          node "$GITHUB_WORKSPACE/scripts/compat-expected.mjs" "$RUNNER_TEMP/db-results.json" \
+            "$GITHUB_WORKSPACE/supabase/migrations" "$RUNNER_TEMP/live/supabase/migrations"
