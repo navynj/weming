@@ -382,7 +382,7 @@ export function LayoutControls({
               value={label.width}
               fallback={1}
               min={0.3}
-              max={2}
+              max={4}
               step={0.05}
               unit={lanes}
               onChange={(v) => onEdit({ label: { width: v } })}

@@ -23,8 +23,8 @@ export const LabelLayout = z
     y,
     tilt,
     fontSize: z.number().int().min(10).max(18),
-    // A share of the lane, like X: narrower than it, or across the next (0027).
-    width: z.number().min(0.3).max(2),
+    // A share of the lane, like X: narrower than it, or across up to four (0027, 0050).
+    width: z.number().min(0.3).max(4),
     // A filled label's fill (0027): white or ink. No fill is another kind of label, never a choice.
     style: z.enum(['white', 'ink']),
   })
