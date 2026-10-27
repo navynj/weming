@@ -59,6 +59,22 @@ describe('a ripple’s own day inside a range (0031)', () => {
     expect(ordered.map((b) => b.id)).toEqual(['undated', 'oct10', 'oct10-later', 'oct12']);
   });
 
+  it('counts a frozen day inside a post widened into a range; ignores one outside (0031)', () => {
+    // A one-day post on Oct 8 with frozen days Oct 10 and Sep 1, widened to Oct 8–12.
+    expect(blockDay('2026-10-10', ONE_DAY)).toBe('2026-10-08');
+    expect(blockDay('2026-10-10', RANGE)).toBe('2026-10-10');
+    expect(blockDay('2026-09-01', RANGE)).toBe('2026-10-08');
+    const ordered = orderBlocks(
+      [
+        block('frozen-oct10', '2026-10-10', '2026-10-01T01:00:00Z'),
+        block('frozen-sep1', '2026-09-01', '2026-10-02T01:00:00Z'),
+        block('new-oct9', '2026-10-09', '2026-10-20T01:00:00Z'),
+      ],
+      RANGE,
+    );
+    expect(ordered.map((b) => b.id)).toEqual(['frozen-sep1', 'new-oct9', 'frozen-oct10']);
+  });
+
   it('orders by when written on a one-day splash, whatever frozen days say', () => {
     const ordered = orderBlocks(
       [

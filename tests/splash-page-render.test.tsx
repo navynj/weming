@@ -335,6 +335,32 @@ describe('writing on the page, in place', () => {
     expect(calls.find((c) => c.name === 'addBlock')!.args[0]).not.toHaveProperty('occurredOn');
   });
 
+  it('on a one-day post widened into a range, shows a frozen day inside it and reads one outside as undated (0031)', () => {
+    const widened = { ...board, declared_start: '2026-10-08', declared_end: '2026-10-12' };
+    const frozen = [
+      block({
+        id: 'frozen-oct10',
+        occurred_on: '2026-10-10',
+        created_at: '2026-10-08T16:00:00.000Z',
+      }),
+      block({
+        id: 'frozen-sep1',
+        occurred_on: '2026-09-01',
+        created_at: '2026-10-08T17:00:00.000Z',
+      }),
+    ];
+    const { container } = page({
+      splash: summarizeSplash(widened, frozen, TZ, NOW),
+      blocks: frozen,
+    });
+    const ids = [...container.querySelectorAll('[data-block]')].map((b) =>
+      b.getAttribute('data-block'),
+    );
+    expect(ids).toEqual(['frozen-sep1', 'frozen-oct10']);
+    const labels = [...container.querySelectorAll('[data-block-date]')].map((l) => l.textContent);
+    expect(labels).toEqual(['Oct 8', 'Oct 10']);
+  });
+
   it('reads Oct 10 before Oct 12 inside a range, whatever order they were written in (0031)', () => {
     const range = { ...board, declared_start: '2026-10-08', declared_end: '2026-10-12' };
     const late = [
