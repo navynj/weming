@@ -19,6 +19,7 @@ import {
   getMyLinks,
   getMyPlacements,
   getMyPoolNames,
+  getPlacementTogether,
 } from '@/lib/queries/pools';
 import { getResponsesOnMine } from '@/lib/queries/responses';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
@@ -60,9 +61,21 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     joints.map((j) => j.id),
   );
   // My pool records whose pool lane has this lane as its home lane (0033).
-  const placements = mine.some((s) => s.own_pool_id)
-    ? await getMyPlacements(supabase, profile.id)
-    : [];
+  const placements = mine.length > 0 ? await getMyPlacements(supabase, profile.id) : [];
+  // Filled once any pool has someone with it (0035), as on Home.
+  const withByPool = await getPlacementTogether(
+    supabase,
+    mine.map((s) => s.id),
+  );
+  const filled = new Set(
+    mine
+      .filter(
+        (s) =>
+          placements.some((p) => p.splashId === s.id && p.inviteAll) ||
+          Object.values(withByPool[s.id] ?? {}).some((ids) => ids.length > 0),
+      )
+      .map((s) => s.id),
+  );
   const ownHome = new Map(
     mine.flatMap((s) => {
       const at = placements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
@@ -125,7 +138,9 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
         );
       }
       // My own splash carries the pencil; a block read alone has none.
-      return summary.orphan ? card : { ...card, editable: true };
+      return summary.orphan
+        ? card
+        : { ...card, editable: true, ...(filled.has(summary.id) ? { together: true } : {}) };
     })
     .sort(byNewest);
   // What readers left (H25), on the posts others can read, as on Home: the
