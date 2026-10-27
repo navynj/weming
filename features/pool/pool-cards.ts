@@ -141,12 +141,21 @@ export function poolCards(
   }
   // The calendar's layouts its members set (0025): the pool's, for every splash in it.
   const layouts = view.layouts ?? {};
-  return cards
-    .map((card) => {
-      const layout = layouts[card.splash.id];
-      return layout ? { ...card, layout, layoutSource: 'pool' as const } : card;
-    })
-    .sort(byNewest);
+  return (
+    cards
+      .map((card) => {
+        const layout = layouts[card.splash.id];
+        return layout ? { ...card, layout, layoutSource: 'pool' as const } : card;
+      })
+      // What readers left, for the board and the unseen dots (H24).
+      .map((card) => ({
+        ...card,
+        respondedAsOf: view.respondedAsOf,
+        responses: view.responses?.[card.splash.id],
+        respondedAt: view.respondedAt?.[card.splash.id],
+      }))
+      .sort(byNewest)
+  );
 }
 
 /**

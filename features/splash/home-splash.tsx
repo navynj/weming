@@ -8,6 +8,7 @@ import { signOwnMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { audienceFor } from '@/features/pool/audience-for';
 import { getMyLinks, getMyOriginTags, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
+import { getRippleResponses } from '@/lib/queries/responses';
 import { getMySplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -54,6 +55,15 @@ export async function HomeSplash({ id }: { id: string }) {
     ? summarizeSplash(board, blocks, profile.timezone, now)
     : summarizeOrphan(lone!, profile.timezone, now);
 
+  // Someone besides me sees it: shared to a pool, or a pool's own (H24).
+  const respondable =
+    !!board &&
+    (board.own_pool_id !== null || placements.some((p) => p.splashId === board.id && p.shared));
+  const responses = await getRippleResponses(
+    supabase,
+    blocks.map((r) => r.id),
+  );
+
   const { data: lockRows } = await supabase
     .from('ripple_audience')
     .select('ripple_id')
@@ -81,6 +91,8 @@ export async function HomeSplash({ id }: { id: string }) {
       timeZone={profile.timezone}
       today={today}
       initials={initialsOf(profile.display_name)}
+      responses={responses}
+      respondable={respondable}
       poolTags={board ? (tags.get(board.id) ?? []) : []}
       audience={audienceFor({
         board,

@@ -8,6 +8,7 @@ import { RippleThread } from '@/features/splash/ripple-thread';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
 import { Monogram } from '@/components/ui/monogram';
 import { usePeople } from '@/features/people/people-provider';
+import { isUnseen, useSeen } from '@/features/responses/seen';
 
 import { cardDate, postIcon, type Card, type CardLane } from './grid';
 
@@ -61,6 +62,7 @@ export function CardFace({
   onClickCapture?: (event: React.MouseEvent) => void;
 }) {
   const { me } = usePeople();
+  const seen = useSeen();
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   // The post's own icon, else its lane's emoji (0008).
   const glyph = postIcon(card.splash, lane);
@@ -167,6 +169,10 @@ export function CardFace({
             id: ripple.id,
             initials: ripple.initials,
             authorId: ripple.authorId,
+            // New reactions or replies on my ripple since I last opened it, on this device (H24).
+            dot:
+              seen !== null &&
+              isUnseen(card.respondedAt?.[ripple.id], seen[card.splash.id] ?? null),
             body: (
               <span className="text-ink/80 text-[13px]/relaxed whitespace-pre-wrap">
                 {ripple.note}

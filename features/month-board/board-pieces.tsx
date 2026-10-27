@@ -23,6 +23,7 @@ import {
   type LabelStyle,
   type PhotoCard,
 } from './layout';
+import { BoardResponsesView } from './board-responses';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 
@@ -416,12 +417,15 @@ export function BoardPieceView({
   metrics,
   onPick,
   onWrite,
+  onOpenAt,
   ripple,
   plunge,
 }: Shared & {
   piece: BoardPiece;
   photos: SignedMedia;
   onWrite: (card: Card) => void;
+  /** A badge or a reply line (H24): the splash opened at what it shows. */
+  onOpenAt: (card: Card, anchor: string) => void;
   /** Just dropped: it plunges in. */
   plunge: boolean;
 }) {
@@ -552,6 +556,14 @@ export function BoardPieceView({
           </span>
         ) : null}
       </div>
+      {/* Reactions and replies (H24): taps of their own, in the label's frame. */}
+      <BoardResponsesView
+        piece={piece}
+        metrics={metrics}
+        moved={moveOf(layout.label, metrics.column, line)}
+        fade={fade}
+        onOpenAt={onOpenAt}
+      />
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
       {piece.slotBox ? (
         <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} muted={piece.muted} />

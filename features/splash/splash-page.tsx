@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { GhostRing } from '@/components/ui/ghost-ring';
 import type { CommitResult } from '@/features/input-sheet/commit';
@@ -13,6 +13,11 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
 import { deleteJointSplash } from '@/features/pool/actions';
+import { usePeople } from '@/features/people/people-provider';
+import { latestFromOthers, type RippleResponsesValue } from '@/features/responses/model';
+import { RippleResponses } from '@/features/responses/ripple-responses';
+import { isUnseen, rememberSeen, useSeenBefore } from '@/features/responses/seen';
+import { useOpenedAt, useRippleResponses } from '@/features/responses/use-ripple-responses';
 import { authorClock } from '@/features/pool/times';
 import { usePoolEditScope } from '@/features/pool/edit-scope';
 
@@ -54,6 +59,8 @@ function outcome(result: CommitResult): ActionOutcome {
   };
 }
 
+const NO_RESPONSES: RippleResponsesValue = { reactions: [], replies: [] };
+
 /** What the page holds and edits: the post and its blocks, as one value. */
 type PageState = { splash: SplashSummary; blocks: RippleWithCategory[]; lockedIds: string[] };
 
@@ -87,6 +94,8 @@ export function SplashPage({
   poolTags = [],
   pool = null,
   writing = false,
+  responses = NO_RESPONSES,
+  respondable = false,
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -106,6 +115,10 @@ export function SplashPage({
   pool?: PoolContext | null;
   /** Opened to write: the next block's editor is up from the start (Board view's "Add your side"). */
   writing?: boolean;
+  /** What readers left under its blocks (H24). */
+  responses?: RippleResponsesValue;
+  /** Someone besides me can see it, so its blocks take reactions and replies (H24). */
+  respondable?: boolean;
 }) {
   // Mine to edit: everything off a pool; in one, my own ripples only.
   const editable = (block: RippleWithCategory): boolean => !pool || block.author_id === pool.me;
@@ -116,6 +129,28 @@ export function SplashPage({
   const editScope = usePoolEditScope();
   // Inside the splash sheet (review): a delete closes it over the screen beneath.
   const closeSheet = useCloseSplash();
+  const { me } = usePeople();
+  const answered = useRippleResponses(splash.id, responses);
+  // Opened at a reply from the board: its block's replies open in full (H24).
+  const openedAt = useOpenedAt();
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const openedRipple = answered.value.replies.find((r) => `reply-${r.id}` === openedAt)?.ripple_id;
+  const isExpanded = (id: string): boolean => expanded.includes(id) || id === openedRipple;
+  // Seen as of this open, on this device; its dots stay until the next (H24).
+  const seenBefore = useSeenBefore(splash.id);
+  const fromOthers = latestFromOthers(answered.value, me ?? '', (id) =>
+    blocks.some((b) => b.id === id && b.author_id === me),
+  );
+  useEffect(() => rememberSeen(splash.id), [splash.id]);
+  useEffect(() => {
+    if (!openedAt) return;
+    // The badge opens at the first block anyone reacted or replied to (H24).
+    const target =
+      openedAt === 'responded'
+        ? document.querySelector('[data-reaction], [data-reply]')?.closest('[data-block-entry]')
+        : document.getElementById(openedAt);
+    target?.scrollIntoView({ block: 'center' });
+  }, [openedAt, openedRipple]);
   const [editor, setEditor] = useState<EditorTarget | null>(() =>
     writing && !splash.orphan ? { kind: 'add', splashId: splash.id } : null,
   );
@@ -321,9 +356,9 @@ export function SplashPage({
           </p>
         ) : null}
 
-        {message ? (
+        {message || answered.message ? (
           <p role="alert" className="text-pool-500 pb-4 text-sm">
-            {message}
+            {message ?? answered.message}
           </p>
         ) : null}
       </div>
@@ -338,6 +373,8 @@ export function SplashPage({
               // Each ripple keeps its author in a pool (H23).
               initials: pool ? (pool.initialsOf[block.author_id] ?? '') : undefined,
               authorId: block.author_id,
+              // Something new from someone else on my ripple since I last opened it (H24).
+              dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
               body: (
                 <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
                   {editor?.kind === 'edit' && editor.block.id === block.id ? (
@@ -349,31 +386,43 @@ export function SplashPage({
                       onCancel={() => setEditor(null)}
                     />
                   ) : (
-                    <BlockView
-                      block={block}
-                      photos={photos[block.id] ?? []}
-                      clock={
-                        pool
-                          ? authorClock(
-                              block.started_at ?? block.created_at,
-                              timeZone,
-                              pool.zoneOf[block.author_id] ?? timeZone,
-                            )
-                          : null
-                      }
-                      timeZone={timeZone}
-                      today={today}
-                      onEdit={
-                        editable(block)
-                          ? () =>
-                              setEditor({
-                                kind: 'edit',
-                                block,
-                                locked: page.lockedIds.includes(block.id),
-                              })
-                          : undefined
-                      }
-                    />
+                    <>
+                      <BlockView
+                        block={block}
+                        photos={photos[block.id] ?? []}
+                        clock={
+                          pool
+                            ? authorClock(
+                                block.started_at ?? block.created_at,
+                                timeZone,
+                                pool.zoneOf[block.author_id] ?? timeZone,
+                              )
+                            : null
+                        }
+                        timeZone={timeZone}
+                        today={today}
+                        onEdit={
+                          editable(block)
+                            ? () =>
+                                setEditor({
+                                  kind: 'edit',
+                                  block,
+                                  locked: page.lockedIds.includes(block.id),
+                                })
+                            : undefined
+                        }
+                      />
+                      <RippleResponses
+                        rippleId={block.id}
+                        rippleAuthor={block.author_id}
+                        value={answered.value}
+                        canRespond={respondable && !page.lockedIds.includes(block.id)}
+                        expanded={isExpanded(block.id)}
+                        onExpand={() => setExpanded((ids) => [...ids, block.id])}
+                        onReact={(emoji) => answered.react(block.id, emoji)}
+                        on={answered.handlers(block.id)}
+                      />
+                    </>
                   )}
                 </div>
               ),
