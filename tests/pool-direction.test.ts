@@ -18,7 +18,7 @@ describe('where a pick lands (0017)', () => {
   it('Just mine off, linked both or in: joint, my ripple in my linked lane', () => {
     for (const d of ['both', 'in'] as const) {
       expect(resolvePick(games(d), false)).toEqual({ kind: 'joint', poolLaneId: 'pl-games' });
-      expect(landingHint(games(d), false, nameOf)).toBe('Joint · your Games lane');
+      expect(landingHint(games(d), false, nameOf)).toBe('Joint · also in your Games');
     }
   });
 
@@ -36,7 +36,7 @@ describe('where a pick lands (0017)', () => {
         poolLaneId: 'pl-games',
         myCategoryId: 'my-games',
       });
-      expect(landingHint(games(d), true, nameOf)).toBe('Yours · Games lane');
+      expect(landingHint(games(d), true, nameOf)).toBe('Yours · in Games');
     }
   });
 

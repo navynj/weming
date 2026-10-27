@@ -31,13 +31,16 @@ export function resolvePick(
     : { kind: 'own', poolLaneId: lane.id };
 }
 
-/** "Joint · your Games lane", "Joint · pool only", "Yours · Games lane", "Yours · pool only". */
+/**
+ * "Joint · also in your Games", "Joint · pool only", "Yours · in Games",
+ * "Yours · pool only". No "lane" on a compose screen (hotfix 2026-10-26).
+ */
 export function landingHint(
   lane: PoolScope['lanes'][number],
   justMine: boolean,
   myLaneName: (id: string) => string | null,
 ): string {
   const mine = lane.myCategoryId && bringsIn(lane.direction) ? myLaneName(lane.myCategoryId) : null;
-  if (!justMine) return mine ? `Joint · your ${mine} lane` : 'Joint · pool only';
-  return mine ? `Yours · ${mine} lane` : 'Yours · pool only';
+  if (!justMine) return mine ? `Joint · also in your ${mine}` : 'Joint · pool only';
+  return mine ? `Yours · in ${mine}` : 'Yours · pool only';
 }

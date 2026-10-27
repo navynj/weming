@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/pool/new',
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {}, refresh: () => {} }),
 }));
+const { created } = vi.hoisted(() => ({ created: [] as unknown[] }));
 vi.mock('@/features/pool/actions', () => ({
-  createPool: () => Promise.resolve({ ok: true, id: 'p-new' }),
+  createPool: (input: unknown) => {
+    created.push(input);
+    return Promise.resolve({ ok: true, id: 'p-new' });
+  },
 }));
 vi.mock('@/features/lanes/actions', () => ({
   saveLane: () => Promise.resolve({ ok: true, id: 'c-made' }),
@@ -67,6 +71,26 @@ describe('opening a new pool (review)', () => {
     fireEvent.change(container.querySelector('[data-pool-name]')!, { target: { value: 'Sarang' } });
     addLane(container, 'Trips');
     expect(button().disabled).toBe(false);
-    expect(button().textContent).toBe('Connect 1 lane and join');
+    // Step 2 is optional (hotfix 2026-10-26): skipping is the primary way on;
+    // connecting what was matched is the quieter second choice.
+    expect(button().textContent).toBe('Skip for now');
+    expect(
+      container.querySelector('[data-create-step="2"] [data-create-connect]')!.textContent,
+    ).toBe('Connect 1 lane and join');
+  });
+
+  it('skips matching: the pool opens with every lane unconnected and no earlier records', async () => {
+    created.length = 0;
+    const { container } = render(<CreateFlow categories={MINE} />);
+    fireEvent.change(container.querySelector('[data-pool-name]')!, { target: { value: 'Sarang' } });
+    addLane(container, 'Trips');
+    fireEvent.click(container.querySelector('[data-create-step="2"] [data-primary]')!);
+    await waitFor(() => expect(created).toHaveLength(1));
+    const input = created[0] as {
+      lanes: { myCategoryId: string | null }[];
+      includeHistory: boolean;
+    };
+    expect(input.lanes.every((l) => l.myCategoryId === null)).toBe(true);
+    expect(input.includeHistory).toBe(false);
   });
 });

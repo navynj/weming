@@ -56,7 +56,8 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
   const ready = name.trim().length > 0 && lanes.length > 0;
   const count = linkedCount(links);
 
-  const create = async (): Promise<void> => {
+  /** Opens the pool; `skip` leaves every pool lane unconnected (hotfix: step 2 is optional). */
+  const create = async (skip = false): Promise<void> => {
     setBusy(true);
     setMessage(null);
     const made = await createPool({
@@ -65,10 +66,10 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
         name: lane.name,
         icon: lane.icon,
         description: lane.description,
-        myCategoryId: links[lane.key] ?? null,
+        myCategoryId: skip ? null : (links[lane.key] ?? null),
         direction: settleDirections(keys, links, directions)[lane.key],
       })),
-      includeHistory,
+      includeHistory: skip ? false : includeHistory,
     });
     if (!made.ok) {
       setMessage(made.message);
@@ -180,9 +181,24 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
               </>
             }
             action={
-              <PrimaryButton disabled={busy || !ready} onClick={() => void create()}>
-                {busy ? 'Opening the Pool…' : joinLabel(count)}
-              </PrimaryButton>
+              // Optional (hotfix 2026-10-26): skipping is the main way on; a
+              // pool's lanes connect later from its settings.
+              <div className="flex flex-col items-center gap-3">
+                <PrimaryButton disabled={busy || !ready} onClick={() => void create(true)}>
+                  {busy ? 'Opening the Pool…' : 'Skip for now'}
+                </PrimaryButton>
+                {count > 0 ? (
+                  <button
+                    type="button"
+                    data-create-connect
+                    disabled={busy || !ready}
+                    onClick={() => void create()}
+                    className="text-main-900 text-sm font-semibold disabled:opacity-40"
+                  >
+                    {joinLabel(count)}
+                  </button>
+                ) : null}
+              </div>
             }
           />
         </section>

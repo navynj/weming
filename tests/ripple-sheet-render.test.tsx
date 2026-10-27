@@ -373,16 +373,16 @@ describe('the chip row (H20f)', () => {
 
   it('shows a search field only past the lane threshold, never on mere overflow', () => {
     const few = sheet();
-    expect(few.queryByLabelText('Search lanes')).toBeNull();
+    expect(few.queryByLabelText('Search')).toBeNull();
     cleanup();
 
     const many = Array.from({ length: LANE_SEARCH_THRESHOLD + 1 }, (_, i) =>
       category({ id: `c-${i}`, name: `Lane ${i}` }),
     );
     const view = sheet({ context: { ...context, categories: many } });
-    expect(view.getByLabelText('Search lanes')).toBeTruthy();
+    expect(view.getByLabelText('Search')).toBeTruthy();
 
-    fireEvent.change(view.getByLabelText('Search lanes'), { target: { value: 'Lane 3' } });
+    fireEvent.change(view.getByLabelText('Search'), { target: { value: 'Lane 3' } });
     expect(view.getByRole('group', { name: 'Lane' }).textContent).toBe('📍Lane 3');
   });
 });

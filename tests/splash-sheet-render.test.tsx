@@ -506,11 +506,11 @@ describe('compose from a pool (H23)', () => {
     const view = poolSheet();
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
-      'Joint · your Place lane',
+      'Joint · also in your Place',
     );
     fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
     expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
-      'Yours · Place lane',
+      'Yours · in Place',
     );
   });
 

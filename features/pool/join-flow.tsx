@@ -4,146 +4,109 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Monogram } from '@/components/ui/monogram';
-import { saveLane } from '@/features/lanes/actions';
-import type { MyCategory } from '@/lib/queries/profile';
+import { saveProfile } from '@/features/people/actions';
+import { NAME_MAX } from '@/features/people/name';
 
 import { joinPool } from './actions';
-import { LaneMatch } from './lane-match';
-import {
-  settleDirections,
-  joinLabel,
-  linkedCount,
-  prefillLinks,
-  type Directions,
-  type Links,
-  type MatchLane,
-} from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
- * Joining from an invite link (H23): first who is there — the pool's name
- * and its members' initials, nothing more (0011 `invite_preview`) — then the
- * same step 2 as creating: my lanes matched to the pool's, and whether my
- * earlier records come along. The token is checked again when joining.
+ * Joining from an invite link (H23; hotfix 2026-10-26): one screen — the
+ * pool's name and its members' initials (0011 `invite_preview`), my name as
+ * they will see it, and Join. Nothing about how my records connect: every
+ * pool lane starts unconnected, writing from the pool works as for any
+ * unconnected one, and connecting stays in the pool's settings. The token is
+ * checked again when joining.
  */
 export function JoinFlow({
   token,
   poolName,
   photo = null,
   initials,
-  lanes,
-  categories,
+  myName,
 }: {
   token: string;
   poolName: string;
   /** The pool's photo, signed briefly for this invite (0024); the letters without one. */
   photo?: string | null;
   initials: string[];
-  lanes: MatchLane[];
-  categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
+  /** My name as it stands (from signing in); the members see it. */
+  myName: string;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
-  const [mine, setMine] = useState(categories);
-  const [links, setLinks] = useState<Links>(() => prefillLinks(lanes, categories));
-  const [directions, setDirections] = useState<Directions>({});
-  const [includeHistory, setIncludeHistory] = useState(false);
+  const [name, setName] = useState(myName);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const ready = name.trim().length > 0;
 
-  if (step === 1) {
-    return (
-      <StepPage step="1 / 2" onBack={() => router.replace('/')}>
-        <p className="text-pool-500 text-sm">You are invited to</p>
-        <div className="mt-4 flex items-center gap-4">
-          <Monogram name={poolName} size="tile" photo={photo} />
-          <h1
-            data-invite-pool
-            className="text-main-900 min-w-0 text-3xl/tight font-semibold break-words"
-          >
-            {poolName}
-          </h1>
-        </div>
-        <ul aria-label="Members" className="mt-8 flex flex-wrap gap-2">
-          {initials.map((letters, index) => (
-            <li
-              key={`${letters}-${index}`}
-              data-invite-member
-              className="bg-pool-100 text-pool-500 flex h-10 w-10 items-center justify-center rounded-full text-xs font-medium"
-            >
-              {letters}
-            </li>
-          ))}
-        </ul>
-        <p className="text-pool-500 mt-6 text-sm/relaxed">
-          Only the lanes you connect next will flow into this Pool. Everything else stays yours.
-        </p>
-        <div className="mt-auto pt-10">
-          <PrimaryButton onClick={() => setStep(2)}>Next: match lanes</PrimaryButton>
-        </div>
-      </StepPage>
-    );
+  async function join(): Promise<void> {
+    setBusy(true);
+    setMessage(null);
+    if (name.trim() !== myName.trim()) {
+      const saved = await saveProfile({ name: name.trim(), photo: 'keep' });
+      if (!saved.ok) {
+        setMessage(saved.message);
+        setBusy(false);
+        return;
+      }
+    }
+    // No links (hotfix): every pool lane starts unconnected for me.
+    const joined = await joinPool({ token, links: [], includeHistory: false });
+    if (!joined.ok) {
+      setMessage(joined.message);
+      setBusy(false);
+      return;
+    }
+    router.replace(`/pool/${joined.id}`);
   }
 
   return (
-    <StepPage step="2 / 2" onBack={() => setStep(1)}>
-      <LaneMatch
-        poolName={poolName}
-        lanes={lanes}
-        categories={mine}
-        links={links}
-        onLinksChange={setLinks}
-        directions={directions}
-        onDirectionsChange={setDirections}
-        includeHistory={includeHistory}
-        onIncludeHistoryChange={setIncludeHistory}
-        onCreateLane={async (lane) => {
-          const made = await saveLane({ id: null, ...lane });
-          if (!made.ok || !made.id) return { message: made.ok ? 'Try again.' : made.message };
-          setMine((current) => [...current, { id: made.id!, name: lane.name, icon: lane.icon }]);
-          return made.id;
-        }}
-        footer={
-          <>
-            {message ? (
-              <p role="alert" className="text-pool-500 text-sm">
-                {message}
-              </p>
-            ) : null}
-            <p className="text-pool-500 text-xs">You can change this anytime in Pool settings.</p>
-          </>
-        }
-        action={
-          <PrimaryButton
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setMessage(null);
-              const joined = await joinPool({
-                token,
-                links: lanes.map((lane) => ({
-                  poolLaneId: lane.key,
-                  myCategoryId: links[lane.key] ?? null,
-                  direction: settleDirections(
-                    lanes.map((lane) => lane.key),
-                    links,
-                    directions,
-                  )[lane.key],
-                })),
-                includeHistory,
-              });
-              if (!joined.ok) {
-                setMessage(joined.message);
-                setBusy(false);
-                return;
-              }
-              router.replace(`/pool/${joined.id}`);
-            }}
+    <StepPage step={null} onBack={() => router.replace('/')}>
+      <p className="text-pool-500 text-sm">You are invited to</p>
+      <div className="mt-4 flex items-center gap-4">
+        <Monogram name={poolName} size="tile" photo={photo} />
+        <h1
+          data-invite-pool
+          className="text-main-900 min-w-0 text-3xl/tight font-semibold break-words"
+        >
+          {poolName}
+        </h1>
+      </div>
+      <ul aria-label="Members" className="mt-8 flex flex-wrap gap-2">
+        {initials.map((letters, index) => (
+          <li
+            key={`${letters}-${index}`}
+            data-invite-member
+            className="bg-pool-100 text-pool-500 flex h-10 w-10 items-center justify-center rounded-full text-xs font-medium"
           >
-            {busy ? 'Joining…' : joinLabel(linkedCount(links))}
-          </PrimaryButton>
-        }
-      />
+            {letters}
+          </li>
+        ))}
+      </ul>
+      <label className="mt-10 flex flex-col gap-2">
+        <span className="text-pool-500 text-sm">Your name, as the members see it</span>
+        <input
+          data-join-name
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          maxLength={NAME_MAX}
+          autoComplete="name"
+          className="bg-pool-100 text-ink h-12 rounded-xl px-4 text-base outline-none"
+        />
+      </label>
+      <p className="text-pool-500 mt-6 text-sm/relaxed">
+        What you write here is shared with {poolName}. Everything else stays yours.
+      </p>
+      {message ? (
+        <p role="alert" className="text-pool-500 mt-4 text-sm">
+          {message}
+        </p>
+      ) : null}
+      <div className="mt-auto pt-10">
+        <PrimaryButton disabled={busy || !ready} onClick={() => void join()}>
+          {busy ? 'Joining…' : 'Join'}
+        </PrimaryButton>
+      </div>
     </StepPage>
   );
 }

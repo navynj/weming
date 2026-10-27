@@ -2,14 +2,15 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { JoinFlow } from '@/features/pool/join-flow';
-import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { getMyProfile } from '@/lib/queries/profile';
 import { signInvitePhoto } from '@/lib/avatars';
 import { createClient } from '@/lib/supabase/server';
 
 /**
  * `/join/[token]` (H23). Signed out, the proxy sends the visitor to sign in
  * and back here. A current member goes straight to the pool. An expired or
- * revoked link opens nothing and says so.
+ * revoked link opens nothing and says so. Joining asks my name and nothing
+ * else (hotfix 2026-10-26): connecting lanes lives in the pool's settings.
  */
 export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
   const { token } = await params;
@@ -28,9 +29,8 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
 
   // The preview, and the pool's photo signed for ten minutes when the token
   // is valid, unexpired and unrevoked (0024, invite_photo; server only).
-  const [{ data: preview }, { data: lanes }, photo] = await Promise.all([
+  const [{ data: preview }, photo] = await Promise.all([
     supabase.rpc('invite_preview', { p_token: token }),
-    supabase.rpc('invite_lanes', { p_token: token }),
     signInvitePhoto(token),
   ]);
   const pool = preview?.[0];
@@ -53,13 +53,7 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
       poolName={pool.pool_name}
       photo={photo}
       initials={pool.member_initials}
-      lanes={(lanes ?? []).map((lane) => ({
-        key: lane.id,
-        name: lane.name,
-        icon: lane.icon,
-        description: lane.description,
-      }))}
-      categories={await getMyCategories(supabase)}
+      myName={profile.display_name}
     />
   );
 }
