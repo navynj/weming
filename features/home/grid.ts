@@ -48,6 +48,11 @@ export type Card = {
   /** My record on Home: its members' ripples, a count per pool (0035): "JY · 3 · SY · 2". */
   sides?: { label: string; count: number }[];
   /**
+   * On Home, my side on someone else's record (0035): drawn with the pale fill
+   * a period band has and its pool's face, never a fill of my choosing (review).
+   */
+  side?: boolean;
+  /**
    * In a pool's Calendar, Lane and List (review): its author's face after the
    * title — on every record that is not joint, mine included. Never on Home;
    * never in Swimmers, whose column says who.

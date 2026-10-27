@@ -104,7 +104,8 @@ const FACES_CHARS = 4;
  * none, a pool set), however many ripples or authors it has — white or
  * ink, alternating within a day, wherever it is drawn.
  */
-export type LabelStyle = 'none' | 'white' | 'ink';
+/** `pale`: my side on someone else's record (review), a period band's fill; never chosen. */
+export type LabelStyle = 'none' | 'white' | 'ink' | 'pale';
 export const LABEL_STYLES: readonly LabelStyle[] = ['none', 'white', 'ink'];
 
 /** The sizes that follow the board's width. */
@@ -470,7 +471,9 @@ function planDay(cards: Card[]): Plan[] {
   let bigUsed = false;
   return cards.map((card, at) => {
     let label: LabelStyle = 'none';
-    if (card.together) {
+    // My side on someone's record (review): pale, as a period band; not mine to colour.
+    if (card.side) label = 'pale';
+    else if (card.together) {
       const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'ink';
       // A fill set by hand (0027) is drawn as set; the next joint one alternates from it.
       fill =

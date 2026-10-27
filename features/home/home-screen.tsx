@@ -370,6 +370,7 @@ export async function HomeScreen({
         const name = friend.poolName ?? 'A pool you left';
         return {
           ...card,
+          side: true,
           column: home ?? ownPoolColumn(friend.poolId),
           pools: friend.poolName ? [friend.poolName] : [],
           poolPhoto: columnPhotos[friend.poolId] ?? null,

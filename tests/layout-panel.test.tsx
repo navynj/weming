@@ -314,6 +314,14 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(label().className).toContain(auto === 'ink' ? 'bg-ink' : 'bg-white');
   });
 
+  it('offers no Style on my side of someone else’s record: its pale is not mine to set (review)', () => {
+    media(true);
+    const { container } = home([{ ...ONE[0], side: true, pools: ['Our Pool'] }]);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    expect(container.querySelector('[data-layout-group="Label"]')).not.toBeNull();
+    expect(container.querySelector('[data-layout-control="Style"]')).toBeNull();
+  });
+
   it('offers Style, White or Black, on my own record once someone is invited on it (0035)', () => {
     media(true);
     const { container } = home([{ ...ONE[0], together: true }]);

@@ -1454,3 +1454,30 @@ describe('a set layout holds when a ripple is added (review)', () => {
     }
   });
 });
+
+describe('my side on someone else’s record, on Home (review)', () => {
+  const side: Card = {
+    ...card('theirs', 'Their trip', '2026-10-21'),
+    side: true,
+    pools: ['Our Pool'],
+    poolPhoto: null,
+    // A fill set by hand elsewhere is not this record's: it stays pale.
+    layout: { label: { style: 'ink' } },
+  };
+
+  it('is drawn with a period band’s pale fill and its pool’s monogram', () => {
+    const { container } = board([side]);
+    const piece = container.querySelector('[data-board-piece="theirs"]')!;
+    expect(piece.getAttribute('data-label')).toBe('pale');
+    const label = piece.querySelector<HTMLElement>('[data-board-label]')!;
+    expect(label.className).toContain('bg-white/20');
+    expect(label.className).not.toMatch(/bg-ink|bg-white /);
+    expect(piece.querySelector('[data-board-pool]')!.textContent).toBe('OU');
+  });
+
+  it('is laid out with a filled label’s padding', () => {
+    const layout = layoutWeekBoard([side], TODAY, { width: 980 });
+    expect(layout.pieces[0].label).toBe('pale');
+    expect(layout.pieces[0].pad.top).toBe(6);
+  });
+});

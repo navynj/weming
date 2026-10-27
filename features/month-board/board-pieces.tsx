@@ -188,12 +188,15 @@ const LABEL_CLASS: Record<LabelStyle, string> = {
   white: 'label-fill bg-white text-main-900',
   // label-ink: a pale fill in pastel mode (0036, globals.css).
   ink: 'label-ink bg-ink text-white',
+  // A period band's fill (review): my side on someone else's record.
+  pale: 'bg-white/20 text-white',
 };
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {
   none: 'ring-main-900',
   white: 'ring-white',
   ink: 'ring-ink',
+  pale: 'ring-transparent',
 };
 /**
  * A face's size on the calendar: a little past the words' line (review: "a
@@ -659,7 +662,8 @@ export function BoardPieceView({
               </span>
             ) : null}
             {caption}
-            {card.joint || card.together ? (
+            {card.joint || card.together || card.side ? (
+              // My side on someone's record shows its pool there (review).
               <Faces card={card} ring={FACE_RING[piece.label]} />
             ) : card.authorFace && card.authorId ? (
               <AuthorFace card={card} px={metrics.narrow ? 12 : 14} />
