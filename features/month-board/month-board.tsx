@@ -20,6 +20,7 @@ import { WaveGlyph } from '@/components/ui/waves';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
+import { ON_PIECE } from './board-handles';
 import { BoardPieceView, BoardTapeView } from './board-pieces';
 import { boardPhotos } from './board-layout';
 import { useBoardSpan, type BoardSpan } from './board-span';
@@ -38,6 +39,7 @@ import {
   shiftMonth,
   weekOf,
 } from './layout';
+import type { BoardEditing } from './use-board-editing';
 import { useBoardPhotos } from './use-board-photos';
 
 /** A sideways swipe this long turns the page, once its axis is decided (the first 8px). */
@@ -104,6 +106,7 @@ export function MonthBoard({
   onPick,
   lanes,
   onDrawn,
+  editing = null,
 }: {
   cards: Card[];
   /** `YYYY-MM`: the month shown, when Month is; the week shown is the board's own. */
@@ -120,6 +123,8 @@ export function MonthBoard({
   lanes: Pick<GridColumn, 'id' | 'icon' | 'name'>[];
   /** The recipe each piece is drawn with, by splash, whenever it changes: the Layout panel shows it. */
   onDrawn?: (recipes: Record<string, Recipe>) => void;
+  /** Direct manipulation (review): taps go through it, and the piece on top may be active. */
+  editing?: BoardEditing | null;
 }) {
   const [span, setSpan] = useBoardSpan();
   // The week shown: this one on open (review), unless the ground was opened on another month.
@@ -336,6 +341,8 @@ export function MonthBoard({
     const t = event.changedTouches[0];
     const start = touch.current;
     touch.current = null;
+    // While a piece is being edited a swipe never turns the page; the arrows still do.
+    if (editing?.activeId) return;
     if (!t || !start || start.axis !== 'x') return;
     const dx = t.clientX - start.x;
     if (Math.abs(dx) >= SWIPE_PX) turn(dx < 0 ? 1 : -1);
@@ -424,6 +431,12 @@ export function MonthBoard({
             key={`${span}:${layout.key}`}
             ref={canvas}
             data-board-canvas
+            // A tap on empty board lets the active piece go (review).
+            onClick={(event) => {
+              if (!editing?.activeId) return;
+              if ((event.target as Element).closest(ON_PIECE)) return;
+              editing.deactivate();
+            }}
             className="absolute text-white select-none"
             style={{
               left: bleed.left,
@@ -545,6 +558,7 @@ export function MonthBoard({
                         metrics={metrics}
                         onPick={onPick}
                         ripple={ripple(tape.id)}
+                        editing={editing}
                       />
                     ))}
                   {layout.pieces
@@ -560,6 +574,7 @@ export function MonthBoard({
                         onWrite={onWrite}
                         ripple={ripple(piece.id)}
                         plunge={plunge(piece.id)}
+                        editing={editing}
                       />
                     ))}
                 </div>

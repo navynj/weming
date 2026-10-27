@@ -24,6 +24,8 @@ import { useFlip } from './use-flip';
 import { homeViewName, nextHomeView, ViewToggle, type HomeView } from './view-toggle';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { LayoutPanel } from '@/features/month-board/layout-panel';
+import { LayoutSheet } from '@/features/month-board/layout-sheet';
+import { useBoardEditing, useLayoutHistory } from '@/features/month-board/use-board-editing';
 import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
@@ -188,7 +190,9 @@ export function HomeGround({
   const { heading, bringForward, jumpTo } = flip;
   // The calendar's hand-set layouts as the panel edits them (review): drawn
   // at once, saved when the sliders rest; mine on Home.
-  const drafts = useLayoutDrafts(shown, null);
+  // Each save the database takes, kept to undo per piece and view until I leave (review).
+  const history = useLayoutHistory();
+  const drafts = useLayoutDrafts(shown, null, 'calendar', history.recorders.calendar);
   // The Lane view's own (0045): its layout read as the card's, saved as the Lane view's.
   const laneShown = useMemo(
     () =>
@@ -200,7 +204,7 @@ export function HomeGround({
       })),
     [shown],
   );
-  const laneDrafts = useLayoutDrafts(laneShown, null, 'lane');
+  const laneDrafts = useLayoutDrafts(laneShown, null, 'lane', history.recorders.lane);
   // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
@@ -209,6 +213,22 @@ export function HomeGround({
   const viewDrafts = laneView ? laneDrafts : drafts;
   const topCard = viewDrafts.drawn.find((card) => card.splash.id === heading) ?? null;
   const goTo = bringForward;
+  // Direct manipulation (review): a second tap on the top card's piece edits
+  // it by hand. Every Home layout is mine to set. More opens the panel on a
+  // desktop and the sheet on a phone.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const editing = useBoardEditing({
+    drafts: viewDrafts,
+    history,
+    view: laneView ? 'lane' : 'calendar',
+    topId: heading,
+    canEdit: view === 'board' || laneView,
+    onPick: goTo,
+    onMore: () => (wide ? setPanelOpen(true) : setSheetOpen(true)),
+  });
+  // The sheet goes with the piece it edits.
+  if (sheetOpen && editing.activeId === null) setSheetOpen(false);
 
   // A bare `/` reached by the browser's back button finds the card that was
   // on top in this tab, put back at once rather than flipped to (review).
@@ -361,6 +381,7 @@ export function HomeGround({
                 onPick={goTo}
                 lanes={columns}
                 onDrawn={setRecipes}
+                editing={editing}
               />
             </BoardFrame>
           ) : (
@@ -380,6 +401,7 @@ export function HomeGround({
                 scrollToMonth={scrollToMonth}
                 onPick={goTo}
                 onCreateLane={() => setNewLane(true)}
+                editing={laneView ? editing : null}
               />
             </>
           )}
@@ -400,6 +422,7 @@ export function HomeGround({
               onPin={pin}
               onDelete={remove}
               low={boardView}
+              collapsed={editing.activeId !== null}
             />
           ) : (
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
@@ -416,6 +439,22 @@ export function HomeGround({
               message={viewDrafts.message}
               onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
               onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}
+              open={panelOpen}
+              onOpenChange={setPanelOpen}
+            />
+          ) : null}
+          {sheetOpen && !wide && topCard ? (
+            <LayoutSheet
+              card={topCard}
+              recipe={recipes[topCard.splash.id] ?? null}
+              layout={viewDrafts.shown(topCard.splash.id).layout}
+              source={viewDrafts.shown(topCard.splash.id).source}
+              home
+              view={laneView ? 'lane' : 'calendar'}
+              message={viewDrafts.message}
+              onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
+              onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}
+              onClose={() => setSheetOpen(false)}
             />
           ) : null}
 

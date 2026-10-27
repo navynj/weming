@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import {
   postIcon,
@@ -24,7 +24,17 @@ import {
   type LabelStyle,
   type PhotoCard,
 } from './layout';
-import { handMoved } from './board-layout';
+import { handMoved, isPeriod, type BoardLayoutJson } from './board-layout';
+import {
+  EditToolbar,
+  NO_TOOLS,
+  PartFrame,
+  partAt,
+  type FrameUnits,
+  type Tools,
+} from './board-handles';
+import { LABEL_PART, partValues, type BoardPart } from './handle-math';
+import type { BoardEditing } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
@@ -36,6 +46,11 @@ type Shared = {
   metrics: BoardMetrics;
   /** Brings the post's card to the top of the stack, as a mark does in the Lane view. */
   onPick: (id: string) => void;
+  /**
+   * Direct manipulation (review, 2026-10-27): a tap goes here instead of
+   * `onPick`, and the active piece draws its handles and its toolbar.
+   */
+  editing?: BoardEditing | null;
   /**
    * The stack is heading to this post (review): it bobs on the water, once
    * per value — the ring's counterpart on the calendar.
@@ -117,6 +132,8 @@ function WaveDecoration({
   line,
   moving = '',
   stack = 0,
+  selectable = false,
+  frame = null,
 }: {
   label: Box;
   wave: {
@@ -134,6 +151,10 @@ function WaveDecoration({
   moving?: string;
   /** The piece's layers (lifted), so a moved wave rises with its piece. */
   stack?: number;
+  /** Its piece is being edited: a tap on the wave selects it. */
+  selectable?: boolean;
+  /** Its frame while selected, laid over it exactly. */
+  frame?: ReactNode;
 }) {
   const amp = wave.amp ?? WAVE_DEFAULTS.amp;
   const wavelength = wave.length ?? WAVE_DEFAULTS.length;
@@ -141,33 +162,56 @@ function WaveDecoration({
   const width = Math.max(4, label.w * (wave.span ?? WAVE_DEFAULTS.span));
   const pad = weight;
   const height = amp * 2 + pad * 2;
+  const placedAt: CSSProperties = {
+    left: label.x,
+    top: label.y + label.h - height / 2,
+    transform: moveOf(wave, column, line),
+    transformOrigin: 'left center',
+    ...lifted(0, stack),
+  };
+  const path = wavePath(width, amp, wavelength, pad);
   return (
-    <svg
-      aria-hidden
-      data-board-wave
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      fill="none"
-      className={`absolute overflow-visible ${moving}`}
-      style={{
-        left: label.x,
-        top: label.y + label.h - height / 2,
-        transform: moveOf(wave, column, line),
-        transformOrigin: 'left center',
-        ...lifted(0, stack),
-      }}
-    >
-      <path
-        d={wavePath(width, amp, wavelength, pad)}
-        // What reads as white on the ground in every mode (0032, 0036).
-        style={{ stroke: 'var(--color-white)' }}
-        strokeOpacity={0.8}
-        strokeWidth={weight}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <>
+      <svg
+        aria-hidden
+        data-board-wave
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        fill="none"
+        className={`absolute overflow-visible ${moving}`}
+        style={placedAt}
+      >
+        {selectable ? (
+          // A finger's width to tap, unseen: the drawn line is two pixels.
+          <path
+            d={path}
+            stroke="transparent"
+            strokeWidth={16}
+            style={{ pointerEvents: 'stroke' }}
+            className="cursor-pointer"
+          />
+        ) : null}
+        <path
+          d={path}
+          // What reads as white on the ground in every mode (0032, 0036).
+          style={{ stroke: 'var(--color-white)' }}
+          strokeOpacity={0.8}
+          strokeWidth={weight}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {frame ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{ ...placedAt, width, height, zIndex: 60 }}
+        >
+          {frame}
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -451,6 +495,7 @@ function PhotoCardView({
   area,
   more,
   moved,
+  children,
 }: {
   photo: PhotoCard;
   url: string | null | undefined;
@@ -458,6 +503,8 @@ function PhotoCardView({
   more: number;
   /** Its offset and tilt set by hand, drawn without moving anything else (review). */
   moved: string | undefined;
+  /** Its frame, while it is the part selected. */
+  children?: ReactNode;
 }) {
   return (
     <span
@@ -493,6 +540,7 @@ function PhotoCardView({
           +{more}
         </span>
       ) : null}
+      {children}
     </span>
   );
 }
@@ -514,6 +562,7 @@ export function BoardPieceView({
   onWrite,
   ripple,
   plunge,
+  editing = null,
 }: Shared & {
   piece: BoardPiece;
   photos: SignedMedia;
@@ -535,8 +584,41 @@ export function BoardPieceView({
   // never the stack; X is a share of the lane, Y in line heights.
   const layout = card.layout ?? {};
   const line = piece.type.line;
+  // Being edited by hand (review): its handles and toolbar, its parts over every other piece.
+  const active = editing !== null && editing.activeId === piece.id;
+  const selected = active ? pieceSelected(editing.part, piece, layout, icon !== null) : null;
   // Moved by hand (0044): above every piece in place, its own layer kept among the moved.
-  const stack = (layout.piece?.layer ?? 0) + (handMoved(layout) ? MOVED_LAYERS : 0);
+  const stack =
+    (layout.piece?.layer ?? 0) +
+    (handMoved(layout) ? MOVED_LAYERS : 0) +
+    (active ? ACTIVE_LAYERS : 0);
+  const tap = (event: React.MouseEvent): void => {
+    if (editing) editing.tap(card.splash.id, partAt(event.target));
+    else onPick(card.splash.id);
+  };
+  const units: FrameUnits = {
+    column: metrics.column,
+    line,
+    sizeUnit: selected?.kind === 'photo' ? metrics.column : metrics.caption.line,
+    sizePx:
+      selected?.kind === 'photo'
+        ? (piece.fan.find((p) => p.path === selected.path)?.size ?? 0)
+        : (piece.stickerBox?.w ?? 0),
+    labelW: label.w,
+  };
+  const period = isPeriod(card.splash);
+  const frameOf = (part: BoardPart): ReactNode =>
+    selected &&
+    selected.kind === part.kind &&
+    (part.kind !== 'photo' || (selected.kind === 'photo' && selected.path === part.path)) ? (
+      <PartFrame
+        part={selected}
+        values={partValues(layout, selected)}
+        units={units}
+        tools={period ? NO_TOOLS : TOOLS[selected.kind]}
+        editing={editing!}
+      />
+    ) : null;
   return (
     <div
       // Remounted per ring, so the motion plays again for the same post.
@@ -564,7 +646,7 @@ export function BoardPieceView({
       {/* The tap that brings its card up, under the drawing; the slot is a tap of its own. */}
       <button
         type="button"
-        onClick={() => onPick(card.splash.id)}
+        onClick={tap}
         aria-label={caption}
         data-board-pick={piece.id}
         // Keyboard and screen readers: a pointer taps what is drawn, wherever a
@@ -578,7 +660,7 @@ export function BoardPieceView({
         aria-hidden
         data-board-hits
         className="pointer-events-none absolute inset-0"
-        onClick={() => onPick(card.splash.id)}
+        onClick={tap}
       >
         {piece.photoBox ? (
           <span
@@ -598,7 +680,9 @@ export function BoardPieceView({
                   metrics.column,
                   line,
                 )}
-              />
+              >
+                {frameOf({ kind: 'photo', path: photo.path })}
+              </PhotoCardView>
             ))}
           </span>
         ) : null}
@@ -610,6 +694,8 @@ export function BoardPieceView({
             line={line}
             moving={moving}
             stack={stack}
+            selectable={active}
+            frame={frameOf({ kind: 'wave' })}
           />
         ) : null}
         <span
@@ -670,6 +756,7 @@ export function BoardPieceView({
               <AuthorFace card={card} px={metrics.narrow ? 12 : 14} />
             ) : null}
           </span>
+          {frameOf(LABEL_PART)}
         </span>
         {reading && !still ? (
           // Out from the sticker, or the front of the label when the icon is inline.
@@ -707,15 +794,24 @@ export function BoardPieceView({
             }}
           >
             {icon}
+            {frameOf({ kind: 'icon' })}
           </span>
         ) : null}
       </div>
+      {active ? (
+        <EditToolbar
+          editing={editing!}
+          fontSize={selected?.kind === 'label' ? piece.type.size : null}
+          style={toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line)}
+        />
+      ) : null}
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
       {piece.slotBox ? (
         <OpenSlot
           piece={piece}
           narrow={metrics.narrow}
-          onWrite={onWrite}
+          // Being edited, the note is part of the drawing, not a way in.
+          onWrite={active ? () => {} : onWrite}
           muted={piece.muted}
           shift={moveOf(layout.piece, metrics.column, line)}
           layer={stack}
@@ -731,7 +827,13 @@ export function BoardPieceView({
  * of its lanes, translucent white with no outline (review), at the top of
  * the row above the items.
  */
-export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: BoardTape }) {
+export function BoardTapeView({
+  tape,
+  lanes,
+  onPick,
+  ripple,
+  editing = null,
+}: Shared & { tape: BoardTape }) {
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
@@ -743,58 +845,146 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
   const line = size + 3;
   const label = nudge(layout.label, layout.piece);
   const iconSet = layout.icon;
+  // Being edited by hand (review): a range along its days takes its text size
+  // alone; a band across Members its label, icon and wave (0047), as the panel says.
+  const active = editing !== null && editing.activeId === tape.id;
+  const period = isPeriod(card.splash);
+  const selected = active ? tapeSelected(editing.part, layout) : null;
+  const tap = (event: React.MouseEvent): void => {
+    if (editing) editing.tap(card.splash.id, partAt(event.target));
+    else onPick(card.splash.id);
+  };
+  const frameOf = (kind: 'label' | 'icon' | 'wave'): ReactNode =>
+    selected?.kind === kind ? (
+      <PartFrame
+        part={selected}
+        values={partValues(layout, selected)}
+        units={{
+          column: tape.w,
+          line,
+          sizeUnit: line,
+          sizePx: iconSet?.size ? Math.round(iconSet.size * line) : size,
+          labelW: tape.w,
+        }}
+        tools={period ? NO_TOOLS : TOOLS[kind]}
+        editing={editing!}
+        origin={kind === 'label' ? 'left' : 'center'}
+      />
+    ) : null;
   return (
-    <div
-      key={ripple ?? 'still'}
-      data-board-tape={tape.id}
-      data-board-week={tape.week}
-      data-starts-here={tape.startsHere ? '' : undefined}
-      data-ends-here={tape.endsHere ? '' : undefined}
-      data-heading={ripple !== null ? '' : undefined}
-      data-muted={tape.muted ? '' : undefined}
-      className={`absolute ${tape.muted ? 'opacity-50' : ''} ${motionOf(ripple, false)}`}
-      style={placed(tape)}
-    >
-      {layout.wave?.on ? (
-        <WaveDecoration
-          label={{ x: 0, y: 0, w: tape.w, h: tape.h }}
-          wave={nudge(layout.wave, layout.piece)!}
-          column={tape.w}
-          line={line}
+    <>
+      <div
+        key={ripple ?? 'still'}
+        data-board-tape={tape.id}
+        data-board-week={tape.week}
+        data-starts-here={tape.startsHere ? '' : undefined}
+        data-ends-here={tape.endsHere ? '' : undefined}
+        data-heading={ripple !== null ? '' : undefined}
+        data-muted={tape.muted ? '' : undefined}
+        className={`absolute ${tape.muted ? 'opacity-50' : ''} ${motionOf(ripple, false)}`}
+        style={placed(tape)}
+      >
+        {layout.wave?.on ? (
+          <WaveDecoration
+            label={{ x: 0, y: 0, w: tape.w, h: tape.h }}
+            wave={nudge(layout.wave, layout.piece)!}
+            column={tape.w}
+            line={line}
+            selectable={active}
+            frame={frameOf('wave')}
+          />
+        ) : null}
+        <button
+          type="button"
+          onClick={tap}
+          aria-label={caption}
+          data-board-pick={tape.id}
+          data-board-band
+          className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
+          style={{
+            fontSize: size,
+            transform: moveOf(label, tape.w, line),
+            transformOrigin: 'left center',
+          }}
+        >
+          {icon ? (
+            <span
+              aria-hidden
+              data-band-icon
+              className="relative inline-block leading-none"
+              style={{
+                ...(iconSet?.size ? { fontSize: Math.round(iconSet.size * line) } : {}),
+                transform: moveOf(iconSet, tape.w, line),
+              }}
+            >
+              {icon}
+              {frameOf('icon')}
+            </span>
+          ) : null}
+          <span className="min-w-0 truncate">{caption}</span>
+          {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
+          {card.joint || card.together ? <Faces card={card} ring="ring-joint" /> : null}
+          {frameOf('label')}
+        </button>
+      </div>
+      {active ? (
+        <EditToolbar
+          editing={editing!}
+          fontSize={selected?.kind === 'label' ? size : null}
+          style={{ left: tape.x, top: tape.y + tape.h + 10 }}
         />
       ) : null}
-      <button
-        type="button"
-        onClick={() => onPick(card.splash.id)}
-        aria-label={caption}
-        data-board-pick={tape.id}
-        data-board-band
-        className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
-        style={{
-          fontSize: size,
-          transform: moveOf(label, tape.w, line),
-          transformOrigin: 'left center',
-        }}
-      >
-        {icon ? (
-          <span
-            aria-hidden
-            data-band-icon
-            className="inline-block leading-none"
-            style={{
-              ...(iconSet?.size ? { fontSize: Math.round(iconSet.size * line) } : {}),
-              transform: moveOf(iconSet, tape.w, line),
-            }}
-          >
-            {icon}
-          </span>
-        ) : null}
-        <span className="min-w-0 truncate">{caption}</span>
-        {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
-        {card.joint || card.together ? <Faces card={card} ring="ring-joint" /> : null}
-      </button>
-    </div>
+    </>
   );
+}
+
+/** Which handles each part has (review): the label moves and turns, its size the toolbar's. */
+const TOOLS: Record<BoardPart['kind'], Tools> = {
+  label: { move: true, rotate: true, size: false, ends: false },
+  icon: { move: true, rotate: true, size: true, ends: false },
+  photo: { move: true, rotate: true, size: true, ends: false },
+  wave: { move: true, rotate: false, size: false, ends: true },
+};
+
+/** Lifts the piece being edited over every other, moved ones included. */
+const ACTIVE_LAYERS = 20;
+
+/** The part asked for, when the piece has it as its own: a sticker, a photo shown, a wave on; else its label. */
+function pieceSelected(
+  part: BoardPart,
+  piece: BoardPiece,
+  layout: BoardLayoutJson,
+  hasIcon: boolean,
+): BoardPart {
+  if (part.kind === 'icon' && piece.stickerBox && hasIcon) return part;
+  if (part.kind === 'photo' && piece.fan.some((p) => p.path === part.path)) return part;
+  if (part.kind === 'wave' && layout.wave?.on) return part;
+  return LABEL_PART;
+}
+
+/** A band's: its icon once it is set apart from the words (Inline off), its wave once on; else its label. */
+function tapeSelected(part: BoardPart, layout: BoardLayoutJson): BoardPart {
+  if (part.kind === 'icon' && layout.icon?.inline === false) return part;
+  if (part.kind === 'wave' && layout.wave?.on) return part;
+  return LABEL_PART;
+}
+
+/**
+ * The toolbar's seat (review): under the label as it is moved — below its
+ * own handles and the wave's — towards the board's middle, so it stays on it.
+ */
+function toolbarAt(
+  piece: BoardPiece,
+  moved: { x?: number; y?: number } | undefined,
+  metrics: BoardMetrics,
+  line: number,
+): CSSProperties {
+  const box = piece.labelBox;
+  const x = box.x + (moved?.x ?? 0) * metrics.column;
+  const top = box.y + (moved?.y ?? 0) * line + box.h + 26;
+  return piece.x + x + box.w / 2 > metrics.width / 2
+    ? { left: x + box.w, top, transform: 'translateX(-100%)' }
+    : { left: x, top };
 }
 
 /**
