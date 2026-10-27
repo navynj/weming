@@ -570,6 +570,10 @@ A member's column in Swimmers opens nothing.
 - **Together:** member faces, plus Everyone. Everyone is a flag that invites every current member, later joiners included; individual picks are fixed rows. "Add your side" waits for these, less those who wrote. A pool setting preselects Everyone.
 - **Links are advanced only** (Pool settings → Advanced → Connect your lanes), never part of joining or creating. A link carries two optional defaults: the default pool lane with "Share by default", and the home lane, which is display only. Unlinking moves nothing.
 - **Migration:** every migrated link has share by default off, out and both included. Production shows 0 records shared through a default, and turning defaults on would start sharing new Home records in 23 lanes without anyone choosing it. The home lane comes from both/in links, so every joint record keeps its Home column.
-- **Conversions kept:** Home record ↔ joint, pool record ↔ joint ("Make it mine"), and Move to Home. Each keeps a record visible where it was, except into joint.
+- **Conversions:**
+  - Into joint happens in the pool, through Together.
+  - Becoming mine happens on Home only ("Make it mine", Move to Home). The lane and Audience are set anew: Audience starts as a new record's would, and the record leaves its pool unless Audience shares it there.
+  - A Home record's lane change moves no placement.
+  - Joint → pool record is gone.
 - **Retired:** link directions, "include my earlier records" (`_place_history`), and lane matching on join and create. They are dropped in 0034 with quoted approval; H24's release 2 follows as its own migration.
 

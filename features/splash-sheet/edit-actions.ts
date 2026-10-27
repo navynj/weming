@@ -139,7 +139,6 @@ const CONVERSION = z.discriminatedUnion('op', [
     invitees: z.array(z.uuid()).max(64),
     everyone: z.boolean(),
   }),
-  z.object({ op: z.literal('to_pool_record'), poolLaneId: z.uuid() }),
   z.object({ op: z.literal('to_mine'), myLaneId: z.uuid(), placeOn: z.uuid().nullable() }),
   z.object({
     op: z.literal('set_lane'),
@@ -168,11 +167,6 @@ async function convert(
       p_users: plan.invitees,
     });
     return inviteError ? refused(inviteError) : null;
-  }
-  if (plan.op === 'to_pool_record') {
-    const { error } = await supabase.rpc('splash_to_pool_record', { p_splash: id });
-    if (error) return refused(error);
-    return movePoolSplash(supabase, id, plan.poolLaneId);
   }
   const { error } =
     plan.op === 'none'
@@ -264,6 +258,11 @@ export async function saveSplashEdit(
       ? await convert(supabase, edit.id, edit.conversion)
       : await movePoolSplash(supabase, edit.id, edit.poolLaneId);
     if (moved) return moved;
+    // Made mine from Home: shared where its new Audience says.
+    if (edit.conversion?.op === 'to_mine') {
+      const shared = await applyShare(edit.id, edit.share);
+      if (shared) return shared;
+    }
     revalidatePath('/');
     if (edit.poolId) {
       revalidatePath(`/pool/${edit.poolId}`);
@@ -292,17 +291,31 @@ export async function saveSplashEdit(
   revalidatePath('/');
   revalidatePath(`/splash/${edit.id}`);
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
-  // Hand-made sharing applies to a record that stays mine; a conversion to
-  // joint has already let go of every pool.
-  const stillMine = !edit.conversion || ['none', 'set_lane'].includes(edit.conversion.op);
-  if (edit.kind === 'mine' && stillMine) {
-    for (const { poolId, on, poolLaneId } of edit.share) {
-      const done = await setPlacement(edit.id, poolId, on, poolLaneId);
-      if (!done.ok) return { ok: false, message: `Saved, but not shared: ${done.message}` };
-    }
+  // Hand-made sharing applies to a record that is mine after the save — one
+  // made mine from Home too, its Audience set anew; a conversion to joint
+  // has already let go of every pool.
+  const mineAfter =
+    edit.kind === 'mine'
+      ? !edit.conversion || ['none', 'set_lane'].includes(edit.conversion.op)
+      : edit.conversion?.op === 'to_mine';
+  if (mineAfter) {
+    const shared = await applyShare(edit.id, edit.share);
+    if (shared) return shared;
   }
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}`);
   return { ok: true };
+}
+
+/** Each pool the Audience changed, on its pool lane or off; null when done. */
+async function applyShare(
+  id: string,
+  share: { poolId: string; on: boolean; poolLaneId: string | null }[],
+): Promise<{ ok: false; message: string } | null> {
+  for (const { poolId, on, poolLaneId } of share) {
+    const done = await setPlacement(id, poolId, on, poolLaneId);
+    if (!done.ok) return { ok: false, message: `Saved, but not shared: ${done.message}` };
+  }
+  return null;
 }
 
 /** Moves a pool's own splash to another of its pool's lanes (0020); null when done or unmoved. */

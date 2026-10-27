@@ -177,7 +177,7 @@ A pool record **is** today's Just-mine row: `splashes.own_pool_id` and its place
 | `set_splash_lane` | a lane change moves my record's placements to where the new lane sends | a lane change **moves no placement**: sharing is per record |
 | `create_own_pool_splash` | makes a Just-mine record | kept: makes **my pool record** (the default from a pool) |
 | `create_joint_splash` | joint, awaiting every member | joint with **invitees** (Together) |
-| `splash_to_joint` / `splash_to_mine` | personal or Just mine ↔ joint | kept for my record ↔ joint (decision 3 sets the pairs) |
+| `splash_to_joint` / `splash_to_mine` | personal or Just mine ↔ joint | to joint from a pool (`splash_to_together`); to mine from Home only, its lane and Audience set anew: `splash_to_mine` keeps no placement |
 | `splash_to_just_mine` | personal or joint → Just mine | **retired** |
 | `move_pool_splash` | joint or Just mine within its pool | joint or pool record within its pool (unchanged) |
 | `delete_pool` | Just mine → a made lane; joint → the author's `_joint_lane_for` lane, else a made lane | pool records → a made lane (as Just mine); joint → the author's **home lane** for its pool lane, else a made lane |
@@ -207,8 +207,9 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 
 ### Edit sheets
 - **Home record:** lane, title, icon and dates; Audience per pool with its lane chip. **Make it joint…** picks the pool, a pool lane and who's together.
-- **Pool record (mine):** title, icon, dates and pool lane chip. **Make it joint…** (Together) and **Move to Home…** (decision 3).
-- **Joint:** title and icon for any member; pool lane; **Together** to add people (decision 6). **Make it mine** appears only while every ripple is mine.
+- **Pool record (mine):** title, icon, dates and pool lane chip. In the pool: **Together** makes it joint. On Home: picking a lane of mine moves it to Home.
+- **Joint:** title and icon for any member; pool lane; **Together** to add people (decision 6). **Make it mine** is on Home only (Yoonji, in the session), while every ripple is mine: picking a lane of mine makes it mine.
+- **Becoming mine on Home**, for a pool record or a joint record, sets its lane and its Audience anew. Audience starts as a new record's would (Only me, unless the lane's link shares by default), and it leaves its pool unless Audience shares it there.
 
 ### Home pool columns
 - After my lanes: one column per pool with any of my pool records or joint records in it, headed by the pool's monogram and name.
@@ -227,7 +228,7 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 
 1. **Home lane is optional** per (pool lane, me).
 2. **Defaults are markers** on `lane_mappings`.
-3. **Conversions kept:** Home record ↔ joint, pool record ↔ joint, and **Move to Home…** for a pool record.
+3. **Conversions kept:** Home record ↔ joint, pool record ↔ joint, and **Move to Home…** for a pool record. Amended in the session: to joint is done in the pool (Together); to mine is done on Home only, its lane and Audience set anew. Joint → pool record is gone.
 4. **Joint invitees backfill: (a)**, all current members of the joint record's pool. This became **Everyone on** for each existing joint record (§3).
 5. **"Include my earlier records" and `_place_history` are retired.**
 6. **Any current member can add people to Together.**

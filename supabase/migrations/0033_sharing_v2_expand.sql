@@ -40,7 +40,7 @@
 --                     old direction-shaped links too
 --   _place_on         needs no link
 --   set_splash_lane   moves no placement: sharing is per record
---   splash_to_mine    leaves the record shared where it was
+--   splash_to_mine    keeps no placement: its lane and Audience are set anew
 --   splash_to_joint, create_joint_splash  the old app's calls, kept until
 --                     0034 as wrappers that make Everyone on
 --   join_pool, create_pool  place nothing earlier (decision 5)
@@ -48,8 +48,7 @@
 -- Added: joint_invitees, splashes.joint_invite_all ("Everyone"),
 -- pools.invite_all_by_default, add_joint_invitees, joint_together,
 -- set_pool_invite_all, create_together_splash and splash_to_together (the
--- new app's, Everyone said explicitly), splash_to_pool_record (joint → my
--- pool record),
+-- new app's, Everyone said explicitly),
 -- _home_lane_for, _settle_lane_default.
 --
 -- Until 0034 the old indexes hold: one link of mine per pool lane (0009)
@@ -512,9 +511,10 @@ end;
 $$;
 
 -- A joint record or my pool record becomes my Home record, in a lane of
--- mine ("Make it mine", "Move to Home…"). It stays shared to its pool, on
--- the pool lane chosen or the one it was on, while I am in that pool:
--- what the pool saw, it still sees.
+-- mine ("Make it mine", "Move to Home…", from Home only; Yoonji, in the
+-- session). Its lane and its Audience are set anew: it keeps no placement,
+-- and the app shares it where Audience says (placed here only when
+-- p_place_on names a pool lane).
 create or replace function public.splash_to_mine(p_splash uuid, p_my_lane uuid, p_place_on uuid default null)
 returns void
 language plpgsql
@@ -525,7 +525,6 @@ declare
   uid uuid := public._require_uid();
   s record;
   pid uuid;
-  target uuid;
 begin
   select id, owner_id, pool_id, pool_lane_id, own_pool_id into s
     from public.splashes where id = p_splash;
@@ -539,16 +538,12 @@ begin
     pid := s.pool_id;
     perform public._require_member(pid);
     perform public._require_only_mine(p_splash, uid);
-    target := s.pool_lane_id;
   elsif s.own_pool_id is not null and s.owner_id = uid then
     pid := s.own_pool_id;
-    select pool_lane_id into target from public.splash_placements
-     where splash_id = p_splash and pool_id = pid;
   else
     raise exception 'only a joint record or your pool record becomes yours this way'
       using errcode = '42501';
   end if;
-  target := coalesce(p_place_on, target);
 
   perform set_config('weming.reshape', 'on', true);
   delete from public.splash_placements where splash_id = p_splash;
@@ -562,10 +557,8 @@ begin
          pinned_at = null,
          joint_invite_all = false
    where id = p_splash;
-  if target is not null and exists (
-    select 1 from public.pool_members where pool_id = pid and user_id = uid and left_at is null
-  ) then
-    perform public._place_on(p_splash, uid, p_my_lane, target);
+  if p_place_on is not null then
+    perform public._place_on(p_splash, uid, p_my_lane, p_place_on);
   end if;
   perform set_config('weming.reshape', 'off', true);
 end;
@@ -633,46 +626,6 @@ security definer
 set search_path = ''
 as $$
   select public.splash_to_together(p_splash, p_pool_lane, true);
-$$;
-
--- A joint record, every ripple mine, becomes my pool record on its pool
--- lane. Replaces splash_to_just_mine's joint path; its Home path is retired.
-create function public.splash_to_pool_record(p_splash uuid)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  uid uuid := public._require_uid();
-  s record;
-begin
-  select id, owner_id, pool_id, pool_lane_id into s from public.splashes where id = p_splash;
-  if not found then
-    raise exception 'that splash is gone' using errcode = 'P0002';
-  end if;
-  if s.owner_id is not null then
-    raise exception 'only a joint record becomes a pool record' using errcode = '42501';
-  end if;
-  perform public._require_member(s.pool_id);
-  perform public._require_only_mine(p_splash, uid);
-
-  perform set_config('weming.reshape', 'on', true);
-  delete from public.joint_invitees where splash_id = p_splash;
-  update public.splashes
-     set owner_id = uid,
-         pool_id = null,
-         pool_lane_id = null,
-         own_pool_id = s.pool_id,
-         declared_lane_id = null,
-         session_id = null,
-         pinned_at = null,
-         joint_invite_all = false
-   where id = p_splash;
-  insert into public.splash_placements (splash_id, pool_id, pool_lane_id, shared)
-  values (p_splash, s.pool_id, s.pool_lane_id, true);
-  perform set_config('weming.reshape', 'off', true);
-end;
 $$;
 
 -- A joint record, with Everyone or not (p_invite_all, said by the new
@@ -987,5 +940,3 @@ revoke execute on function public.create_together_splash(uuid, uuid, uuid, text,
 grant execute on function public.create_together_splash(uuid, uuid, uuid, text, text, date, boolean) to authenticated;
 revoke execute on function public.splash_to_together(uuid, uuid, boolean) from public, anon;
 grant execute on function public.splash_to_together(uuid, uuid, boolean) to authenticated;
-revoke execute on function public.splash_to_pool_record(uuid) from public, anon;
-grant execute on function public.splash_to_pool_record(uuid) to authenticated;
