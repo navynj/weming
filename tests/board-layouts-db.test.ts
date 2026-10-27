@@ -357,33 +357,16 @@ describe('after leaving the pool', () => {
   });
 });
 
-describe('Members, stored as members (0048)', () => {
-  it('still takes a write from the app before the rename, as swimmers, until 0049', async () => {
+describe('Members, stored as members (0048, 0049)', () => {
+  it('refuses the old name once 0049 has moved it', async () => {
     const old = await set(ana, { label: { y: 1 } }, { view: 'swimmers' as never });
-    expect(old.error).toBeNull();
-    const rows = await asUser(ana)
-      .from('board_layouts')
-      .select('view')
-      .eq('splash_id', splash)
-      .eq('scope', 'pool')
-      .in('view', ['swimmers', 'members']);
-    expect(new Set(rows.data!.map((r) => r.view))).toEqual(new Set(['swimmers', 'members']));
+    expect(old.error).not.toBeNull();
   });
 
-  it('reads a leftover swimmers row as Members, the members row winning where both stand', async () => {
+  it('reads the Members view’s layouts, stored as members', async () => {
     const { getPoolLayouts } = await import('@/lib/queries/layouts');
     const byMembers = await getPoolLayouts(asUser(ana), pool, 'members');
-    // The members row (written by the earlier test as label x 2, tilt -10) wins.
+    // Written by the separation test above as label x 2, tilt -10.
     expect(byMembers[splash]).toMatchObject({ label: { x: 2, tilt: -10 } });
-    // With only the old row, it is read.
-    await asAdmin()
-      .from('board_layouts')
-      .delete()
-      .eq('splash_id', splash)
-      .eq('scope', 'pool')
-      .eq('view', 'members');
-    expect((await getPoolLayouts(asUser(ana), pool, 'members'))[splash]).toEqual({
-      label: { y: 1 },
-    });
   });
 });
