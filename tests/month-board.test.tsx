@@ -1358,3 +1358,24 @@ describe('the Lane view drawn with the board’s pieces (0045)', () => {
     expect(layoutLaneBoard(BUSY, [], LANES, { width: 358, columnOf: laneOf }).pieces).toEqual([]);
   });
 });
+
+describe('a set layout holds when a ripple is added (review)', () => {
+  it('keeps a day’s posts in the order they were made, not by their latest ripple', () => {
+    const first: Card = {
+      ...card('first', 'Made first', '2026-10-21'),
+      layout: { label: { x: 0.2, y: 1 } },
+    };
+    const second = card('second', 'Made second', '2026-10-21', {
+      over: { created_at: '2026-10-21T19:00:00.000Z' },
+    });
+    const before = layoutWeekBoard([first, second], TODAY, { width: 980 });
+    // A ripple added to the first post today: its latest instant is now the day's last.
+    const added = { ...first, instant: Date.parse('2026-10-21T23:00:00.000Z') };
+    const after = layoutWeekBoard([added, second], TODAY, { width: 980 });
+    for (const id of ['first', 'second']) {
+      const a = before.pieces.find((p) => p.id === id)!;
+      const b = after.pieces.find((p) => p.id === id)!;
+      expect([b.x, b.y]).toEqual([a.x, a.y]);
+    }
+  });
+});

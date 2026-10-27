@@ -965,10 +965,12 @@ function layoutBoard(
     if (list) list.push(card);
     else byDay.set(key, [card]);
   }
+  // A cell's posts in the order they were made: never by their latest
+  // ripple, which would move a post — and every hand-set offset on it — each
+  // time someone adds to it (review: a ripple added broke a set layout).
   for (const list of byDay.values()) {
     list.sort(
       (a, b) =>
-        a.instant - b.instant ||
         a.splash.createdAt.localeCompare(b.splash.createdAt) ||
         a.splash.id.localeCompare(b.splash.id),
     );
