@@ -166,6 +166,8 @@ export function poolCards(
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,
       authorId: splash.owner_id,
+      // Its author's face after the title, but where the column already says who.
+      authorFace: kind !== 'swimmers',
       authorName: nameOf.get(splash.owner_id),
       href,
       origins,

@@ -48,6 +48,12 @@ export type Card = {
   /** My record on Home: its members' ripples, a count per pool (0035): "JY · 3 · SY · 2". */
   sides?: { label: string; count: number }[];
   /**
+   * In a pool's Calendar, Lane and List (review): its author's face after the
+   * title — on every record that is not joint, mine included. Never on Home;
+   * never in Swimmers, whose column says who.
+   */
+  authorFace?: boolean;
+  /**
    * In a pool, with Everyone (review): a joint record with Everyone on, or a
    * member's own record shared here with Everyone on. In Swimmers, drawn with
    * pieces, it spans every column as a band.

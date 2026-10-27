@@ -5,7 +5,7 @@ import { Heart } from 'lucide-react';
 
 import { CommitRing } from '@/components/ui/waves';
 import { Monogram } from '@/components/ui/monogram';
-import { PersonName } from '@/features/people/avatar';
+import { Avatar, PersonName } from '@/features/people/avatar';
 
 import { postIcon, type Card, type CardLane } from './grid';
 
@@ -91,6 +91,17 @@ export function PostRow({
         // Shared to a pool (H23), in the lane chip's place on Home.
         <Monogram key={pool} name={pool} size="chip" photo={card.poolPhoto ?? null} />
       ))}
+      {card.authorFace && card.authorId && !(card.joint || card.together) ? (
+        // Whose it is, as a face after the title (review), its name beside it.
+        <span data-row-author-face className="flex shrink-0">
+          <Avatar
+            id={card.authorId}
+            initials={card.author ?? ''}
+            className="text-main-900/60 bg-joint-face flex items-center justify-center overflow-hidden rounded-full leading-none"
+            style={{ width: 14, height: 14, fontSize: 6 }} // allow-small-text: initials sized with the face
+          />
+        </span>
+      ) : null}
       {card.author ? (
         // In a pool's Date view each row says whose it is (H23).
         <span

@@ -209,7 +209,7 @@ function ground(view: PoolView) {
 
 /** The view a test's pool opens on: a visit opens on the Calendar (review); these choose. */
 let startView: PoolViewKind = 'swimmers';
-function setView(view: 'lane' | 'date' | 'swimmers'): void {
+function setView(view: 'lane' | 'date' | 'swimmers' | 'board'): void {
   startView = view;
 }
 
@@ -1032,5 +1032,50 @@ describe('Swimmers layouts (0047)', () => {
       '[data-lane-band="s-joint"] [data-board-band]',
     )!;
     expect(words.style.transform ?? '').not.toContain('rotate(9deg)');
+  });
+});
+
+describe('whose a record is, in a pool (review)', () => {
+  const authored = (root: Element) =>
+    [...root.querySelectorAll('[data-board-author]')].map((el) =>
+      el.closest('[data-board-piece]')!.getAttribute('data-board-piece'),
+    );
+
+  it('puts its author’s face after the title in the Lane view, mine included; never on a joint record', () => {
+    setView('lane');
+    const { container } = ground(A);
+    const ids = authored(container);
+    expect(ids).toEqual(expect.arrayContaining(['s-mine', 's-mina']));
+    expect(ids).not.toContain('s-joint');
+    const face = container.querySelector<HTMLElement>(
+      '[data-lane-piece="s-mina"] [data-board-author] > *',
+    )!;
+    expect(['12px', '14px']).toContain(face.style.width);
+  });
+
+  it('in the Calendar too', () => {
+    setView('board');
+    const { container } = ground(A);
+    expect(
+      container.querySelector('[data-board-piece="s-mina"] [data-board-author]'),
+    ).not.toBeNull();
+  });
+
+  it('in the List, before the name', () => {
+    setView('date');
+    const { container } = ground(A);
+    const row = container.querySelector('[data-pill="s-mina"]')!;
+    const face = row.querySelector('[data-row-author-face]')!;
+    expect(face).not.toBeNull();
+    expect(
+      face.compareDocumentPosition(row.querySelector('[data-row-author]')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(container.querySelector('[data-pill="s-joint"] [data-row-author-face]')).toBeNull();
+  });
+
+  it('never in Swimmers, whose column says who', () => {
+    setView('swimmers');
+    expect(ground(A).container.querySelector('[data-board-author]')).toBeNull();
   });
 });

@@ -652,6 +652,8 @@ export function BoardPieceView({
             {caption}
             {card.joint || card.together ? (
               <Faces card={card} ring={FACE_RING[piece.label]} />
+            ) : card.authorFace && card.authorId ? (
+              <AuthorFace card={card} px={metrics.narrow ? 12 : 14} />
             ) : null}
           </span>
         </span>
@@ -817,5 +819,31 @@ function ReadingRipple({
       className="board-ripple pointer-events-none absolute rounded-full border-[1.5px] border-white"
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, transform, zIndex: z }}
     />
+  );
+}
+
+/**
+ * Whose a record is, in a pool's Calendar, Lane and List (review): their face
+ * after the title, 14px (12px on a phone), mine included; a joint record
+ * shows its writers instead. Its initials scale with it, not the 10px floor:
+ * a face is read as a mark.
+ */
+export function AuthorFace({ card, px }: { card: Card; px: number }) {
+  return (
+    <>
+      {SEPARATOR}
+      <span
+        data-board-author={card.authorId}
+        className={`inline-flex h-[var(--line,13px)] items-center align-top ${NO_INDENT}`}
+      >
+        <Avatar
+          id={card.authorId}
+          initials={card.author ?? ''}
+          className="text-main-900/60 bg-joint-face flex shrink-0 items-center justify-center overflow-hidden rounded-full leading-none"
+          // allow-small-text: initials sized with the face, read as a mark
+          style={{ width: px, height: px, fontSize: Math.round(px * 0.45) }}
+        />
+      </span>
+    </>
   );
 }

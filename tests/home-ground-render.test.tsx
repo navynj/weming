@@ -1186,3 +1186,14 @@ describe('?view= (review)', () => {
     ]).toEqual(['swimmers', 'lane', 'date', 'board']);
   });
 });
+
+describe('author faces stay off Home (review)', () => {
+  it('shows no author face on any piece or row', () => {
+    homeView = 'lane';
+    const lane = ground();
+    expect(lane.container.querySelector('[data-board-author]')).toBeNull();
+    cleanup();
+    homeView = 'date';
+    expect(ground().container.querySelector('[data-row-author-face]')).toBeNull();
+  });
+});
