@@ -30,6 +30,7 @@ import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
+import { Bell } from '@/features/notifications/bell';
 
 /**
  * Which board Home shows (review, 2026-10-22): the **stair** — read cards
@@ -357,6 +358,7 @@ export function HomeGround({
             <div className="min-w-0 flex-1">
               <ViewToggle view={view} onChange={setView} />
             </div>
+            <Bell />
           </header>
 
           {dropMessage || lanes.message ? (

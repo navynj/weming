@@ -29,6 +29,7 @@ import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
+import { Bell } from '@/features/notifications/bell';
 
 import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
@@ -289,6 +290,7 @@ export function PoolGround({
             >
               {view.pool.name}
             </h1>
+            <Bell />
             <span className="flex shrink-0 items-center">
               {/* The members' faces are the way to the member list (review). */}
               <button
