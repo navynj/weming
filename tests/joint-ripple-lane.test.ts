@@ -95,11 +95,14 @@ async function addTo(
   expect(linked.error).toBeNull();
   const id = crypto.randomUUID();
   joints.push(id);
-  const opened = await asUser(ana).rpc('create_joint_splash', {
+  const opened = await asUser(ana).rpc('create_together_splash', {
     p_id: id,
     p_pool: pool,
     p_pool_lane: poolLane === 'trips' ? trips : days,
     p_title: `${poolLane} ${home ? 'home' : 'linked'}`,
+    p_icon: '',
+    p_declared_start: null as unknown as string,
+    p_invite_all: false,
   });
   expect(opened.error).toBeNull();
   const done = await addBlock({

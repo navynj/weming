@@ -39,10 +39,6 @@ function said(error: { message: string; code?: string } | null): string {
   if (error.code === '42501' && /ripples? by other members/.test(error.message)) {
     return error.message;
   }
-  // 0009, until 0036 lifts it: a pool lane connects to one lane of mine.
-  if (error.code === '23505' && /lane_mappings_one_per_pool_lane/.test(error.message)) {
-    return 'Each lane of this Pool connects to one of your lanes for now.';
-  }
   if (error.code === '23505' && /lane_mappings_one_default/.test(error.message)) {
     return 'Each of your lanes has one default here.';
   }

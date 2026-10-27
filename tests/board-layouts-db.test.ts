@@ -85,11 +85,14 @@ beforeAll(async () => {
   });
   if (joined.error) throw joined.error;
   splash = randomUUID();
-  const opened = await asUser(ana).rpc('create_joint_splash', {
+  const opened = await asUser(ana).rpc('create_together_splash', {
     p_id: splash,
     p_pool: pool,
     p_pool_lane: lane,
     p_title: 'A weekend',
+    p_icon: '',
+    p_declared_start: null as unknown as string,
+    p_invite_all: false,
   });
   if (opened.error) throw opened.error;
   const ripple = await asAdmin()

@@ -105,12 +105,14 @@ beforeAll(async () => {
   }
 
   // A joint splash: three ripples of Ben's, one of Ana's.
-  await asUser(ana).rpc('create_joint_splash', {
+  await asUser(ana).rpc('create_together_splash', {
     p_id: JOINT,
     p_pool: pool,
     p_pool_lane: lane.Games,
     p_title: 'Arnak league',
     p_icon: '🏛️',
+    p_declared_start: null as unknown as string,
+    p_invite_all: false,
   });
   for (const [n, at] of [
     [1, '2026-10-20T18:00:00.000Z'],

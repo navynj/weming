@@ -152,7 +152,6 @@ export type Database = {
       lane_mappings: {
         Row: {
           created_at: string
-          direction: Database["public"]["Enums"]["lane_link_direction"]
           id: string
           is_default: boolean
           is_home: boolean
@@ -164,7 +163,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          direction?: Database["public"]["Enums"]["lane_link_direction"]
           id?: string
           is_default?: boolean
           is_home?: boolean
@@ -176,7 +174,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          direction?: Database["public"]["Enums"]["lane_link_direction"]
           id?: string
           is_default?: boolean
           is_home?: boolean
@@ -1110,21 +1107,13 @@ export type Database = {
         Returns: undefined
       }
       _home_lane_for: { Args: { sid: string; uid: string }; Returns: string }
-      _inherit_backfill: { Args: never; Returns: undefined }
-      _inherit_post_title: { Args: { note: string }; Returns: string }
-      _inherit_split_from: {
-        Args: { p_created: string; p_lane: string; src: string }
-        Returns: string
-      }
       _invite_pool: { Args: { p_token: string }; Returns: string }
-      _joint_lane_for: { Args: { sid: string; uid: string }; Returns: string }
       _joint_pool: { Args: { sid: string }; Returns: string }
       _layout_group: { Args: { g: Json; kind: string }; Returns: boolean }
       _layout_number: {
         Args: { hi: number; lo: number; v: Json }
         Returns: boolean
       }
-      _place_history: { Args: { pid: string; uid: string }; Returns: undefined }
       _place_on: {
         Args: { cid: string; plid: string; sid: string; uid: string }
         Returns: undefined
@@ -1136,10 +1125,6 @@ export type Database = {
       }
       _require_uid: { Args: never; Returns: string }
       _ripple_pools: { Args: { rid: string }; Returns: string[] }
-      _sending_lane: {
-        Args: { cid: string; pid: string; uid: string }
-        Returns: string
-      }
       _set_links: {
         Args: { p_links: Json; pid: string; uid: string }
         Returns: undefined
@@ -1167,17 +1152,6 @@ export type Database = {
           expires_at: string
           token: string
         }[]
-      }
-      create_joint_splash: {
-        Args: {
-          p_declared_start?: string
-          p_icon?: string
-          p_id: string
-          p_pool: string
-          p_pool_lane: string
-          p_title: string
-        }
-        Returns: string
       }
       create_own_pool_splash: {
         Args: {
@@ -1221,16 +1195,6 @@ export type Database = {
       hide_reply: {
         Args: { p_hidden?: boolean; p_reply: string }
         Returns: undefined
-      }
-      invite_lanes: {
-        Args: { p_token: string }
-        Returns: {
-          description: string
-          icon: string
-          id: string
-          lane_position: number
-          name: string
-        }[]
       }
       invite_photo: {
         Args: { p_token: string }
@@ -1370,39 +1334,10 @@ export type Database = {
       splash_in_my_pools: { Args: { sid: string }; Returns: boolean }
       splash_in_pool: { Args: { pid: string; sid: string }; Returns: boolean }
       splash_owner: { Args: { sid: string }; Returns: string }
-      splash_reaction_summary: {
-        Args: { p_splashes: string[] }
-        Returns: {
-          emoji: string[]
-          splash_id: string
-          total: number
-        }[]
-      }
-      splash_reply_preview: {
-        Args: { p_splashes: string[] }
-        Returns: {
-          author_id: string
-          body: string
-          created_at: string
-          reply_id: string
-          ripple_id: string
-          splash_id: string
-          total: number
-        }[]
-      }
-      splash_to_joint: {
-        Args: { p_pool_lane: string; p_splash: string }
-        Returns: undefined
-      }
-      splash_to_just_mine: {
-        Args: { p_pool_lane: string; p_splash: string }
-        Returns: undefined
-      }
       splash_to_mine: {
         Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
         Returns: undefined
       }
-      splash_to_pool_record: { Args: { p_splash: string }; Returns: undefined }
       splash_to_together: {
         Args: { p_invite_all: boolean; p_pool_lane: string; p_splash: string }
         Returns: undefined
@@ -1413,7 +1348,6 @@ export type Database = {
     }
     Enums: {
       audience_target: "list" | "pool" | "lock"
-      lane_link_direction: "out" | "both" | "in"
       pool_kind:
         | "couple_diary"
         | "study"
@@ -1555,7 +1489,6 @@ export const Constants = {
   public: {
     Enums: {
       audience_target: ["list", "pool", "lock"],
-      lane_link_direction: ["out", "both", "in"],
       pool_kind: [
         "couple_diary",
         "study",

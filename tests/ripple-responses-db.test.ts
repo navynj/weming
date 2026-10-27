@@ -83,11 +83,14 @@ beforeAll(async () => {
   for (const who of [ben, dee, eve]) await join(who);
 
   joint = crypto.randomUUID();
-  const made = await asUser(ana).rpc('create_joint_splash', {
+  const made = await asUser(ana).rpc('create_together_splash', {
     p_id: joint,
     p_pool: pool,
     p_pool_lane: lane,
     p_title: 'A walk',
+    p_icon: '',
+    p_declared_start: null as unknown as string,
+    p_invite_all: false,
   });
   expect(made.error).toBeNull();
   open = await block('the river was high');
@@ -137,14 +140,16 @@ describe('reactions', () => {
         .insert({ ripple_id: open, user_id: who, emoji });
       expect(error).toBeNull();
     }
-    const { data, error } = await asUser(ben).rpc('splash_reaction_summary', {
-      p_splashes: [joint],
-    });
+    const { data, error } = await asUser(ben)
+      .from('ripple_reactions')
+      .select('emoji')
+      .eq('ripple_id', open);
     expect(error).toBeNull();
-    expect(data).toHaveLength(1);
-    expect(data![0].total).toBe(5);
-    expect(data![0].emoji![0]).toBe('❤️');
-    expect(data![0].emoji).toHaveLength(3);
+    expect(data).toHaveLength(5);
+    const counts = new Map<string, number>();
+    for (const r of data!) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+    expect(counts.size).toBe(3);
+    expect(counts.get('❤️')).toBe(3);
   });
 
   it('refuses whitespace and an over-long emoji', async () => {
@@ -201,9 +206,6 @@ describe('replies', () => {
     expect(third[0].body).toBeNull();
     expect((await repliesFor(ben, open)).data![0].body).toBe('so very high');
     expect((await repliesFor(ana, open)).data![0].body).toBe('so very high');
-    // Hidden is skipped and not counted on the board.
-    const preview = await asUser(eve).rpc('splash_reply_preview', { p_splashes: [joint] });
-    expect(preview.data).toHaveLength(0);
     expect(
       (await asUser(ana).rpc('hide_reply', { p_reply: benReply, p_hidden: false })).error,
     ).toBeNull();
@@ -214,17 +216,6 @@ describe('replies', () => {
     expect((await asUser(ben).rpc('delete_reply', { p_reply: benReply })).error).toBeNull();
     const gone = await asAdmin().from('ripple_replies').select('id').eq('id', benReply);
     expect(gone.data).toHaveLength(0);
-  });
-
-  it('the board preview: the first three (two shown, the third for "+n"), oldest first, and the count', async () => {
-    for (const body of ['one', 'two', 'three', 'four', 'five']) {
-      expect(
-        (await asUser(eve).rpc('add_reply', { p_ripple: open, p_body: body })).error,
-      ).toBeNull();
-    }
-    const { data } = await asUser(ben).rpc('splash_reply_preview', { p_splashes: [joint] });
-    expect(data!.map((r) => r.body)).toEqual(['one', 'two', 'three']);
-    expect(data![0].total).toBe(5);
   });
 
   it('replies are not ripples: the joint splash still awaits Ben', async () => {
@@ -252,12 +243,6 @@ describe('outside, signed out, and locked', () => {
     expect(
       (await asUser(cal).rpc('add_reply', { p_ripple: open, p_body: 'hi' })).error,
     ).not.toBeNull();
-    expect((await asUser(cal).rpc('splash_reply_preview', { p_splashes: [joint] })).data).toEqual(
-      [],
-    );
-    expect(
-      (await asUser(cal).rpc('splash_reaction_summary', { p_splashes: [joint] })).data,
-    ).toEqual([]);
   });
 
   it('a signed-out caller reaches nothing', async () => {
@@ -267,9 +252,6 @@ describe('outside, signed out, and locked', () => {
     expect((await repliesFor(null, open)).error).not.toBeNull();
     expect(
       (await anonymous().rpc('add_reply', { p_ripple: open, p_body: 'hi' })).error,
-    ).not.toBeNull();
-    expect(
-      (await anonymous().rpc('splash_reaction_summary', { p_splashes: [joint] })).error,
     ).not.toBeNull();
   });
 
