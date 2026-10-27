@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# The push gate: the whole suite — unit, dom and the database tests — since
+# The push gate: the whole suite — unit, dom and the database tests, then the
+# browser measurements (Playwright on the installed Chrome) — since
 # every push goes to main or to a pull request. The commit hook ran only the
 # tests related to each commit; this is where everything is proven together.
 #
@@ -17,4 +18,14 @@ pnpm -s test > "$out" 2>&1 || {
   exit 1
 }
 grep -E 'Tests ' "$out" || true
+
+# Direct manipulation measured in Chrome (e2e/, the /dev/board fixture): it
+# reuses a dev server that is already up, else starts one.
+printf '\n→ push gate: the browser measurements\n'
+pnpm -s test:e2e > "$out" 2>&1 || {
+  grep -E '✘|failed|Error|expect' "$out" | head -20 >&2
+  echo '✖ browser measurements failed: nothing pushed' >&2
+  exit 1
+}
+grep -E 'passed' "$out" | tail -1 || true
 printf '\n✓ push gate passed\n'

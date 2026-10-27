@@ -54,3 +54,7 @@ weming-backup.key
 
 # Agent worktrees (Claude Code): separate checkouts, never part of this one.
 .claude/worktrees/
+
+# Playwright
+/test-results/
+/playwright-report/

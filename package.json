@@ -18,6 +18,7 @@
     "seed:me": "./scripts/assert-local.sh && ./scripts/seed-me.sh",
     "test:ci": "vitest run --project unit --project unit-iso --project dom",
     "test:db": "vitest run --project db",
+    "test:e2e": "playwright test",
     "verify": "pnpm lint && pnpm test:ci",
     "backup": "./scripts/backup.sh",
     "db:push": "./scripts/db-push.sh",
@@ -38,6 +39,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
