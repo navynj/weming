@@ -309,6 +309,42 @@ export type Database = {
           },
         ]
       }
+      member_notification_prefs: {
+        Row: {
+          pool_id: string
+          type: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          pool_id: string
+          type: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          pool_id?: string
+          type?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_notification_prefs_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_notification_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       my_categories: {
         Row: {
           created_at: string
@@ -343,6 +379,126 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_settings: {
+        Row: {
+          paused: boolean
+          show_titles: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          paused?: boolean
+          show_titles?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          paused?: boolean
+          show_titles?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          actor_id: string
+          count: number
+          created_at: string
+          id: string
+          invited: boolean
+          pool_id: string
+          pushed_at: string | null
+          read_at: string | null
+          recipient_id: string
+          reply_id: string | null
+          ripple_id: string | null
+          splash_id: string
+          type: string
+        }
+        Insert: {
+          actor_id: string
+          count?: number
+          created_at?: string
+          id?: string
+          invited?: boolean
+          pool_id: string
+          pushed_at?: string | null
+          read_at?: string | null
+          recipient_id: string
+          reply_id?: string | null
+          ripple_id?: string | null
+          splash_id: string
+          type: string
+        }
+        Update: {
+          actor_id?: string
+          count?: number
+          created_at?: string
+          id?: string
+          invited?: boolean
+          pool_id?: string
+          pushed_at?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          reply_id?: string | null
+          ripple_id?: string | null
+          splash_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: false
+            referencedRelation: "ripple_replies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_ripple_id_fkey"
+            columns: ["ripple_id"]
+            isOneToOne: false
+            referencedRelation: "ripples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_splash_id_fkey"
+            columns: ["splash_id"]
+            isOneToOne: false
+            referencedRelation: "splashes"
             referencedColumns: ["id"]
           },
         ]
@@ -472,6 +628,32 @@ export type Database = {
           },
         ]
       }
+      pool_notification_defaults: {
+        Row: {
+          pool_id: string
+          type: string
+          value: string
+        }
+        Insert: {
+          pool_id: string
+          type: string
+          value: string
+        }
+        Update: {
+          pool_id?: string
+          type?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pool_notification_defaults_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pools: {
         Row: {
           born_from_splash: string | null
@@ -570,6 +752,47 @@ export type Database = {
           timezone?: string
         }
         Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_used_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_used_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_used_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ripple_audience: {
         Row: {
@@ -1107,6 +1330,18 @@ export type Database = {
         Args: { hi: number; lo: number; v: Json }
         Returns: boolean
       }
+      _notification_pool: {
+        Args: { actor: string; recipient: string; rid: string }
+        Returns: string
+      }
+      _notification_value: {
+        Args: { p_type: string; pid: string; uid: string }
+        Returns: string
+      }
+      _notify_new_post: {
+        Args: { p_pool: string; p_splash: string }
+        Returns: undefined
+      }
       _place_on: {
         Args: { cid: string; plid: string; sid: string; uid: string }
         Returns: undefined
@@ -1223,6 +1458,10 @@ export type Database = {
         Args: { p_keep: boolean; p_pool: string }
         Returns: undefined
       }
+      mark_notifications_read: {
+        Args: { p_ids?: string[] }
+        Returns: undefined
+      }
       member_visible: { Args: { pid: string; uid: string }; Returns: boolean }
       move_pool_splash: {
         Args: { p_pool_lane: string; p_splash: string }
@@ -1234,6 +1473,10 @@ export type Database = {
           pool_id: string
           ripple_id: string
         }[]
+      }
+      my_notification_value: {
+        Args: { p_pool: string; p_type: string }
+        Returns: string
       }
       my_thread_ripples: {
         Args: never
@@ -1261,6 +1504,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      pool_creator_is_me: { Args: { pid: string }; Returns: boolean }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
       rename_pool: {
         Args: { p_name: string; p_pool: string }
@@ -1293,6 +1537,15 @@ export type Database = {
         Returns: unknown
       }
       ripple_writable: { Args: { sid: string; tp: string }; Returns: boolean }
+      save_push_subscription: {
+        Args: {
+          p_auth: string
+          p_endpoint: string
+          p_p256dh: string
+          p_user_agent?: string
+        }
+        Returns: undefined
+      }
       set_board_layout: {
         Args: {
           p_clear?: string[]
