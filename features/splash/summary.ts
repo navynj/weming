@@ -35,6 +35,8 @@ export type SplashSummary = {
   title: string;
   /** For an untitled post: the first block's first words, else null. */
   ghostTitle: string | null;
+  /** Its description (0037), under the title, apart from its ripples; null when none. */
+  description: string | null;
   /** Its lane (H24); none for joint and Just mine, whose lane is their pool lane. */
   declaredLaneId: string | null;
   /** The post's own icon (0008), or none: its lane's emoji stands in. */
@@ -113,6 +115,7 @@ export function summarizeSplash(
     id: splash.id,
     title: splash.title,
     ghostTitle: splash.title.trim() ? null : ghostTitle(written[0]?.note ?? null),
+    description: splash.description ?? null,
     declaredLaneId: splash.declared_lane_id,
     icon: splash.icon ?? null,
     laneIds: splash.declared_lane_id ? [splash.declared_lane_id] : [],
@@ -147,6 +150,7 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
     id: block.id,
     title: '',
     ghostTitle: ghostTitle(block.note),
+    description: null,
     declaredLaneId: null,
     icon: null,
     laneIds: block.category_id ? [block.category_id] : [],

@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useOptimistic, useState, useTransition } from 'react';
 
+import { useToast } from '@/components/ui/toast';
+
 export type ActionOutcome = { ok: true } | { ok: false; message: string };
 
 /**
@@ -13,12 +15,13 @@ export type ActionOutcome = { ok: true } | { ok: false; message: string };
  * the action refuses, the optimistic state falls away with the transition
  * and the refusal is shown.
  *
- * `run(updater, work)`: `updater` is the change as the screen should show
- * it, `work` is the action that makes it true.
+ * `run(updater, work, saved?)`: `updater` is the change as the screen
+ * should show it, `work` is the action that makes it true; `saved`, for a
+ * change that saves with no Save button, is the toast once it has.
  */
 export function useOptimisticAction<T>(value: T): {
   value: T;
-  run: (updater: (current: T) => T, work: () => Promise<ActionOutcome>) => void;
+  run: (updater: (current: T) => T, work: () => Promise<ActionOutcome>, saved?: string) => void;
   pending: boolean;
   message: string | null;
 } {
@@ -28,9 +31,10 @@ export function useOptimisticAction<T>(value: T): {
   );
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   const run = useCallback(
-    (updater: (current: T) => T, work: () => Promise<ActionOutcome>): void => {
+    (updater: (current: T) => T, work: () => Promise<ActionOutcome>, saved?: string): void => {
       setMessage(null);
       startTransition(async () => {
         apply(updater);
@@ -39,12 +43,13 @@ export function useOptimisticAction<T>(value: T): {
           setMessage(outcome.message);
           return;
         }
+        if (saved) toast.show(saved);
         // Joins this transition, so the optimistic value holds until the
         // re-read lands rather than flashing back to the old rows.
         router.refresh();
       });
     },
-    [apply, router],
+    [apply, router, toast],
   );
 
   return { value: optimistic, run, pending, message };

@@ -21,6 +21,7 @@ vi.mock('@/features/splash/actions', () => ({
   updateSplashHeader: record('updateSplashHeader', { ok: true, splash: {} }),
   setSplashPinned: record('setSplashPinned'),
   deleteSplash: record('deleteSplash'),
+  setSplashDescription: record('setSplashDescription'),
 }));
 vi.mock('@/features/splash/block-actions', () => ({
   addBlock: record('addBlock', { ok: true, rippleId: 'r-new' }),
@@ -100,6 +101,7 @@ const board: Splash = {
   pool_lane_id: null,
   own_pool_id: null,
   joint_invite_all: false,
+  description: null,
   created_by: null,
   type: 'free',
   prompt: null,
@@ -512,5 +514,51 @@ describe('my record’s sides, a tab per pool (0035)', () => {
     fireEvent.click(getByRole('tab', { name: 'Club (off)' }));
     expect(shown()).toContain('from Club');
     expect(shown()).not.toContain('from Crew');
+  });
+});
+
+describe('a splash’s description (0037)', () => {
+  it('waits behind "+ Add description", then saves what was written when the field is left', async () => {
+    const { container } = page();
+    expect(container.querySelector('[data-splash-description]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-splash-description-add]')!);
+    const field = container.querySelector<HTMLTextAreaElement>('[data-splash-description-field]')!;
+    fireEvent.change(field, { target: { value: '  A weekend in Whistler.  ' } });
+    // Set apart from the ripples by a divider.
+    expect(container.querySelector('[data-splash-description-block]')!.className).toContain(
+      'border-b',
+    );
+    fireEvent.blur(field);
+    await waitFor(() =>
+      expect(calls.find((c) => c.name === 'setSplashDescription')?.args).toEqual([
+        board.id,
+        'A weekend in Whistler.',
+      ]),
+    );
+  });
+
+  it('keeps what was there on Escape, and shows nothing to a reader when there is none', () => {
+    const { container, unmount } = page({
+      splash: { ...summarizeSplash(board, blocks, TZ, NOW), description: 'Kept' },
+    });
+    fireEvent.click(container.querySelector('[data-splash-description]')!);
+    const field = container.querySelector<HTMLTextAreaElement>('[data-splash-description-field]')!;
+    fireEvent.change(field, { target: { value: 'Changed' } });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(container.querySelector('[data-splash-description]')!.textContent).toBe('Kept');
+    expect(calls.some((c) => c.name === 'setSplashDescription')).toBe(false);
+    unmount();
+    const reader = page({
+      pool: {
+        poolId: 'p-1',
+        me: 'someone-else',
+        scope: 'theirs',
+        initialsOf: {},
+        laneChip: null,
+        canDeleteJoint: false,
+        zoneOf: {},
+      },
+    });
+    expect(reader.container.querySelector('[data-splash-description-block]')).toBeNull();
   });
 });

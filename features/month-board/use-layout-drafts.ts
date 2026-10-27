@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useToast } from '@/components/ui/toast';
 import type { Card } from '@/features/home/grid';
 
 import { revertToPoolLayout, setBoardLayout } from './actions';
@@ -53,6 +54,7 @@ export function useLayoutDrafts(cards: Card[], poolId: string | null) {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [saving, startTransition] = useTransition();
+  const toast = useToast();
   const [held, hold] = useOptimistic<Record<string, Shown>, { id: string; shown: Shown }>(
     {},
     (current, { id, shown }) => ({ ...current, [id]: shown }),
@@ -111,8 +113,11 @@ export function useLayoutDrafts(cards: Card[], poolId: string | null) {
             patch: draft.patch,
             clear: draft.clear,
           });
-          if (result.ok) router.refresh();
-          else setMessage(result.message);
+          if (result.ok) {
+            // Saved with no Save button: said once it has (Yoonji, in the session).
+            toast.show('Layout saved');
+            router.refresh();
+          } else setMessage(result.message);
           // Dropped once answered — unless the hand moved again meanwhile.
           setDrafts((all) => {
             if (all[id]?.version !== draft.version) return all;
@@ -124,7 +129,7 @@ export function useLayoutDrafts(cards: Card[], poolId: string | null) {
       }
     }, LAYOUT_SAVE_MS);
     return () => window.clearTimeout(timer);
-  }, [drafts, hold, poolId, router, source]);
+  }, [drafts, hold, poolId, router, source, toast]);
 
   /** "Use pool layout": my Home layout gone; the pool's is drawn again at once. */
   const revertToPool = useCallback(

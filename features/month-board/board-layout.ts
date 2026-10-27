@@ -45,8 +45,18 @@ export const WaveLayout = z
   })
   .partial()
   .strict();
+/**
+ * The whole piece (0038, Yoonji, in the session): label, icon, photos, wave
+ * and slot moved together, and its layer — which pieces it sits over where
+ * they meet, higher on top. Each part keeps its own offset on top of this.
+ */
+export const PieceLayout = z
+  .object({ x, y, layer: z.number().int().min(0).max(5) })
+  .partial()
+  .strict();
 export const BoardLayout = z
   .object({
+    piece: PieceLayout,
     icon: IconLayout,
     label: LabelLayout,
     photos: z.record(z.string(), PhotoLayout).refine((p) => Object.keys(p).length <= 20),
@@ -59,7 +69,7 @@ export type BoardLayoutJson = z.infer<typeof BoardLayout>;
 /** Where a splash's layout comes from on the screen it is drawn on. */
 export type LayoutSource = 'pool' | 'home' | null;
 
-type Group = 'icon' | 'label' | 'wave';
+type Group = 'piece' | 'icon' | 'label' | 'wave';
 
 /**
  * The database's merge, mirrored (set_board_layout): icon, label and wave
@@ -68,7 +78,7 @@ type Group = 'icon' | 'label' | 'wave';
  */
 export function mergeLayout(base: BoardLayoutJson, patch: BoardLayoutJson): BoardLayoutJson {
   const out: BoardLayoutJson = { ...base };
-  for (const key of ['icon', 'label', 'wave'] as const satisfies readonly Group[]) {
+  for (const key of ['piece', 'icon', 'label', 'wave'] as const satisfies readonly Group[]) {
     if (patch[key]) (out as Record<Group, unknown>)[key] = { ...base[key], ...patch[key] };
   }
   if (patch.photos) {

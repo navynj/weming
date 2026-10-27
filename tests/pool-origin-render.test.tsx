@@ -26,6 +26,7 @@ const SUMMARY = {
   id: 's',
   title: 'Arnak league',
   ghostTitle: null,
+  description: null,
   declaredLaneId: null,
   icon: null,
   laneIds: [],

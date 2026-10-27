@@ -982,6 +982,7 @@ export type Database = {
           declared_end: string | null
           declared_lane_id: string | null
           declared_start: string | null
+          description: string | null
           ends_at: string | null
           icon: string | null
           id: string
@@ -1003,6 +1004,7 @@ export type Database = {
           declared_end?: string | null
           declared_lane_id?: string | null
           declared_start?: string | null
+          description?: string | null
           ends_at?: string | null
           icon?: string | null
           id?: string
@@ -1024,6 +1026,7 @@ export type Database = {
           declared_end?: string | null
           declared_lane_id?: string | null
           declared_start?: string | null
+          description?: string | null
           ends_at?: string | null
           icon?: string | null
           id?: string

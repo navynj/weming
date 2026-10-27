@@ -67,6 +67,7 @@ const SUMMARY = {
   id: 's-joint',
   title: 'Arnak league',
   ghostTitle: null,
+  description: null,
   declaredLaneId: null,
   icon: '🏛️',
   laneIds: [],

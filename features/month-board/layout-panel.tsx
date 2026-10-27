@@ -226,6 +226,7 @@ export function LayoutPanel({
   const [advanced, setAdvanced] = useState(false);
   const photos = (card.photos ?? []).slice(0, 3);
   const signed = useSignedPhotos(photos);
+  const piece = layout.piece ?? {};
   const icon = layout.icon ?? {};
   const label = layout.label ?? {};
   const wave = layout.wave ?? {};
@@ -274,6 +275,46 @@ export function LayoutPanel({
                 </button>
               ) : null}
             </div>
+          ) : null}
+
+          {/* The whole piece moved, and set over or under others (0038). */}
+          {!period ? (
+            <Group title="Position">
+              <Slider
+                name="X"
+                value={piece.x}
+                fallback={0}
+                min={-0.6}
+                max={0.6}
+                step={0.01}
+                unit={lanes}
+                onChange={(v) => onEdit({ piece: { x: v } })}
+                onReset={() => onEdit({}, ['piece.x'])}
+              />
+              <Slider
+                name="Y"
+                value={piece.y}
+                fallback={0}
+                min={-6}
+                max={6}
+                step={0.1}
+                unit={lines}
+                onChange={(v) => onEdit({ piece: { y: v } })}
+                onReset={() => onEdit({}, ['piece.y'])}
+              />
+              {/* Said as a layer, the way design tools say it: higher sits on top. */}
+              <Slider
+                name="Layer"
+                value={piece.layer}
+                fallback={0}
+                min={0}
+                max={5}
+                step={1}
+                unit={(v) => (v === 0 ? 'Base' : `On top +${v}`)}
+                onChange={(v) => onEdit({ piece: { layer: Math.round(v) } })}
+                onReset={() => onEdit({}, ['piece.layer'])}
+              />
+            </Group>
           ) : null}
 
           {/* A period is a tape along its days (review): only its words' size is its own. */}

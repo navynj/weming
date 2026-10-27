@@ -118,6 +118,7 @@ export function PoolSettings({
               inviteAll.run(
                 () => on,
                 () => setPoolInviteAll(poolId, on),
+                'Saved',
               )
             }
           />

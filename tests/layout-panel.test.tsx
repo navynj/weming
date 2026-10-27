@@ -450,6 +450,45 @@ describe('hand-set layouts on the calendar (review)', () => {
     }
   });
 
+  it('moves the whole piece and lifts its layer: every part together, its own order kept (0038)', () => {
+    media(true);
+    const moved = { ...ONE[0], layout: { label: { x: 0.1 }, piece: { x: 0.2, y: -1, layer: 2 } } };
+    const { container } = home([moved]);
+    const label = container.querySelector<HTMLElement>(
+      '[data-board-piece="s1"] [data-board-label]',
+    )!;
+    const pick = container.querySelector<HTMLElement>('[data-board-piece="s1"] [data-board-pick]')!;
+    // The label's own X and the piece's add up; Y is the piece's alone.
+    expect(label.style.transform).toMatch(/^translate\(/);
+    expect(label.style.transform).toContain('px');
+    expect(label.style.zIndex).toBe('5');
+    expect(pick.style.zIndex).toBe('5');
+    // The piece itself carries no transform or z: no stacking context of its own.
+    const piece = container.querySelector<HTMLElement>('[data-board-piece="s1"]')!;
+    expect(piece.style.transform).toBe('');
+    expect(piece.style.zIndex).toBe('');
+  });
+
+  it('offers Position — X, Y and Layer — and saves it as the piece’s', async () => {
+    vi.useFakeTimers();
+    media(true);
+    const { container } = home(ONE);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    expect(container.querySelector('[data-layout-group="Position"]')).not.toBeNull();
+    fireEvent.change(container.querySelector('input[aria-label="Layer"]')!, {
+      target: { value: '3' },
+    });
+    expect(
+      container.querySelector<HTMLElement>('[data-board-piece="s1"] [data-board-label]')!.style
+        .zIndex,
+    ).toBe('7');
+    await act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+    expect(saved.at(-1)!.patch).toEqual({ piece: { layer: 3 } });
+  });
+
   it('draws a joint label’s hand-set fill; a label with no fill stays so', () => {
     for (const style of ['white', 'ink'] as const) {
       const joint = { ...ONE[0], joint: true, together: true, layout: { label: { style } } };

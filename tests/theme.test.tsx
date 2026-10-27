@@ -20,6 +20,7 @@ vi.mock('@/features/people/actions', () => ({
   },
 }));
 
+import { ToastProvider } from '@/components/ui/toast';
 import { ThemePicker } from '@/features/people/theme-picker';
 import { ThemeProvider } from '@/features/people/theme-provider';
 import { asTheme, PASTEL_INK, THEMES } from '@/lib/theme';
@@ -78,7 +79,9 @@ describe('the twelve colours', () => {
 function picker() {
   return render(
     <ThemeProvider initial={{ color: 'blue', mode: 'dark' }}>
-      <ThemePicker />
+      <ToastProvider>
+        <ThemePicker />
+      </ToastProvider>
     </ThemeProvider>,
   );
 }
@@ -102,6 +105,12 @@ describe('choosing a theme in Settings', () => {
     expect(document.documentElement.dataset.mode).toBe('light');
     await waitFor(() => expect(saved).toHaveLength(2));
     expect(saved[1]).toEqual({ color: 'pink', mode: 'light' });
+  });
+
+  it('says "Theme saved" once a choice has saved, with no Save button (Yoonji, in the session)', async () => {
+    const { container, findByRole } = picker();
+    fireEvent.click(container.querySelector('[data-theme-swatch="mint"]')!);
+    expect((await findByRole('status')).textContent).toBe('Theme saved');
   });
 
   it('offers Pastel, and shows each swatch in its pastel there (0036)', async () => {

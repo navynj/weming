@@ -21,8 +21,9 @@ import { useOpenedAt, useRippleResponses } from '@/features/responses/use-ripple
 import { authorClock } from '@/features/pool/times';
 import { usePoolEditScope } from '@/features/pool/edit-scope';
 
-import { deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
+import { deleteSplash, setSplashPinned, updateSplashHeader, setSplashDescription } from './actions';
 import { addBlock, editBlock } from './block-actions';
+import { SplashDescription } from './splash-description';
 import { orderBlocks } from './block-day';
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
 import { BlockView } from './block';
@@ -206,8 +207,18 @@ export function SplashPage({
         },
       }),
       () => updateSplashHeader(page.splash.id, edit),
+      'Saved',
     );
     return Promise.resolve();
+  }
+
+  /** The description, shown at once (0037); empty takes it off. */
+  function describe(text: string): void {
+    run(
+      (current) => ({ ...current, splash: { ...current.splash, description: text || null } }),
+      () => setSplashDescription(page.splash.id, text),
+      text ? 'Description saved' : 'Description removed',
+    );
   }
 
   function pin(pinned: boolean): Promise<void> {
@@ -379,6 +390,13 @@ export function SplashPage({
                   : await deleteSplash(page.splash.id);
             if (result.ok) router.refresh();
           }}
+        />
+
+        {/* Its description (0037): under the header, a divider from the ripples. */}
+        <SplashDescription
+          value={page.splash.description}
+          editable={!orphan && (scope === 'mine' || scope === 'joint')}
+          onSave={describe}
         />
 
         {poolTags.length > 0 ? (

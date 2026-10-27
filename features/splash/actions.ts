@@ -134,6 +134,29 @@ async function residualLane(
  * the update touches no block, and every block follows at once (H24): a
  * block's lane and date are its post's.
  */
+/**
+ * A splash's description (0037): set, changed, or taken off (empty is none).
+ * My own splash, or a joint one by any current member — RLS holds that, as
+ * for its title.
+ */
+export async function setSplashDescription(id: string, text: string): Promise<Done> {
+  const parsed = z
+    .object({ id: z.uuid(), text: z.string().trim().max(2000) })
+    .safeParse({ id, text });
+  if (!parsed.success) return { ok: false, message: 'A description is up to 2,000 characters.' };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('splashes')
+    .update({ description: parsed.data.text || null })
+    .eq('id', parsed.data.id)
+    .select('id');
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: 'That splash is not yours to describe.' };
+  revalidatePath('/');
+  revalidatePath(`/splash/${id}`);
+  return { ok: true };
+}
+
 export async function updateSplashHeader(id: string, input: Header): Promise<SplashResult> {
   const parsed = Header.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That header is incomplete.' };

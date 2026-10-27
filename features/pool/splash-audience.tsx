@@ -53,12 +53,14 @@ export function SplashAudience({
           audience.run(
             (current) => withPick(current, poolId, poolLaneId),
             () => setPlacement(splashId, poolId, poolLaneId !== null, poolLaneId),
+            'Audience saved',
           );
         }}
         onTogether={(poolId, together) =>
           audience.run(
             (current) => withTogether(current, poolId, together),
             () => setPlacementTogether(splashId, poolId, together.picked, together.everyone),
+            'Saved',
           )
         }
       />

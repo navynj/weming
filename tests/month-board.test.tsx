@@ -102,6 +102,7 @@ function card(
       pool_lane_id: null,
       own_pool_id: null,
       joint_invite_all: false,
+      description: null,
       created_by: null,
       type: 'free',
       prompt: null,
@@ -831,17 +832,20 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     const { container, rerender } = board(OCTOBER, { ring: { id: 'lynn', seq: 0 } });
     const heading = container.querySelector('[data-board-piece="lynn"]')!;
     expect(heading.hasAttribute('data-heading')).toBe(true);
-    expect(heading.className).toContain('board-bob');
-    expect(container.querySelector('[data-board-piece="hoppers"]')!.className).not.toContain(
-      'board-bob',
-    );
+    // Played on each part, never on the piece itself (review: z-order while it bobs).
+    expect(heading.className).not.toContain('board-bob');
+    expect(heading.querySelector('[data-board-label]')!.className).toContain('board-bob');
+    expect(heading.querySelector('[data-board-pick]')!.className).toContain('board-bob');
+    expect(
+      container.querySelector('[data-board-piece=\"hoppers\"] [data-board-label]')!.className,
+    ).not.toContain('board-bob');
     rerender(tree(OCTOBER, { ring: { id: 'hoppers', seq: 1 } }));
-    expect(container.querySelector('[data-board-piece="lynn"]')!.className).not.toContain(
-      'board-bob',
-    );
-    expect(container.querySelector('[data-board-piece="hoppers"]')!.className).toContain(
-      'board-bob',
-    );
+    expect(
+      container.querySelector('[data-board-piece=\"lynn\"] [data-board-label]')!.className,
+    ).not.toContain('board-bob');
+    expect(
+      container.querySelector('[data-board-piece=\"hoppers\"] [data-board-label]')!.className,
+    ).toContain('board-bob');
   });
 
   it('turns to the week the heading post is on when it is on another page', () => {
@@ -850,7 +854,9 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     expect(container.querySelector('[data-month-board]')!.getAttribute('data-month-board')).toBe(
       '2026-09-27',
     );
-    expect(container.querySelector('[data-board-piece="early"]')!.className).toContain('board-bob');
+    expect(
+      container.querySelector('[data-board-piece=\"early\"] [data-board-label]')!.className,
+    ).toContain('board-bob');
   });
 
   it('turns to the heading post’s month, through its owner, when Month is showing', () => {
@@ -866,16 +872,17 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     const { container } = board(OCTOBER, { ring: { id: 'four', seq: 1 }, dropped: 'four' });
     const dropped = container.querySelector('[data-board-piece="four"]')!;
     expect(dropped.hasAttribute('data-dropped')).toBe(true);
-    expect(dropped.className).toContain('board-plunge');
-    expect(dropped.className).not.toContain('board-bob');
+    const part = dropped.querySelector('[data-board-label]')!;
+    expect(part.className).toContain('board-plunge');
+    expect(part.className).not.toContain('board-bob');
   });
 
   it('holds still under reduced motion', () => {
     media(true);
     const { container } = board(OCTOBER, { ring: { id: 'lynn', seq: 0 } });
-    expect(container.querySelector('[data-board-piece="lynn"]')!.className).not.toContain(
-      'board-bob',
-    );
+    expect(
+      container.querySelector('[data-board-piece=\"lynn\"] [data-board-label]')!.className,
+    ).not.toContain('board-bob');
   });
 });
 

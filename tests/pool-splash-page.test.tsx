@@ -47,6 +47,7 @@ const JOINT: Splash = {
   pool_lane_id: 'l-media',
   own_pool_id: null,
   joint_invite_all: false,
+  description: null,
   created_by: MINA,
   title: 'Lost Ruins of Arnak',
   declared_start: null,

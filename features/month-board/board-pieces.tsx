@@ -56,6 +56,24 @@ function moveOf(
   return parts.join(' ');
 }
 
+/** A part's own offset with the whole piece's added (0038): one move for every part. */
+function nudge<T extends { x?: number; y?: number }>(
+  set: T | undefined,
+  shift: { x?: number; y?: number } | undefined,
+): T | undefined {
+  if (!shift || (shift.x === undefined && shift.y === undefined)) return set;
+  return { ...set, x: (set?.x ?? 0) + (shift.x ?? 0), y: (set?.y ?? 0) + (shift.y ?? 0) } as T;
+}
+
+/**
+ * A part's stacking with the whole piece's layer added (0038): every part
+ * rises together, two steps a layer, so its own order (sticker over label)
+ * holds and pieces still interleave with no stacking context of their own.
+ */
+function lifted(base: number, layer: number | undefined): CSSProperties | undefined {
+  return layer ? { zIndex: base + 2 * layer } : undefined;
+}
+
 /** The wave's defaults: a small calm wave, the label's width. */
 export const WAVE_DEFAULTS = { amp: 2, length: 16, weight: 2, span: 1 } as const;
 
@@ -91,6 +109,7 @@ function WaveDecoration({
   wave,
   column,
   line,
+  moving = '',
 }: {
   label: Box;
   wave: {
@@ -104,6 +123,8 @@ function WaveDecoration({
   };
   column: number;
   line: number;
+  /** The piece's bob or plunge, played on each part (motionOf). */
+  moving?: string;
 }) {
   const amp = wave.amp ?? WAVE_DEFAULTS.amp;
   const wavelength = wave.length ?? WAVE_DEFAULTS.length;
@@ -119,7 +140,7 @@ function WaveDecoration({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       fill="none"
-      className="absolute overflow-visible"
+      className={`absolute overflow-visible ${moving}`}
       style={{
         left: label.x,
         top: label.y + label.h - height / 2,
@@ -285,11 +306,19 @@ function OpenSlot({
   narrow,
   onWrite,
   muted = false,
+  shift,
+  layer,
+  moving = '',
 }: {
   piece: BoardPiece;
   narrow: boolean;
   onWrite: (card: Card) => void;
   muted?: boolean;
+  /** The whole piece's move (0038), before its own turn. */
+  shift?: string;
+  layer?: number;
+  /** The piece's bob or plunge, played on each part (motionOf). */
+  moving?: string;
 }) {
   const { me } = usePeople();
   const awaiting = piece.card.awaiting ?? [];
@@ -317,11 +346,12 @@ function OpenSlot({
   const style: CSSProperties = {
     left: box.x,
     top: box.y,
-    transform: `rotate(${piece.slotRotate}deg)`,
+    transform: `${shift ? `${shift} ` : ''}rotate(${piece.slotRotate}deg)`,
     transformOrigin: piece.slotAt === 'right' ? 'top left' : 'top right',
+    ...lifted(0, layer),
   };
   // Under every label where they meet (review): the labels' z is 1.
-  const className = `absolute z-0 flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80 ${muted ? 'opacity-50' : ''}`;
+  const className = `absolute z-0 flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80 ${muted ? 'opacity-50' : ''} ${moving}`;
   return mine ? (
     <button
       type="button"
@@ -434,6 +464,7 @@ export function BoardPieceView({
   const top = piece.fan.length - 1;
   const label = piece.labelBox;
   const fade = piece.muted ? 'opacity-50' : '';
+  const moving = motionOf(ripple, plunge);
   // Set by hand (review): offsets and tilts move only this piece's drawing,
   // never the stack; X is a share of the lane, Y in line heights.
   const layout = card.layout ?? {};
@@ -455,7 +486,10 @@ export function BoardPieceView({
       // stack with every other piece's in the row — the slot under the
       // labels, the stickers over them (review). A muted day's half
       // strength is on each part.
-      className={`absolute ${motionOf(ripple, plunge)}`}
+      // Its bob or plunge plays on each part, never on this wrapper: an
+      // animated wrapper is a stacking context of its own, and its parts
+      // would stop meeting other pieces' (review: z-order while it bobs).
+      className="absolute"
       style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }}
     >
       {/* The tap that brings its card up, under the drawing; the slot is a tap of its own. */}
@@ -464,14 +498,15 @@ export function BoardPieceView({
         onClick={() => onPick(card.splash.id)}
         aria-label={caption}
         data-board-pick={piece.id}
-        className="absolute inset-0 z-[1] block"
+        className={`absolute inset-0 z-[1] block ${moving}`}
+        style={lifted(1, layout.piece?.layer)}
       />
       <div aria-hidden className="pointer-events-none absolute inset-0">
         {piece.photoBox ? (
           <span
             data-board-photos
-            className={`absolute z-[1] block ${fade}`}
-            style={placed(piece.photoBox)}
+            className={`absolute z-[1] block ${fade} ${moving}`}
+            style={{ ...placed(piece.photoBox), ...lifted(1, layout.piece?.layer) }}
           >
             {piece.fan.map((photo, at) => (
               <PhotoCardView
@@ -480,20 +515,31 @@ export function BoardPieceView({
                 url={photos[photo.path]}
                 area={piece.photoBox!}
                 more={at === top ? piece.morePhotos : 0}
-                moved={moveOf(layout.photos?.[photo.path], metrics.column, line)}
+                moved={moveOf(
+                  nudge(layout.photos?.[photo.path], layout.piece),
+                  metrics.column,
+                  line,
+                )}
               />
             ))}
           </span>
         ) : null}
         {layout.wave?.on ? (
-          <WaveDecoration label={label} wave={layout.wave} column={metrics.column} line={line} />
+          <WaveDecoration
+            label={label}
+            wave={nudge(layout.wave, layout.piece)!}
+            column={metrics.column}
+            line={line}
+            moving={moving}
+          />
         ) : null}
         <span
           data-board-label
-          className={`absolute z-[1] block ${LABEL_CLASS[piece.label]} ${fade}`}
+          className={`absolute z-[1] block ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
           style={{
             ...placed(label),
-            transform: moveOf(layout.label, metrics.column, line),
+            transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
+            ...lifted(1, layout.piece?.layer),
             paddingTop: piece.pad.top,
             paddingRight: piece.pad.right,
             paddingBottom: piece.pad.bottom,
@@ -546,11 +592,12 @@ export function BoardPieceView({
             data-size={piece.stickerSize ?? undefined}
             data-at={piece.stickerAt ?? undefined}
             // Over its own label and any other (review).
-            className={`absolute z-[2] flex items-center justify-center leading-none ${fade}`}
+            className={`absolute z-[2] flex items-center justify-center leading-none ${fade} ${moving}`}
             style={{
               ...placed(piece.stickerBox),
               fontSize: piece.stickerBox.w,
-              transform: moveOf(layout.icon, metrics.column, line),
+              transform: moveOf(nudge(layout.icon, layout.piece), metrics.column, line),
+              ...lifted(2, layout.piece?.layer),
             }}
           >
             {icon}
@@ -559,7 +606,15 @@ export function BoardPieceView({
       </div>
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
       {piece.slotBox ? (
-        <OpenSlot piece={piece} narrow={metrics.narrow} onWrite={onWrite} muted={piece.muted} />
+        <OpenSlot
+          piece={piece}
+          narrow={metrics.narrow}
+          onWrite={onWrite}
+          muted={piece.muted}
+          shift={moveOf(layout.piece, metrics.column, line)}
+          layer={layout.piece?.layer}
+          moving={moving}
+        />
       ) : null}
     </div>
   );

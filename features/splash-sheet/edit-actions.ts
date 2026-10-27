@@ -17,6 +17,8 @@ export type SplashEditState =
       kind: 'mine' | 'own' | 'joint';
       title: string;
       icon: string | null;
+      /** Its description (0037), or null. */
+      description: string | null;
       declaredStart: string | null;
       declaredEnd: string | null;
       declaredLaneId: string | null;
@@ -71,7 +73,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     supabase
       .from('splashes')
       .select(
-        'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id, joint_invite_all',
+        'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, description, declared_start, declared_end, declared_lane_id, joint_invite_all',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -114,6 +116,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     kind: joint ? 'joint' : splash.own_pool_id ? 'own' : 'mine',
     title: splash.title,
     icon: splash.icon,
+    description: splash.description,
     declaredStart: splash.declared_start,
     declaredEnd: splash.declared_end,
     declaredLaneId: splash.declared_lane_id,
@@ -210,6 +213,8 @@ const Edit = z.object({
   kind: z.enum(['mine', 'own', 'joint']),
   title: z.string().trim().max(120),
   icon: z.string().trim().max(16).nullable(),
+  /** Its description (0037) when it changed; empty takes it off. Absent leaves it. */
+  description: z.string().trim().max(2000).optional(),
   declaredStart: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -263,7 +268,11 @@ export async function saveSplashEdit(
     const supabase = await createClient();
     const { error } = await supabase
       .from('splashes')
-      .update({ title: edit.title, icon: edit.icon || null })
+      .update({
+        title: edit.title,
+        icon: edit.icon || null,
+        ...(edit.description !== undefined ? { description: edit.description || null } : {}),
+      })
       .eq('id', edit.id);
     if (error) return { ok: false, message: error.message };
     if (edit.invite.length > 0 || edit.inviteEveryone) {
@@ -301,6 +310,13 @@ export async function saveSplashEdit(
   });
   if (!header.ok) return header;
   const supabase = await createClient();
+  if (edit.description !== undefined) {
+    const { error: describeError } = await supabase
+      .from('splashes')
+      .update({ description: edit.description || null })
+      .eq('id', edit.id);
+    if (describeError) return { ok: false, message: describeError.message };
+  }
   if (edit.conversion) {
     const converted = await convert(supabase, edit.id, edit.conversion);
     if (converted) return converted;

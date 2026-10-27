@@ -606,3 +606,17 @@ A member's column in Swimmers opens nothing.
   - Every pastel fill keeps the grey at 4.5:1 or better.
 - **Settings:** Dark | Light | Pastel, with the swatches shown in pastel there.
 - **Calendar waves:** they take the ground's white in every mode (they were fixed white, invisible in light mode).
+
+**H29. A splash's description; a board piece moved whole; saved toasts (0037, 0038, 2026-10-27).** Asked by Yoonji.
+- **Description (0037, `splashes.description`):** optional, up to 2,000 characters.
+  - On a record's page it waits behind "+ Add description" and saves when the field is left; Escape keeps what was there.
+  - It sits under the header, a divider between it and the ripples. The edit sheet has the same field.
+  - Mine to write on my record; on a joint record, any current member's, as its title is. A reader sees it, never an empty field.
+- **The whole piece (0038, a layout's `piece` group: x, y, layer):** on the Calendar, Position moves a piece as one — label, icon, photos, wave and slot — on X and Y, each part keeping its own offset on top.
+  - **Layer** (0–5, higher on top) sets which pieces it sits over where they meet; said as a layer, not "z-index".
+  - Both are added to each part, never set on the piece itself, so pieces still interleave (a sticker over a neighbour's label).
+- **Bob and plunge:** they play on each part of the piece, not on its wrapper. An animated wrapper became a stacking context, so a bobbing piece's parts slid under its neighbours until the bob ended.
+- **Saved toasts:** a change that saves with no Save button says so once it has: "Theme saved", "Saved", "Description saved", "Audience saved", "Layout saved".
+  - One line at the foot, then gone (`components/ui/toast.tsx`). A refusal is never a toast: it is said where the change was made.
+  - `useOptimisticAction`'s `run` takes the toast's words as a third argument.
+

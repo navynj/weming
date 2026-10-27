@@ -203,6 +203,7 @@ describe('Together in a pool: my record becomes joint', () => {
       owner_id: null,
       pool_id: sarang,
       joint_invite_all: true,
+      description: null,
     });
   });
 
@@ -289,6 +290,7 @@ describe('a joint splash back to mine', () => {
       declared_lane_id: CHURCH,
       pinned_at: null,
       joint_invite_all: false,
+      description: null,
     });
     // The splash takes the lane; the ripple inherits it and carries none (H24).
     expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);

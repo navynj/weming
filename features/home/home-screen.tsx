@@ -457,6 +457,7 @@ function fromThread(t: MyThreadRipple): Splash {
     pool_lane_id: null,
     own_pool_id: null,
     joint_invite_all: false,
+    description: null,
     created_by: null,
     type: 'free',
     prompt: null,

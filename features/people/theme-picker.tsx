@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 import { THEMES, type ThemeMode } from '@/lib/theme';
 
+import { useToast } from '@/components/ui/toast';
+
 import { useTheme } from './theme-provider';
 
 const MODES: { mode: ThemeMode; label: string }[] = [
@@ -23,9 +25,13 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 export function ThemePicker() {
   const { theme, choose } = useTheme();
   const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   async function pick(next: typeof theme): Promise<void> {
-    setMessage(await choose(next));
+    const refused = await choose(next);
+    setMessage(refused);
+    // Applied at once and saved with no Save button: said once it has.
+    if (!refused) toast.show('Theme saved');
   }
 
   return (

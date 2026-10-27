@@ -211,6 +211,7 @@ export function SplashComposer({
         own_pool_id: own && pool ? pool.poolId : null,
         created_by: null,
         joint_invite_all: false,
+        description: null,
         type: 'free',
         prompt: null,
         ends_at: null,
