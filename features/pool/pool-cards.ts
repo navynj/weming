@@ -74,11 +74,12 @@ export function poolCards(
       (writer && zoneOf.get(writer)) || timeZone,
       now,
     );
+    // Its blocks with words or photos: the top card shows each one's photos under its words.
     const thread = blocks
-      .filter((r) => r.note)
+      .filter((r) => r.note || r.media.length > 0)
       .map((r) => ({
         id: r.id,
-        note: r.note!,
+        note: r.note ?? '',
         createdAt: r.created_at,
         initials: initialsOf.get(r.author_id) ?? '',
         authorId: r.author_id,
@@ -92,7 +93,7 @@ export function poolCards(
       // A joint splash: the pool's, so its pin is shared (any member) and it
       // is deleted only while every ripple on it is mine.
       const lane = splash.pool_lane_id ? laneOf.get(splash.pool_lane_id) : undefined;
-      const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
+      const card = placeCard(summary, bodyOf(thread), timeZone, thread);
       const wrote = [...new Set(blocks.map((r) => r.author_id))];
       cards.push({
         ...card,
@@ -122,7 +123,7 @@ export function poolCards(
     // The tag reads live here: I am in this pool (0015).
     const origins = lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined;
     const author = initialsOf.get(splash.owner_id) ?? '';
-    const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
+    const card = placeCard(summary, bodyOf(thread), timeZone, thread);
     const mine = splash.owner_id === me;
     cards.push({
       ...card,
@@ -147,13 +148,24 @@ export function poolCards(
         const layout = layouts[card.splash.id];
         return layout ? { ...card, layout, layoutSource: 'pool' as const } : card;
       })
-      // What readers left, for the board and the unseen dots (H25).
-      .map((card) => ({
-        ...card,
-        respondedAsOf: view.respondedAsOf,
-        responses: view.responses?.[card.splash.id],
-        respondedAt: view.respondedAt?.[card.splash.id],
-      }))
+      // What readers left, for the top card and the unseen dots (H25): every
+      // member reads a pool's post, so each takes reactions and replies.
+      .map((card) => {
+        const ids = new Set(card.ripples.map((r) => r.id));
+        return {
+          ...card,
+          responded: view.responded
+            ? {
+                value: {
+                  reactions: view.responded.reactions.filter((r) => ids.has(r.ripple_id)),
+                  replies: view.responded.replies.filter((r) => ids.has(r.ripple_id)),
+                },
+                locked: view.lockedIds ?? [],
+              }
+            : undefined,
+          respondedAt: view.respondedAt?.[card.splash.id],
+        };
+      })
       .sort(byNewest)
   );
 }
@@ -243,4 +255,9 @@ export function withPoolMoves(
     }
     return moved;
   });
+}
+
+/** A card's words: its blocks' notes, those that have any. */
+function bodyOf(thread: { note: string }[]): string {
+  return thread.flatMap((r) => (r.note ? [r.note] : [])).join('\n\n');
 }

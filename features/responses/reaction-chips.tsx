@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 
 import { usePeople } from '@/features/people/people-provider';
 
@@ -22,16 +23,37 @@ export function ReactionChips({
   chips,
   canReact,
   onToggle,
+  floating = false,
 }: {
   chips: ReactionChip[];
   canReact: boolean;
   onToggle: (emoji: string) => void;
+  /**
+   * The picker and the who-reacted list float over the page, where the chips
+   * sit in something that clips: the top card, cut at its fixed height.
+   */
+  floating?: boolean;
 }) {
   const { people, me } = usePeople();
   const [picking, setPicking] = useState(false);
   const [showing, setShowing] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<CSSProperties | null>(null);
+  const row = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
+
+  /** Where a floating popover sits: under the chips' row, kept on screen. */
+  function place(): void {
+    const box = row.current?.getBoundingClientRect();
+    if (!box) return;
+    setAnchor({
+      position: 'fixed',
+      top: box.bottom + 4,
+      left: Math.max(8, Math.min(box.left, window.innerWidth - 8 - 320)),
+    });
+  }
+  const pop = (node: React.ReactNode): React.ReactNode =>
+    floating && anchor ? createPortal(node, document.body) : node;
   const nameOf = (id: string): string => (id === me ? 'You' : (people[id]?.name ?? 'Someone'));
 
   if (chips.length === 0 && !canReact) return null;
@@ -40,6 +62,7 @@ export function ReactionChips({
     held.current = false;
     timer.current = setTimeout(() => {
       held.current = true;
+      if (floating) place();
       setShowing(emoji);
     }, LONG_PRESS_MS);
   }
@@ -57,7 +80,7 @@ export function ReactionChips({
   }
 
   return (
-    <div data-reactions className="relative flex flex-wrap items-center gap-1.5">
+    <div ref={row} data-reactions className="relative flex flex-wrap items-center gap-1.5">
       {chips.map((chip) => (
         <button
           key={chip.emoji}
@@ -87,45 +110,73 @@ export function ReactionChips({
           data-reaction-add
           aria-label="Add a reaction"
           aria-expanded={picking}
-          onClick={() => setPicking((open) => !open)}
+          onClick={() => {
+            if (floating) place();
+            setPicking((open) => !open);
+          }}
           className={`${CHIP} border-pool-200 text-pool-500 border bg-white`}
         >
           +
         </button>
       ) : null}
 
-      {picking ? <Picker onPick={pick} onClose={() => setPicking(false)} /> : null}
+      {picking
+        ? pop(
+            <Picker
+              onPick={pick}
+              onClose={() => setPicking(false)}
+              style={floating ? anchor : null}
+            />,
+          )
+        : null}
 
-      {showing ? (
-        <div
-          role="dialog"
-          aria-label="Who reacted"
-          data-reaction-who
-          onClick={() => setShowing(null)}
-          className="border-pool-200 text-ink absolute top-full left-0 z-10 mt-1 flex flex-col gap-0.5 rounded-lg border bg-white px-3 py-2 text-xs shadow-sm"
-        >
-          {chips
-            .find((c) => c.emoji === showing)
-            ?.who.map((id) => (
-              <span key={id}>
-                {showing} {nameOf(id)}
-              </span>
-            ))}
-        </div>
-      ) : null}
+      {showing
+        ? pop(
+            <div
+              role="dialog"
+              aria-label="Who reacted"
+              data-reaction-who
+              onClick={() => setShowing(null)}
+              style={floating && anchor ? anchor : undefined}
+              className={`border-pool-200 text-ink z-50 flex flex-col gap-0.5 rounded-lg border bg-white px-3 py-2 text-xs shadow-sm ${
+                floating && anchor ? '' : 'absolute top-full left-0 mt-1'
+              }`}
+            >
+              {chips
+                .find((c) => c.emoji === showing)
+                ?.who.map((id) => (
+                  <span key={id}>
+                    {showing} {nameOf(id)}
+                  </span>
+                ))}
+            </div>,
+          )
+        : null}
     </div>
   );
 }
 
 /** Six quick ones, then a field the native keyboard fills with any emoji (H25). */
-function Picker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
+function Picker({
+  onPick,
+  onClose,
+  style = null,
+}: {
+  onPick: (emoji: string) => void;
+  onClose: () => void;
+  /** Floating: fixed where its chips are, over everything. */
+  style?: CSSProperties | null;
+}) {
   const [draft, setDraft] = useState('');
   return (
     <div
       role="dialog"
       aria-label="Pick a reaction"
       data-reaction-picker
-      className="border-pool-200 absolute top-full left-0 z-10 mt-1 flex items-center gap-1 rounded-full border bg-white p-1 shadow-sm"
+      style={style ?? undefined}
+      className={`border-pool-200 z-50 flex items-center gap-1 rounded-full border bg-white p-1 shadow-sm ${
+        style ? '' : 'absolute top-full left-0 mt-1'
+      }`}
       onKeyDown={(event) => event.key === 'Escape' && onClose()}
     >
       {QUICK_EMOJI.map((emoji) => (

@@ -131,7 +131,7 @@ export function SplashPage({
   // Inside the splash sheet (review): a delete closes it over the screen beneath.
   const closeSheet = useCloseSplash();
   const { me } = usePeople();
-  const answered = useRippleResponses(splash.id, responses);
+  const answered = useRippleResponses(responses);
   // Opened at a reply from the board: its block's replies open in full (H25).
   const openedAt = useOpenedAt();
   const [expanded, setExpanded] = useState<string[]>([]);

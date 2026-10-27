@@ -2,8 +2,8 @@
  * Reactions and replies on a ripple (H25): what a reader leaves under a
  * block. Neither is a ripple — no lane, no date, never a record on the
  * board, never a side written on a joint splash. Pure: the shapes and the
- * arithmetic every surface shares, so the post page, the stack card and the
- * board agree on what there is.
+ * arithmetic every surface shares, so the post page and the top card agree
+ * on what there is. The calendar board shows none of it.
  */
 
 /** The six the picker offers before the keyboard (H25). */
@@ -12,11 +12,8 @@ export const QUICK_EMOJI = ['❤️', '😂', '😮', '😢', '👏', '🔥'] as
 /** A reply's longest text (0030). */
 export const REPLY_MAX = 500;
 
-/** Replies shown under a block, and on the board, before "+n" (H25). */
+/** Replies shown under a block, on its page and on the top card, before "+n" (H25). */
 export const REPLIES_SHOWN = 2;
-
-/** Emoji at most on the board's badge, most used first (H25). */
-export const BADGE_EMOJI = 3;
 
 export type ReactionRow = {
   ripple_id: string;
@@ -40,17 +37,6 @@ export type ReplyRow = {
 
 /** One reaction chip: an emoji, how many, whether one is mine, and who (oldest first). */
 export type ReactionChip = { emoji: string; count: number; mine: boolean; who: string[] };
-
-/** What the board shows of a splash's responses (0030: splash_reaction_summary, splash_reply_preview). */
-export type ReplyPreview = { id: string; rippleId: string; authorId: string; body: string };
-export type BoardResponses = {
-  /** Up to three, most used first. */
-  emoji: string[];
-  reactions: number;
-  /** The first replies, oldest first, across all its ripples, hidden ones skipped: two shown, the third where "+n" opens. */
-  replies: ReplyPreview[];
-  replyTotal: number;
-};
 
 /** A block's responses, as its section holds them. */
 export type RippleResponsesValue = { reactions: ReactionRow[]; replies: ReplyRow[] };
@@ -144,11 +130,6 @@ export function latestFromOthers(
   return latest;
 }
 
-/** Whether a splash has anything for the board to show. */
-export function hasResponses(board: BoardResponses | undefined): board is BoardResponses {
-  return !!board && (board.reactions > 0 || board.replyTotal > 0);
-}
-
 /** "3m", "2h", "5d", else the date: a reply's age, short. */
 export function relativeTime(iso: string, now: Date = new Date()): string {
   const seconds = Math.max(0, (now.getTime() - new Date(iso).getTime()) / 1000);
@@ -157,37 +138,4 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
   if (seconds < 86400 * 7) return `${Math.floor(seconds / 86400)}d`;
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-/**
- * A splash's board numbers from everything its page holds: the same rule as
- * 0030's splash_reaction_summary and splash_reply_preview, so the page can
- * show the board the change it just made before the server re-reads.
- */
-export function boardFrom(value: RippleResponsesValue): BoardResponses {
-  const counts = new Map<string, { n: number; first: string }>();
-  for (const r of value.reactions) {
-    const seen = counts.get(r.emoji);
-    if (seen) {
-      seen.n += 1;
-      if (r.created_at < seen.first) seen.first = r.created_at;
-    } else counts.set(r.emoji, { n: 1, first: r.created_at });
-  }
-  const emoji = [...counts.entries()]
-    .sort(
-      (a, b) => b[1].n - a[1].n || a[1].first.localeCompare(b[1].first) || a[0].localeCompare(b[0]),
-    )
-    .slice(0, BADGE_EMOJI)
-    .map(([e]) => e);
-  const open = value.replies
-    .filter((r) => !r.hidden && r.body !== null)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
-  return {
-    emoji,
-    reactions: value.reactions.length,
-    replies: open
-      .slice(0, REPLIES_SHOWN + 1)
-      .map((r) => ({ id: r.id, rippleId: r.ripple_id, authorId: r.author_id, body: r.body! })),
-    replyTotal: open.length,
-  };
 }

@@ -6,39 +6,28 @@ import { usePeople } from '@/features/people/people-provider';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
 import { addReply, deleteReply, editReply, hideReply, setReaction } from './actions';
-import { useShowOnBoard } from './board-pending';
-import { boardFrom, toggled, type ReplyRow, type RippleResponsesValue } from './model';
+import { toggled, type ReplyRow, type RippleResponsesValue } from './model';
 import type { ReplyHandlers } from './reply-list';
 
 /**
- * A splash page's reactions and replies (H25), every change optimistic
- * (CLAUDE.md, the principle): shown on the page and on the board beneath it
- * the moment it is made, the action behind it, a refusal taking both back.
+ * A splash's reactions and replies (H25), on its page or its top card, every
+ * change optimistic (CLAUDE.md, the principle): shown the moment it is made,
+ * the action behind it, a refusal taking it back.
  */
-export function useRippleResponses(
-  splashId: string,
-  initial: RippleResponsesValue,
-): {
+export function useRippleResponses(initial: RippleResponsesValue): {
   value: RippleResponsesValue;
   react: (rippleId: string, emoji: string) => void;
   handlers: (rippleId: string) => ReplyHandlers;
   message: string | null;
 } {
   const { me } = usePeople();
-  const show = useShowOnBoard();
   const { value, run, message } = useOptimisticAction(initial);
 
   function change(
     update: (current: RippleResponsesValue) => RippleResponsesValue,
     work: () => Promise<ActionOutcome>,
   ): void {
-    const before = value;
-    show(splashId, boardFrom(update(before)));
-    run(update, async () => {
-      const outcome = await work();
-      if (!outcome.ok) show(splashId, boardFrom(before));
-      return outcome;
-    });
+    run(update, work);
   }
 
   const replies = (

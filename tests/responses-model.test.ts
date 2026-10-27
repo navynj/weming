@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  boardFrom,
   chipsOf,
   isOneEmoji,
   lastGrapheme,
@@ -81,41 +80,6 @@ describe('replies (H25)', () => {
     expect(more).toBe(3);
     expect(repliesShown(five, 'r1', true)).toEqual({ shown: five, more: 0 });
     expect(repliesShown(five.slice(0, 2), 'r1', false).more).toBe(0);
-  });
-});
-
-describe('the board’s numbers, from a page (H25)', () => {
-  it('aggregates every ripple of the splash: top three emoji by use, the total, the first replies', () => {
-    const board = boardFrom({
-      reactions: [
-        reaction('r1', 'u-a', '😂', '01'),
-        reaction('r2', 'u-b', '❤️', '02'),
-        reaction('r1', 'u-c', '❤️', '03'),
-        reaction('r2', 'u-a', '🔥', '04'),
-        reaction('r2', 'u-c', '👏', '05'),
-      ],
-      replies: [
-        reply('x', 'r2', 'u-a', '09'),
-        reply('h', 'r1', 'u-b', '01', { hidden: true, body: null }),
-        reply('y', 'r1', 'u-b', '03'),
-        reply('z', 'r2', 'u-c', '05'),
-        reply('w', 'r1', 'u-c', '07'),
-      ],
-    });
-    expect(board.emoji).toEqual(['❤️', '😂', '🔥']);
-    expect(board.reactions).toBe(5);
-    // Hidden skipped and not counted; two shown and the third where "+n" opens.
-    expect(board.replies.map((r) => r.id)).toEqual(['y', 'z', 'w']);
-    expect(board.replyTotal).toBe(4);
-  });
-
-  it('is empty when nobody left anything', () => {
-    expect(boardFrom({ reactions: [], replies: [] })).toEqual({
-      emoji: [],
-      reactions: 0,
-      replies: [],
-      replyTotal: 0,
-    });
   });
 });
 

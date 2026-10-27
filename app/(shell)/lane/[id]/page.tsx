@@ -1,6 +1,13 @@
 import { notFound, redirect } from 'next/navigation';
 
-import { byNewest, cardLane, initialsOf, placeCard, type CardRipple } from '@/features/home/grid';
+import {
+  byNewest,
+  cardLane,
+  initialsOf,
+  placeCard,
+  type CardPhoto,
+  type CardRipple,
+} from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
 import { jointLaneFor } from '@/features/pool/direction';
 import { withPoolBadge } from '@/features/pool/home-badge';
@@ -42,15 +49,23 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
   const jointOf = new Map(joints.map((j) => [j.id, j]));
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
 
-  // Each card's ripples, oldest first, for the stack's thread.
+  // Each card's ripples with words or photos, oldest first, for the stack's
+  // thread; and its photos, shown under each ripple's words on the top card.
   const threads = new Map<string, CardRipple[]>();
+  const photos = new Map<string, CardPhoto[]>();
   for (const ripple of [...ripples].reverse()) {
-    if (!ripple.note) continue;
+    if (!ripple.note && ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
-    const entry = { id: ripple.id, note: ripple.note, createdAt: ripple.created_at };
+    const entry = { id: ripple.id, note: ripple.note ?? '', createdAt: ripple.created_at };
     const list = threads.get(key);
     if (list) list.push(entry);
     else threads.set(key, [entry]);
+    if (ripple.media.length > 0) {
+      photos.set(key, [
+        ...(photos.get(key) ?? []),
+        ...ripple.media.map((path) => ({ rippleId: ripple.id, path })),
+      ]);
+    }
   }
   const cards = summarizeSplashes([...mine, ...joints], ripples, profile.timezone, new Date())
     .filter((summary) => {
@@ -59,12 +74,16 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     })
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];
-      const card = placeCard(
-        summary,
-        thread.map((r) => r.note).join('\n\n'),
-        profile.timezone,
-        thread,
-      );
+      const pictured = photos.get(summary.id);
+      const card = {
+        ...placeCard(
+          summary,
+          thread.flatMap((r) => (r.note ? [r.note] : [])).join('\n\n'),
+          profile.timezone,
+          thread,
+        ),
+        ...(pictured ? { photos: pictured } : {}),
+      };
       const joint = jointOf.get(summary.id);
       if (joint) {
         return withPoolBadge(card, {

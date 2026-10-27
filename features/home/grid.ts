@@ -1,6 +1,6 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
 import type { BoardLayoutJson, LayoutSource } from '@/features/month-board/board-layout';
-import type { BoardResponses } from '@/features/responses/model';
+import type { RippleResponsesValue } from '@/features/responses/model';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -70,10 +70,12 @@ export type Card = {
   writers?: CardFace[];
   /** A joint splash (Board view): the current members who have not written on it yet. */
   awaiting?: CardFace[];
-  /** Its reactions and first replies, for the board's badge and reply lines (H25); absent when none. */
-  responses?: BoardResponses;
-  /** When `responses` was read: a change made on the page after it is drawn over it (H25). */
-  respondedAsOf?: string;
+  /**
+   * What readers left on its ripples, for the top card (H25): present only
+   * where someone besides me can see the post, with my ripples that are
+   * locked and so take nothing. The calendar board shows none of it.
+   */
+  responded?: { value: RippleResponsesValue; locked: string[] };
   /** The newest reaction or reply someone else left on each ripple of mine on it: the unseen dot (H25). */
   respondedAt?: Record<string, string>;
 };

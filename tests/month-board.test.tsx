@@ -258,6 +258,56 @@ const BUSY: Card[] = [
   }),
 ];
 
+describe('the board shows no reactions or replies (review)', () => {
+  it('renders no reaction or reply elements on any item, whatever readers left', () => {
+    // Each post with a ripple, and on it a reaction and a reply someone else left.
+    const answered = OCTOBER.map((post) => ({
+      ...post,
+      ripples: [{ id: `${post.splash.id}-r`, note: 'words', createdAt: '2026-10-20T01:00:00Z' }],
+    })).map((c) => ({
+      ...c,
+      responded: {
+        value: {
+          reactions: c.ripples.map((r) => ({
+            ripple_id: r.id,
+            user_id: 'u-mina',
+            emoji: '❤️',
+            created_at: '2026-10-21T01:00:00Z',
+          })),
+          replies: c.ripples.map((r) => ({
+            id: `reply-${r.id}`,
+            ripple_id: r.id,
+            author_id: 'u-mina',
+            body: 'so good',
+            created_at: '2026-10-21T02:00:00Z',
+            edited_at: null,
+            hidden: false,
+            former: false,
+          })),
+        },
+        locked: [],
+      },
+      respondedAt: Object.fromEntries(c.ripples.map((r) => [r.id, '2026-10-21T02:00:00Z'])),
+    }));
+    expect(answered.every((c) => c.responded.value.reactions.length === 1)).toBe(true);
+    const { container } = board(answered);
+    expect(container.querySelectorAll('[data-board-label]').length).toBeGreaterThan(0);
+    for (const selector of [
+      '[data-reactions]',
+      '[data-reaction]',
+      '[data-card-responses]',
+      '[data-card-replies]',
+      '[data-replies]',
+      '[data-board-responses]',
+      '[data-board-badge]',
+      '[data-board-reply]',
+    ]) {
+      expect(container.querySelector(selector)).toBeNull();
+    }
+    expect(container.textContent).not.toContain('so good');
+  });
+});
+
 describe('the week board (the default)', () => {
   const layout = layoutWeekBoard(WEEK, TODAY, { width: 358 });
 

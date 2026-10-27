@@ -1,9 +1,4 @@
-import type {
-  BoardResponses,
-  ReactionRow,
-  ReplyRow,
-  RippleResponsesValue,
-} from '@/features/responses/model';
+import type { ReactionRow, ReplyRow, RippleResponsesValue } from '@/features/responses/model';
 import type { DuringClient } from '@/lib/queries/profile';
 
 /**
@@ -35,37 +30,20 @@ export async function getRippleResponses(
   };
 }
 
-/** Each splash's badge and reply lines for the board, by splash id; absent when it has none. */
-export async function getBoardResponses(
-  supabase: DuringClient,
-  splashIds: string[],
-): Promise<Record<string, BoardResponses>> {
-  if (splashIds.length === 0) return {};
-  const [summary, preview] = await Promise.all([
-    supabase.rpc('splash_reaction_summary', { p_splashes: splashIds }),
-    supabase.rpc('splash_reply_preview', { p_splashes: splashIds }),
-  ]);
-  if (summary.error) throw summary.error;
-  if (preview.error) throw preview.error;
-  const out: Record<string, BoardResponses> = {};
-  const entry = (id: string): BoardResponses =>
-    (out[id] ??= { emoji: [], reactions: 0, replies: [], replyTotal: 0 });
-  for (const row of summary.data) {
-    const e = entry(row.splash_id);
-    e.emoji = row.emoji ?? [];
-    e.reactions = row.total ?? 0;
-  }
-  for (const row of preview.data) {
-    const e = entry(row.splash_id);
-    e.replyTotal = row.total ?? 0;
-    e.replies.push({
-      id: row.reply_id,
-      rippleId: row.ripple_id,
-      authorId: row.author_id,
-      body: row.body,
-    });
-  }
-  return out;
+/**
+ * Which of these ripples are locked (C8): a locked ripple takes no reaction
+ * or reply (0030). The lock row is its author's alone to read, so only my
+ * own come back — anyone else's locked ripple never reaches me at all.
+ */
+export async function getLockedIds(supabase: DuringClient, rippleIds: string[]): Promise<string[]> {
+  if (rippleIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('ripple_audience')
+    .select('ripple_id')
+    .eq('target_type', 'lock')
+    .in('ripple_id', rippleIds);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.ripple_id);
 }
 
 /**

@@ -17,8 +17,6 @@ import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motio
 import type { Card, GridColumn } from '@/features/home/grid';
 import type { Ring } from '@/features/home/lane-grid';
 import { WaveGlyph } from '@/components/ui/waves';
-import { splashHref } from '@/features/home/scope';
-import { useCardsWithPending } from '@/features/responses/board-pending';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
@@ -95,7 +93,7 @@ export function BoardFrame({ children }: { children: ReactNode }) {
  * to its page first if it is on another.
  */
 export function MonthBoard({
-  cards: read,
+  cards,
   month,
   onMonth,
   today,
@@ -121,8 +119,6 @@ export function MonthBoard({
   /** The recipe each piece is drawn with, by splash, whenever it changes: the Layout panel shows it. */
   onDrawn?: (recipes: Record<string, Recipe>) => void;
 }) {
-  // A reaction or reply made on an open splash a moment ago, drawn at once (H25).
-  const cards = useCardsWithPending(read);
   const [span, setSpan] = useBoardSpan();
   // The week shown: this one on open (review), unless the ground was opened on another month.
   const [week, setWeek] = useState<IsoDate>(() =>
@@ -267,13 +263,6 @@ export function MonthBoard({
   const onWrite = useCallback(
     (card: Card): void => {
       if (card.href) router.push(`${card.href}?write=1`, { scroll: false });
-    },
-    [router],
-  );
-  // A badge or a reply line (H25): the splash's own sheet, at what was tapped.
-  const onOpenAt = useCallback(
-    (card: Card, anchor: string): void => {
-      router.push(`${card.href ?? splashHref(card.splash.id)}#${anchor}`, { scroll: false });
     },
     [router],
   );
@@ -507,7 +496,6 @@ export function MonthBoard({
                       metrics={metrics}
                       onPick={onPick}
                       onWrite={onWrite}
-                      onOpenAt={onOpenAt}
                       ripple={ripple(piece.id)}
                       plunge={plunge(piece.id)}
                     />

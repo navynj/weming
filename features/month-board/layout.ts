@@ -1,6 +1,5 @@
 import type { Card } from '@/features/home/grid';
 import { monthKey } from '@/features/splash/summary';
-import { REPLIES_SHOWN } from '@/features/responses/model';
 import type { IsoDate } from '@/lib/time';
 
 import { seedOf } from './layout-seed';
@@ -90,21 +89,6 @@ const SLOT_TILT_MAX = 6;
 const SLOT_WORDS = { wide: 'Add your side', narrow: 'Add' } as const;
 /** A range band's height, the gap between bands, and the lanes bands pack into. */
 export const TAPE_PX = 24;
-
-/**
- * Reactions and replies on the board (H25). The badge: a white pill on the
- * label's top-right corner, over its edge by half its height, like a
- * sticker; the label keeps this much more top padding while it has one, so
- * the badge never covers its words. The reply lines: under the label,
- * indented, a thread line from the label to the last.
- */
-const BADGE_ROOM_PX = 8;
-const BADGE_PAD_PX = 5;
-const BADGE_GAP_PX = 3;
-const BADGE_EMOJI_OVERLAP_PX = 3;
-const BADGE_BORDER_PX = 1;
-const REPLY_GAP_PX = 2;
-export const REPLY_INDENT_PX = 8;
 const TAPE_GAP_PX = 2;
 
 /** At most this many photo cards; past it the top card carries "+N". */
@@ -155,10 +139,6 @@ export type BoardMetrics = {
   /** Each photo card behind the top one peeks this much above the one before. */
   fanMin: number;
   fanMax: number;
-  /** The reactions badge (H25): 18px tall, 14 on a phone; its type never under 10. */
-  badge: { h: number; size: number; emoji: number };
-  /** A reply line (H25): the face, the words' size, the line's height. */
-  reply: { face: number; size: number; line: number };
 };
 
 /** The metrics at a width. */
@@ -187,9 +167,6 @@ export function boardMetrics(width: number): BoardMetrics {
     },
     fanMin: narrow ? 3 : 4,
     fanMax: narrow ? 5 : 8,
-    // 10px on a phone, never 9 (Yoonji: "10px on phone, no exception").
-    badge: { h: narrow ? 14 : 18, size: narrow ? 10 : 11, emoji: narrow ? 1 : 3 },
-    reply: { face: narrow ? 12 : 14, size: narrow ? 10 : 11, line: narrow ? 12 : 14 },
   };
 }
 
@@ -248,17 +225,6 @@ export type BoardPiece = {
   slotBounds: Box | null;
   slotAt: 'right' | 'left' | null;
   slotRotate: number;
-  /**
-   * Its reactions' badge (H25): on the label's top-right corner, else — a
-   * sticker set there by hand — its top-left, after the sticker; in the
-   * label's own frame, so it follows the label's offset and tilt.
-   */
-  badgeBox: Box | null;
-  badgeAt: 'right' | 'left' | null;
-  /** Its first replies under the label (H25), then "+n": one box per line, in the label's frame too. */
-  replyLines: Box[];
-  /** Replies past the lines shown: the last line's "+n". */
-  replyMore: number;
   /** The label's padding, as drawn; `center` for C's caption. */
   pad: { top: number; right: number; bottom: number; left: number };
   center: boolean;
@@ -411,8 +377,7 @@ export function intersects(a: Box, b: Box): boolean {
 
 /** Everything a piece draws on the board: its label, its photos, its sticker. */
 export function extentOf(piece: BoardPiece): Box[] {
-  return [piece.labelBox, piece.photoBox, piece.stickerBox, piece.slotBounds, piece.badgeBox]
-    .concat(piece.replyLines)
+  return [piece.labelBox, piece.photoBox, piece.stickerBox, piece.slotBounds]
     .filter((box): box is Box => box !== null)
     .map((box) => onBoard(piece, box));
 }
@@ -562,18 +527,9 @@ type Shape = Omit<
   'id' | 'card' | 'day' | 'week' | 'col' | 'label' | 'muted' | 'type' | 'x' | 'y'
 >;
 
-/**
- * A label's vertical padding: shallow with no fill, where it would only make
- * gaps; with a reactions badge, room at the top so it never covers the words (H25).
- */
-function padY(label: LabelStyle, m: BoardMetrics, card: Card): { top: number; bottom: number } {
-  const v = label === 'none' ? m.pad.none : m.pad.filled;
-  return hasBadge(card) ? { ...v, top: v.top + BADGE_ROOM_PX } : v;
-}
-
-/** A splash with reactions carries the badge (H25). */
-function hasBadge(card: Card): boolean {
-  return (card.responses?.reactions ?? 0) > 0;
+/** A label's vertical padding: shallow with no fill, where it would only make gaps. */
+function padY(label: LabelStyle, m: BoardMetrics): { top: number; bottom: number } {
+  return label === 'none' ? m.pad.none : m.pad.filled;
 }
 
 /**
@@ -628,10 +584,6 @@ function base(
   | 'slotAt'
   | 'slotRotate'
   | 'tuck'
-  | 'badgeBox'
-  | 'badgeAt'
-  | 'replyLines'
-  | 'replyMore'
 > {
   return {
     fan: [],
@@ -643,10 +595,6 @@ function base(
     slotAt: null,
     slotRotate: 0,
     tuck: 0,
-    badgeBox: null,
-    badgeAt: null,
-    replyLines: [],
-    replyMore: 0,
   };
 }
 
@@ -683,10 +631,8 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
       words,
   );
   const label = shape.labelBox;
-  // Up onto the label (review), by all of its bottom padding: over its edge, never its words;
-  // under its reply lines when it has them (H25), which are part of the item.
-  const last = shape.replyLines.at(-1);
-  const y = last ? last.y + last.h + REPLY_GAP_PX : label.y + label.h - shape.pad.bottom;
+  // Up onto the label (review), by all of its bottom padding: over its edge, never its words.
+  const y = label.y + label.h - shape.pad.bottom;
   const tilt = SLOT_TILT_MIN + unit(card.splash.id, 'slot') * (SLOT_TILT_MAX - SLOT_TILT_MIN);
   const right: Box = { x: label.x + label.w - Math.round(w * 0.6), y, w, h: SLOT_PX };
   const rightBounds = tilted(right, tilt, 'left');
@@ -709,100 +655,6 @@ function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   };
 }
 
-/** The badge's width: its emoji overlapping a little, then the count (H25). */
-function badgeWidth(emoji: number, count: number, m: BoardMetrics): number {
-  const glyph = m.badge.size + 4;
-  const shown = Math.max(1, Math.min(emoji, m.badge.emoji));
-  const digits = String(count).length * m.badge.size * CHAR_EM;
-  return Math.ceil(
-    BADGE_BORDER_PX * 2 +
-      BADGE_PAD_PX * 2 +
-      shown * glyph -
-      (shown - 1) * BADGE_EMOJI_OVERLAP_PX +
-      BADGE_GAP_PX +
-      digits,
-  );
-}
-
-/** A box moved by a part's offset set by hand (review): X a share of the lane, Y in line heights. */
-function movedBy(box: Box, set: { x?: number; y?: number } | undefined, m: BoardMetrics): Box {
-  return {
-    ...box,
-    x: box.x + (set?.x ?? 0) * m.column,
-    y: box.y + (set?.y ?? 0) * m.caption.line,
-  };
-}
-
-/** Every box of a shape moved down, the item growing with it. */
-function shiftedDown(shape: Shape, dy: number): Shape {
-  const down = (box: Box): Box => ({ ...box, y: box.y + dy });
-  const maybe = (box: Box | null): Box | null => (box ? down(box) : null);
-  return {
-    ...shape,
-    labelBox: down(shape.labelBox),
-    textBoxes: shape.textBoxes.map(down),
-    photoBox: maybe(shape.photoBox),
-    stickerBox: maybe(shape.stickerBox),
-    slotBox: maybe(shape.slotBox),
-    slotBounds: maybe(shape.slotBounds),
-    badgeBox: maybe(shape.badgeBox),
-    replyLines: shape.replyLines.map(down),
-    h: shape.h + dy,
-  };
-}
-
-/**
- * Reactions and replies on the board (H25): the badge on the label's
- * top-right corner, over its edge by half its height — top-left, after the
- * sticker, where a sticker set by hand sits on that corner — and the first
- * two replies as lines under the label, then "+n". Both are part of the
- * item: it grows to hold them, and moves down where the badge would rise
- * out of it.
- */
-function withResponses(shape: Shape, card: Card, ctx: Context): Shape {
-  const responses = card.responses;
-  if (!responses || (responses.reactions === 0 && responses.replyTotal === 0)) return shape;
-  const { m } = ctx;
-  const label = shape.labelBox;
-  let out: Shape = shape;
-  if (responses.reactions > 0) {
-    const w = badgeWidth(responses.emoji.length, responses.reactions, m);
-    const y = label.y - Math.round(m.badge.h / 2);
-    const right: Box = { x: label.x + label.w - w, y, w, h: m.badge.h };
-    // Where it and the sticker are drawn, each with its own offset set by hand.
-    const sticker = shape.stickerBox ? movedBy(shape.stickerBox, card.layout?.icon, m) : null;
-    const drawn = (box: Box): Box => movedBy(box, card.layout?.label, m);
-    const clear = (box: Box): boolean => !sticker || !intersects(drawn(box), sticker);
-    let badgeBox = right;
-    let badgeAt: 'right' | 'left' = 'right';
-    if (!clear(right)) {
-      badgeAt = 'left';
-      badgeBox = { ...right, x: label.x };
-      if (!clear(badgeBox)) {
-        const after = sticker!.x + sticker!.w - drawn(label).x + label.x + 2;
-        badgeBox = { ...right, x: Math.min(after, label.x + label.w - w) };
-      }
-    }
-    out = { ...out, badgeBox, badgeAt };
-  }
-  const shown = Math.min(REPLIES_SHOWN, responses.replies.length);
-  const more = Math.max(0, responses.replyTotal - shown);
-  const count = shown + (more > 0 ? 1 : 0);
-  if (count > 0) {
-    const top = label.y + label.h + REPLY_GAP_PX;
-    const replyLines = Array.from({ length: count }, (_, at) => ({
-      x: label.x + REPLY_INDENT_PX,
-      y: top + at * (m.reply.line + REPLY_GAP_PX),
-      w: Math.max(0, label.w - REPLY_INDENT_PX),
-      h: m.reply.line,
-    }));
-    const last = replyLines[replyLines.length - 1];
-    out = { ...out, replyLines, replyMore: more, h: Math.max(out.h, last.y + last.h) };
-  }
-  const rise = out.badgeBox ? Math.max(0, -out.badgeBox.y) : 0;
-  return rise > 0 ? shiftedDown(out, rise) : out;
-}
-
 /**
  * A (Hoppers): the icon inline, at the words' height. On a desktop the
  * label starts 35–45% into its lane at the lane's width, overhanging the
@@ -811,7 +663,7 @@ function withResponses(shape: Shape, card: Card, ctx: Context): Shape {
  */
 function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
   const { m, col } = ctx;
-  const pad = { ...padY(plan.label, m, card), left: m.pad.side, right: m.pad.right };
+  const pad = { ...padY(plan.label, m), left: m.pad.side, right: m.pad.right };
   const fitFor = (w: number) => {
     const lines = linesIn(card, w - pad.left - pad.right, 0, true, ctx);
     return { lines, h: pad.top + lines * m.caption.line + pad.bottom };
@@ -886,7 +738,7 @@ function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
       const s = handSize ? Math.round(handSize * m.caption.line) : m.stickers[size];
       const half = s / 2;
       const x = col === 0 ? half : Math.max(0, Math.ceil(half - m.pad.right));
-      const v = padY(plan.label, m, card);
+      const v = padY(plan.label, m);
       const left = at === 'left' ? Math.ceil(half) + 4 : m.pad.side;
       const indent = at === 'corner' ? Math.max(0, Math.ceil(half + 2 - left)) : 0;
       const cy = at === 'corner' ? 0 : v.top + m.caption.line / 2;
@@ -961,7 +813,7 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
   const spread = fan.length > 0 ? fan[fan.length - 1].dy : 0;
   const photoBox = { x, y: 0, w: size, h: size + spread };
   const side = Math.min(m.pad.side, Math.floor(size / 8));
-  const v = padY(plan.label, m, card);
+  const v = padY(plan.label, m);
   // Against the line, the caption keeps the right padding the next lane's sticker hangs on.
   const right = x + size >= m.column - 1 ? m.pad.right : side;
   const pad = { ...v, right, left: side };
@@ -1156,15 +1008,11 @@ function layoutBoard(
             room: room(y0),
             measured,
           };
-          return withResponses(
-            plan.recipe === 'C'
-              ? shapeC(card, plan, ctx)
-              : plan.recipe === 'A'
-                ? shapeA(card, plan, ctx)
-                : shapeB(card, plan, ctx),
-            card,
-            ctx,
-          );
+          return plan.recipe === 'C'
+            ? shapeC(card, plan, ctx)
+            : plan.recipe === 'A'
+              ? shapeA(card, plan, ctx)
+              : shapeB(card, plan, ctx);
         };
         let drawn = shapeAt(top);
         // The lane's first item keeps its sticker in its row, off the header and

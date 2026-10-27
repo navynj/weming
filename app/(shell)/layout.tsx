@@ -4,7 +4,6 @@ import { TimezoneSync } from '@/features/auth/timezone-sync';
 import { initialsOf } from '@/features/home/grid';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolActivityProvider } from '@/features/pool/activity';
-import { BoardResponsesProvider } from '@/features/responses/board-pending';
 import { getPeople } from '@/lib/queries/people';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { getMyLinks, getMyPoolNames, getPoolActivity } from '@/lib/queries/pools';
@@ -66,16 +65,13 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
     <PeopleProvider me={profile?.id ?? null} people={people}>
       <PoolActivityProvider activity={activity} pools={stripPools}>
         <InputSheetProvider>
-          {/* A reaction or reply on an open splash shows on the board beneath at once (H25). */}
-          <BoardResponsesProvider>
-            <div className="flex min-h-dvh flex-col">
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-            </div>
-            {/* A splash opened from inside the app: a sheet over the screen (review). */}
-            {modal}
-            {context ? <SheetHost context={context} /> : null}
-            {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
-          </BoardResponsesProvider>
+          <div className="flex min-h-dvh flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+          </div>
+          {/* A splash opened from inside the app: a sheet over the screen (review). */}
+          {modal}
+          {context ? <SheetHost context={context} /> : null}
+          {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
         </InputSheetProvider>
       </PoolActivityProvider>
     </PeopleProvider>

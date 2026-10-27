@@ -54,7 +54,8 @@ export function PinnedCards({
           const lane = laneOfCard(card, categories);
           const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
           // The latest ripple: the thread runs oldest first.
-          const excerpt = card.ripples.at(-1)?.note ?? card.body;
+          // The last block with words: a photo-only block has none to quote.
+          const excerpt = card.ripples.findLast((r) => r.note)?.note ?? card.body;
           return (
             <li
               key={card.splash.id}

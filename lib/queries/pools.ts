@@ -6,9 +6,10 @@ import type { Database } from '@/lib/database.types';
 import type { BoardLayoutJson } from '@/features/month-board/board-layout';
 import { getPoolLayouts } from '@/lib/queries/layouts';
 import type { DuringClient } from '@/lib/queries/profile';
-import type { BoardResponses } from '@/features/responses/model';
+import type { RippleResponsesValue } from '@/features/responses/model';
 import {
-  getBoardResponses,
+  getLockedIds,
+  getRippleResponses,
   getResponsesOnMine,
   latestResponseOnMine,
 } from '@/lib/queries/responses';
@@ -82,11 +83,11 @@ export type PoolView = {
   invites: PoolInvite[];
   /** The calendar's layouts its members set, by splash (0025). */
   layouts?: Record<string, BoardLayoutJson>;
-  /** Each splash's reactions and first replies, for the board (H25). */
-  responses?: Record<string, BoardResponses>;
+  /** What readers left on every ripple here, for the top card (H25), and my locked ones. */
+  responded?: RippleResponsesValue;
+  lockedIds?: string[];
   /** By splash then ripple of mine: the newest response someone else left (H25). */
   respondedAt?: Record<string, Record<string, string>>;
-  respondedAsOf?: string;
 };
 
 const RIPPLE_COLUMNS =
@@ -315,10 +316,13 @@ export async function getPoolView(
     ripples,
     invites: invites.data ?? [],
     layouts: await getPoolLayouts(supabase, poolId),
-    respondedAsOf: new Date().toISOString(),
-    responses: await getBoardResponses(
+    responded: await getRippleResponses(
       supabase,
-      splashes.map((s) => s.id),
+      ripples.map((r) => r.id),
+    ),
+    lockedIds: await getLockedIds(
+      supabase,
+      ripples.flatMap((r) => (r.author_id === me ? [r.id] : [])),
     ),
     respondedAt: await getResponsesOnMine(
       supabase,

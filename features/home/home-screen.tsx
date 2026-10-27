@@ -27,7 +27,7 @@ import {
 import { effectiveLayout } from '@/features/month-board/board-layout';
 import { getHomeLayouts } from '@/lib/queries/layouts';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
-import { getBoardResponses, getResponsesOnMine } from '@/lib/queries/responses';
+import { getLockedIds, getResponsesOnMine, getRippleResponses } from '@/lib/queries/responses';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -192,12 +192,13 @@ export async function HomeScreen({
     };
   });
 
-  // A card's ripples: its blocks with words, oldest first. A lone block's is its own.
+  // A card's ripples: its blocks with words or photos, oldest first — the
+  // top card shows each one's photos under its words. A lone block's is its own.
   const threads = new Map<string, CardRipple[]>();
   for (const ripple of [...ripples].reverse()) {
-    if (!ripple.note) continue;
+    if (!ripple.note && ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
-    const entry = { id: ripple.id, note: ripple.note, createdAt: ripple.created_at };
+    const entry = { id: ripple.id, note: ripple.note ?? '', createdAt: ripple.created_at };
     const list = threads.get(key);
     if (list) list.push(entry);
     else threads.set(key, [entry]);
@@ -216,7 +217,7 @@ export async function HomeScreen({
       const thread = threads.get(summary.id) ?? [];
       const placed = placeCard(
         summary,
-        thread.map((r) => r.note).join('\n\n'),
+        thread.flatMap((r) => (r.note ? [r.note] : [])).join('\n\n'),
         profile.timezone,
         thread,
       );
@@ -272,9 +273,13 @@ export async function HomeScreen({
     ...mine.flatMap((s) => (s.own_pool_id ? [s.id] : [])),
     ...(await getMyPlacements(supabase, profile.id)).flatMap((p) => (p.shared ? [p.splashId] : [])),
   ]);
-  const respondedAsOf = new Date().toISOString();
-  const [boardResponses, respondedAt] = await Promise.all([
-    getBoardResponses(supabase, [...sharedIds]),
+  // Everything on the ripples a top card reads, and my locked ones among them.
+  const answerable = cards.flatMap((c) =>
+    sharedIds.has(c.splash.id) ? c.ripples.map((r) => r.id) : [],
+  );
+  const [responded, locked, respondedAt] = await Promise.all([
+    getRippleResponses(supabase, answerable),
+    getLockedIds(supabase, answerable),
     getResponsesOnMine(
       supabase,
       profile.id,
@@ -284,10 +289,20 @@ export async function HomeScreen({
     ),
   ]);
   const laid = cards.map((read) => {
+    const ids = new Set(read.ripples.map((r) => r.id));
     const card: Card = {
       ...read,
-      respondedAsOf,
-      responses: boardResponses[read.splash.id],
+      ...(sharedIds.has(read.splash.id)
+        ? {
+            responded: {
+              value: {
+                reactions: responded.reactions.filter((r) => ids.has(r.ripple_id)),
+                replies: responded.replies.filter((r) => ids.has(r.ripple_id)),
+              },
+              locked,
+            },
+          }
+        : {}),
       respondedAt: respondedAt[read.splash.id],
     };
     const pooled = layouts.pool[card.splash.id] ?? null;
