@@ -142,8 +142,6 @@ function pendingFor(conversion: Conversion, loaded: Loaded): Partial<PendingEdit
       return { poolLane: poolLane(conversion.poolLaneId) };
     case 'to_joint':
       return { kind: 'joint', poolLane: poolLane(conversion.poolLaneId) };
-    case 'to_pool_record':
-      return { kind: 'own', poolLane: poolLane(conversion.poolLaneId) };
     case 'to_mine':
       return {
         kind: 'mine',
@@ -305,21 +303,23 @@ function EditForm({
       ...dates(),
       declaredLaneId: mine ? laneId : null,
       // Only the pools that changed: on, moved to another pool lane, or off.
-      share: mine
-        ? [
-            ...shared
-              .filter(
-                (pick) =>
-                  !initial.sharedIn.some(
-                    (was) => was.poolId === pick.poolId && was.poolLaneId === pick.poolLaneId,
-                  ),
-              )
-              .map((pick) => ({ poolId: pick.poolId, on: true, poolLaneId: pick.poolLaneId })),
-            ...initial.sharedIn
-              .filter((was) => !shared.some((pick) => pick.poolId === was.poolId))
-              .map((was) => ({ poolId: was.poolId, on: false, poolLaneId: null })),
-          ]
-        : [],
+      // Made mine from Home, every pool its new Audience names.
+      share:
+        mine || lanes.conversion.op === 'to_mine'
+          ? [
+              ...shared
+                .filter(
+                  (pick) =>
+                    !initial.sharedIn.some(
+                      (was) => was.poolId === pick.poolId && was.poolLaneId === pick.poolLaneId,
+                    ),
+                )
+                .map((pick) => ({ poolId: pick.poolId, on: true, poolLaneId: pick.poolLaneId })),
+              ...initial.sharedIn
+                .filter((was) => !shared.some((pick) => pick.poolId === was.poolId))
+                .map((was) => ({ poolId: was.poolId, on: false, poolLaneId: null })),
+            ]
+          : [],
       invite: lanes.invite,
       inviteEveryone: lanes.inviteEveryone,
       poolId: initial.poolId,

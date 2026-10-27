@@ -1319,7 +1319,6 @@ export type Database = {
         Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
         Returns: undefined
       }
-      splash_to_pool_record: { Args: { p_splash: string }; Returns: undefined }
       splash_to_together: {
         Args: { p_invite_all: boolean; p_pool_lane: string; p_splash: string }
         Returns: undefined

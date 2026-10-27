@@ -4,11 +4,15 @@ import { useState, type ReactNode } from 'react';
 
 import { LaneChips } from '@/features/input-sheet/lane-chips';
 import { usePeople } from '@/features/people/people-provider';
-import { preselectLane, withPick, type AudiencePick } from '@/features/pool/audience';
+import {
+  defaultAudience,
+  preselectLane,
+  withPick,
+  type AudiencePick,
+} from '@/features/pool/audience';
 import { AudienceChip } from '@/features/pool/audience-sheet';
 import type { PoolScope } from '@/features/pool/compose-scope';
 import { lastPicked, rememberPick } from '@/features/pool/last-pick';
-import { Switch } from '@/features/pool/lane-match';
 import { PoolLanePicker } from '@/features/pool/pool-lane-picker';
 import type { Together } from '@/features/pool/pool-pick';
 
@@ -42,10 +46,11 @@ export type EditLanes = {
 
 /**
  * The edit sheet's lanes (0022, 0033). Opened from a pool the record is in:
- * that pool's lane chips and Together, and for a joint record only I wrote
- * in, "Make it mine". Opened from Home: my lanes — with the Audience for my
- * Home record, and for a pool or joint record a move to Home; a joint record
- * someone else wrote in keeps to its pool's lanes.
+ * that pool's lane chips and Together; nothing becomes mine there. Opened
+ * from Home: my lanes — with the Audience for my Home record; for a pool or
+ * joint record only I wrote in, picking a lane makes it mine, its Audience
+ * set anew as a new record's; a joint record someone else wrote in keeps to
+ * its pool's lanes.
  */
 export function useEditLanes(
   initial: Loaded,
@@ -70,16 +75,17 @@ export function useEditLanes(
       : initial.poolLaneId
     : null;
 
-  // From a pool: the chosen pool lane, Together, and Make it mine.
+  // From a pool: the chosen pool lane and Together.
   const [chosenLane, setChosenLane] = useState<string | null>(null);
   const [together, setTogether] = useState<Together>({ everyone: false, picked: [] });
-  const [toPoolRecord, setToPoolRecord] = useState(false);
   const poolLane = chosenLane ?? hereLane;
   // From Home: my lane, the Audience, or (a joint someone else wrote in) a pool lane.
   const [laneId, setLaneId] = useState<string | null>(
     initial.kind === 'mine' ? initial.declaredLaneId : null,
   );
   const [shared, setShared] = useState<AudiencePick[]>(initial.sharedIn);
+  // Made mine from Home, its Audience starts anew, as a new record's would.
+  const [fresh, setFresh] = useState<AudiencePick[] | null>(null);
   const [poolLaneId, setPoolLaneId] = useState(initial.poolLaneId);
   const stuck = initial.kind === 'joint' && initial.othersWrote;
 
@@ -92,12 +98,11 @@ export function useEditLanes(
           pool,
           poolLane,
           joint ? [] : together.picked,
-          toPoolRecord,
           !joint && together.everyone,
         )
       : ({ op: 'none' } as const);
     const removed = removedFrom(current, pool.poolId).map(poolName);
-    const adding = joint && !toPoolRecord && !initial.inviteAll;
+    const adding = joint && !initial.inviteAll;
     const inviteEveryone = adding && together.everyone;
     const invite =
       adding && !together.everyone ? together.picked.filter((id) => !fixed.includes(id)) : [];
@@ -118,24 +123,11 @@ export function useEditLanes(
             scope={pool}
             pick={poolLane ? { kind: joint ? 'joint' : 'own', poolLaneId: poolLane } : null}
             onPick={(next) => next && setChosenLane(next.poolLaneId)}
-            together={toPoolRecord ? { everyone: false, picked: [] } : together}
+            together={together}
             onTogether={setTogether}
-            fixed={toPoolRecord ? [] : fixed}
-            fixedEveryone={!toPoolRecord && joint && initial.inviteAll}
-            togetherLocked={toPoolRecord ? `Yours · in ${pool.poolName}` : null}
+            fixed={fixed}
+            fixedEveryone={joint && initial.inviteAll}
           />
-          {joint && !stuck ? (
-            <label data-make-mine className="text-ink flex items-center justify-between text-xs">
-              Make it mine
-              <Switch
-                on={toPoolRecord}
-                onChange={setToPoolRecord}
-                label="Make it mine"
-                tone="ink"
-                size="sm"
-              />
-            </label>
-          ) : null}
           <Notes
             lines={
               conversion.op === 'to_joint' && removed.length > 0
@@ -181,6 +173,9 @@ export function useEditLanes(
   const conversion = planFromHome(current, laneId);
   const warnings = homeWarnings({ ...current, poolId: initial.poolId }, laneId, poolName);
   const mine = initial.kind === 'mine';
+  const audience = mine ? shared : (fresh ?? defaultAudience(laneId, links));
+  const setAudience = (next: (list: AudiencePick[]) => AudiencePick[]): void =>
+    mine ? setShared(next) : setFresh(next(audience));
   const key = (list: AudiencePick[]): string =>
     list
       .map((p) => `${p.poolId}:${p.poolLaneId}`)
@@ -189,7 +184,7 @@ export function useEditLanes(
   return {
     conversion,
     laneId,
-    shared,
+    shared: audience,
     invite: [],
     inviteEveryone: false,
     changed: conversion.op !== 'none' || (mine && key(shared) !== key(initial.sharedIn)),
@@ -205,9 +200,9 @@ export function useEditLanes(
               surface="white"
             />
           </div>
-          {mine && pools.length > 0 ? (
+          {(mine || conversion.op === 'to_mine') && pools.length > 0 ? (
             <AudienceChip
-              shared={shared}
+              shared={audience}
               pools={pools}
               preselect={(poolId) =>
                 preselectLane(
@@ -220,7 +215,7 @@ export function useEditLanes(
               }
               onChange={(poolId, chip) => {
                 if (chip) rememberPick(laneId, poolId, chip);
-                setShared((list) => withPick(list, poolId, chip));
+                setAudience((list) => withPick(list, poolId, chip));
               }}
             />
           ) : null}
