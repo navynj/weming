@@ -239,6 +239,22 @@ describe('the top card reads each ripple in full (H25, review)', () => {
     expect(topCard(container).querySelector('[data-reactions]')).toBeNull();
   });
 
+  it('offers no reaction on a post with no ripples yet, shared or not (review)', () => {
+    const summary = summarizeSplash(
+      splash('empty', 'Soon'),
+      [],
+      TZ,
+      new Date(`${TODAY}T20:00:00Z`),
+    );
+    const empty: Card = {
+      ...placeCard(summary, '', TZ, []),
+      responded: { value: { reactions: [], replies: [] }, locked: [] },
+    };
+    const { container } = home([empty]);
+    expect(topCard(container).querySelector('[data-card-responses]')).toBeNull();
+    expect(topCard(container).querySelector('[data-reactions]')).toBeNull();
+  });
+
   it('keeps its fixed height whatever it holds, fading out what does not fit', () => {
     const heavy = home([rich()]);
     const heavyHeight = topCard(heavy.container).style.height;

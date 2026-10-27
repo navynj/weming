@@ -235,7 +235,9 @@ export function CardFace({
                     photos={(card.photos ?? NO_PHOTOS).filter((p) => p.rippleId === ripple.id)}
                     signed={signed}
                   />
-                  {respond ? (
+                  {/* The stand-in for a post with no ripples is the post itself:
+                      nothing there to react to (review). */}
+                  {respond && card.ripples.length > 0 ? (
                     <CardResponses
                       rippleId={ripple.id}
                       value={answered.value}
