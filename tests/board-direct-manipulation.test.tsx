@@ -599,6 +599,34 @@ describe('direct manipulation: the page around it', () => {
     expect(desk.container.querySelector('[data-layout-sheet]')).toBeNull();
   });
 
+  it('sends a piece to the back from the toolbar: the Layer slider follows, saved after the rest, undoable', async () => {
+    media(true);
+    // Oct 21's label moved a lane right, over Oct 22's: the two overlap.
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22'),
+      card('s1', 'Grand Austria Hotel', '2026-10-21', { layout: { label: { x: 1 } } }),
+    ]);
+    fireEvent.click(label(container, 's2'));
+    fireEvent.click(q(container, '[data-edit-more]'));
+    const slider = () => q(container, '[data-layout-control="Layer"] input') as HTMLInputElement;
+    expect(slider().value).toBe('0');
+    // On top of what it overlaps: nothing to bring forward.
+    expect(q(container, '[data-edit-layer="forward"]').hasAttribute('disabled')).toBe(true);
+    expect(q(container, '[data-edit-layer="front"]').hasAttribute('disabled')).toBe(true);
+    fireEvent.click(q(container, '[data-edit-layer="back"]'));
+    expect(slider().value).toBe('-1');
+    expect(Number(label(container, 's2').style.zIndex)).toBeLessThan(
+      Number(label(container, 's1').style.zIndex),
+    );
+    expect(q(container, '[data-edit-layer="back"]').hasAttribute('disabled')).toBe(true);
+    expect(saved).toHaveLength(0);
+    await act(() => new Promise((resolve) => setTimeout(resolve, LAYOUT_SAVE_MS + 20)));
+    expect(saved[0].patch).toEqual({ piece: { layer: -1 } });
+    fireEvent.click(q(container, '[data-edit-undo]'));
+    await settle();
+    expect(saved[1]).toMatchObject({ patch: {}, clear: ['piece.layer'] });
+  });
+
   it('moves the slider as the handle moves: one value, two controls', async () => {
     media(true);
     const { container } = home();

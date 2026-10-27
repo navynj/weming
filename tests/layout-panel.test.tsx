@@ -502,45 +502,70 @@ describe('hand-set layouts on the calendar (review)', () => {
     }
   });
 
-  it('moves the whole piece and lifts its layer: every part together, its own order kept (0038)', () => {
+  it('moves the whole piece and orders it by its layer: every part together, its own steps kept (0038, 0051)', () => {
     media(true);
+    // An earlier day, moved by hand and set a layer up; a later day left as it is.
     const moved = { ...ONE[0], layout: { label: { x: 0.1 }, piece: { x: 0.2, y: -1, layer: 2 } } };
-    const { container } = home([moved]);
+    const later = card('s2', 'Lynn Canyon', '2026-10-22');
+    const { container } = home([later, moved]);
+    const z = (id: string, part: string): string =>
+      container.querySelector<HTMLElement>(`[data-board-piece="${id}"] [data-board-${part}]`)!.style
+        .zIndex;
     const label = container.querySelector<HTMLElement>(
       '[data-board-piece="s1"] [data-board-label]',
     )!;
-    const pick = container.querySelector<HTMLElement>('[data-board-piece="s1"] [data-board-pick]')!;
     // The label's own X and the piece's add up; Y is the piece's alone.
     expect(label.style.transform).toMatch(/^translate\(/);
     expect(label.style.transform).toContain('px');
-    // Moved by hand, it sits above every piece in place (0044): its layer 2
-    // plus six, two steps a layer, over the label's 1.
-    expect(label.style.zIndex).toBe('17');
-    expect(pick.style.zIndex).toBe('17');
+    // One order for the view (stacking.ts): its layer puts it over the later
+    // day's piece, four steps a place; the label and its tap on step 1.
+    expect(z('s1', 'label')).toBe('6');
+    expect(z('s1', 'pick')).toBe('6');
+    expect(z('s2', 'label')).toBe('2');
     // The piece itself carries no transform or z: no stacking context of its own.
     const piece = container.querySelector<HTMLElement>('[data-board-piece="s1"]')!;
     expect(piece.style.transform).toBe('');
     expect(piece.style.zIndex).toBe('');
   });
 
-  it('offers Position — X, Y and Layer — and saves it as the piece’s', async () => {
+  it('a piece moved by hand keeps its place in the order: a later day still draws over it', () => {
+    media(true);
+    const moved = { ...ONE[0], layout: { photos: {}, label: { x: 0.4 } } };
+    const later = card('s2', 'Lynn Canyon', '2026-10-22');
+    const { container } = home([later, moved]);
+    const z = (id: string): number =>
+      Number(
+        container.querySelector<HTMLElement>(`[data-board-piece="${id}"] [data-board-label]`)!.style
+          .zIndex,
+      );
+    expect(z('s2')).toBeGreaterThan(z('s1'));
+  });
+
+  it('offers Position — X, Y and Layer, under 0 too — and saves it as the piece’s', async () => {
     vi.useFakeTimers();
     media(true);
-    const { container } = home(ONE);
+    // The top card is the later day's; its Layer under 0 sends it beneath the earlier one.
+    const { container } = home([card('s2', 'Lynn Canyon', '2026-10-22'), ONE[0]]);
+    const z = (id: string): string =>
+      container.querySelector<HTMLElement>(`[data-board-piece="${id}"] [data-board-label]`)!.style
+        .zIndex;
+    expect(z('s2')).toBe('6');
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
     expect(container.querySelector('[data-layout-group="Position"]')).not.toBeNull();
-    fireEvent.change(container.querySelector('input[aria-label="Layer"]')!, {
-      target: { value: '3' },
-    });
-    expect(
-      container.querySelector<HTMLElement>('[data-board-piece="s1"] [data-board-label]')!.style
-        .zIndex,
-    ).toBe('7');
+    const slider = container.querySelector<HTMLInputElement>('input[aria-label="Layer"]')!;
+    expect(slider.min).toBe('-20');
+    expect(slider.max).toBe('20');
+    fireEvent.change(slider, { target: { value: '-1' } });
+    expect(z('s2')).toBe('2');
+    expect(z('s1')).toBe('6');
+    expect(container.querySelector('[data-layout-control="Layer"]')!.textContent).toContain(
+      'Under −1',
+    );
     await act(async () => {
       vi.advanceTimersByTime(LAYOUT_SAVE_MS);
       await Promise.resolve();
     });
-    expect(saved.at(-1)!.patch).toEqual({ piece: { layer: 3 } });
+    expect(saved.at(-1)!.patch).toEqual({ piece: { layer: -1 } });
   });
 
   it('draws a joint label’s hand-set fill; a label with no fill stays so', () => {

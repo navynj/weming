@@ -1,7 +1,16 @@
 'use client';
 
-import { useEffect, useRef, type CSSProperties } from 'react';
-import { Check, MoreHorizontal, Type, Undo2 } from 'lucide-react';
+import { useEffect, useImperativeHandle, useRef, type CSSProperties, type Ref } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  BringToFront,
+  Check,
+  MoreHorizontal,
+  SendToBack,
+  Type,
+  Undo2,
+} from 'lucide-react';
 
 import { AXIS_LOCK_PX } from '@/components/ui/use-axis-lock';
 
@@ -23,6 +32,7 @@ import {
   type BoardPart,
   type PartValues,
 } from './handle-math';
+import type { LayerMove } from './stacking';
 import type { BoardEditing } from './use-board-editing';
 
 /** Which handles a part has (review): the panel's own fields, no more. */
@@ -78,7 +88,7 @@ type Gesture = {
 /** A corner pull or a width pull begins after this much travel, then tracks the finger exactly. */
 const SIZE_DEAD_PX = 4;
 
-const HANDLE = 'absolute flex h-11 w-11 items-center justify-center';
+const HANDLE = 'pointer-events-auto absolute flex h-11 w-11 items-center justify-center';
 const DOT = 'block h-3 w-3 rounded-full border border-main-900 bg-white';
 
 /** What a tap on the board is on when it lets an active piece go: none of these. */
@@ -113,6 +123,9 @@ function scaleAt(el: Element | null): number {
  * hold the part's top-left (or a pinch's midpoint) where it was. While a
  * finger is down only the screen changes; letting go saves once.
  */
+/** A frame's move, started by its piece from a pointer down on the selected part itself. */
+export type FrameHandle = { beginMove: (event: React.PointerEvent) => void };
+
 export function PartFrame({
   part,
   values,
@@ -122,6 +135,8 @@ export function PartFrame({
   origin = 'center',
   widthInside = false,
   onHold,
+  onHeld,
+  ref,
 }: {
   part: BoardPart;
   /** The part's hand-set values as drawn now. */
@@ -135,6 +150,14 @@ export function PartFrame({
   widthInside?: boolean;
   /** A size change begins (the point of the part to hold, as a share of it) or ends (null). */
   onHold?: (share: Point | null) => void;
+  /** A handle is down (the part rises over every piece) or let go (it drops back). */
+  onHeld?: (held: boolean) => void;
+  /**
+   * Drawn over every piece, its body lets pointers through to what is
+   * beneath — a sticker on the label's corner stays a tap away — and the
+   * piece starts a move from the part itself through this.
+   */
+  ref?: Ref<FrameHandle>;
 }) {
   const root = useRef<HTMLSpanElement>(null);
   const pivotRef = useRef<HTMLSpanElement>(null);
@@ -144,9 +167,9 @@ export function PartFrame({
   const frame = useRef<number | null>(null);
   const pending = useRef<PartValues | null>(null);
   // The latest of everything a gesture reads, without re-binding its listeners.
-  const latest = useRef({ part, values, units, tools, editing, onHold });
+  const latest = useRef({ part, values, units, tools, editing, onHold, onHeld });
   useEffect(() => {
-    latest.current = { part, values, units, tools, editing, onHold };
+    latest.current = { part, values, units, tools, editing, onHold, onHeld };
   });
   const stop = useRef<() => void>(() => {});
   useEffect(() => () => stop.current(), []);
@@ -244,6 +267,7 @@ export function PartFrame({
     if (!g || !g.pointers.has(event.pointerId)) return;
     // A finger lifted ends the gesture, pinch or not: one save a release.
     stop.current();
+    latest.current.onHeld?.(false);
     const release = latest.current.onHold;
     if (g.moved) {
       flush();
@@ -297,6 +321,7 @@ export function PartFrame({
     };
     // A corner pulled or a width pulled holds the top-left where it is.
     if (holding) latest.current.onHold?.({ x: 0, y: 0 });
+    latest.current.onHeld?.(true);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
@@ -309,6 +334,12 @@ export function PartFrame({
       window.removeEventListener('pointerdown', onSecond);
     };
   };
+
+  useImperativeHandle(ref, () => ({
+    beginMove: (event) => {
+      if (latest.current.tools.move) begin('move', event);
+    },
+  }));
 
   // Its own taps do nothing more: never the piece's pick beneath.
   const swallow = (event: React.SyntheticEvent): void => event.stopPropagation();
@@ -324,7 +355,7 @@ export function PartFrame({
         .join(' ')}
       onClick={swallow}
       onPointerDown={(event) => (tools.move ? begin('move', event) : swallow(event))}
-      className={`pointer-events-auto absolute -inset-[3px] block outline outline-1 outline-white ${tools.move ? 'cursor-move' : ''}`}
+      className="pointer-events-none absolute -inset-[3px] block outline outline-1 outline-white"
       style={still}
     >
       <span
@@ -426,14 +457,43 @@ export function PartFrame({
 export function EditToolbar({
   editing,
   fontSize,
+  layers = null,
   style,
 }: {
   editing: BoardEditing;
   /** The label's text size as drawn, while the label is selected; else no stepper. */
   fontSize: number | null;
+  /** The piece's layer moves (stacking.ts), each possible or not; none for a band along its days. */
+  layers?: { can: Record<LayerMove, boolean>; move: (how: LayerMove) => void } | null;
   style: CSSProperties;
 }) {
   const button = 'flex h-8 min-w-8 items-center justify-center rounded-full px-1.5';
+  // Cmd/Ctrl+] forward, Cmd/Ctrl+[ backward; with Shift, to the front and the back.
+  const latest = useRef(layers);
+  useEffect(() => {
+    latest.current = layers;
+  });
+  const hasLayers = layers !== null;
+  useEffect(() => {
+    if (!hasLayers) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const up = event.code === 'BracketRight';
+      if (!up && event.code !== 'BracketLeft') return;
+      const how: LayerMove = up
+        ? event.shiftKey
+          ? 'front'
+          : 'forward'
+        : event.shiftKey
+          ? 'back'
+          : 'backward';
+      // Never the browser's back or forward.
+      event.preventDefault();
+      if (latest.current?.can[how]) latest.current.move(how);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasLayers]);
   return (
     <div
       data-edit-toolbar
@@ -442,7 +502,8 @@ export function EditToolbar({
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
       // A white bar on the ground stays white with ink (0032).
-      className="surface text-ink pointer-events-auto absolute z-[100] flex items-center gap-0.5 rounded-full bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md"
+      // Wraps to a second row on a phone rather than leave the board.
+      className="surface text-ink pointer-events-auto absolute flex w-max flex-wrap items-center gap-0.5 rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md"
       style={style}
     >
       {fontSize !== null ? (
@@ -472,6 +533,25 @@ export function EditToolbar({
           >
             +
           </button>
+          <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
+        </div>
+      ) : null}
+      {layers ? (
+        <div data-edit-layers className="flex items-center" role="group" aria-label="Layer">
+          {LAYER_BUTTONS.map(({ how, label, Icon }) => (
+            <button
+              key={how}
+              type="button"
+              aria-label={label}
+              title={label}
+              data-edit-layer={how}
+              disabled={!layers.can[how]}
+              onClick={() => layers.move(how)}
+              className={`${button} disabled:opacity-20`}
+            >
+              <Icon aria-hidden size={16} />
+            </button>
+          ))}
           <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
         </div>
       ) : null}
@@ -511,3 +591,11 @@ export function EditToolbar({
     </div>
   );
 }
+
+/** The toolbar's layer buttons, in order (review): forward, backward, to the front, to the back. */
+const LAYER_BUTTONS = [
+  { how: 'forward', label: 'Bring forward', Icon: ArrowUp },
+  { how: 'backward', label: 'Send backward', Icon: ArrowDown },
+  { how: 'front', label: 'Bring to front', Icon: BringToFront },
+  { how: 'back', label: 'Send to back', Icon: SendToBack },
+] as const;

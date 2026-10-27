@@ -37,6 +37,7 @@ import {
   NO_TOOLS,
   PartFrame,
   partAt,
+  type FrameHandle,
   type FrameUnits,
   type Tools,
 } from './board-handles';
@@ -44,6 +45,7 @@ import {
   clamp,
   LABEL_PART,
   LIMITS,
+  samePart,
   moveHolding,
   partPatch,
   partValues,
@@ -52,6 +54,7 @@ import {
   type PartBox,
   type PartValues,
 } from './handle-math';
+import { overAll, zOf, type LayerMove, type Stacking } from './stacking';
 import type { BoardEditing } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
@@ -101,18 +104,6 @@ function nudge<T extends { x?: number; y?: number }>(
   return { ...set, x: (set?.x ?? 0) + (shift.x ?? 0), y: (set?.y ?? 0) + (shift.y ?? 0) } as T;
 }
 
-/**
- * A part's stacking with the whole piece's layer added (0038): every part
- * rises together, two steps a layer, so its own order (sticker over label)
- * holds and pieces still interleave with no stacking context of their own.
- */
-/** Above the highest layer (5) a post in place can take: a moved post's lift (0044). */
-const MOVED_LAYERS = 6;
-
-function lifted(base: number, layer: number | undefined): CSSProperties | undefined {
-  return layer ? { zIndex: base + 2 * layer } : undefined;
-}
-
 /** The wave's defaults: a small calm wave, the label's width. */
 export const WAVE_DEFAULTS = { amp: 2, length: 16, weight: 2, span: 1 } as const;
 
@@ -149,7 +140,8 @@ function WaveDecoration({
   column,
   line,
   moving = '',
-  stack = 0,
+  z,
+  frameZ,
   selectable = false,
   frame = null,
 }: {
@@ -167,8 +159,10 @@ function WaveDecoration({
   line: number;
   /** The piece's bob or plunge, played on each part (motionOf). */
   moving?: string;
-  /** The piece's layers (lifted), so a moved wave rises with its piece. */
-  stack?: number;
+  /** Its place in the view's one stacking order (stacking.ts). */
+  z?: number;
+  /** Its frame's, over every piece. */
+  frameZ?: number;
   /** Its piece is being edited: a tap on the wave selects it. */
   selectable?: boolean;
   /** Its frame while selected, laid over it exactly. */
@@ -185,7 +179,7 @@ function WaveDecoration({
     top: label.y + label.h - height / 2,
     transform: moveOf(wave, column, line),
     transformOrigin: 'left center',
-    ...lifted(0, stack),
+    ...(z !== undefined ? { zIndex: z } : {}),
   };
   const path = wavePath(width, amp, wavelength, pad);
   return (
@@ -224,7 +218,7 @@ function WaveDecoration({
         <span
           aria-hidden
           className="pointer-events-none absolute"
-          style={{ ...placedAt, width, height, zIndex: 60 }}
+          style={{ ...placedAt, width, height, zIndex: frameZ }}
         >
           {frame}
         </span>
@@ -432,7 +426,7 @@ function OpenSlot({
   onWrite,
   muted = false,
   shift,
-  layer,
+  z,
   moving = '',
 }: {
   piece: BoardPiece;
@@ -441,7 +435,8 @@ function OpenSlot({
   muted?: boolean;
   /** The whole piece's move (0038), before its own turn. */
   shift?: string;
-  layer?: number;
+  /** Its place in the view's one stacking order: under its own label. */
+  z?: number;
   /** The piece's bob or plunge, played on each part (motionOf). */
   moving?: string;
 }) {
@@ -473,7 +468,7 @@ function OpenSlot({
     top: box.y,
     transform: `${shift ? `${shift} ` : ''}rotate(${piece.slotRotate}deg)`,
     transformOrigin: piece.slotAt === 'right' ? 'top left' : 'top right',
-    ...lifted(0, layer),
+    ...(z !== undefined ? { zIndex: z } : {}),
   };
   // Under every label where they meet (review): the labels' z is 1.
   const className = `absolute z-0 flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80 ${muted ? 'opacity-50' : ''} ${moving}`;
@@ -581,8 +576,16 @@ export function BoardPieceView({
   ripple,
   plunge,
   editing = null,
+  order = 0,
+  total = 1,
+  stacking = null,
 }: Shared & {
   piece: BoardPiece;
+  /** Its place in the view's one stacking order, and how many pieces the view has (stacking.ts). */
+  order?: number;
+  total?: number;
+  /** The view's order: what the toolbar's layer buttons do. */
+  stacking?: Stacking | null;
   photos: SignedMedia;
   onWrite: (card: Card) => void;
   /** Just dropped: it plunges in. */
@@ -677,16 +680,39 @@ export function BoardPieceView({
       at: pointOfBox(box, pixelsOf(values), values.tilt, share),
     });
   };
-  // Moved by hand (0044): above every piece in place, its own layer kept among the moved.
-  const stack =
-    (layout.piece?.layer ?? 0) +
-    (handMoved(layout) ? MOVED_LAYERS : 0) +
-    (active ? ACTIVE_LAYERS : 0);
-  // A sticker, photo or wave selected sits over its own piece's other parts,
-  // so its handles are never covered (a photo's corner under its caption).
-  // Not the label: raised, it would cover the sticker on its corner.
-  const layerOf = (kind: BoardPart['kind']): number =>
-    stack + (selected?.kind === kind && kind !== 'label' ? SELECTED_LAYERS : 0);
+  // One order for the whole view (stacking.ts): its place, then each part's
+  // step. The part a handle holds rises over every piece while it is held,
+  // and drops back on release; otherwise the order is drawn as it is, so a
+  // layer button shows what it did.
+  const [held, setHeld] = useState(false);
+  const frameRef = useRef<FrameHandle>(null);
+  // A move starts from the selected part itself: its frame lets pointers through.
+  const onPartDown = (event: React.PointerEvent): void => {
+    if (selected && samePart(partAt(event.target), selected)) frameRef.current?.beginMove(event);
+  };
+  // The selected part takes the finger: dragging it never scrolls the board.
+  const stillIf = (kind: BoardPart['kind']): CSSProperties | undefined =>
+    selected?.kind === kind ? { touchAction: 'none' } : undefined;
+  const zFor = (step: 'label' | 'photos' | 'wave' | 'sticker', kind: BoardPart['kind']) =>
+    held && selected?.kind === kind ? overAll(total, 1) : zOf(order, step);
+  const frameZ = overAll(total, 2);
+  const id = card.splash.id;
+  // The layer buttons: what each would do, on the pieces this one overlaps.
+  const layers =
+    active && stacking && !isPeriod(card.splash)
+      ? {
+          can: Object.fromEntries(
+            (['forward', 'backward', 'front', 'back'] as const).map((how) => [
+              how,
+              stacking.move(id, how) !== null,
+            ]),
+          ) as Record<LayerMove, boolean>,
+          move: (how: LayerMove): void => {
+            const next = stacking.move(id, how);
+            if (next !== null) editing!.edit({ piece: { layer: next } });
+          },
+        }
+      : null;
   const tap = (event: React.MouseEvent): void => {
     if (editing) editing.tap(card.splash.id, partAt(event.target));
     else onPick(card.splash.id);
@@ -705,20 +731,63 @@ export function BoardPieceView({
   // Where the label's right edge is drawn: at the board's edge its width bar would be clipped.
   const labelRight =
     piece.x + label.x + (nudge(layout.label, layout.piece)?.x ?? 0) * metrics.column + label.w;
-  const frameOf = (part: BoardPart): ReactNode =>
-    selected &&
-    selected.kind === part.kind &&
-    (part.kind !== 'photo' || (selected.kind === 'photo' && selected.path === part.path)) ? (
-      <PartFrame
-        part={selected}
-        values={partValues(layout, selected)}
-        units={units}
-        tools={period ? NO_TOOLS : TOOLS[selected.kind]}
-        editing={editing!}
-        widthInside={labelRight > metrics.width - 22}
-        onHold={onHold}
-      />
-    ) : null;
+  const frame: ReactNode = selected ? (
+    <PartFrame
+      part={selected}
+      values={partValues(layout, selected)}
+      units={units}
+      tools={period ? NO_TOOLS : TOOLS[selected.kind]}
+      editing={editing!}
+      widthInside={labelRight > metrics.width - 22}
+      onHold={onHold}
+      onHeld={setHeld}
+      ref={frameRef}
+    />
+  ) : null;
+  // The selected part's frame, over every piece: placed and turned exactly as
+  // the part, so its outline and handles are never covered, while the part
+  // itself keeps its place in the order.
+  const overlay = (): ReactNode => {
+    if (!selected || selected.kind === 'wave') return null;
+    const local =
+      selected.kind === 'label'
+        ? label
+        : selected.kind === 'icon'
+          ? piece.stickerBox
+          : (() => {
+              const photo = piece.fan.find((p) => p.path === selected.path);
+              const area = piece.photoBox;
+              return photo && area
+                ? {
+                    x: area.x,
+                    y: area.y + area.h - photo.dy - photo.size,
+                    w: photo.size,
+                    h: photo.size,
+                  }
+                : null;
+            })();
+    if (!local) return null;
+    const set =
+      selected.kind === 'label'
+        ? layout.label
+        : selected.kind === 'icon'
+          ? layout.icon
+          : layout.photos?.[selected.path];
+    return (
+      <span
+        aria-hidden
+        data-edit-overlay={selected.kind}
+        className="pointer-events-none absolute"
+        style={{
+          ...placed(local),
+          transform: moveOf(nudge(set, layout.piece), metrics.column, line),
+          zIndex: frameZ,
+        }}
+      >
+        {frame}
+      </span>
+    );
+  };
   return (
     <div
       // Remounted per ring, so the motion plays again for the same post.
@@ -752,7 +821,7 @@ export function BoardPieceView({
         // Keyboard and screen readers: a pointer taps what is drawn, wherever a
         // layout moved it (review: taps on a moved label missed).
         className={`pointer-events-none absolute inset-0 z-[1] block ${moving}`}
-        style={lifted(1, stack)}
+        style={{ zIndex: zOf(order, 'label') }}
       />
       {/* What is drawn takes the tap, where a layout put it (review): the
           label, the sticker and each photo; the gaps between them do not. */}
@@ -761,12 +830,17 @@ export function BoardPieceView({
         data-board-hits
         className="pointer-events-none absolute inset-0"
         onClick={tap}
+        onPointerDown={active ? onPartDown : undefined}
       >
         {piece.photoBox ? (
           <span
             data-board-photos
             className={`absolute z-[1] block ${fade} ${moving}`}
-            style={{ ...placed(piece.photoBox), ...lifted(1, layerOf('photo')) }}
+            style={{
+              ...placed(piece.photoBox),
+              zIndex: zFor('photos', 'photo'),
+              ...stillIf('photo'),
+            }}
           >
             {piece.fan.map((photo, at) => (
               <PhotoCardView
@@ -780,9 +854,7 @@ export function BoardPieceView({
                   metrics.column,
                   line,
                 )}
-              >
-                {frameOf({ kind: 'photo', path: photo.path })}
-              </PhotoCardView>
+              />
             ))}
           </span>
         ) : null}
@@ -793,9 +865,10 @@ export function BoardPieceView({
             column={metrics.column}
             line={line}
             moving={moving}
-            stack={layerOf('wave')}
+            z={zFor('wave', 'wave')}
+            frameZ={frameZ}
             selectable={active}
-            frame={frameOf({ kind: 'wave' })}
+            frame={selected?.kind === 'wave' ? frame : null}
           />
         ) : null}
         <span
@@ -805,7 +878,8 @@ export function BoardPieceView({
           style={{
             ...placed(label),
             transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
-            ...lifted(1, layerOf('label')),
+            zIndex: zFor('label', 'label'),
+            ...stillIf('label'),
             ...(reading && still
               ? { outline: '2px solid var(--color-white)', outlineOffset: 2 }
               : {}),
@@ -856,7 +930,6 @@ export function BoardPieceView({
               <AuthorFace card={card} px={metrics.narrow ? 12 : 14} />
             ) : null}
           </span>
-          {frameOf(LABEL_PART)}
         </span>
         {reading && !still ? (
           // Out from the sticker, or the front of the label when the icon is inline.
@@ -875,7 +948,7 @@ export function BoardPieceView({
                 ? { x: 0, y: 0, w: piece.stickerBox.w, h: piece.stickerBox.h }
                 : { x: piece.pad.left, y: piece.pad.top, w: piece.type.line, h: piece.type.line }
             }
-            z={lifted(3, stack)?.zIndex ?? 3}
+            z={zOf(order, 'sticker')}
           />
         ) : null}
         {piece.stickerBox && icon ? (
@@ -890,19 +963,25 @@ export function BoardPieceView({
               ...placed(piece.stickerBox),
               fontSize: piece.stickerBox.w,
               transform: moveOf(nudge(layout.icon, layout.piece), metrics.column, line),
-              ...lifted(2, layerOf('icon')),
+              zIndex: zFor('sticker', 'icon'),
+              ...stillIf('icon'),
             }}
           >
             {icon}
-            {frameOf({ kind: 'icon' })}
           </span>
         ) : null}
+        {overlay()}
       </div>
       {active ? (
         <EditToolbar
           editing={editing!}
           fontSize={selected?.kind === 'label' ? piece.type.size : null}
-          style={toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line)}
+          layers={layers}
+          style={{
+            ...toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line),
+            zIndex: overAll(total, 3),
+            maxWidth: metrics.width,
+          }}
         />
       ) : null}
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
@@ -914,7 +993,7 @@ export function BoardPieceView({
           onWrite={active ? () => {} : onWrite}
           muted={piece.muted}
           shift={moveOf(layout.piece, metrics.column, line)}
-          layer={stack}
+          z={zOf(order, 'slot')}
           moving={moving}
         />
       ) : null}
@@ -1046,11 +1125,6 @@ const TOOLS: Record<BoardPart['kind'], Tools> = {
   photo: { move: true, rotate: true, size: true, ends: false, width: false },
   wave: { move: true, rotate: false, size: false, ends: true, width: false },
 };
-
-/** Lifts the piece being edited over every other, moved ones included. */
-const ACTIVE_LAYERS = 20;
-/** Lifts its selected part over its own other parts: a photo's corner over the caption beneath it. */
-const SELECTED_LAYERS = 5;
 
 /** The part asked for, when the piece has it as its own: a sticker, a photo shown, a wave on; else its label. */
 function pieceSelected(

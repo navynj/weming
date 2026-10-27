@@ -18,6 +18,7 @@ import { Plus } from 'lucide-react';
 
 import { ON_PIECE } from '@/features/month-board/board-handles';
 import { BoardPieceView, BoardTapeView, TapeSlot } from '@/features/month-board/board-pieces';
+import { stackingOf } from '@/features/month-board/stacking';
 import type { BoardEditing } from '@/features/month-board/use-board-editing';
 import { boardPhotos } from '@/features/month-board/board-layout';
 import {
@@ -356,6 +357,11 @@ export const LaneGrid = forwardRef<
       rowOf: (card) => rowOfId.get(card.splash.id) ?? null,
     });
   }, [drawPieces, segmentsOf, cards, columnIds, columnPx, columns, measured, categories]);
+  // One stacking order across every day's pieces (stacking.ts).
+  const laneStacking = useMemo(
+    () => (laneBoard ? stackingOf(laneBoard.pieces, laneBoard.metrics.column) : null),
+    [laneBoard],
+  );
   const weekOf = useMemo(
     () => new Map((laneBoard?.weeks ?? []).map((w) => [laneBoard!.rowKeys[w.index], w])),
     [laneBoard],
@@ -587,7 +593,8 @@ export const LaneGrid = forwardRef<
         <div
           ref={gridRef}
           data-grid
-          className={`relative grid ${even ? 'w-full' : 'w-max min-w-full'}`}
+          // One stacking layer for every row's pieces (isolate), its rail over them.
+          className={`relative isolate grid ${even ? 'w-full' : 'w-max min-w-full'}`}
           // Every day row at least this tall and as tall as its fullest cell,
           // so stacked marks grow the row rather than spill into the next.
           style={{ gridTemplateColumns: template, gridAutoRows: 'auto' }}
@@ -781,6 +788,9 @@ export const LaneGrid = forwardRef<
                                     ripple={ringAt?.id === piece.id ? ringAt.seq : null}
                                     plunge={false}
                                     editing={editing}
+                                    order={laneStacking?.order.get(piece.id) ?? 0}
+                                    total={laneStacking?.total ?? 1}
+                                    stacking={laneStacking}
                                   />
                                 </div>
                               ))}
@@ -886,6 +896,9 @@ function ColumnHeader({ column }: { column: GridColumn }) {
 }
 
 /** A day's row: its label on the rail, then a cell per column. */
+/** The rail stays over every piece of the grid's one stacking order (stacking.ts). */
+const RAIL_Z = 'z-[100000]';
+
 function DayRow({
   day,
   monthChanges,
@@ -904,7 +917,7 @@ function DayRow({
         <div
           aria-hidden
           data-day-continued={day}
-          className="bg-main-900 sticky left-0 z-10"
+          className={`bg-main-900 sticky left-0 ${RAIL_Z}`}
           style={{ minHeight: ROW_PX }}
         />
         {children}
@@ -919,7 +932,7 @@ function DayRow({
       <div
         data-day-row={day}
         data-labelled=""
-        className="bg-main-900 sticky left-0 z-10 flex flex-col justify-center gap-0.5 py-2 pr-2 pl-6 text-white/70"
+        className={`bg-main-900 sticky left-0 ${RAIL_Z} flex flex-col justify-center gap-0.5 py-2 pr-2 pl-6 text-white/70`}
         style={{ minHeight: ROW_PX }}
       >
         {monthChanges ? (
@@ -955,7 +968,7 @@ function GapRow({
         data-day-row={from}
         data-day-to={to}
         data-gap=""
-        className="bg-main-900 sticky left-0 z-10"
+        className={`bg-main-900 sticky left-0 ${RAIL_Z}`}
         style={{ height: GAP_PX }}
       />
       {columns === 0 ? <div /> : null}

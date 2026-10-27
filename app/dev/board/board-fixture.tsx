@@ -19,7 +19,13 @@ const TZ = 'America/Vancouver';
 const TODAY = '2026-10-23';
 const LANES = [{ id: 'c-food', name: 'Food', icon: '🍜' }];
 
-function fixture(id: string, title: string, day: string, over: Partial<Card> = {}): Card {
+function fixture(
+  id: string,
+  title: string,
+  day: string,
+  over: Partial<Card> = {},
+  icon: string | null = null,
+): Card {
   const splash = summarizeSplash(
     {
       id,
@@ -29,7 +35,7 @@ function fixture(id: string, title: string, day: string, over: Partial<Card> = {
       declared_end: null,
       declared_lane_id: 'c-food',
       session_id: null,
-      icon: null,
+      icon,
       pinned_at: null,
       pool_id: null,
       pool_lane_id: null,
@@ -56,8 +62,58 @@ function fixture(id: string, title: string, day: string, over: Partial<Card> = {
   return { ...placeCard(splash, '', TZ), ...over };
 }
 
+/** The fixture's scenes: `resize` (the default), `layers`, `captions`. */
+export type Scene = 'resize' | 'layers' | 'captions';
+
+const photo = (id: string): Pick<Card, 'photos'> => ({
+  photos: [{ rippleId: `${id}-b`, path: `fixture/${id}.webp` }],
+});
+
+/**
+ * Overlap across days: Oct 23's right-aligned photo and its caption, and
+ * Oct 24's big 📚 sticker hanging left over them from its label's corner.
+ * `moved`: Oct 23's photo set off its place by hand.
+ */
+function layerCards(saved: Record<string, BoardLayoutJson>, moved: boolean): Card[] {
+  const start: Record<string, BoardLayoutJson> = {
+    oct23: { photos: { 'fixture/oct23.webp': { size: 0.9, ...(moved ? { x: 0.05 } : {}) } } },
+    cameron: { icon: { inline: false, size: 5 } },
+  };
+  const layout = (id: string): BoardLayoutJson => saved[id] ?? start[id];
+  return [
+    fixture('oct23', 'Beef Short Rib', '2026-10-23', {
+      ...photo('oct23'),
+      layout: layout('oct23'),
+    }),
+    fixture('cameron', 'Cameron Library', '2026-10-24', { layout: layout('cameron') }, '📚'),
+  ];
+}
+
+/** A left-aligned and a right-aligned photo (the engine's draw), each with a short caption. */
+function captionCards(saved: Record<string, BoardLayoutJson>): Card[] {
+  const layout = (id: string): BoardLayoutJson =>
+    saved[id] ?? { photos: { [`fixture/${id}.webp`]: { size: 0.5 } } };
+  return [
+    fixture('photo-left', 'Soup', '2026-10-20', {
+      ...photo('photo-left'),
+      layout: layout('photo-left'),
+    }),
+    fixture('photo-right', 'Tea', '2026-10-22', {
+      ...photo('photo-right'),
+      layout: layout('photo-right'),
+    }),
+  ];
+}
+
 /** Three parts to pull: a label, a sticker (Inline off) and a photo, each on its own day. */
-function cards(tilt: number, saved: Record<string, BoardLayoutJson>): Card[] {
+function cards(
+  tilt: number,
+  saved: Record<string, BoardLayoutJson>,
+  scene: Scene,
+  moved: boolean,
+): Card[] {
+  if (scene === 'layers') return layerCards(saved, moved);
+  if (scene === 'captions') return captionCards(saved);
   const turned = tilt ? { tilt } : {};
   const start: Record<string, BoardLayoutJson> = {
     label: { label: turned },
@@ -75,10 +131,18 @@ function cards(tilt: number, saved: Record<string, BoardLayoutJson>): Card[] {
   ];
 }
 
-export function BoardFixture({ tilt }: { tilt: number }) {
+export function BoardFixture({
+  tilt,
+  scene = 'resize',
+  moved = false,
+}: {
+  tilt: number;
+  scene?: Scene;
+  moved?: boolean;
+}) {
   // What a save would have written, kept in the page: nothing reaches the database.
   const [saved, setSaved] = useState<Record<string, BoardLayoutJson>>({});
-  const shown = useMemo(() => cards(tilt, saved), [tilt, saved]);
+  const shown = useMemo(() => cards(tilt, saved, scene, moved), [tilt, saved, scene, moved]);
   const keep = useCallback<typeof setBoardLayout>(
     async ({ splashId, patch, clear }) => {
       let next: BoardLayoutJson = {};

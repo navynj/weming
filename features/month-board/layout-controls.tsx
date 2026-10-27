@@ -10,6 +10,7 @@ import { THEMES } from '@/lib/theme';
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
 import type { Recipe } from './layout';
 import { WAVE_DEFAULTS } from './board-pieces';
+import { LAYER_RANGE } from './stacking';
 import { useSignedPhotos } from './use-board-photos';
 
 /** The wave's Size slider scales its height and wavelength together: height 2–8px, wavelength 8–32px. */
@@ -287,10 +288,11 @@ export function LayoutControls({
             name="Layer"
             value={piece.layer}
             fallback={0}
-            min={0}
-            max={5}
+            min={LAYER_RANGE[0]}
+            max={LAYER_RANGE[1]}
             step={1}
-            unit={(v) => (v === 0 ? 'Base' : `On top +${v}`)}
+            // The toolbar's layer buttons write it too, and it follows them (0051).
+            unit={(v) => (v === 0 ? 'Base' : v > 0 ? `On top +${v}` : `Under −${-v}`)}
             onChange={(v) => onEdit({ piece: { layer: Math.round(v) } })}
             onReset={() => onEdit({}, ['piece.layer'])}
           />

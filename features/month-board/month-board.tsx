@@ -21,6 +21,7 @@ import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
 import { ON_PIECE } from './board-handles';
+import { stackingOf } from './stacking';
 import { BoardPieceView, BoardTapeView } from './board-pieces';
 import { boardPhotos } from './board-layout';
 import { useBoardSpan, type BoardSpan } from './board-span';
@@ -164,6 +165,11 @@ export function MonthBoard({
     [drawn, span, week, month, room, tall, measured],
   );
   const { metrics } = layout;
+  // One stacking order for the whole view: every piece's parts compete in it (stacking.ts).
+  const stacking = useMemo(
+    () => stackingOf(layout.pieces, metrics.column),
+    [layout.pieces, metrics.column],
+  );
 
   // What was drawn, told once per change (review: Inline showed on for a sticker).
   const told = useRef('');
@@ -431,13 +437,15 @@ export function MonthBoard({
             key={`${span}:${layout.key}`}
             ref={canvas}
             data-board-canvas
+            // The one stacking layer for every piece's parts (isolate): no
+            // stacking context sits between them, and none of their z escapes.
             // A tap on empty board lets the active piece go (review).
             onClick={(event) => {
               if (!editing?.activeId) return;
               if ((event.target as Element).closest(ON_PIECE)) return;
               editing.deactivate();
             }}
-            className="absolute text-white select-none"
+            className="absolute isolate text-white select-none"
             style={{
               left: bleed.left,
               top: bleed.top,
@@ -575,6 +583,9 @@ export function MonthBoard({
                         ripple={ripple(piece.id)}
                         plunge={plunge(piece.id)}
                         editing={editing}
+                        order={stacking.order.get(piece.id) ?? 0}
+                        total={stacking.total}
+                        stacking={stacking}
                       />
                     ))}
                 </div>
