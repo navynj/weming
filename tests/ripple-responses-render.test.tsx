@@ -7,7 +7,7 @@ import type { ReactionRow, ReplyRow, RippleResponsesValue } from '@/features/res
 import { RippleResponses } from '@/features/responses/ripple-responses';
 
 /**
- * Under a block in the splash detail (H24): reaction chips, then replies —
+ * Under a block in the splash detail (H25): reaction chips, then replies —
  * the first two, "+n more replies", the input at the bottom.
  */
 

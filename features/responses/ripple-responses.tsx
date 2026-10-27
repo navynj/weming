@@ -7,7 +7,7 @@ import { ReactionChips } from './reaction-chips';
 import { ReplyList, type ReplyHandlers } from './reply-list';
 
 /**
- * What readers left under one block (H24): its reaction chips, then its
+ * What readers left under one block (H25): its reaction chips, then its
  * replies and the reply input. Nothing at all where nobody else can see the
  * ripple and nothing was left; a locked ripple takes none (0030).
  */

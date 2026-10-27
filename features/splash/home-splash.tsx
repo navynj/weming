@@ -55,7 +55,7 @@ export async function HomeSplash({ id }: { id: string }) {
     ? summarizeSplash(board, blocks, profile.timezone, now)
     : summarizeOrphan(lone!, profile.timezone, now);
 
-  // Someone besides me sees it: shared to a pool, or a pool's own (H24).
+  // Someone besides me sees it: shared to a pool, or a pool's own (H25).
   const respondable =
     !!board &&
     (board.own_pool_id !== null || placements.some((p) => p.splashId === board.id && p.shared));

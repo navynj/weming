@@ -39,7 +39,7 @@ function reply(
   };
 }
 
-describe('reactions (H24)', () => {
+describe('reactions (H25)', () => {
   const rows = [
     reaction('r1', 'u-a', '❤️', '01'),
     reaction('r1', ME, '😂', '02'),
@@ -72,7 +72,7 @@ describe('reactions (H24)', () => {
   });
 });
 
-describe('replies (H24)', () => {
+describe('replies (H25)', () => {
   const five = ['a', 'b', 'c', 'd', 'e'].map((id, at) => reply(id, 'r1', 'u-a', `0${at}`));
 
   it('shows the first two, oldest first, and counts the rest for "+n more replies"', () => {
@@ -84,7 +84,7 @@ describe('replies (H24)', () => {
   });
 });
 
-describe('the board’s numbers, from a page (H24)', () => {
+describe('the board’s numbers, from a page (H25)', () => {
   it('aggregates every ripple of the splash: top three emoji by use, the total, the first replies', () => {
     const board = boardFrom({
       reactions: [
@@ -119,7 +119,7 @@ describe('the board’s numbers, from a page (H24)', () => {
   });
 });
 
-describe('the unseen dot (H24)', () => {
+describe('the unseen dot (H25)', () => {
   it('marks what someone else left on my ripples after my last open; never opened counts as new', () => {
     const latest = latestFromOthers(
       {

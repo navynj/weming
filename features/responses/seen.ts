@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Per device (H24), as the pool dots are (features/pool/remembered.ts): when
+ * Per device (H25), as the pool dots are (features/pool/remembered.ts): when
  * I last opened each splash, so a ripple of mine with reactions or replies
  * newer than that carries a dot beside its avatar until I open it. Browser
  * storage only — a convenience, never a record — so every read and write

@@ -169,7 +169,7 @@ export function CardFace({
             id: ripple.id,
             initials: ripple.initials,
             authorId: ripple.authorId,
-            // New reactions or replies on my ripple since I last opened it, on this device (H24).
+            // New reactions or replies on my ripple since I last opened it, on this device (H25).
             dot:
               seen !== null &&
               isUnseen(card.respondedAt?.[ripple.id], seen[card.splash.id] ?? null),

@@ -121,7 +121,7 @@ export function MonthBoard({
   /** The recipe each piece is drawn with, by splash, whenever it changes: the Layout panel shows it. */
   onDrawn?: (recipes: Record<string, Recipe>) => void;
 }) {
-  // A reaction or reply made on an open splash a moment ago, drawn at once (H24).
+  // A reaction or reply made on an open splash a moment ago, drawn at once (H25).
   const cards = useCardsWithPending(read);
   const [span, setSpan] = useBoardSpan();
   // The week shown: this one on open (review), unless the ground was opened on another month.
@@ -270,7 +270,7 @@ export function MonthBoard({
     },
     [router],
   );
-  // A badge or a reply line (H24): the splash's own sheet, at what was tapped.
+  // A badge or a reply line (H25): the splash's own sheet, at what was tapped.
   const onOpenAt = useCallback(
     (card: Card, anchor: string): void => {
       router.push(`${card.href ?? splashHref(card.splash.id)}#${anchor}`, { scroll: false });

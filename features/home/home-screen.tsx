@@ -265,7 +265,7 @@ export async function HomeScreen({
     profile.id,
     joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! })),
   );
-  // What readers left (H24), only where someone besides me can see the post:
+  // What readers left (H25), only where someone besides me can see the post:
   // a pool's own, or one shared to a pool.
   const sharedIds = new Set([
     ...joints.map((j) => j.id),

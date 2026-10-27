@@ -70,11 +70,11 @@ export type Card = {
   writers?: CardFace[];
   /** A joint splash (Board view): the current members who have not written on it yet. */
   awaiting?: CardFace[];
-  /** Its reactions and first replies, for the board's badge and reply lines (H24); absent when none. */
+  /** Its reactions and first replies, for the board's badge and reply lines (H25); absent when none. */
   responses?: BoardResponses;
-  /** When `responses` was read: a change made on the page after it is drawn over it (H24). */
+  /** When `responses` was read: a change made on the page after it is drawn over it (H25). */
   respondedAsOf?: string;
-  /** The newest reaction or reply someone else left on each ripple of mine on it: the unseen dot (H24). */
+  /** The newest reaction or reply someone else left on each ripple of mine on it: the unseen dot (H25). */
   respondedAt?: Record<string, string>;
 };
 

@@ -32,7 +32,7 @@ import { summarizeSplash } from '@/features/splash/summary';
 import { written } from './written-on';
 
 /**
- * Reactions and replies on the board (H24): the badge on the label's
+ * Reactions and replies on the board (H25): the badge on the label's
  * top-right corner, the first two replies as lines under it and "+n";
  * part of the item, never over anyone's words.
  */
@@ -153,7 +153,7 @@ function pieceOf(layout: BoardLayout, id: string): BoardPiece {
   return layout.pieces.find((p) => p.id === id)!;
 }
 
-describe('reply lines (H24)', () => {
+describe('reply lines (H25)', () => {
   it('with 5 replies: 2 lines and "+3"; with 2: both and no "+n"; with none: nothing', () => {
     const { container } = board([
       with_(card('five', 'Five replies', '2026-10-20'), responses(5)),
@@ -201,7 +201,7 @@ describe('reply lines (H24)', () => {
   });
 });
 
-describe('the badge (H24)', () => {
+describe('the badge (H25)', () => {
   it('shows the emoji (one on a phone) and the reaction count only; absent when there are none', () => {
     const cards = [
       with_(card('loved', 'Loved', '2026-10-20'), responses(2, 7)),

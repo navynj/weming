@@ -66,7 +66,7 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
     <PeopleProvider me={profile?.id ?? null} people={people}>
       <PoolActivityProvider activity={activity} pools={stripPools}>
         <InputSheetProvider>
-          {/* A reaction or reply on an open splash shows on the board beneath at once (H24). */}
+          {/* A reaction or reply on an open splash shows on the board beneath at once (H25). */}
           <BoardResponsesProvider>
             <div className="flex min-h-dvh flex-col">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>

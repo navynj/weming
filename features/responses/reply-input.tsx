@@ -7,7 +7,7 @@ import { REPLY_MAX } from './model';
 /** The count of what is left shows this close to the limit. */
 const NEAR_LIMIT = 50;
 
-/** One line that grows to four (H24): Enter sends, Shift+Enter breaks the line. */
+/** One line that grows to four (H25): Enter sends, Shift+Enter breaks the line. */
 export function ReplyInput({
   initial = '',
   label,

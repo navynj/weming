@@ -424,7 +424,7 @@ export function BoardPieceView({
   piece: BoardPiece;
   photos: SignedMedia;
   onWrite: (card: Card) => void;
-  /** A badge or a reply line (H24): the splash opened at what it shows. */
+  /** A badge or a reply line (H25): the splash opened at what it shows. */
   onOpenAt: (card: Card, anchor: string) => void;
   /** Just dropped: it plunges in. */
   plunge: boolean;
@@ -556,7 +556,7 @@ export function BoardPieceView({
           </span>
         ) : null}
       </div>
-      {/* Reactions and replies (H24): taps of their own, in the label's frame. */}
+      {/* Reactions and replies (H25): taps of their own, in the label's frame. */}
       <BoardResponsesView
         piece={piece}
         metrics={metrics}

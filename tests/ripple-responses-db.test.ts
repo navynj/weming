@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { anonymous, asAdmin, asUser } from './as-user';
 
 /**
- * Reactions and replies (H24, 0030), proved through PostgREST with real user
+ * Reactions and replies (H25, 0030), proved through PostgREST with real user
  * tokens. Ana opens a pool and writes on a joint splash; Ben is a member; Cal
  * stays outside; Dee joins and leaves taking her records; Eve joins and
  * leaves keeping hers. Everything goes with them in afterAll.

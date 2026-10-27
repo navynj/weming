@@ -1,21 +1,21 @@
 /**
- * Reactions and replies on a ripple (H24): what a reader leaves under a
+ * Reactions and replies on a ripple (H25): what a reader leaves under a
  * block. Neither is a ripple — no lane, no date, never a record on the
  * board, never a side written on a joint splash. Pure: the shapes and the
  * arithmetic every surface shares, so the post page, the stack card and the
  * board agree on what there is.
  */
 
-/** The six the picker offers before the keyboard (H24). */
+/** The six the picker offers before the keyboard (H25). */
 export const QUICK_EMOJI = ['❤️', '😂', '😮', '😢', '👏', '🔥'] as const;
 
 /** A reply's longest text (0030). */
 export const REPLY_MAX = 500;
 
-/** Replies shown under a block, and on the board, before "+n" (H24). */
+/** Replies shown under a block, and on the board, before "+n" (H25). */
 export const REPLIES_SHOWN = 2;
 
-/** Emoji at most on the board's badge, most used first (H24). */
+/** Emoji at most on the board's badge, most used first (H25). */
 export const BADGE_EMOJI = 3;
 
 export type ReactionRow = {
@@ -67,7 +67,7 @@ export function graphemes(text: string): string[] {
 }
 
 /**
- * One emoji, as the picker's field may take it (H24): one grapheme, no
+ * One emoji, as the picker's field may take it (H25): one grapheme, no
  * letters, digits or space, at most sixteen code units (0030's bound).
  */
 export function isOneEmoji(text: string): boolean {
@@ -127,7 +127,7 @@ export function repliesShown(
 
 /**
  * The newest thing someone else left on each of my ripples: what the unseen
- * dot compares with the last time I opened the splash (H24).
+ * dot compares with the last time I opened the splash (H25).
  */
 export function latestFromOthers(
   value: RippleResponsesValue,

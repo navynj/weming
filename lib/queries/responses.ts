@@ -7,7 +7,7 @@ import type {
 import type { DuringClient } from '@/lib/queries/profile';
 
 /**
- * Reactions and replies (H24, 0030). Every read goes through RLS or a
+ * Reactions and replies (H25, 0030). Every read goes through RLS or a
  * function that asks can_see_ripple, so a viewer only ever receives what
  * they may see: a locked ripple's, a stranger's, a former member's who
  * chose remove — none of it arrives.
@@ -71,7 +71,7 @@ export async function getBoardResponses(
 /**
  * The newest thing someone else left on each of my ripples in these
  * splashes, by splash then ripple: what the unseen dot compares with the
- * last time I opened the splash on this device (H24).
+ * last time I opened the splash on this device (H25).
  */
 export async function getResponsesOnMine(
   supabase: DuringClient,
@@ -96,7 +96,7 @@ export async function getResponsesOnMine(
   return out;
 }
 
-/** The newest response by someone else on my ripples in these splashes: the pool dot's other half (H24). */
+/** The newest response by someone else on my ripples in these splashes: the pool dot's other half (H25). */
 export async function latestResponseOnMine(
   supabase: DuringClient,
   me: string,
