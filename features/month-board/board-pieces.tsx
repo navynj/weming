@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 
 import {
   postIcon,
@@ -24,7 +31,7 @@ import {
   type LabelStyle,
   type PhotoCard,
 } from './layout';
-import { handMoved, isPeriod, type BoardLayoutJson } from './board-layout';
+import { handMoved, isPeriod, mergeLayout, type BoardLayoutJson } from './board-layout';
 import {
   EditToolbar,
   NO_TOOLS,
@@ -33,7 +40,18 @@ import {
   type FrameUnits,
   type Tools,
 } from './board-handles';
-import { LABEL_PART, partValues, type BoardPart } from './handle-math';
+import {
+  clamp,
+  LABEL_PART,
+  LIMITS,
+  moveHolding,
+  partPatch,
+  partValues,
+  pointOfBox,
+  type BoardPart,
+  type PartBox,
+  type PartValues,
+} from './handle-math';
 import type { BoardEditing } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
@@ -582,16 +600,93 @@ export function BoardPieceView({
   const moving = still ? '' : motionOf(ripple, plunge);
   // Set by hand (review): offsets and tilts move only this piece's drawing,
   // never the stack; X is a share of the lane, Y in line heights.
-  const layout = card.layout ?? {};
+  const saved = card.layout ?? {};
   const line = piece.type.line;
+  const shift = saved.piece ?? {};
   // Being edited by hand (review): its handles and toolbar, its parts over every other piece.
   const active = editing !== null && editing.activeId === piece.id;
-  const selected = active ? pieceSelected(editing.part, piece, layout, icon !== null) : null;
+  const selected = active ? pieceSelected(editing.part, piece, saved, icon !== null) : null;
+
+  // A part's box as the engine lays it out, before its own move and turn, on
+  // the board: the piece's own place counts, as a bigger sticker hanging
+  // above the row moves the whole piece down.
+  const boxOf = (part: BoardPart): PartBox | null => {
+    const local = (): PartBox | null => {
+      if (part.kind === 'label') return label;
+      if (part.kind === 'icon') return piece.stickerBox;
+      if (part.kind !== 'photo' || !piece.photoBox) return null;
+      const photo = piece.fan.find((p) => p.path === part.path);
+      const area = piece.photoBox;
+      return photo
+        ? { x: area.x, y: area.y + area.h - photo.dy - photo.size, w: photo.size, h: photo.size }
+        : null;
+    };
+    const box = local();
+    return box ? { ...box, x: piece.x + box.x, y: piece.y + box.y } : null;
+  };
+  // A part's move in pixels, the whole piece's added: as moveOf draws it.
+  const pixelsOf = (values: PartValues) => ({
+    x: ((values.x ?? 0) + (shift.x ?? 0)) * metrics.column,
+    y: ((values.y ?? 0) + (shift.y ?? 0)) * line,
+  });
+  // A size change holds a point of the part where it was (review): its
+  // top-left for a corner or a width pulled, a pinch's midpoint. As the
+  // engine lays the part out at each new size — its own alignment, a
+  // right-aligned photo, a label reaching into an empty lane — and as it
+  // turns about its centre, the move that keeps that point still is
+  // computed here and drawn in the same frame, then written with the size.
+  const [holding, setHolding] = useState<{
+    part: BoardPart;
+    share: { x: number; y: number };
+    at: { x: number; y: number };
+  } | null>(null);
+  const heldBox = holding ? boxOf(holding.part) : null;
+  const kept =
+    holding && heldBox
+      ? (() => {
+          const m = moveHolding(
+            holding.at,
+            heldBox,
+            partValues(saved, holding.part).tilt,
+            holding.share,
+          );
+          return {
+            x: clamp(Number((m.x / metrics.column - (shift.x ?? 0)).toFixed(4)), LIMITS.x),
+            y: clamp(Number((m.y / line - (shift.y ?? 0)).toFixed(4)), LIMITS.y),
+          };
+        })()
+      : null;
+  const layout = kept && holding ? mergeLayout(saved, partPatch(holding.part, kept)) : saved;
+  useLayoutEffect(() => {
+    if (!holding || !kept || !editing) return;
+    const now = partValues(saved, holding.part);
+    // Written before the frame is painted, so the part never shows out of place.
+    if (Math.abs((now.x ?? 0) - kept.x) > 5e-5 || Math.abs((now.y ?? 0) - kept.y) > 5e-5)
+      editing.adjust(partPatch(holding.part, kept));
+  });
+  const onHold = (share: { x: number; y: number } | null): void => {
+    const box = share && selected ? boxOf(selected) : null;
+    if (!share || !selected || !box) {
+      setHolding(null);
+      return;
+    }
+    const values = partValues(layout, selected);
+    setHolding({
+      part: selected,
+      share,
+      at: pointOfBox(box, pixelsOf(values), values.tilt, share),
+    });
+  };
   // Moved by hand (0044): above every piece in place, its own layer kept among the moved.
   const stack =
     (layout.piece?.layer ?? 0) +
     (handMoved(layout) ? MOVED_LAYERS : 0) +
     (active ? ACTIVE_LAYERS : 0);
+  // A sticker, photo or wave selected sits over its own piece's other parts,
+  // so its handles are never covered (a photo's corner under its caption).
+  // Not the label: raised, it would cover the sticker on its corner.
+  const layerOf = (kind: BoardPart['kind']): number =>
+    stack + (selected?.kind === kind && kind !== 'label' ? SELECTED_LAYERS : 0);
   const tap = (event: React.MouseEvent): void => {
     if (editing) editing.tap(card.splash.id, partAt(event.target));
     else onPick(card.splash.id);
@@ -621,6 +716,7 @@ export function BoardPieceView({
         tools={period ? NO_TOOLS : TOOLS[selected.kind]}
         editing={editing!}
         widthInside={labelRight > metrics.width - 22}
+        onHold={onHold}
       />
     ) : null;
   return (
@@ -670,7 +766,7 @@ export function BoardPieceView({
           <span
             data-board-photos
             className={`absolute z-[1] block ${fade} ${moving}`}
-            style={{ ...placed(piece.photoBox), ...lifted(1, stack) }}
+            style={{ ...placed(piece.photoBox), ...lifted(1, layerOf('photo')) }}
           >
             {piece.fan.map((photo, at) => (
               <PhotoCardView
@@ -697,7 +793,7 @@ export function BoardPieceView({
             column={metrics.column}
             line={line}
             moving={moving}
-            stack={stack}
+            stack={layerOf('wave')}
             selectable={active}
             frame={frameOf({ kind: 'wave' })}
           />
@@ -709,7 +805,7 @@ export function BoardPieceView({
           style={{
             ...placed(label),
             transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
-            ...lifted(1, stack),
+            ...lifted(1, layerOf('label')),
             ...(reading && still
               ? { outline: '2px solid var(--color-white)', outlineOffset: 2 }
               : {}),
@@ -794,7 +890,7 @@ export function BoardPieceView({
               ...placed(piece.stickerBox),
               fontSize: piece.stickerBox.w,
               transform: moveOf(nudge(layout.icon, layout.piece), metrics.column, line),
-              ...lifted(2, stack),
+              ...lifted(2, layerOf('icon')),
             }}
           >
             {icon}
@@ -953,6 +1049,8 @@ const TOOLS: Record<BoardPart['kind'], Tools> = {
 
 /** Lifts the piece being edited over every other, moved ones included. */
 const ACTIVE_LAYERS = 20;
+/** Lifts its selected part over its own other parts: a photo's corner over the caption beneath it. */
+const SELECTED_LAYERS = 5;
 
 /** The part asked for, when the piece has it as its own: a sticker, a photo shown, a wave on; else its label. */
 function pieceSelected(

@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { clearLayout, mergeLayout } from '@/features/month-board/board-layout';
 import {
   alongTilt,
-  cornerSized,
-  heldAt,
-  pointOn,
+  cornerPulled,
+  moveHolding,
+  pointOfBox,
   shareOf,
   widened,
   moved,
@@ -58,29 +58,35 @@ describe('handles, in layout units (review, direct manipulation)', () => {
     expect(alongTilt(0, 10, 90)).toBeCloseTo(10);
   });
 
-  it('sizes from a corner one to one, the opposite corner held: a 20px pull on 100px is 120px', () => {
-    const tl = { x: 0, y: 0 };
-    const br = { x: 100, y: 100 };
-    expect(cornerSized(100, tl, br, { x: 20, y: 20 })).toBeCloseTo(120);
-    expect(cornerSized(100, tl, br, { x: -20, y: -20 })).toBeCloseTo(80);
-    // Read along the diagonal: a pull straight across counts half.
-    expect(cornerSized(100, tl, br, { x: 20, y: 0 })).toBeCloseTo(110);
+  it('sizes from a corner by the travel since the finger went down, on the turned diagonal', () => {
+    // Along the diagonal, 20px each way: the corner 20px further out on both sides.
+    expect(cornerPulled(100, 20, 20, 0)).toBeCloseTo(120);
+    expect(cornerPulled(100, -20, -20, 0)).toBeCloseTo(80);
+    // Straight across, half of it lies along the diagonal.
+    expect(cornerPulled(100, 20, 0, 0)).toBeCloseTo(110);
     // Turned 90°, the diagonal turns with it.
-    expect(cornerSized(100, tl, { x: -100, y: 100 }, { x: -20, y: 20 })).toBeCloseTo(120);
+    expect(cornerPulled(100, -20, 20, 90)).toBeCloseTo(120);
+    // Over the board's CSS scale: drawn at twice its size, a 40px pull is 20.
+    expect(cornerPulled(100, 40, 40, 0, 2)).toBeCloseTo(120);
   });
 
-  it('finds a point of a turned square box and back, and takes its drift off the offset', () => {
-    const tl = { x: 10, y: 10 };
-    const br = { x: 10, y: 10 + 100 * Math.SQRT2 };
-    const mid = pointOn(tl, br, { x: 0.5, y: 0.5 });
-    expect(mid.x).toBeCloseTo(10);
-    expect(mid.y).toBeCloseTo(10 + 50 * Math.SQRT2);
-    const share = shareOf(tl, br, { x: 30, y: 60 });
-    const back = pointOn(tl, br, share);
-    expect(back.x).toBeCloseTo(30);
-    expect(back.y).toBeCloseTo(60);
-    // Drifted 14px right and 13px down: 0.1 lane and a line back.
-    expect(heldAt({ x: 0.5, y: 2 }, { x: 14, y: 13 }, 140, 13)).toEqual({ x: 0.4, y: 1 });
+  it('holds a point of a part still as its box changes, turned about its centre', () => {
+    const box = { x: 10, y: 20, w: 100, h: 40 };
+    // Unturned, the top-left is the box's own corner plus its move.
+    expect(pointOfBox(box, { x: 5, y: 6 }, 0, { x: 0, y: 0 })).toEqual({ x: 15, y: 26 });
+    for (const tilt of [0, 20, -35]) {
+      const at = pointOfBox(box, { x: 5, y: 6 }, tilt, { x: 0, y: 0 });
+      // Wider, laid out further right and lower by the engine: the move puts the corner back.
+      const grown = { x: 30, y: 25, w: 160, h: 52 };
+      const move = moveHolding(at, grown, tilt, { x: 0, y: 0 });
+      const again = pointOfBox(grown, move, tilt, { x: 0, y: 0 });
+      expect(again.x).toBeCloseTo(at.x);
+      expect(again.y).toBeCloseTo(at.y);
+    }
+    // A pinch's midpoint, read as a share of the part once, held the same way.
+    const share = shareOf({ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 25, y: 75 });
+    expect(share.x).toBeCloseTo(0.25);
+    expect(share.y).toBeCloseTo(0.75);
   });
 
   it('widens a label by its right edge, in column widths, 0.3 to 4', () => {

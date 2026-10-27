@@ -44,7 +44,13 @@ type Draft = {
 export type Shown = { layout: BoardLayoutJson; source: LayoutSource };
 
 /** How an edit is made: by a slider or key (saved after the rest), a handle held, or at once. */
-export type EditHow = { hold?: boolean; now?: boolean; untracked?: boolean };
+export type EditHow = {
+  hold?: boolean;
+  now?: boolean;
+  untracked?: boolean;
+  /** Joins the run of edits as it stands: held stays held, a release still saves at once. */
+  keep?: boolean;
+};
 
 /** A save the database took: the paths it changed and what they held before, for undo. */
 export type SavedChange = { id: string; before: BoardLayoutJson; paths: string[] };
@@ -83,6 +89,8 @@ export function useLayoutDrafts(
   view: BoardView = 'calendar',
   /** Told of every save the database took, for undo. */
   onSaved?: (change: SavedChange) => void,
+  /** Where a layout is saved: the database's set_board_layout, unless a fixture says otherwise. */
+  save: typeof setBoardLayout = setBoardLayout,
 ) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -138,8 +146,10 @@ export function useLayoutDrafts(
             version: (was?.version ?? 0) + 1,
             sent: was?.sent ?? 0,
             base: was?.base ?? start,
-            held: how.hold === true,
-            now: how.now === true || (was?.now === true && !how.hold),
+            held: how.keep ? was?.held === true : how.hold === true,
+            now: how.keep
+              ? was?.now === true
+              : how.now === true || (was?.now === true && !how.hold),
             untracked: how.untracked === true || was?.untracked === true,
           },
         };
@@ -180,7 +190,7 @@ export function useLayoutDrafts(
         setFlying((all) => ({ ...all, [id]: (all[id] ?? 0) + 1 }));
         startTransition(async () => {
           hold({ id, shown: { layout: draft.layout, source } });
-          const result = await setBoardLayout({
+          const result = await save({
             splashId: id,
             poolId,
             patch: draft.patch,
@@ -205,7 +215,7 @@ export function useLayoutDrafts(
       }
     }, wait);
     return () => window.clearTimeout(timer);
-  }, [drafts, hold, poolId, router, source, toast, view]);
+  }, [drafts, hold, poolId, router, save, source, toast, view]);
 
   /** "Use pool layout": my Home layout gone; the pool's is drawn again at once. */
   const revertToPool = useCallback(

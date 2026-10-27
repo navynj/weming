@@ -208,31 +208,24 @@ async function frames(n: number): Promise<void> {
 }
 
 /**
- * jsdom draws nothing: the frame's corner markers read the part's box as
- * the browser would — its side from its style, centred at (50, 50) plus its
- * translate — so a size change grows it from the middle, as the engine
- * draws it, and a held corner has to be put back.
+ * Where a part's top-left is drawn on the board, unturned: the laid-out
+ * left and top of it and every box it sits in, up to the board, plus its
+ * own translate. jsdom lays nothing out, but these are the engine's numbers.
  */
-function drawCorners(): () => void {
-  const real = Element.prototype.getBoundingClientRect;
-  Element.prototype.getBoundingClientRect = function rect(this: Element): DOMRect {
-    const corner = (this as HTMLElement).dataset?.editCorner;
-    if (!corner) return real.call(this);
-    const part = this.closest<HTMLElement>('[data-board-photo-card], [data-board-sticker]')!;
-    const side = parseFloat(part.style.width);
-    const shift = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(part.style.transform ?? '');
-    const cx = 50 + (shift ? Number(shift[1]) : 0);
-    const cy = 50 + (shift ? Number(shift[2]) : 0);
-    const half = corner === 'tl' ? -side / 2 : side / 2;
-    const x = cx + half;
-    const y = cy + half;
-    return { left: x, top: y, x, y, right: x, bottom: y, width: 0, height: 0 } as DOMRect;
-  };
-  return () => {
-    Element.prototype.getBoundingClientRect = real;
-  };
+function drawnTopLeft(part: HTMLElement): { x: number; y: number } {
+  let x = 0;
+  let y = 0;
+  for (
+    let el: HTMLElement | null = part;
+    el && !el.hasAttribute('data-board-canvas');
+    el = el.parentElement
+  ) {
+    x += parseFloat(el.style.left) || 0;
+    y += parseFloat(el.style.top) || 0;
+  }
+  const shift = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(part.style.transform ?? '');
+  return { x: x + Number(shift?.[1] ?? 0), y: y + Number(shift?.[2] ?? 0) };
 }
-let undraw: (() => void) | null = null;
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -246,8 +239,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
-  undraw?.();
-  undraw = null;
 });
 
 describe('direct manipulation: which tap does what (review, 2026-10-27)', () => {
@@ -353,36 +344,33 @@ describe('direct manipulation: handles write layout units, once on release', () 
     expect(saved).toHaveLength(2);
   });
 
-  it('sizes a sticker from its corner, one to one, the opposite corner held in place', async () => {
-    undraw = drawCorners();
+  it('sizes a sticker from its corner, one to one, its top-left held where it was', async () => {
     const { container } = home([
       card('s2', 'Lynn Canyon', '2026-10-22', { layout: { icon: { inline: false } } }),
       card('s1', 'Grand Austria Hotel', '2026-10-21'),
     ]);
     fireEvent.click(label(container, 's2'));
-    const sticker = q(container, '[data-board-piece="s2"] [data-board-sticker]');
-    const px = parseFloat(sticker.style.width);
-    fireEvent.click(sticker);
+    const sticker = () => q(container, '[data-board-piece="s2"] [data-board-sticker]');
+    const px = parseFloat(sticker().style.width);
+    const before = drawnTopLeft(sticker());
+    fireEvent.click(sticker());
     expect(q(container, '[data-edit-frame="icon"]').dataset.editTools).toBe('move rotate size');
-    const corner = 50 + px / 2;
-    await drag(
-      q(container, '[data-edit-handle="size"]'),
-      [corner, corner],
-      [corner + 10, corner + 10],
-    );
-    await frames(12);
+    // 10px along each side: the corner 10px out, both ways.
+    await drag(q(container, '[data-edit-handle="size"]'), [0, 0], [10, 10], { release: false });
+    expect(parseFloat(sticker().style.width)).toBeCloseTo(px + 10, 0);
+    // The engine centres a sticker on the label's corner; held, its top-left has not moved.
+    const during = drawnTopLeft(sticker());
+    expect(during.x).toBeCloseTo(before.x, 0);
+    expect(during.y).toBeCloseTo(before.y, 0);
+    fireEvent.pointerUp(window, { clientX: 10, clientY: 10, pointerId: 1 });
+    await frames(2);
     await settle();
     expect(saved).toHaveLength(1);
-    const icon = (saved[0].patch as { icon: { size: number; x: number; y: number } }).icon;
-    // Ten pixels more on each side, in the board's line heights.
+    const icon = (saved[0].patch as { icon: { size: number } }).icon;
     expect(icon.size).toBeCloseTo((px + 10) / LINE, 2);
-    // Drawn from its middle, it grew 5px up and left: moved back, so its top-left stayed put.
-    expect(icon.x * COLUMN).toBeCloseTo(5, 0);
-    expect(icon.y * LINE).toBeCloseTo(5, 0);
   });
 
   it('a 20px corner drag on a 100px photo makes it about 120px, not a multiple', async () => {
-    undraw = drawCorners();
     const path = 'a1/s2-0.webp';
     const { container } = home([
       card('s2', 'Lynn Canyon', '2026-10-22', {
@@ -396,27 +384,25 @@ describe('direct manipulation: handles write layout units, once on release', () 
     fireEvent.click(label(container, 's2'));
     fireEvent.click(photo());
     expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
-    // The bottom-right corner is at (100, 100); the finger takes it 20px out.
+    const before = drawnTopLeft(photo());
+    // The finger takes the corner 20px out each way.
     await drag(q(container, '[data-edit-handle="size"]'), [100, 100], [120, 120], {
       release: false,
     });
     const drawn = parseFloat(photo().style.width);
     expect(Math.abs(drawn - 120)).toBeLessThanOrEqual(1);
+    const during = drawnTopLeft(photo());
+    expect(during.x).toBeCloseTo(before.x, 0);
+    expect(during.y).toBeCloseTo(before.y, 0);
     fireEvent.pointerUp(window, { clientX: 120, clientY: 120, pointerId: 1 });
-    await frames(12);
+    await frames(2);
     await settle();
     expect(saved).toHaveLength(1);
-    const set = (
-      saved[0].patch as { photos: Record<string, { size: number; x: number; y: number }> }
-    ).photos[path];
+    const set = (saved[0].patch as { photos: Record<string, { size: number }> }).photos[path];
     expect(set.size).toBeCloseTo(120 / COLUMN, 2);
-    // The top-left corner held where it was: the 10px the middle-drawn box grew by, taken back.
-    expect(set.x * COLUMN).toBeCloseTo(10, 0);
-    expect(set.y * LINE).toBeCloseTo(10, 0);
   });
 
   it('ignores a corner’s first 4px, then follows it', async () => {
-    undraw = drawCorners();
     const path = 'a1/s2-0.webp';
     const { container } = home([
       card('s2', 'Lynn Canyon', '2026-10-22', {

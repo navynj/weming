@@ -64,6 +64,11 @@ export type BoardEditing = {
   hold: (patch: BoardLayoutJson) => void;
   /** A handle let go: one save. */
   commit: () => void;
+  /**
+   * A part's place kept as its size changes (review): written into the
+   * handle's run of edits as it stands, held while held, saved with the release.
+   */
+  adjust: (patch: BoardLayoutJson) => void;
   /** The text size stepper: saved after the rest, as a slider is. */
   edit: (patch: BoardLayoutJson) => void;
   undo: () => void;
@@ -151,6 +156,13 @@ export function useBoardEditing({
     },
     [activeId, drafts],
   );
+  const adjust = useCallback(
+    (patch: BoardLayoutJson): void => {
+      const id = held.current ?? activeId;
+      if (id) drafts.edit(id, patch, [], { keep: true });
+    },
+    [activeId, drafts],
+  );
 
   const last = activeId ? history.last(view, activeId) : null;
   const undo = useCallback((): void => {
@@ -203,6 +215,7 @@ export function useBoardEditing({
     deactivate,
     hold,
     commit,
+    adjust,
     edit,
     undo,
     canUndo: last !== null,

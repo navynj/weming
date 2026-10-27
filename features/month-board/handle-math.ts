@@ -146,40 +146,65 @@ export function resized(
 type Point = { x: number; y: number };
 
 /**
- * A sticker's or photo's corner pulled (review): the opposite corner held,
- * the pulled one following the finger one to one. The finger's travel is
- * added to where the corner was, projected on the box's diagonal from the
- * held corner, and read against that diagonal: so a 20px pull on a 100px
- * photo makes it 120px, not a multiple of the pull.
+ * A sticker's or photo's corner pulled (review): the finger's travel since
+ * it went down, read on the part's turned diagonal and over the board's CSS
+ * scale, added to the size it had then — never to the size as drawn now,
+ * which compounds every frame. With the top-left held, the corner then
+ * follows the finger one to one.
  */
-export function cornerSized(startPx: number, anchor: Point, corner: Point, travel: Point): number {
-  const dx = corner.x - anchor.x;
-  const dy = corner.y - anchor.y;
-  const len2 = dx * dx + dy * dy;
-  if (len2 === 0) return startPx;
-  const along = (corner.x + travel.x - anchor.x) * dx + (corner.y + travel.y - anchor.y) * dy;
-  return Math.max(0, (startPx * along) / len2);
+export function cornerPulled(
+  startPx: number,
+  dx: number,
+  dy: number,
+  tilt: number | undefined,
+  scale = 1,
+): number {
+  const diagonal = ((tilt ?? 0) * Math.PI) / 180 + Math.PI / 4;
+  const along = (dx * Math.cos(diagonal) + dy * Math.sin(diagonal)) / (scale || 1);
+  return Math.max(0, startPx + along / Math.SQRT2);
 }
 
-/**
- * A point of a square box given as a share of it from its top-left — (0, 0)
- * the corner itself, (0.5, 0.5) its middle — the box read from its top-left
- * and bottom-right corners on screen, turned however it is.
- */
-export function pointOn(topLeft: Point, bottomRight: Point, at: Point): Point {
-  const dx = bottomRight.x - topLeft.x;
-  const dy = bottomRight.y - topLeft.y;
-  const side = Math.hypot(dx, dy) / Math.SQRT2;
-  const turn = Math.atan2(dy, dx) - Math.PI / 4;
-  const u = { x: Math.cos(turn), y: Math.sin(turn) };
-  const v = { x: -Math.sin(turn), y: Math.cos(turn) };
+/** A part's box as laid out, before its own move and turn. */
+export type PartBox = { x: number; y: number; w: number; h: number };
+
+/** A point of a box given as a share of it ((0, 0) its top-left), the box moved by `move` and turned about its centre. */
+export function pointOfBox(
+  box: PartBox,
+  move: Point,
+  tilt: number | undefined,
+  share: Point,
+): Point {
+  const t = ((tilt ?? 0) * Math.PI) / 180;
+  const lx = (share.x - 0.5) * box.w;
+  const ly = (share.y - 0.5) * box.h;
   return {
-    x: topLeft.x + side * (at.x * u.x + at.y * v.x),
-    y: topLeft.y + side * (at.x * u.y + at.y * v.y),
+    x: box.x + move.x + box.w / 2 + lx * Math.cos(t) - ly * Math.sin(t),
+    y: box.y + move.y + box.h / 2 + lx * Math.sin(t) + ly * Math.cos(t),
   };
 }
 
-/** Where a point on screen lies in such a box, as a share of it: pointOn's inverse. */
+/**
+ * The move that keeps a point of a part where it was while its size
+ * changes (review): from the point as it stood when the gesture began, the
+ * box the engine lays out at the new size — its own alignment included, a
+ * right-aligned photo or a label reaching into an empty lane — and the
+ * turn about its centre. Computed, never measured on screen after the fact.
+ */
+export function moveHolding(
+  at: Point,
+  box: PartBox,
+  tilt: number | undefined,
+  share: Point,
+): Point {
+  const placed = pointOfBox(box, { x: 0, y: 0 }, tilt, share);
+  return { x: at.x - placed.x, y: at.y - placed.y };
+}
+
+/**
+ * Where a point on screen lies in a square part, as a share of it, the part
+ * read from its top-left and bottom-right corners as drawn: where a pinch's
+ * midpoint is, once, as the second finger lands.
+ */
 export function shareOf(topLeft: Point, bottomRight: Point, p: Point): Point {
   const dx = bottomRight.x - topLeft.x;
   const dy = bottomRight.y - topLeft.y;
@@ -191,23 +216,6 @@ export function shareOf(topLeft: Point, bottomRight: Point, p: Point): Point {
   return {
     x: (rx * Math.cos(turn) + ry * Math.sin(turn)) / side,
     y: (-rx * Math.sin(turn) + ry * Math.cos(turn)) / side,
-  };
-}
-
-/**
- * The part's offset taken back by how far the point it is held at has
- * drifted on screen (review): a size change draws the box from its own
- * place, so the held corner — or a pinch's midpoint — would move without it.
- */
-export function heldAt(
-  values: PartValues,
-  drift: Point,
-  column: number,
-  line: number,
-): { x: number; y: number } {
-  return {
-    x: clamp(round((values.x ?? 0) - drift.x / column, 3), LIMITS.x),
-    y: clamp(round((values.y ?? 0) - drift.y / line, 2), LIMITS.y),
   };
 }
 
