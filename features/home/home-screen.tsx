@@ -433,11 +433,12 @@ export async function HomeScreen({
     .sort(byNewest);
   // The calendar's layouts (0025): mine on Home; else, for a joint splash,
   // its pool's — wholly one or the other, never a mix.
-  const layouts = await getHomeLayouts(
-    supabase,
-    profile.id,
-    joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! })),
-  );
+  const jointPlaces = joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! }));
+  // And the Lane view's, kept apart (0045).
+  const [layouts, laneLayouts] = await Promise.all([
+    getHomeLayouts(supabase, profile.id, jointPlaces),
+    getHomeLayouts(supabase, profile.id, jointPlaces, 'lane'),
+  ]);
   // What readers left (H25), only where someone besides me can see the post.
   const sharedIds = await sharedSplashIds(supabase, profile.id, mine, joints);
   const [answered, respondedAt] = await Promise.all([
@@ -454,9 +455,15 @@ export async function HomeScreen({
     const card: Card = { ...read, respondedAt: respondedAt[read.splash.id] };
     const pooled = layouts.pool[card.splash.id] ?? null;
     const { layout, source } = effectiveLayout(layouts.home[card.splash.id], pooled);
+    const lanePooled = laneLayouts.pool[card.splash.id] ?? null;
+    const lane = effectiveLayout(laneLayouts.home[card.splash.id], lanePooled);
+    const laneLayout = {
+      ...(lane.source ? { layout: lane.layout, layoutSource: lane.source } : {}),
+      poolLayout: lanePooled,
+    };
     return source
-      ? { ...card, layout, layoutSource: source, poolLayout: pooled }
-      : { ...card, poolLayout: pooled };
+      ? { ...card, layout, layoutSource: source, poolLayout: pooled, laneLayout }
+      : { ...card, poolLayout: pooled, laneLayout };
   });
   const pinned = summaries
     .filter((s) => s.pinnedAt !== null && !jointPool.has(s.id))

@@ -63,6 +63,15 @@ export type Card = {
   layout?: BoardLayoutJson;
   layoutSource?: LayoutSource;
   poolLayout?: BoardLayoutJson | null;
+  /**
+   * Its Lane view layout (0045), kept apart from the Calendar's above: the
+   * same three, for the Lane view's drafts to read as theirs.
+   */
+  laneLayout?: {
+    layout?: BoardLayoutJson;
+    layoutSource?: LayoutSource;
+    poolLayout?: BoardLayoutJson | null;
+  };
   /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>", one per pool. */
   origins?: string[];
   /** Where the top card opens, when not the post's own page from Home. */

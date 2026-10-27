@@ -13,7 +13,18 @@ import {
   type ReactNode,
 } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
+
+import { BoardPieceView } from '@/features/month-board/board-pieces';
+import { boardPhotos } from '@/features/month-board/board-layout';
+import {
+  layoutLaneBoard,
+  measureKey,
+  type Measured,
+  type Recipe,
+} from '@/features/month-board/layout';
+import { useBoardPhotos } from '@/features/month-board/use-board-photos';
 
 import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { CommitRing } from '@/components/ui/waves';
@@ -138,6 +149,14 @@ export const LaneGrid = forwardRef<
      * pills, one per line, and there are no lane columns.
      */
     view?: 'lane' | 'date';
+    /**
+     * The Lane view drawn with the Calendar's pieces (0045): labels, stickers,
+     * photo cards, faces, "Add your side" and waves, in their lane columns,
+     * a row per day. Off, a post is its mark (the Swimmers view keeps those).
+     */
+    pieces?: boolean;
+    /** The recipe each piece is drawn with, whenever it changes: the Layout panel shows it. */
+    onDrawn?: (recipes: Record<string, Recipe>) => void;
   }
 >(function LaneGrid(
   {
@@ -153,10 +172,13 @@ export const LaneGrid = forwardRef<
     onAvatar,
     bands = true,
     view = 'lane',
+    pieces = false,
+    onDrawn,
   },
   ref,
 ) {
   const { me } = usePeople();
+  const router = useRouter();
   const scroller = useRef<HTMLDivElement>(null);
   // The inner, sideways scroller, and the header bar that follows it.
   const across = useRef<HTMLDivElement>(null);
@@ -182,7 +204,9 @@ export const LaneGrid = forwardRef<
   );
 
   const plusColumn = onCreateLane !== undefined;
-  const banded = (card: Card): boolean => bands && card.branches !== undefined;
+  const drawPieces = pieces && view === 'lane';
+  // Drawn with pieces, a joint record is one piece in its column, never a band (0045).
+  const banded = (card: Card): boolean => bands && !drawPieces && card.branches !== undefined;
   const orphans = cards.some((card) => !banded(card) && isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
   const even = dateView || columns <= EVEN_COLUMNS_MAX;
@@ -208,7 +232,7 @@ export const LaneGrid = forwardRef<
     const map = new Map<string, Card[]>();
     for (const card of cards) {
       // A joint splash drawn as a band is never also a mark in a cell (H23).
-      if (bands && card.branches) continue;
+      if (banded(card)) continue;
       const lane = isOrphanCard(card, categories) ? '' : (cardColumn(card) ?? '');
       const key = `${card.day}|${lane}`;
       const cell = map.get(key);
@@ -216,7 +240,8 @@ export const LaneGrid = forwardRef<
       else map.set(key, [card]);
     }
     return map;
-  }, [cards, categories, bands]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- banded reads bands and drawPieces
+  }, [cards, categories, bands, drawPieces]);
 
   // The avatar row is sticky at the left and exactly as wide as the viewport,
   // so it never scrolls sideways with the columns.
@@ -261,6 +286,81 @@ export const LaneGrid = forwardRef<
     if (last && last.kind === 'gap') last.to = day;
     else rows.push({ kind: 'gap', from: day, to: day });
   }
+
+  // The Lane view drawn with pieces (0045): laid out by the Calendar's engine,
+  // a column per lane at the grid's own column width, a row per named day.
+  const columnIds = useMemo(
+    () => [...categories.map((c) => c.id), ...(orphans ? [''] : [])],
+    [categories, orphans],
+  );
+  const columnPx = even
+    ? viewportWidth !== null
+      ? (viewportWidth - RAIL_PX - (plusColumn ? PLUS_PX : 0)) / Math.max(columns, 1)
+      : FIXED_COLUMN_PX
+    : share;
+  const namedKey = rows.flatMap((r) => (r.kind === 'day' ? [r.day] : [])).join(',');
+  const [measured, setMeasured] = useState<Measured>({});
+  const laneBoard = useMemo(() => {
+    if (!drawPieces) return null;
+    const named = namedKey ? (namedKey.split(',') as IsoDate[]) : [];
+    // A photo hidden from the board (0044) is not on it.
+    const drawn = cards.map((card) =>
+      card.photos?.length ? { ...card, photos: boardPhotos(card.photos, card.layout) } : card,
+    );
+    return layoutLaneBoard(drawn, named, columnIds, {
+      width: columnPx * Math.max(columns, 1),
+      measured,
+      columnOf: (card) => (isOrphanCard(card, categories) ? '' : cardColumn(card)),
+    });
+  }, [drawPieces, namedKey, cards, columnIds, columnPx, columns, measured, categories]);
+  const weekOf = useMemo(
+    () => new Map((laneBoard?.weeks ?? []).map((w) => [w.cells[0]?.day, w])),
+    [laneBoard],
+  );
+  const boardPhotosSigned = useBoardPhotos(laneBoard?.pieces ?? NO_PIECES);
+  const onWrite = useCallback(
+    (card: Card): void => {
+      if (card.href) router.push(`${card.href}?write=1`, { scroll: false });
+    },
+    [router],
+  );
+  // What was drawn, told once per change, for the panel's recipe.
+  const told = useRef('');
+  useEffect(() => {
+    if (!onDrawn || !laneBoard) return;
+    const recipes = Object.fromEntries(laneBoard.pieces.map((p) => [p.id, p.recipe]));
+    const key = JSON.stringify(recipes);
+    if (key === told.current) return;
+    told.current = key;
+    onDrawn(recipes);
+  }, [laneBoard, onDrawn]);
+  // Each title's lines as drawn, kept where the estimate was wrong (as the Calendar does).
+  const gridRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el || !laneBoard) return;
+    const found: Measured = {};
+    for (const piece of laneBoard.pieces) {
+      const text = el.querySelector<HTMLElement>(
+        `[data-board-piece="${CSS.escape(piece.id)}"] [data-board-text]`,
+      );
+      if (!text || text.scrollHeight === 0) continue;
+      const lines = Math.min(
+        piece.type.lines,
+        Math.max(1, Math.round(text.scrollHeight / piece.type.line)),
+      );
+      const key = measureKey(
+        piece.id,
+        piece.labelBox.w - piece.pad.left - piece.pad.right,
+        piece.indent,
+        piece.type.size,
+      );
+      if (lines !== piece.captionLines && measured[key] !== lines) found[key] = lines;
+    }
+    if (Object.keys(found).length === 0) return;
+    const frame = requestAnimationFrame(() => setMeasured((current) => ({ ...current, ...found })));
+    return () => cancelAnimationFrame(frame);
+  }, [laneBoard, measured]);
 
   // The window grows when its end comes into view.
   const sentinel = useRef<HTMLDivElement>(null);
@@ -436,6 +536,7 @@ export const LaneGrid = forwardRef<
         className={`no-scrollbar ${dateView ? '' : 'overflow-x-auto overflow-y-hidden overscroll-x-contain'}`}
       >
         <div
+          ref={gridRef}
           data-grid
           className={`relative grid ${even ? 'w-full' : 'w-max min-w-full'}`}
           // Every day row at least this tall and as tall as its fullest cell,
@@ -518,6 +619,60 @@ export const LaneGrid = forwardRef<
               if (banded(card)) segments.push({ kind: 'band', card });
               else if (last?.kind === 'marks') last.ids.add(card.splash.id);
               else segments.push({ kind: 'marks', ids: new Set([card.splash.id]) });
+            }
+            const week = laneBoard ? weekOf.get(day) : undefined;
+            if (laneBoard && week) {
+              const h = Math.max(ROW_PX, week.h + 8);
+              return (
+                <DayRow key={day} day={day} monthChanges={monthChanges}>
+                  <div
+                    data-lane-pieces={day}
+                    className="relative"
+                    style={{ gridColumn: `span ${Math.max(columns, 1)}`, height: h }}
+                  >
+                    {Array.from({ length: Math.max(columns - 1, 0) }, (_, at) => (
+                      <span
+                        key={at}
+                        aria-hidden
+                        data-rope
+                        className="pointer-events-none absolute inset-y-0 w-px bg-white/15"
+                        style={{ left: (at + 1) * columnPx }}
+                      />
+                    ))}
+                    {/* The day's pieces, placed as the engine laid them, centred in a short row. */}
+                    <div
+                      className="absolute inset-x-0"
+                      style={{ top: -week.y + (h - week.h) / 2, height: laneBoard.height }}
+                    >
+                      {laneBoard.pieces
+                        .filter((piece) => piece.week === week.index)
+                        .map((piece) => (
+                          // Which lane and day it is in, and whether it rings: for
+                          // finding it, with no box of its own (display: contents).
+                          <div
+                            key={piece.id}
+                            data-lane-piece={piece.id}
+                            data-cell={columnIds[piece.col]}
+                            data-ring={ringAt?.id === piece.id ? '' : undefined}
+                            className="contents"
+                          >
+                            <BoardPieceView
+                              piece={piece}
+                              photos={boardPhotosSigned}
+                              lanes={categories}
+                              metrics={laneBoard.metrics}
+                              onPick={onPick}
+                              onWrite={onWrite}
+                              ripple={ringAt?.id === piece.id ? ringAt.seq : null}
+                              plunge={false}
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                  {plusColumn ? <Cell lane="+" /> : null}
+                </DayRow>
+              );
             }
             return (
               <Fragment key={day}>
@@ -840,8 +995,11 @@ function Mark({
 /** The element a post shows as on either view: its mark, or its pill. */
 function markSelector(id: string): string {
   const escaped = CSS.escape(id);
-  return `[data-mark="${escaped}"], [data-pill="${escaped}"]`;
+  // Drawn with pieces (0045), a post is its piece.
+  return `[data-mark="${escaped}"], [data-pill="${escaped}"], [data-board-piece="${escaped}"]`;
 }
+
+const NO_PIECES: [] = [];
 
 /** An element's position within the scroller's content. */
 function offsetIn(el: HTMLElement, scroller: HTMLElement): { top: number; left: number } {

@@ -221,7 +221,7 @@ describe('the Layout panel (review)', () => {
       await Promise.resolve();
     });
     expect(saved).toEqual([
-      { splashId: 's1', poolId: null, patch: { label: { tilt: 7 } }, clear: [] },
+      { splashId: 's1', poolId: null, patch: { label: { tilt: 7 } }, clear: [], view: 'calendar' },
     ]);
   });
 

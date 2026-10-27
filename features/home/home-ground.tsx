@@ -189,10 +189,25 @@ export function HomeGround({
   // The calendar's hand-set layouts as the panel edits them (review): drawn
   // at once, saved when the sliders rest; mine on Home.
   const drafts = useLayoutDrafts(shown, null);
+  // The Lane view's own (0045): its layout read as the card's, saved as the Lane view's.
+  const laneShown = useMemo(
+    () =>
+      shown.map((card) => ({
+        ...card,
+        layout: card.laneLayout?.layout,
+        layoutSource: card.laneLayout?.layoutSource,
+        poolLayout: card.laneLayout?.poolLayout,
+      })),
+    [shown],
+  );
+  const laneDrafts = useLayoutDrafts(laneShown, null, 'lane');
   // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
-  const topCard = drafts.drawn.find((card) => card.splash.id === heading) ?? null;
+  const laneView = view === 'lane';
+  // The panel edits the view on screen: the Calendar's layouts, or the Lane view's.
+  const viewDrafts = laneView ? laneDrafts : drafts;
+  const topCard = viewDrafts.drawn.find((card) => card.splash.id === heading) ?? null;
   const goTo = bringForward;
 
   // A bare `/` reached by the browser's back button finds the card that was
@@ -353,7 +368,9 @@ export function HomeGround({
               <LaneGrid
                 ref={grid}
                 view={view}
-                cards={shown}
+                cards={laneView ? laneDrafts.drawn : shown}
+                pieces
+                onDrawn={setRecipes}
                 categories={columns}
                 today={today}
                 ring={ring}
@@ -388,16 +405,17 @@ export function HomeGround({
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
           {/* Desktop only (review): the top card's layout, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
-          {boardView && wide && topCard ? (
+          {(boardView || laneView) && wide && topCard ? (
             <LayoutPanel
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
-              layout={drafts.shown(topCard.splash.id).layout}
-              source={drafts.shown(topCard.splash.id).source}
+              layout={viewDrafts.shown(topCard.splash.id).layout}
+              source={viewDrafts.shown(topCard.splash.id).source}
               home
-              message={drafts.message}
-              onEdit={(patch, clear) => drafts.edit(topCard.splash.id, patch, clear)}
-              onRevert={() => drafts.revertToPool(topCard.splash.id)}
+              view={laneView ? 'lane' : 'calendar'}
+              message={viewDrafts.message}
+              onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
+              onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}
             />
           ) : null}
 

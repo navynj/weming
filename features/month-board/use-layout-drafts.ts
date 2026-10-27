@@ -49,7 +49,12 @@ function setPaths(patch: BoardLayoutJson): Set<string> {
  * after it. Writes go to the pool's layout in a pool, to my Home layout on
  * Home.
  */
-export function useLayoutDrafts(cards: Card[], poolId: string | null) {
+export function useLayoutDrafts(
+  cards: Card[],
+  poolId: string | null,
+  /** Which view's layouts these are (0045): the Calendar's unless said. */
+  view: 'calendar' | 'lane' = 'calendar',
+) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [message, setMessage] = useState<string | null>(null);
@@ -112,6 +117,7 @@ export function useLayoutDrafts(cards: Card[], poolId: string | null) {
             poolId,
             patch: draft.patch,
             clear: draft.clear,
+            view,
           });
           if (result.ok) {
             // Saved with no Save button: said once it has (Yoonji, in the session).
@@ -129,7 +135,7 @@ export function useLayoutDrafts(cards: Card[], poolId: string | null) {
       }
     }, LAYOUT_SAVE_MS);
     return () => window.clearTimeout(timer);
-  }, [drafts, hold, poolId, router, source, toast]);
+  }, [drafts, hold, poolId, router, source, toast, view]);
 
   /** "Use pool layout": my Home layout gone; the pool's is drawn again at once. */
   const revertToPool = useCallback(
@@ -146,12 +152,12 @@ export function useLayoutDrafts(cards: Card[], poolId: string | null) {
           id,
           shown: { layout: card?.poolLayout ?? {}, source: card?.poolLayout ? 'pool' : null },
         });
-        const result = await revertToPoolLayout(id);
+        const result = await revertToPoolLayout(id, view);
         if (result.ok) router.refresh();
         else setMessage(result.message);
       });
     },
-    [byId, hold, router],
+    [byId, hold, router, view],
   );
 
   /** The cards as the board draws them. */

@@ -209,6 +209,7 @@ export function LayoutPanel({
   message,
   onEdit,
   onRevert,
+  view = 'calendar',
 }: {
   card: Card;
   /** The recipe the board drew it with; null while it is not on the page shown. */
@@ -220,6 +221,8 @@ export function LayoutPanel({
   message: string | null;
   onEdit: Edit;
   onRevert: () => void;
+  /** Which view it edits (0045): its title says so, "Layout · Lane". */
+  view?: 'calendar' | 'lane';
 }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -251,7 +254,7 @@ export function LayoutPanel({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold"
       >
-        Layout
+        {view === 'lane' ? 'Layout · Lane' : 'Layout · Calendar'}
         <ChevronDown aria-hidden size={16} className={open ? 'rotate-180' : ''} />
       </button>
       {open ? (

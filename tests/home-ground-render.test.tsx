@@ -242,12 +242,14 @@ function ground(
   );
 }
 
+// The Lane view draws each post as its board piece (0045): found by its
+// lane and day, tapped by its pick.
 const markIds = (root: Element): (string | null)[] =>
-  [...root.querySelectorAll('[data-mark]')].map((el) => el.getAttribute('data-mark'));
+  [...root.querySelectorAll('[data-lane-piece]')].map((el) => el.getAttribute('data-lane-piece'));
 const cellOf = (mark: Element): HTMLElement => mark.closest<HTMLElement>('[data-cell]')!;
 const rowOf = (mark: Element): HTMLElement => {
-  // A row is the rail cell and the cells after it, up to the next rail cell.
-  let el: Element | null = cellOf(mark);
+  // A row is the rail cell and the pieces' strip after it.
+  let el: Element | null = mark.closest('[data-lane-pieces]') ?? cellOf(mark);
   while (el && !el.hasAttribute('data-day-row')) el = el.previousElementSibling;
   return el as HTMLElement;
 };
@@ -273,11 +275,19 @@ const stair = (root: Element, which: 'up' | 'down'): (string | null)[] =>
     .map((el) => el.getAttribute('data-stack-card'));
 const scaleOf = (el: Element): number =>
   Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 1);
+/** Translucent posts: none since the Lane view is drawn with pieces (0045). */
 const water = (root: Element): (string | null)[] =>
-  [...root.querySelectorAll('[data-mark][data-dived]')].map((el) => el.getAttribute('data-mark'));
+  [...root.querySelectorAll('[data-lane-piece] [data-dived]')].map((el) =>
+    el.closest('[data-lane-piece]')!.getAttribute('data-lane-piece'),
+  );
+/** The post the stack heads to bobs on the board (0045): one at a time. */
+const bobbing = (root: Element): (string | null)[] =>
+  [...root.querySelectorAll('[data-lane-piece] [data-board-piece][data-heading]')].map((el) =>
+    el.getAttribute('data-board-piece'),
+  );
 /** The ring arrives once the mark has been brought into view. */
 const ringed = (root: Element, id: string): Promise<void> =>
-  waitFor(() => expect(root.querySelector(`[data-mark="${id}"][data-ring]`)).not.toBeNull());
+  waitFor(() => expect(root.querySelector(`[data-lane-piece="${id}"][data-ring]`)).not.toBeNull());
 /** The window reaches every day once the grid has measured where its end is. */
 const grown = (root: Element): Promise<void> =>
   waitFor(() => expect(root.querySelector('[data-day-row="2026-08-17"]')).not.toBeNull());
@@ -306,19 +316,19 @@ describe('the lane grid', () => {
     await grown(container);
     const ids = markIds(container);
     expect([...ids].sort()).toEqual(['aug', 'early', 'late', 'mid', 'soup']);
-    expect(cellOf(container.querySelector('[data-mark="late"]')!).getAttribute('data-cell')).toBe(
-      'c-food',
-    );
-    expect(rowOf(container.querySelector('[data-mark="late"]')!).getAttribute('data-day-row')).toBe(
-      '2026-09-20',
-    );
+    expect(
+      cellOf(container.querySelector('[data-lane-piece="late"]')!).getAttribute('data-cell'),
+    ).toBe('c-food');
+    expect(
+      rowOf(container.querySelector('[data-lane-piece="late"]')!).getAttribute('data-day-row'),
+    ).toBe('2026-09-20');
     // A post sits on the last day of its range (H22): Arnak's third block.
     expect(
-      rowOf(container.querySelector('[data-mark="early"]')!).getAttribute('data-day-row'),
+      rowOf(container.querySelector('[data-lane-piece="early"]')!).getAttribute('data-day-row'),
     ).toBe('2026-09-05');
-    expect(cellOf(container.querySelector('[data-mark="early"]')!).getAttribute('data-cell')).toBe(
-      'c-day',
-    );
+    expect(
+      cellOf(container.querySelector('[data-lane-piece="early"]')!).getAttribute('data-cell'),
+    ).toBe('c-day');
   });
 
   it('reads newest day first, names only the days with something, and the month on the first named day', async () => {
@@ -356,10 +366,10 @@ describe('the lane grid', () => {
     ]);
     expect(headers[0].textContent).toBe('🍜Food');
     // A rope runs beside each lane, between it and the next; none at the rail's side (review).
-    const row = container.querySelector('[data-day-row="2026-09-20"]')!;
-    const cells = [row.nextElementSibling!, row.nextElementSibling!.nextElementSibling!];
-    expect(cells[0].querySelector('[data-rope]')).toBeNull();
-    expect(cells[1].querySelector('[data-rope]')).not.toBeNull();
+    const strip = container.querySelector('[data-lane-pieces="2026-09-20"]')!;
+    const ropes = [...strip.querySelectorAll<HTMLElement>('[data-rope]')];
+    expect(ropes).toHaveLength(2);
+    for (const rope of ropes) expect(parseFloat(rope.style.left)).toBeGreaterThan(0);
   });
 
   it('renders an empty month as one compressed gap of empty ropes, with no copy', () => {
@@ -376,8 +386,10 @@ describe('the lane grid', () => {
   it('stacks two posts on one lane and day within the row', () => {
     const twin = post('twin', 'Second soup', [block('t', '2026-09-08', 'c-food')]);
     const { container } = ground([...POSTS, twin]);
-    const cell = cellOf(container.querySelector('[data-mark="soup"]')!);
-    expect(markIds(cell).sort()).toEqual(['soup', 'twin']);
+    const soup = container.querySelector('[data-lane-piece="soup"]')!;
+    const row = soup.closest('[data-lane-pieces]')!;
+    const inFood = [...row.querySelectorAll('[data-lane-piece][data-cell="c-food"]')];
+    expect(inFood.map((p) => p.getAttribute('data-lane-piece')).sort()).toEqual(['soup', 'twin']);
   });
 
   it('places a post by its declared lane over the lane its blocks took', () => {
@@ -385,9 +397,9 @@ describe('the lane grid', () => {
       declared_lane_id: 'c-place',
     });
     const { container } = ground([declared]);
-    expect(cellOf(container.querySelector('[data-mark="decl"]')!).getAttribute('data-cell')).toBe(
-      'c-place',
-    );
+    expect(
+      cellOf(container.querySelector('[data-lane-piece="decl"]')!).getAttribute('data-cell'),
+    ).toBe('c-place');
   });
 
   it('gives a post on no lane of mine one unlabelled column at the end, only when any', () => {
@@ -396,9 +408,9 @@ describe('the lane grid', () => {
     const stray = post('stray', 'Stray', [block('x', '2026-09-09', 'c-gone')]);
     const { container } = ground([stray]);
     expect(container.querySelector('[data-lane-header=""]')).not.toBeNull();
-    expect(cellOf(container.querySelector('[data-mark="stray"]')!).getAttribute('data-cell')).toBe(
-      '',
-    );
+    expect(
+      cellOf(container.querySelector('[data-lane-piece="stray"]')!).getAttribute('data-cell'),
+    ).toBe('');
   });
 
   it('shares the width among six lanes or fewer, and scrolls the columns from the seventh', () => {
@@ -440,15 +452,18 @@ describe('the lane grid', () => {
   it('writes the short title under each mark, at six lanes and at eight', () => {
     const five = [...LANES, lane('l3', 'Lane 3', '🌊', 3), lane('l4', 'Lane 4', '🌊', 4)];
     const { container } = ground(POSTS, null, null, five);
-    const title = container.querySelector<HTMLElement>('[data-mark-title="late"]')!;
-    expect(title.textContent).toBe('Toy Story 5');
-    expect(title.className).toContain('text-[10px]');
-    expect(title.className).toContain('line-clamp-2');
+    // Its title is its label's words (0045).
+    const title = container.querySelector<HTMLElement>(
+      '[data-lane-piece="late"] [data-board-text]',
+    )!;
+    expect(title.textContent).toContain('Toy Story 5');
     cleanup();
     const eight = [...five, ...[5, 6, 7].map((i) => lane(`l${i}`, `Lane ${i}`, '🌊', i))];
     const { container: fixed } = ground(POSTS, null, null, eight);
     expect(fixed.querySelector('[data-lane-grid]')!.getAttribute('data-columns')).toBe('fixed');
-    expect(fixed.querySelector('[data-mark-title="late"]')!.textContent).toBe('Toy Story 5');
+    expect(
+      fixed.querySelector('[data-lane-piece="late"] [data-board-text]')!.textContent,
+    ).toContain('Toy Story 5');
   });
 
   it('links each lane header to its lane page', () => {
@@ -476,10 +491,8 @@ describe('the diving board, a staircase', () => {
     expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
     expect(topCard(container).getAttribute('data-stair')).toBe('top');
     await ringed(container, 'late');
-    expect(container.querySelectorAll('[data-commit-ripple]')).toHaveLength(1);
-    for (const ring of container.querySelectorAll<HTMLElement>('.commit-ring')) {
-      expect(ring.style.animationIterationCount).toBe('1');
-    }
+    // The ring is the Calendar's bob on the post being read (0045).
+    expect(bobbing(container)).toEqual(['late']);
   });
 
   it('steps the unread cards down below the top, each smaller by 0.94, three at most; no strip, no chevron', () => {
@@ -522,10 +535,8 @@ describe('the diving board, a staircase', () => {
     expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
     expect(stair(container, 'up')).toEqual(['late']);
     expect(stair(container, 'down')).toEqual(['soup', 'early', 'aug']);
-    // One solid mark, the top card's; every other translucent.
+    // Drawn with pieces, nothing is translucent (0045).
     expect(water(container)).not.toContain('mid');
-    expect(water(container)).toContain('late');
-    expect(water(container)).toContain('soup');
     await ringed(container, 'mid');
     expect(container.querySelectorAll('[data-ring]')).toHaveLength(1);
   });
@@ -552,25 +563,24 @@ describe('the diving board, a staircase', () => {
 
   it('brings a deeper card up from its mark, one read card above and the rest at their marks', async () => {
     const { container } = ground();
-    fireEvent.click(container.querySelector('[data-mark="soup"]')!);
+    fireEvent.click(container.querySelector('[data-board-pick=\"soup\"]')!);
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
     expect(stair(container, 'up')).toEqual(['mid']);
     expect(water(container)).not.toContain('soup');
-    expect(water(container)).toContain('mid');
   });
 
   it('brings a tapped mark\u2019s card to the top with the same motion, read cards above it', async () => {
     const { container } = ground();
     await grown(container);
-    fireEvent.click(container.querySelector('[data-mark="aug"]')!);
+    fireEvent.click(container.querySelector('[data-board-pick=\"aug\"]')!);
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
     expect(stair(container, 'up')).toEqual(['early']);
-    expect(water(container)).toHaveLength(4);
+    expect(water(container)).toHaveLength(0);
     expect(water(container)).not.toContain('aug');
     await ringed(container, 'aug');
-    fireEvent.click(container.querySelector('[data-mark="mid"][data-dived]')!);
+    fireEvent.click(container.querySelector('[data-board-pick=\"mid\"]')!);
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
     expect(stair(container, 'up')).toEqual(['late']);
@@ -599,7 +609,7 @@ describe('the diving board, a staircase', () => {
       'Deletes the post and its 1 block.',
     );
     fireEvent.click(getByText('Delete', { selector: '[data-card-delete-confirm] button' }));
-    await waitFor(() => expect(container.querySelector('[data-mark="late"]')).toBeNull());
+    await waitFor(() => expect(container.querySelector('[data-lane-piece="late"]')).toBeNull());
     expect(container.querySelector('[data-stack-card="late"]')).toBeNull();
     expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
     await waitFor(() => expect(deleted).toEqual(['late']));
@@ -630,7 +640,7 @@ describe('the diving board, a staircase', () => {
   it('turns pages onto a pile instead when the page-turn board is chosen', async () => {
     const { container } = ground(POSTS, null, null, LANES, null, 'flip');
     expect(container.querySelector('[data-board="flip"]')).not.toBeNull();
-    fireEvent.click(container.querySelector('[data-mark="mid"]')!);
+    fireEvent.click(container.querySelector('[data-board-pick=\"mid\"]')!);
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
     expect(pile(container)).toEqual(['late']);
@@ -764,15 +774,15 @@ describe('the post just dropped', () => {
   it('is on the grid at once with the ring, and lands on top of the stack', async () => {
     const fresh = post('fresh', 'Just dropped', [block('f', '2026-09-25', 'c-place')]);
     const { container } = ground(POSTS, fresh);
-    expect(cellOf(container.querySelector('[data-mark="fresh"]')!).getAttribute('data-cell')).toBe(
-      'c-place',
-    );
+    expect(
+      cellOf(container.querySelector('[data-lane-piece="fresh"]')!).getAttribute('data-cell'),
+    ).toBe('c-place');
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('fresh');
     expect(stair(container, 'up')).toEqual([]);
     expect(water(container)).not.toContain('fresh');
     await ringed(container, 'fresh');
-    expect(container.querySelectorAll('[data-commit-ripple]')).toHaveLength(1);
+    expect(bobbing(container)).toEqual(['fresh']);
   });
 
   it('takes a deleted post off the grid, the stack and the pinned bar at once', () => {
@@ -976,8 +986,8 @@ describe('a post\u2019s own icon (0008)', () => {
   it('stands for the post on its mark, its pill and its card, before its lane\u2019s emoji', () => {
     const withIcon = POSTS.map((p) => (p.id === 'late' ? { ...p, icon: '🎬' } : p));
     const { container } = ground(withIcon);
-    expect(container.querySelector('[data-mark="late"]')!.textContent).toBe('🎬');
-    expect(container.querySelector('[data-mark="soup"]')!.textContent).toBe('🍜');
+    expect(container.querySelector('[data-lane-piece="late"]')!.textContent).toContain('🎬');
+    expect(container.querySelector('[data-lane-piece="soup"]')!.textContent).toContain('🍜');
     expect(topCard(container).querySelector('[data-card-title]')!.textContent).toContain('🎬');
     cleanup();
     homeView = 'date';
@@ -1004,7 +1014,7 @@ describe('the Home button at the foot', () => {
     expect(home.getAttribute('aria-current')).toBe('page');
     fireEvent.click(home);
     expect(container.querySelector('[data-month-board]')).toBeNull();
-    expect(container.querySelector('[data-mark]')).not.toBeNull();
+    expect(container.querySelector('[data-lane-piece]')).not.toBeNull();
     fireEvent.click(home);
     expect(container.querySelector('[data-pill]')).not.toBeNull();
     expect(
@@ -1041,7 +1051,7 @@ describe('coming back from a post\u2019s page', () => {
 describe('the top card\u2019s ripples as a thread (round 3)', () => {
   it('gives each ripple its own avatar and draws one line fewer than ripples', () => {
     const { container } = ground();
-    fireEvent.click(container.querySelector('[data-mark="early"]')!);
+    fireEvent.click(container.querySelector('[data-board-pick=\"early\"]')!);
     return settled(container).then(() => {
       const thread = topCard(container).querySelector('[data-ripple-thread]')!;
       expect(thread.querySelectorAll('[data-thread-avatar]')).toHaveLength(3);
@@ -1089,7 +1099,7 @@ describe('Just mine on Home (0014)', () => {
     const header = container.querySelector('[data-lane-header="pool:p-ours"]')!;
     expect(header.textContent).toContain('Our Pool');
     expect(header.querySelector('[data-monogram="OU"]')).not.toBeNull();
-    const mark = container.querySelector('[data-cell="pool:p-ours"] [data-mark="own"]');
+    const mark = container.querySelector('[data-lane-piece="own"][data-cell="pool:p-ours"]');
     expect(mark).not.toBeNull();
     expect(mark!.querySelector('[data-mark-pool]')).toBeNull();
   });
@@ -1151,7 +1161,7 @@ describe('a post just dropped from a pool (review)', () => {
     );
     const header = container.querySelector('[data-lane-header="pool:p-ours"]')!;
     expect(header.querySelector('[data-monogram="OU"]')).not.toBeNull();
-    const mark = container.querySelector('[data-cell="pool:p-ours"] [data-mark="shell"]');
+    const mark = container.querySelector('[data-lane-piece="shell"][data-cell="pool:p-ours"]');
     expect(mark).not.toBeNull();
     expect(mark!.textContent).toContain('🎲');
   });

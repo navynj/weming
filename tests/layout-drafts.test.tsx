@@ -77,6 +77,8 @@ describe('the Layout panel’s drafts (review)', () => {
       {
         splashId: 's1',
         poolId: 'p1',
+        // The Calendar's, unless the drafts are the Lane view's (0045).
+        view: 'calendar',
         patch: { label: { tilt: 5 }, icon: { size: 2, x: 0.2 } },
         clear: ['label.x'],
       },
