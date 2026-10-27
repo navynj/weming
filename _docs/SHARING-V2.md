@@ -136,6 +136,7 @@ primary key (splash_id, user_id)
 - **Only ever turned on:** a trigger refuses turning it off, and a conversion out of joint resets it.
 - **Pool default:** `pools.invite_all_by_default` is the pool setting "Invite everyone to new posts by default", off when a pool is made. When on, Everyone is preselected in that pool's compose.
 - **Backfill (decision 4):** Everyone on for every existing joint record; no invitee rows.
+- **The column defaults to on** (Yoonji, in the session), so a joint record the old app makes between the push and the deploy keeps inviting every member. The old calls `create_joint_splash` and `splash_to_joint` become wrappers that make Everyone on. The new app always says which, through `create_together_splash` and `splash_to_together`: false unless Everyone or the pool default is on. On insert, a record with an owner is never together, whatever the default.
 
 ### Pool records
 

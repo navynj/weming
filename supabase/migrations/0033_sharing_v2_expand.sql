@@ -41,13 +41,15 @@
 --   _place_on         needs no link
 --   set_splash_lane   moves no placement: sharing is per record
 --   splash_to_mine    leaves the record shared where it was
---   splash_to_joint   from any pool I am in; the converter is invited
---   create_joint_splash  its maker is invited
+--   splash_to_joint, create_joint_splash  the old app's calls, kept until
+--                     0034 as wrappers that make Everyone on
 --   join_pool, create_pool  place nothing earlier (decision 5)
 --   delete_pool       joint ripples go to the author's home lane
 -- Added: joint_invitees, splashes.joint_invite_all ("Everyone"),
 -- pools.invite_all_by_default, add_joint_invitees, joint_together,
--- set_pool_invite_all, splash_to_pool_record (joint → my pool record),
+-- set_pool_invite_all, create_together_splash and splash_to_together (the
+-- new app's, Everyone said explicitly), splash_to_pool_record (joint → my
+-- pool record),
 -- _home_lane_for, _settle_lane_default.
 --
 -- Until 0034 the old indexes hold: one link of mine per pool lane (0009)
@@ -180,11 +182,35 @@ alter table public.splashes
   add constraint splashes_invite_all_joint check (owner_id is null or not joint_invite_all);
 
 comment on column public.splashes.joint_invite_all is
-  'Everyone (0033): a joint record together with every current member of its pool, later joiners included. Only ever turned on; reset when it stops being joint.';
+  'Everyone (0033): a joint record together with every current member of its pool, later joiners included. Defaults on (the old app''s joint records); the new app says which. Only ever turned on; reset when it stops being joint.';
 
 -- Decision 4 (a), as Everyone: every existing joint record stays together
 -- with every current member, as it was.
 update public.splashes set joint_invite_all = true where owner_id is null;
+
+-- From here the default is Everyone (Yoonji, in the session): a joint
+-- record the old app makes between this push and the deploy keeps inviting
+-- every member, as the old app promised. The new app always says which
+-- (create_together_splash, splash_to_together). A record of someone's own
+-- is never together: on insert the default yields to that.
+alter table public.splashes alter column joint_invite_all set default true;
+
+create function public.settle_joint_invite_all()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.owner_id is not null then
+    new.joint_invite_all := false;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger splashes_settle_joint_invite_all
+  before insert on public.splashes
+  for each row execute function public.settle_joint_invite_all();
 
 alter table public.pools
   add column invite_all_by_default boolean not null default false;
@@ -546,9 +572,10 @@ end;
 $$;
 
 -- My Home record or my pool record becomes the pool's joint record ("Make
--- it joint…"). A Home record may go to any pool I am in; a pool record
--- stays in its own. Its maker is the first invitee; Together adds others.
-create or replace function public.splash_to_joint(p_splash uuid, p_pool_lane uuid)
+-- it joint…"), with Everyone or not (p_invite_all, said by the new app). A
+-- Home record may go to any pool I am in; a pool record stays in its own.
+-- Its maker is the first invitee; Together adds others.
+create function public.splash_to_together(p_splash uuid, p_pool_lane uuid, p_invite_all boolean)
 returns void
 language plpgsql
 security definer
@@ -588,12 +615,24 @@ begin
          created_by = uid,
          declared_lane_id = null,
          session_id = null,
-         pinned_at = null
+         pinned_at = null,
+         joint_invite_all = coalesce(p_invite_all, false)
    where id = p_splash;
   insert into public.joint_invitees (splash_id, user_id) values (p_splash, uid)
   on conflict do nothing;
   perform set_config('weming.reshape', 'off', true);
 end;
+$$;
+
+-- The old app's call, until 0034: as before the switch, together with
+-- every member.
+create or replace function public.splash_to_joint(p_splash uuid, p_pool_lane uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.splash_to_together(p_splash, p_pool_lane, true);
 $$;
 
 -- A joint record, every ripple mine, becomes my pool record on its pool
@@ -636,15 +675,17 @@ begin
 end;
 $$;
 
--- A joint record's maker is its first invitee; Together adds the rest
--- (add_joint_invitees), so the old app's call still makes one.
-create or replace function public.create_joint_splash(
+-- A joint record, with Everyone or not (p_invite_all, said by the new
+-- app). Its maker is its first invitee; Together adds the rest
+-- (add_joint_invitees).
+create function public.create_together_splash(
   p_id uuid,
   p_pool uuid,
   p_pool_lane uuid,
   p_title text,
-  p_icon text default null,
-  p_declared_start date default null
+  p_icon text,
+  p_declared_start date,
+  p_invite_all boolean
 )
 returns uuid
 language plpgsql
@@ -659,7 +700,8 @@ begin
     raise exception 'pool lane is not in this pool' using errcode = '42501';
   end if;
 
-  insert into public.splashes (id, owner_id, pool_id, pool_lane_id, created_by, title, icon, declared_start)
+  insert into public.splashes
+    (id, owner_id, pool_id, pool_lane_id, created_by, title, icon, declared_start, joint_invite_all)
   values (
     coalesce(p_id, gen_random_uuid()),
     null,
@@ -668,12 +710,31 @@ begin
     uid,
     coalesce(btrim(p_title), ''),
     nullif(btrim(coalesce(p_icon, '')), ''),
-    p_declared_start
+    p_declared_start,
+    coalesce(p_invite_all, false)
   )
   returning id into sid;
   insert into public.joint_invitees (splash_id, user_id) values (sid, uid);
   return sid;
 end;
+$$;
+
+-- The old app's call, until 0034: as before the switch, together with
+-- every member.
+create or replace function public.create_joint_splash(
+  p_id uuid,
+  p_pool uuid,
+  p_pool_lane uuid,
+  p_title text,
+  p_icon text default null,
+  p_declared_start date default null
+)
+returns uuid
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.create_together_splash(p_id, p_pool, p_pool_lane, p_title, p_icon, p_declared_start, true);
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -921,5 +982,10 @@ grant execute on function public.joint_together(uuid[]) to authenticated;
 revoke execute on function public.set_pool_invite_all(uuid, boolean) from public, anon;
 grant execute on function public.set_pool_invite_all(uuid, boolean) to authenticated;
 revoke execute on function public.hold_joint_invite_all() from public, anon, authenticated;
+revoke execute on function public.settle_joint_invite_all() from public, anon, authenticated;
+revoke execute on function public.create_together_splash(uuid, uuid, uuid, text, text, date, boolean) from public, anon;
+grant execute on function public.create_together_splash(uuid, uuid, uuid, text, text, date, boolean) to authenticated;
+revoke execute on function public.splash_to_together(uuid, uuid, boolean) from public, anon;
+grant execute on function public.splash_to_together(uuid, uuid, boolean) to authenticated;
 revoke execute on function public.splash_to_pool_record(uuid) from public, anon;
 grant execute on function public.splash_to_pool_record(uuid) to authenticated;

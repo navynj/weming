@@ -649,12 +649,16 @@ describe('together (0033)', () => {
       .data!.id;
     const EVERYONE = '0e500000-0000-0000-0000-000000000004';
     const PICKED = '0e500000-0000-0000-0000-000000000005';
+    // As the new app makes them: Everyone said explicitly, off.
     for (const id of [EVERYONE, PICKED]) {
-      const made = await asUser(ben).rpc('create_joint_splash', {
+      const made = await asUser(ben).rpc('create_together_splash', {
         p_id: id,
         p_pool: pool,
         p_pool_lane: days,
         p_title: id === EVERYONE ? 'Everyone' : 'Picked',
+        p_icon: '',
+        p_declared_start: null as unknown as string,
+        p_invite_all: false,
       });
       expect(made.error).toBeNull();
     }
@@ -703,6 +707,42 @@ describe('together (0033)', () => {
     for (const id of [EVERYONE, PICKED]) {
       await asUser(ben).rpc('delete_joint_splash', { p_splash: id });
     }
+  });
+
+  it('keeps the old app inviting everyone until the deploy; my own record never is', async () => {
+    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
+      .data!.id;
+    const OLD = '0e500000-0000-0000-0000-000000000006';
+    const MINE = '0e500000-0000-0000-0000-000000000007';
+    // The old app's call: the column's default, Everyone.
+    await asUser(ben).rpc('create_joint_splash', {
+      p_id: OLD,
+      p_pool: pool,
+      p_pool_lane: days,
+      p_title: 'From the old app',
+    });
+    const flag = async (id: string) =>
+      (await asAdmin().from('splashes').select('joint_invite_all').eq('id', id).single()).data!
+        .joint_invite_all;
+    expect(await flag(OLD)).toBe(true);
+    // A record of my own, inserted with the default: never together.
+    expect(
+      (
+        await asUser(ben)
+          .from('splashes')
+          .insert({ id: MINE, owner_id: ben, title: 'mine', declared_lane_id: BEN_TRIPS })
+      ).error,
+    ).toBeNull();
+    expect(await flag(MINE)).toBe(false);
+    // The old app's conversion too: Everyone.
+    await asUser(ben)
+      .from('splash_placements')
+      .insert({ splash_id: MINE, pool_id: pool, pool_lane_id: tripsLane });
+    expect(
+      (await asUser(ben).rpc('splash_to_joint', { p_splash: MINE, p_pool_lane: days })).error,
+    ).toBeNull();
+    expect(await flag(MINE)).toBe(true);
+    for (const id of [OLD, MINE]) await asUser(ben).rpc('delete_joint_splash', { p_splash: id });
   });
 
   it('keeps the pool setting, any current member, and nobody outside', async () => {
