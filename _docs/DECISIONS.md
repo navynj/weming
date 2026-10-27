@@ -628,3 +628,25 @@ A member's column in Swimmers opens nothing.
   - Members cannot write their membership rows; `set_pool_on_home` changes the caller's own row.
 - **Leave Pool in settings:** a member who isn't the pool's creator finds "Leave Pool" where the creator finds "Delete Pool". It asks the same question as the member list's: keep my records there, or remove them.
 
+**H31. Direct manipulation on the board (2026-10-27).** Asked by Yoonji. A piece's layout on the Calendar, the Lane view and a pool's Members can be set by hand on the board itself, writing the same layout json as the Layout panel through `set_board_layout`. No schema change.
+- **No mode, no button: a second tap activates.** A first tap on a piece brings its record to the top of the stack, as before. A tap on the piece that is already the top card makes it active: a thin white outline on the selected part, its handles, and a small toolbar beside it. Tapping a part of the active piece (its label, sticker, a photo, its wave) selects that part. Empty board, Escape, Done, or a tap on another piece lets it go; the other piece comes to the top without handles. Turning the stack to another card lets it go too.
+  - Rejected: a layout mode entered from a "Layout" button on the top card, with Done to leave it (the first brief); Yoonji replaced it with the second tap in the session.
+- **Who may:** the same as the panel. On Home every layout is my Home override, always mine to set; in a pool, only a current member edits the pool's layout. A piece I cannot edit never shows handles, and a second tap does what a first does. Per view: Calendar, Lane, Members.
+- **What each piece type allows:** exactly what the panel offers for it.
+  - **Label:** move and rotate. No corner handle.
+  - **Sticker** (an icon not inline): move, rotate, and size from a corner.
+  - **Each photo shown:** move, rotate, and size from a corner.
+  - **Wave** (when on): move; its two ends set its length, the other end staying put.
+  - **A range along its days** (a Calendar band, or any ranged post): an outline and the text size stepper, nothing more.
+  - **A Members band** (Everyone, joint): its label, its icon once Inline is off, and its wave, as 0047 gave the panel.
+  - On a phone, two fingers pinch and twist the selected part; the second finger may land anywhere.
+  - A turn snaps to 0° within 3°. Every value is clamped to the existing ranges (board_layout_valid). Overflow stays visible, as 0044 has it.
+- **Text size is a stepper, not a handle:** the toolbar reads "T | − 14 +" while the label is selected, a point a press within 10 to 18, saved after the panel's 400ms rest. Rejected: a corner handle on labels scaling the text (the first plan); Yoonji chose the stepper in the session. The size is whole points in a narrow range, which a stepper says exactly.
+- **Y in line heights moves with the text size.** A part's Y offset is measured in lines, so changing the size shifts its pixel offset slightly. Kept as the sliders already behave, so a handle and a slider never disagree.
+- **Saving on release:** while a handle is held only the screen changes; the panel's sliders follow it live. Letting go makes one `set_board_layout` call, optimistic, with the usual revert and message on refusal. The stepper, the keyboard and the sliders save after the 400ms rest. Rejected: saving on the rest during a drag, which wrote mid-gesture whenever the finger paused.
+- **Undo per piece, until I leave the page:** the last 20 saved changes per piece and view, from the toolbar's Undo or Cmd/Ctrl+Z. An undo writes back what each touched field held, and clears a field that was Auto, so it returns to the recipe rather than freezing a copy of it. An undo is not itself a change to undo. "Use pool layout" can be undone (my Home layout written back whole). Rejected: history per activation, which Done would have thrown away.
+- **Keyboard (desktop):** arrows move the selected part by a slider's step, ten with Shift; [ and ] turn it a degree, never snapped; Escape lets go. A focused slider keeps its own arrows.
+- **The toolbar's More:** on a desktop it opens the panel under the stack; on a phone, a low sheet holding every slider the panel holds, in the water's colour with no scrim, so the board stays in view and moves as a slider does. Handles and sliders edit one draft.
+- **While a piece is active:** the week swipe is off (the arrows still turn the week), and on a phone the stack folds to its top card's 44px title strip, coming back whole when the piece is let go.
+- **A toast only on refusal (amends H29 for layouts):** layout saves say "Saving…" then "Saved" in the toolbar and no longer toast "Layout saved". A refused layout save is a toast as well as the panel's line, since the change may have been made on the board, far from the panel.
+
