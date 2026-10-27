@@ -57,7 +57,7 @@ export function PostRow({
       className={`flex w-full min-w-0 items-center gap-3 text-left text-white ${
         card.joint
           ? // The joint surface, solid (JOINT_SURFACE), as on the band.
-            'my-1 rounded-full bg-[#3739D4] py-1.5 pr-3 pl-1.5'
+            'bg-joint my-1 rounded-full py-1.5 pr-3 pl-1.5'
           : 'border-b border-white/15 py-2.5'
       } ${current ? '' : 'opacity-60'}`}
     >

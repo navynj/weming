@@ -62,7 +62,7 @@ export function JointBand({
           // On top of the stack (review): white, its words in blue, as the
           // top card reads; otherwise the solid joint surface, sitting back.
           className={`flex w-full min-w-0 items-center gap-2.5 rounded-[28px] pr-4 pl-1.5 text-left ${
-            dived ? 'bg-[#3739D4] text-white opacity-70' : 'text-main-900 bg-white'
+            dived ? 'bg-joint text-white opacity-70' : 'text-main-900 bg-white'
           }`}
           style={{ height: BAND_PX }}
         >
@@ -169,8 +169,8 @@ export function JointFaces({
           initials={writer.initials}
           // The ring is the surface's own colour (JOINT_SURFACE): it parts
           // stacked faces without drawing a line (review).
-          className={`text-main-900/60 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
-            on === 'white' ? 'ring-white' : 'ring-[#3739D4]'
+          className={`text-main-900/60 bg-joint-face flex items-center justify-center rounded-full text-[10px] font-medium ring-2 ${
+            on === 'white' ? 'ring-white' : 'ring-joint'
           } ${at > 0 ? '-ml-1' : ''}`}
           style={{ width: size, height: size }}
         />

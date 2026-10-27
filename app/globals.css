@@ -7,14 +7,30 @@
  * The main ramp reaches the screen in exactly two places: wave rendering and
  * chip foregrounds. Text is ink by default, main-900 for emphasis, pool-500
  * where the hierarchy needs muting. scripts/check-tokens.sh enforces it.
- * Dark mode is deliberately absent: SPEC 7 defers it to a designed night pool
- * and forbids inversion, so the scaffold ships no `prefers-color-scheme` block.
+ *
+ * A person's theme (0032, H26) moves the main ramp: one colour of eleven
+ * (lib/theme.ts), set on <html> as data-theme. Dark mode is that colour as
+ * the water ground with white on it; light mode (data-mode="light") is a
+ * white ground where what was white on it takes the colour — see
+ * `.water-ground` below. No `prefers-color-scheme`: the mode is chosen.
  */
 @theme {
-  /* Main ramp — content vitality */
-  --color-main-900: #0507c9; /* live / now; also emphasis text */
-  --color-main-400: #787be2; /* recent wave tone; as text, chip foregrounds ONLY */
-  --color-main-100: #d3d7f6; /* settled / past — never used for text */
+  /* Main ramp — content vitality, derived from the theme colour */
+  --color-main-900: var(--theme-900); /* live / now; also emphasis text */
+  --color-main-400: color-mix(
+    in srgb,
+    var(--theme-900) 55%,
+    #ffffff
+  ); /* recent wave tone; chip fg ONLY */
+  --color-main-100: color-mix(
+    in srgb,
+    var(--theme-900) 17%,
+    #ffffff
+  ); /* settled / past — never text */
+  /* A joint splash's surface: white at 20% over the ground, solid (H23). */
+  --color-joint: color-mix(in srgb, var(--color-white) 20%, var(--color-main-900));
+  /* A face on a joint surface: half the colour, solid, so stacked faces never show through. */
+  --color-joint-face: color-mix(in srgb, var(--theme-900) 50%, #ffffff);
 
   /* Gray ramp — structure */
   --color-pool-100: #f1f3f7; /* surfaces */
@@ -43,6 +59,42 @@
   --tracking-wide: -0.025em; /* 0.025em */
   --tracking-wider: 0em; /* 0.05em */
   --tracking-widest: 0.05em; /* 0.1em */
+}
+
+/* The theme colours (0032): the hexes are lib/theme.ts's, one rule each. */
+:root,
+[data-theme='blue'] {
+  --theme-900: #0507c9;
+}
+[data-theme='red'] {
+  --theme-900: #d92d20;
+}
+[data-theme='orange'] {
+  --theme-900: #d9480f;
+}
+[data-theme='yellow'] {
+  --theme-900: #b07c00;
+}
+[data-theme='green'] {
+  --theme-900: #14804a;
+}
+[data-theme='lime'] {
+  --theme-900: #4e8a1a;
+}
+[data-theme='sky'] {
+  --theme-900: #0b7fc2;
+}
+[data-theme='purple'] {
+  --theme-900: #7b2fd0;
+}
+[data-theme='pink'] {
+  --theme-900: #c2307a;
+}
+[data-theme='brown'] {
+  --theme-900: #8a5a2b;
+}
+[data-theme='black'] {
+  --theme-900: #161621;
 }
 
 /* No pinch or double-tap zoom on a phone (layout.tsx's viewport says why);
@@ -231,6 +283,37 @@ body {
   background-color: var(--color-main-900);
   color: #ffffff;
   --wave-ink: #ffffff;
+}
+
+/*
+ * Light mode (0032, H26): the ground is white, and what was white on it —
+ * labels, marks, ropes, words — takes the theme colour, while the colour
+ * that sat inside those labels turns white. One swap of the two variables
+ * every white and main-900 utility reads, inside the ground only; pages and
+ * sheets above the water are untouched.
+ */
+[data-mode='light'] .water-ground {
+  --color-white: var(--theme-900);
+  --color-main-900: #ffffff;
+  --color-joint: color-mix(in srgb, var(--theme-900) 20%, #ffffff);
+  background-color: #ffffff;
+  color: var(--theme-900);
+  --wave-ink: var(--theme-900);
+}
+
+/*
+ * A white surface on the ground — a card, a menu, a sheet — stays white with
+ * ink on it in either mode: the swap above stops at its edge. In light mode a
+ * card on the white ground keeps its edge with a hairline.
+ */
+.water-ground .surface {
+  --color-white: #ffffff;
+  --color-main-900: var(--theme-900);
+  --color-joint: color-mix(in srgb, #ffffff 20%, var(--theme-900));
+  --wave-ink: var(--theme-900);
+}
+[data-mode='light'] .water-ground .surface-edge {
+  box-shadow: 0 0 0 1px var(--color-pool-200);
 }
 
 /*

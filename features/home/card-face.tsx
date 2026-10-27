@@ -36,10 +36,15 @@ const NO_PHOTOS: CardPhoto[] = [];
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** White stepped toward #0507C9 by `tint`: the depth cue of a card behind another. */
-export function face(tint: number): string {
+/**
+ * White stepped toward the theme colour (0032) by `tint`: the depth cue of a
+ * card behind another. Numbers, not a colour-mix, so the stack's spring can
+ * carry it.
+ */
+export function face(tint: number, base = '#0507C9'): string {
   const t = clamp01(tint);
-  return `rgb(${Math.round(lerp(255, 5, t))}, ${Math.round(lerp(255, 7, t))}, ${Math.round(lerp(255, 201, t))})`;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16));
+  return `rgb(${Math.round(lerp(255, r, t))}, ${Math.round(lerp(255, g, t))}, ${Math.round(lerp(255, b, t))})`;
 }
 
 /**

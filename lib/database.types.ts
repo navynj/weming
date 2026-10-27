@@ -473,6 +473,8 @@ export type Database = {
           display_name: string
           id: string
           last_active_at: string
+          theme_color: string
+          theme_mode: string
           timezone: string
         }
         Insert: {
@@ -483,6 +485,8 @@ export type Database = {
           display_name: string
           id: string
           last_active_at?: string
+          theme_color?: string
+          theme_mode?: string
           timezone?: string
         }
         Update: {
@@ -493,6 +497,8 @@ export type Database = {
           display_name?: string
           id?: string
           last_active_at?: string
+          theme_color?: string
+          theme_mode?: string
           timezone?: string
         }
         Relationships: []
@@ -1012,7 +1018,14 @@ export type Database = {
       _board_layout_clear: { Args: { l: Json; paths: string[] }; Returns: Json }
       _board_layout_merge: { Args: { base: Json; patch: Json }; Returns: Json }
       _board_layout_prune: { Args: { l: Json; media: string[] }; Returns: Json }
+      _inherit_backfill: { Args: never; Returns: undefined }
+      _inherit_post_title: { Args: { note: string }; Returns: string }
+      _inherit_split_from: {
+        Args: { p_created: string; p_lane: string; src: string }
+        Returns: string
+      }
       _invite_pool: { Args: { p_token: string }; Returns: string }
+      _joint_lane_for: { Args: { sid: string; uid: string }; Returns: string }
       _layout_group: { Args: { g: Json; kind: string }; Returns: boolean }
       _layout_number: {
         Args: { hi: number; lo: number; v: Json }

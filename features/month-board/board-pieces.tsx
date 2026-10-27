@@ -164,7 +164,7 @@ const FACE_RING: Record<LabelStyle, string> = {
 };
 /** Faces as the calendar draws them: within the words' 13px line, at the 10px floor. */
 const FACE_CLASS =
-  'text-main-900/60 flex h-[calc(var(--line,13px)-1px)] w-[calc(var(--line,13px)-1px)] items-center justify-center overflow-hidden rounded-full bg-[#8283EE] text-[10px] leading-none ring-1';
+  'text-main-900/60 flex h-[calc(var(--line,13px)-1px)] w-[calc(var(--line,13px)-1px)] items-center justify-center overflow-hidden rounded-full bg-joint-face text-[10px] leading-none ring-1';
 
 function FaceStack({
   faces,
@@ -300,7 +300,7 @@ function OpenSlot({
             key={face.authorId}
             id={face.authorId}
             initials={face.initials}
-            className={`text-main-900/60 ring-main-900 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#8283EE] text-[10px] leading-none ring-1 ${at > 0 ? '-ml-1' : ''}`}
+            className={`text-main-900/60 ring-main-900 bg-joint-face flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] leading-none ring-1 ${at > 0 ? '-ml-1' : ''}`}
           />
         ))}
       </span>
@@ -593,7 +593,7 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
         {icon ? <span aria-hidden>{icon}</span> : null}
         <span className="min-w-0 truncate">{caption}</span>
         {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
-        {card.joint ? <Faces card={card} ring="ring-[#3739D4]" /> : null}
+        {card.joint ? <Faces card={card} ring="ring-joint" /> : null}
       </button>
     </div>
   );

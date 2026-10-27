@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
 import { createClient } from '@/lib/supabase/server';
+import { THEME_COLORS, type ThemeColor } from '@/lib/theme';
 
 import { displayName } from './name';
 
@@ -52,6 +53,28 @@ export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
           ? { avatar_path: null, avatar_version: null }
           : {}),
     })
+    .eq('id', user.id);
+  if (error) return { ok: false, message: error.message };
+  return { ok: true };
+}
+
+const themeInput = z.object({
+  color: z.enum(THEME_COLORS as [ThemeColor, ...ThemeColor[]]),
+  mode: z.enum(['dark', 'light']),
+});
+
+/** Saves my theme (0032): one colour and a mode, on my profile alone. */
+export async function saveTheme(raw: z.input<typeof themeInput>): Promise<ProfileSaved> {
+  const parsed = themeInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, message: 'That theme is not one of the eleven.' };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Sign in again to save your theme.' };
+  const { error } = await supabase
+    .from('profiles')
+    .update({ theme_color: parsed.data.color, theme_mode: parsed.data.mode })
     .eq('id', user.id);
   if (error) return { ok: false, message: error.message };
   return { ok: true };

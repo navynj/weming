@@ -1,5 +1,6 @@
 'use client';
 
+import { useTheme } from '@/features/people/theme-provider';
 import { useRef } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
@@ -150,7 +151,8 @@ function Page({
       return forward ? 1 - clamp01(pv as number) : clamp01(pv as number);
     return (v as number) < 0.5 ? 1 : 0;
   });
-  const faceBg = useTransform(slot, (s) => face(s * TINT_STEP));
+  const { hex } = useTheme();
+  const faceBg = useTransform(slot, (s) => face(s * TINT_STEP, hex));
   // A card behind is narrower than the one in front (review).
   const faceInset = useTransform(slot, (s) => s * SHRINK_PX);
   const faceZ = useTransform([t, slot], ([v, s]) =>
@@ -167,7 +169,7 @@ function Page({
   });
   // The back of a turning page is plain: its words arrive as it lies flat.
   const stripWords = useTransform(t, (v) => (reducedMotion ? 1 : clamp01((v - 0.5) * 2) ** 2));
-  const stripBg = useTransform(pileSlot, (s) => face(0.04 + s * TINT_STEP));
+  const stripBg = useTransform(pileSlot, (s) => face(0.04 + s * TINT_STEP, hex));
   const stripZ = useTransform([t, pileSlot], ([v, s]) =>
     (v as number) > 0 && (v as number) < 1 ? 40 : 15 - Math.round(s as number),
   );
