@@ -344,8 +344,8 @@ export function MonthBoard({
   const empty = layout.pieces.length === 0 && layout.tapes.length === 0;
   const lastRow = layout.weeks[layout.weeks.length - 1];
   const gridBottom = lastRow ? lastRow.y + lastRow.h : layout.height;
-  const ripple = (id: string): number | null =>
-    ring && ring.id === id && !reducedMotion ? ring.seq : null;
+  // The post being read, always: with reduced motion the piece shows it still (review).
+  const ripple = (id: string): number | null => (ring && ring.id === id ? ring.seq : null);
   const plunge = (id: string): boolean => dropped === id && !reducedMotion;
 
   return (

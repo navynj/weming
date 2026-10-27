@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import {
   postIcon,
@@ -24,6 +24,7 @@ import {
   type PhotoCard,
 } from './layout';
 import { handMoved } from './board-layout';
+import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
 
@@ -487,7 +488,10 @@ export function BoardPieceView({
   const top = piece.fan.length - 1;
   const label = piece.labelBox;
   const fade = piece.muted ? 'opacity-50' : '';
-  const moving = motionOf(ripple, plunge);
+  // Reduced motion (review): no bob and no ripple; a still outline says which.
+  const still = usePrefersReducedMotion();
+  const reading = ripple !== null;
+  const moving = still ? '' : motionOf(ripple, plunge);
   // Set by hand (review): offsets and tilts move only this piece's drawing,
   // never the stack; X is a share of the lane, Y in line heights.
   const layout = card.layout ?? {};
@@ -563,10 +567,14 @@ export function BoardPieceView({
         <span
           data-board-label
           className={`absolute z-[1] block ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
+          data-reading-outline={reading && still ? '' : undefined}
           style={{
             ...placed(label),
             transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
             ...lifted(1, stack),
+            ...(reading && still
+              ? { outline: '2px solid var(--color-white)', outlineOffset: 2 }
+              : {}),
             paddingTop: piece.pad.top,
             paddingRight: piece.pad.right,
             paddingBottom: piece.pad.bottom,
@@ -612,6 +620,28 @@ export function BoardPieceView({
             ) : null}
           </span>
         </span>
+        {reading && !still ? (
+          // Out from the sticker, or the front of the label when the icon is inline.
+          <ReadingRipple
+            key={ripple}
+            box={
+              piece.stickerBox && icon
+                ? piece.stickerBox
+                : {
+                    x: label.x + piece.pad.left,
+                    y: label.y + piece.pad.top,
+                    w: piece.type.line,
+                    h: piece.type.line,
+                  }
+            }
+            transform={
+              piece.stickerBox && icon
+                ? moveOf(nudge(layout.icon, layout.piece), metrics.column, line)
+                : moveOf(nudge(layout.label, layout.piece), metrics.column, line)
+            }
+            z={lifted(3, stack)?.zIndex ?? 3}
+          />
+        ) : null}
         {piece.stickerBox && icon ? (
           <span
             aria-hidden
@@ -683,5 +713,42 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
         {card.joint || card.together ? <Faces card={card} ring="ring-joint" /> : null}
       </button>
     </div>
+  );
+}
+
+/**
+ * One ring out from the post being read (review): it grows from the icon's
+ * size to three times it and fades over 900ms, once per time the post comes
+ * to the top, then is gone. Keyed by that time, so it never loops.
+ */
+function ReadingRipple({
+  box,
+  transform,
+  z,
+}: {
+  box: Box;
+  transform: string | undefined;
+  z: number | string;
+}) {
+  const [done, setDone] = useState(false);
+  const ring = useRef<HTMLSpanElement>(null);
+  // The standard event, listened to directly: React maps its prop to a
+  // vendor-prefixed name where it guesses the browser lacks it.
+  useEffect(() => {
+    const el = ring.current;
+    if (!el) return;
+    const end = (): void => setDone(true);
+    el.addEventListener('animationend', end);
+    return () => el.removeEventListener('animationend', end);
+  }, []);
+  if (done) return null;
+  return (
+    <span
+      ref={ring}
+      aria-hidden
+      data-reading-ripple
+      className="board-ripple pointer-events-none absolute rounded-full border-[1.5px] border-white"
+      style={{ left: box.x, top: box.y, width: box.w, height: box.h, transform, zIndex: z }}
+    />
   );
 }

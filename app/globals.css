@@ -531,14 +531,31 @@ body {
   }
 }
 .board-bob {
-  animation: board-bob 1.4s ease-in-out 2;
+  /* For as long as the post is the one being read (review), gently. */
+  animation: board-bob 1.4s ease-in-out infinite;
+}
+/* One ring out from the post's icon each time it becomes the one read (review):
+   1.5px of white, from the icon's size to three times it, gone in 900ms. */
+@keyframes board-ripple {
+  from {
+    scale: 1;
+    opacity: 0.9;
+  }
+  to {
+    scale: 3;
+    opacity: 0;
+  }
+}
+.board-ripple {
+  animation: board-ripple 900ms cubic-bezier(0.2, 0.7, 0.3, 1) 1 forwards;
 }
 .board-plunge {
   animation: board-plunge 1.1s cubic-bezier(0.3, 0.7, 0.4, 1) 1;
 }
 @media (prefers-reduced-motion: reduce) {
   .board-bob,
-  .board-plunge {
+  .board-plunge,
+  .board-ripple {
     animation: none;
   }
 }

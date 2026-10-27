@@ -907,6 +907,44 @@ describe('a tap, and the post the stack is heading to (review)', () => {
     ).toContain('board-bob');
   });
 
+  it('sends one ripple out from the icon each time the top card changes, gone once it ends', () => {
+    media(false);
+    const { container, rerender } = board(OCTOBER, { ring: { id: 'lynn', seq: 0 } });
+    const ripples = () => [...container.querySelectorAll('[data-reading-ripple]')];
+    expect(ripples()).toHaveLength(1);
+    expect(ripples()[0].closest('[data-board-piece]')!.getAttribute('data-board-piece')).toBe(
+      'lynn',
+    );
+    expect(ripples()[0].className).toContain('board-ripple');
+    fireEvent.animationEnd(ripples()[0]);
+    expect(ripples()).toHaveLength(0);
+    // Still on top: the bob goes on, no second ripple.
+    expect(
+      container.querySelector('[data-board-piece="lynn"] [data-board-label]')!.className,
+    ).toContain('board-bob');
+    // A new top card: one ripple, on it.
+    rerender(tree(OCTOBER, { ring: { id: 'hoppers', seq: 1 } }));
+    expect(ripples()).toHaveLength(1);
+    expect(ripples()[0].closest('[data-board-piece]')!.getAttribute('data-board-piece')).toBe(
+      'hoppers',
+    );
+  });
+
+  it('with reduced motion: no bob and no ripple, a still white outline on the post being read', () => {
+    media(true);
+    const { container } = board(OCTOBER, { ring: { id: 'lynn', seq: 0 } });
+    const label = container.querySelector<HTMLElement>(
+      '[data-board-piece="lynn"] [data-board-label]',
+    )!;
+    expect(container.querySelector('[data-reading-ripple]')).toBeNull();
+    expect(label.className).not.toContain('board-bob');
+    expect(label.hasAttribute('data-reading-outline')).toBe(true);
+    expect(label.style.outline).toContain('2px solid');
+    expect(
+      container.querySelector('[data-board-piece="hoppers"] [data-reading-outline]'),
+    ).toBeNull();
+  });
+
   it('turns to the week the heading post is on when it is on another page', () => {
     const { container, rerender } = board(OCTOBER, { ring: { id: 'lynn', seq: 0 } });
     rerender(tree(OCTOBER, { ring: { id: 'early', seq: 1 } }));
