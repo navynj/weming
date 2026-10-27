@@ -155,16 +155,17 @@ async function convert(
   plan: z.infer<typeof CONVERSION>,
 ): Promise<{ ok: false; message: string } | null> {
   if (plan.op === 'to_joint') {
-    const { error } = await supabase.rpc('splash_to_joint', {
+    // Everyone said explicitly (0033): splash_to_joint is the old app's.
+    const { error } = await supabase.rpc('splash_to_together', {
       p_splash: id,
       p_pool_lane: plan.poolLaneId,
+      p_invite_all: plan.everyone,
     });
     if (error) return refused(error);
-    if (plan.invitees.length === 0 && !plan.everyone) return null;
+    if (plan.invitees.length === 0) return null;
     const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
       p_splash: id,
       p_users: plan.invitees,
-      p_everyone: plan.everyone,
     });
     return inviteError ? refused(inviteError) : null;
   }

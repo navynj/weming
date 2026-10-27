@@ -1156,6 +1156,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_together_splash: {
+        Args: {
+          p_declared_start: string
+          p_icon: string
+          p_id: string
+          p_invite_all: boolean
+          p_pool: string
+          p_pool_lane: string
+          p_title: string
+        }
+        Returns: string
+      }
       delete_joint_splash: { Args: { p_splash: string }; Returns: undefined }
       delete_pool: { Args: { p_pool: string }; Returns: undefined }
       delete_reply: { Args: { p_reply: string }; Returns: undefined }
@@ -1308,6 +1320,10 @@ export type Database = {
         Returns: undefined
       }
       splash_to_pool_record: { Args: { p_splash: string }; Returns: undefined }
+      splash_to_together: {
+        Args: { p_invite_all: boolean; p_pool_lane: string; p_splash: string }
+        Returns: undefined
+      }
       splash_writable: { Args: { sid: string }; Returns: boolean }
       visible_avatars: { Args: { uids: string[] }; Returns: string[] }
       visible_pool_photos: { Args: { pids: string[] }; Returns: string[] }

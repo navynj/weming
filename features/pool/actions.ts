@@ -404,13 +404,15 @@ export async function createJointSplash(input: z.input<typeof Joint>): Promise<M
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: 'Sign in again to drop this.' };
 
-  const { error } = await supabase.rpc('create_joint_splash', {
+  // Everyone said explicitly (0033): the column's default is the old app's.
+  const { error } = await supabase.rpc('create_together_splash', {
     p_id: joint.id,
     p_pool: joint.poolId,
     p_pool_lane: joint.poolLaneId,
     p_title: joint.title,
-    ...(joint.icon ? { p_icon: joint.icon } : {}),
+    p_icon: joint.icon ?? '',
     p_declared_start: joint.declaredStart,
+    p_invite_all: joint.everyone,
   });
   if (error) return { ok: false, message: said(error) };
   const ended = await endRange(supabase, joint.id, joint.declaredEnd);
@@ -419,11 +421,10 @@ export async function createJointSplash(input: z.input<typeof Joint>): Promise<M
     return { ok: false, message: ended };
   }
   const others = joint.invitees.filter((id) => id !== user.id);
-  if (others.length > 0 || joint.everyone) {
+  if (others.length > 0) {
     const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
       p_splash: joint.id,
       p_users: others,
-      p_everyone: joint.everyone,
     });
     if (inviteError) {
       await supabase.rpc('delete_joint_splash', { p_splash: joint.id });
