@@ -4,6 +4,8 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronDown, RotateCcw } from 'lucide-react';
 
 import type { Card } from '@/features/home/grid';
+import { useTheme } from '@/features/people/theme-provider';
+import { THEMES } from '@/lib/theme';
 
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
 import type { Recipe } from './layout';
@@ -162,10 +164,17 @@ function Choice<T extends string>({
   );
 }
 
-const LABEL_STYLE_CHOICES = [
-  { value: 'white', label: 'White' },
-  { value: 'ink', label: 'Ink' },
-] as const;
+/**
+ * The fill's two choices as they look (Yoonji, in the session): `white` is
+ * white on the dark ground, but in light mode the ground's white is my theme
+ * colour, so it is named after it ("Pink"); `ink` is said "Black".
+ */
+function labelStyleChoices(lightColour: string | null) {
+  return [
+    { value: 'white', label: lightColour ?? 'White' },
+    { value: 'ink', label: 'Black' },
+  ] as const;
+}
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -210,6 +219,7 @@ export function LayoutPanel({
   onEdit: Edit;
   onRevert: () => void;
 }) {
+  const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const photos = (card.photos ?? []).slice(0, 3);
@@ -330,12 +340,17 @@ export function LayoutPanel({
           <Group title="Label">
             {!period ? (
               <>
-                {/* Only a filled label — a joint splash's — has a fill to choose. */}
-                {card.joint ? (
+                {/* Only a filled label has a fill to choose: one with someone
+                  invited on it, mine or the pool's (0033, 0035). */}
+                {card.together ? (
                   <Choice
                     name="Style"
                     value={label.style}
-                    options={LABEL_STYLE_CHOICES}
+                    options={labelStyleChoices(
+                      theme.mode === 'light'
+                        ? (THEMES.find((t) => t.key === theme.color)?.name ?? null)
+                        : null,
+                    )}
                     onChange={(v) => onEdit({ label: { style: v } })}
                     onReset={() => onEdit({}, ['label.style'])}
                   />

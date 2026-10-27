@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { ThemeProvider } from '@/features/people/theme-provider';
+import { DEFAULT_THEME, type Theme } from '@/lib/theme';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -112,19 +114,21 @@ function media(wide: boolean): void {
   });
 }
 
-function home(cards: Card[]) {
+function home(cards: Card[], theme: Theme = DEFAULT_THEME) {
   return render(
-    <InputSheetProvider>
-      <HomeGround
-        cards={cards}
-        pinned={[]}
-        categories={LANES}
-        today={TODAY}
-        timeZone={TZ}
-        initials="YL"
-        scrollToMonth={null}
-      />
-    </InputSheetProvider>,
+    <ThemeProvider initial={theme}>
+      <InputSheetProvider>
+        <HomeGround
+          cards={cards}
+          pinned={[]}
+          categories={LANES}
+          today={TODAY}
+          timeZone={TZ}
+          initials="YL"
+          scrollToMonth={null}
+        />
+      </InputSheetProvider>
+    </ThemeProvider>,
   );
 }
 
@@ -266,7 +270,39 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(label().className).toContain(auto === 'ink' ? 'bg-ink' : 'bg-white');
   });
 
-  it('offers no Style for a label with no fill', () => {
+  it('offers Style, White or Black, on my own record once someone is invited on it (0035)', () => {
+    media(true);
+    const { container } = home([{ ...ONE[0], together: true }]);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const style = container.querySelector('[data-layout-control="Style"]')!;
+    expect(style).not.toBeNull();
+    expect(style.querySelector('[data-layout-choice="white"]')!.textContent).toBe('White');
+    expect(style.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Black');
+    expect(
+      container.querySelector('[data-board-piece="s1"] [data-board-label]')!.className,
+    ).toMatch(/bg-(white|ink)/);
+  });
+
+  it('names the white fill after my theme colour in light mode, where it shows as that colour', () => {
+    media(true);
+    const { container } = home([{ ...ONE[0], together: true }], { color: 'pink', mode: 'light' });
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Pink');
+    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Black');
+  });
+
+  it('offers no Style for a label with no fill, a joint record with nobody invited included', () => {
+    media(true);
+    const plain = home(ONE);
+    fireEvent.click(plain.container.querySelector('[data-layout-toggle]')!);
+    expect(plain.container.querySelector('[data-layout-control="Style"]')).toBeNull();
+    plain.unmount();
+    const alone = home([{ ...ONE[0], joint: true, together: false }]);
+    fireEvent.click(alone.container.querySelector('[data-layout-toggle]')!);
+    expect(alone.container.querySelector('[data-layout-control="Style"]')).toBeNull();
+  });
+
+  it('offers no Style for a label with no fill (plain)', () => {
     media(true);
     const { container } = home(ONE);
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
