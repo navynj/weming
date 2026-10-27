@@ -1063,6 +1063,25 @@ describe('a pool’s splash on Home (review)', () => {
     expect(piece.querySelector('[data-avatar-photo]')).toBeNull();
   });
 
+  it('shows every pool a record of mine is shared to where my face would be (review)', () => {
+    const mine: Card = {
+      ...card('shared', 'Shared', '2026-10-21'),
+      together: true,
+      sharedPools: [
+        { name: 'Our Pool', photo: null },
+        { name: 'Sy Pool', photo: 'https://signed/sy.webp' },
+      ],
+    };
+    const { container } = board([mine]);
+    const piece = container.querySelector('[data-board-piece="shared"]')!;
+    const tiles = piece.querySelectorAll('[data-board-pool] [data-monogram]');
+    expect([...tiles].map((t) => t.getAttribute('data-monogram'))).toEqual(['OU', 'SY']);
+    expect(piece.querySelector<HTMLImageElement>('[data-board-pool] img')!.src).toBe(
+      'https://signed/sy.webp',
+    );
+    expect(piece.querySelector('[data-board-faces]')).toBeNull();
+  });
+
   it('parts the words from the monogram (and the faces) with an en space, never a margin that indents a wrapped line', () => {
     const { container } = board([{ ...joint, pools: ['Our Pool'], poolPhoto: null }]);
     const pool = container.querySelector<HTMLElement>('[data-board-pool]')!;

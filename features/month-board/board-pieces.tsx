@@ -186,9 +186,17 @@ const FACE_RING: Record<LabelStyle, string> = {
   white: 'ring-white',
   ink: 'ring-ink',
 };
-/** Faces as the calendar draws them: within the words' 13px line, at the 10px floor. */
-const FACE_CLASS =
-  'text-main-900/60 flex h-[calc(var(--line,13px)-1px)] w-[calc(var(--line,13px)-1px)] items-center justify-center overflow-hidden rounded-full bg-joint-face text-[10px] leading-none ring-1';
+/**
+ * A face's size on the calendar: a little past the words' line (review: "a
+ * bit bigger"), so it scales with them, standing out of the line box evenly.
+ */
+const FACE_SIZE = 'h-[calc(var(--line,13px)+3px)] w-[calc(var(--line,13px)+3px)]';
+/**
+ * Its letters scale with it rather than holding the 10px floor, which broke
+ * the tile once the face was small (review): a mark, read as a shape.
+ */
+const FACE_TEXT = 'text-[length:calc((var(--line,13px)+3px)*0.42)]'; // allow-small-text: scales with the face
+const FACE_CLASS = `text-main-900/60 flex ${FACE_SIZE} ${FACE_TEXT} shrink-0 items-center justify-center overflow-hidden rounded-full bg-joint-face leading-none ring-1`;
 
 function FaceStack({
   faces,
@@ -243,22 +251,29 @@ const NO_INDENT = 'indent-0';
  */
 function Faces({ card, ring }: { card: Card; ring: string }) {
   const { me } = usePeople();
-  const pool = card.pools?.[0];
-  if (pool !== undefined) {
+  // A joint splash's pool; else every pool my record is shared to (review).
+  const pools =
+    card.pools?.[0] !== undefined
+      ? [{ name: card.pools[0], photo: card.poolPhoto ?? null }]
+      : (card.sharedPools ?? []);
+  if (pools.length > 0) {
     return (
       <>
         {SEPARATOR}
         <span
           data-board-pool
-          className={`inline-flex h-[var(--line,13px)] items-center align-top ${NO_INDENT}`}
+          className={`inline-flex h-[var(--line,13px)] items-center gap-0.5 align-top ${NO_INDENT}`}
         >
-          <Monogram
-            name={pool}
-            size="face"
-            photo={card.poolPhoto ?? null}
-            // A face's size at the words' own line (review: they scale with the text).
-            className="!h-[calc(var(--line,13px)-1px)] !min-w-[calc(var(--line,13px)-1px)]"
-          />
+          {pools.map((pool) => (
+            <Monogram
+              key={pool.name}
+              name={pool.name}
+              size="face"
+              photo={pool.photo}
+              // A face's size, scaling with the words (review), letters and all.
+              className="!h-[calc(var(--line,13px)+3px)] !min-w-[calc(var(--line,13px)+3px)] !text-[length:calc((var(--line,13px)+3px)*0.42)]" // allow-small-text: scales with the face
+            />
+          ))}
         </span>
       </>
     );

@@ -53,6 +53,8 @@ export type Card = {
   pools?: string[];
   /** On Home: the photo of the pool a joint splash belongs to (0024), drawn in its monogram's place. */
   poolPhoto?: string | null;
+  /** On Home, my record: every pool it is shared to now, each its monogram or photo (review). */
+  sharedPools?: { name: string; photo: string | null }[];
   /**
    * Its calendar layout, set by hand (0025): only the fields someone set,
    * drawn over the automatic recipe; where it comes from ('pool' or 'home');

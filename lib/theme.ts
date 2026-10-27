@@ -26,7 +26,7 @@ export const THEMES = [
   {
     key: 'orange',
     name: 'Orange',
-    hex: '#D9480F',
+    hex: '#D9540F',
     pastel: {
       tone: '#E29942',
       fill: '#FED6AD',

@@ -263,10 +263,18 @@ export async function HomeScreen({
   // A pool I am in shows its photo (0024); one I left keeps the neutral tile.
   // A joint splash's pool shows its photo on Home too, where its mark is (review).
   const jointPools = new Set(jointPool.values());
+  // Every pool a record of mine is shared to now (review): its faces' place
+  // on the Calendar shows them all, not me.
+  const sharedTo = new Map<string, string[]>();
+  for (const p of myPlacements) {
+    if (!p.shared || !poolName.has(p.poolId)) continue;
+    sharedTo.set(p.splashId, [...(sharedTo.get(p.splashId) ?? []), p.poolId]);
+  }
+  const sharedPoolIds = new Set([...sharedTo.values()].flat());
   const columnPhotos = await signPoolPhotos(
     supabase,
     pools
-      .filter((p) => ownPools.includes(p.id) || jointPools.has(p.id))
+      .filter((p) => ownPools.includes(p.id) || jointPools.has(p.id) || sharedPoolIds.has(p.id))
       .map((p) => ({ id: p.id, version: p.photoVersion })),
   );
   const poolColumns: GridColumn[] = ownPools
@@ -409,6 +417,18 @@ export async function HomeScreen({
     .map((card) => {
       const tags = originTags.get(card.splash.id);
       return tags ? { ...card, origins: tags } : card;
+    })
+    .map((card) => {
+      const shared = mineIds.has(card.splash.id) ? sharedTo.get(card.splash.id) : undefined;
+      return shared
+        ? {
+            ...card,
+            sharedPools: shared.map((id) => ({
+              name: poolName.get(id)!,
+              photo: columnPhotos[id] ?? null,
+            })),
+          }
+        : card;
     })
     .sort(byNewest);
   // The calendar's layouts (0025): mine on Home; else, for a joint splash,
