@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs/config';
 
 import { resolveSiteUrl } from './lib/site';
 
@@ -18,7 +19,28 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // Baked into the build, for the browser and the server alike: a preview's
   // branch URL is known only to the build.
-  env: siteUrl ? { NEXT_PUBLIC_SITE_URL: siteUrl } : {},
+  env: {
+    ...(siteUrl ? { NEXT_PUBLIC_SITE_URL: siteUrl } : {}),
+    // Error tracking (lib/observability.ts): which deployment, which commit.
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.VERCEL_ENV ?? 'development',
+    NEXT_PUBLIC_SENTRY_RELEASE: process.env.VERCEL_GIT_COMMIT_SHA ?? '',
+  },
 };
 
-export default nextConfig;
+// Source maps go to Sentry from the build that made the bundle (Vercel's),
+// with SENTRY_AUTH_TOKEN from its Production env — never the repo — and are
+// deleted after upload, so they are never served. A build with no token
+// (a preview, a local run) uploads nothing.
+export default withSentryConfig(nextConfig, {
+  org: 'whaleblue-studio',
+  project: 'weming',
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  release: { name: process.env.VERCEL_GIT_COMMIT_SHA },
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
+  widenClientFileUpload: true,
+  telemetry: false,
+  silent: !process.env.SENTRY_AUTH_TOKEN,
+});

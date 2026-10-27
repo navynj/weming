@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 import { downscale, isHeic } from '@/lib/downscale';
+import { reportFailure } from '@/lib/report-failure';
 import { MEDIA_BUCKET } from '@/lib/media-bucket';
 import { createClient } from '@/lib/supabase/client';
 
@@ -51,6 +52,7 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
       for (const file of Array.from(files)) {
         const shrunk = await downscale(file);
         if (isHeic(shrunk)) {
+          reportFailure('upload', 'a HEIC this browser cannot read');
           refused.push(`${file.name}: ${HEIC_UNREADABLE}`);
           continue;
         }
@@ -60,6 +62,8 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
           upsert: false,
         });
         if (error) {
+          // Storage's own words, scrubbed of paths and names: never the photo.
+          reportFailure('upload', error);
           refused.push(`${file.name}: ${uploadFailure(error)}`);
           continue;
         }
@@ -70,6 +74,7 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
       if (added.length > 0) onChange([...paths, ...added]);
       if (refused.length > 0) setFailed(refused.join('\n'));
     } catch (thrown) {
+      reportFailure('upload', thrown);
       setFailed(
         `That photo would not upload: ${thrown instanceof Error ? uploadFailure(thrown) : 'no reason given.'}`,
       );

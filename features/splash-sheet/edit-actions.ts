@@ -8,6 +8,7 @@ import { setPlacement, setPlacementTogether } from '@/features/pool/actions';
 import { getJointInvitees, getPlacementPicks } from '@/lib/queries/pools';
 import { updateSplashHeader } from '@/features/splash/actions';
 import { createClient } from '@/lib/supabase/server';
+import { reported } from '@/lib/report-failure';
 
 /** What the edit sheet opens with, read fresh so the Audience is exact wherever it opened. */
 export type SplashEditState =
@@ -269,6 +270,12 @@ const Edit = z.object({
  * pool's (H23).
  */
 export async function saveSplashEdit(
+  input: z.input<typeof Edit>,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return reported('edit', () => saveSplashEditWork(input));
+}
+
+async function saveSplashEditWork(
   input: z.input<typeof Edit>,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const parsed = Edit.safeParse(input);

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Database } from '@/lib/database.types';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
+import { reported } from '@/lib/report-failure';
 
 export type Done = { ok: true } | { ok: false; message: string };
 export type Made = { ok: true; id: string } | { ok: false; message: string };
@@ -101,6 +102,10 @@ const Join = z.object({ token: z.string().min(1).max(64) });
  * Nothing about lanes (2026-10-26, 0033): every pool lane starts unconnected.
  */
 export async function joinPool(input: z.infer<typeof Join>): Promise<Made> {
+  return reported('join', () => joinPoolWork(input));
+}
+
+async function joinPoolWork(input: z.infer<typeof Join>): Promise<Made> {
   const parsed = Join.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'This invite link is no longer valid.' };
   const supabase = await createClient();
@@ -438,6 +443,10 @@ const Joint = z.object({
  * the members picked as its "Add your side" slots, and my first ripple.
  */
 export async function createJointSplash(input: z.input<typeof Joint>): Promise<Made> {
+  return reported('compose', () => createJointSplashWork(input));
+}
+
+async function createJointSplashWork(input: z.input<typeof Joint>): Promise<Made> {
   const parsed = Joint.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That joint splash is incomplete.' };
   const joint = parsed.data;
@@ -533,6 +542,10 @@ const OwnDrop = z.object({
  * ripple that will not land takes the splash back with it.
  */
 export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise<Made> {
+  return reported('compose', () => dropOwnPoolSplashWork(input));
+}
+
+async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Made> {
   const parsed = OwnDrop.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That splash is incomplete.' };
   const drop = parsed.data;
