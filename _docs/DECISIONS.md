@@ -591,11 +591,3 @@ A member's column in Swimmers opens nothing.
   - Joint records are unchanged.
 - **Destructive DDL, approved and quoted in the migration:** `joint_invitees`' primary key moved to a surrogate `id`.
 
-**H26, amended: Pastel, a third mode (0036, 2026-10-26).** Asked by Yoonji.
-- **Why a mode:** pastels cannot carry white words, and dark and light both pair the colour with white, so a pastel can't be a colour in either.
-- **What it looks like:** Pastel is a white ground with every word a soft grey (`#45424D`, not pure black). The colour's pastel is the accent: selected chips, the compose disc, marks and waves, and card edges.
-- **Label fills:** the colour's pastel ("Pink") or a near-white with a pastel edge ("Pale").
-- **Colours:** each colour has a pastel, which keeps the grey at 4.5:1 or better. Pink's is a baby pink, and purple moved a step toward blue (`#6338D8`).
-- **Settings:** Dark | Light | Pastel, with the swatches shown in pastel there.
-- **Calendar waves:** they take the ground's white in every mode (they were fixed white, which was invisible in light mode).
-

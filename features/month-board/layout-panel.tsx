@@ -167,14 +167,13 @@ function Choice<T extends string>({
 /**
  * The fill's two choices as they look (Yoonji, in the session): `white` is
  * white on the dark ground, but in light mode the ground's white is my theme
- * colour, so it is named after it ("Pink"), as in pastel mode, where it is
- * the colour's pastel; `ink` is said "Black", and in pastel mode, where it is
- * nearly white with a pastel edge, "Pale".
+ * colour, so it is named after it ("Pink"), and in pastel mode the soft grey
+ * ("Grey"); `ink` is said "Black".
  */
-function labelStyleChoices(firstName: string, secondName: string) {
+function labelStyleChoices(firstName: string) {
   return [
     { value: 'white', label: firstName },
-    { value: 'ink', label: secondName },
+    { value: 'ink', label: 'Black' },
   ] as const;
 }
 
@@ -349,12 +348,12 @@ export function LayoutPanel({
                     name="Style"
                     value={label.style}
                     options={labelStyleChoices(
-                      // In light mode it shows as the colour; in pastel, as its pastel (0036).
-                      theme.mode === 'dark'
-                        ? 'White'
-                        : (THEMES.find((t) => t.key === theme.color)?.name ?? 'White'),
-                      // In pastel mode the second is nearly white (0036).
-                      theme.mode === 'pastel' ? 'Pale' : 'Black',
+                      theme.mode === 'light'
+                        ? (THEMES.find((t) => t.key === theme.color)?.name ?? 'White')
+                        : // In pastel mode the ground's white is its soft grey (0036).
+                          theme.mode === 'pastel'
+                          ? 'Grey'
+                          : 'White',
                     )}
                     onChange={(v) => onEdit({ label: { style: v } })}
                     onReset={() => onEdit({}, ['label.style'])}
