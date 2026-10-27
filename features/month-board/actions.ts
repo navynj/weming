@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import type { BoardView } from '@/lib/queries/layouts';
 import { createClient } from '@/lib/supabase/server';
 
 import { BoardLayout, type BoardLayoutJson } from './board-layout';
@@ -20,7 +21,7 @@ const Write = z.object({
   patch: BoardLayout,
   clear: z.array(z.string().min(1).max(600)).max(64),
   /** The view the layout is for (0045); the Calendar's unless said. */
-  view: z.enum(['calendar', 'lane']).default('calendar'),
+  view: z.enum(['calendar', 'lane', 'swimmers']).default('calendar'),
 });
 
 function revalidate(poolId: string | null): void {
@@ -74,7 +75,7 @@ export async function setBoardLayout(input: z.input<typeof Write>): Promise<Layo
 /** "Use pool layout": my Home layout for the splash is gone, so my Home draws the pool's again. */
 export async function revertToPoolLayout(
   splashId: string,
-  view: 'calendar' | 'lane' = 'calendar',
+  view: BoardView = 'calendar',
 ): Promise<LayoutResult> {
   if (!Id.safeParse(splashId).success) {
     return { ok: false, message: 'That splash is not known.' };

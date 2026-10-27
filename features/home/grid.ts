@@ -78,6 +78,12 @@ export type Card = {
     layoutSource?: LayoutSource;
     poolLayout?: BoardLayoutJson | null;
   };
+  /** In a pool, its Swimmers layout (0047): the same three, apart from both above. */
+  swimmersLayout?: {
+    layout?: BoardLayoutJson;
+    layoutSource?: LayoutSource;
+    poolLayout?: BoardLayoutJson | null;
+  };
   /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>", one per pool. */
   origins?: string[];
   /** Where the top card opens, when not the post's own page from Home. */

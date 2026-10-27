@@ -42,7 +42,7 @@ function set(
     pool: p = pool,
     clear = [] as string[],
     view,
-  }: { pool?: string | null; clear?: string[]; view?: 'calendar' | 'lane' } = {},
+  }: { pool?: string | null; clear?: string[]; view?: 'calendar' | 'lane' | 'swimmers' } = {},
 ) {
   // No view is the call as the app before 0045 made it: the Calendar's.
   return asUser(who).rpc('set_board_layout', {
@@ -54,7 +54,11 @@ function set(
   });
 }
 
-async function read(who: string, scope: 'pool' | 'home', view: 'calendar' | 'lane' = 'calendar') {
+async function read(
+  who: string,
+  scope: 'pool' | 'home',
+  view: 'calendar' | 'lane' | 'swimmers' = 'calendar',
+) {
   const { data } = await asUser(who)
     .from('board_layouts')
     .select('layout, scope, user_id, pool_id')
@@ -321,6 +325,15 @@ describe('a layout per view (0045)', () => {
       .eq('view', 'lane');
     expect(await read(ben, 'home', 'lane')).toHaveLength(0);
     expect(await read(ben, 'home')).toHaveLength(1);
+  });
+
+  it('keeps Swimmers apart from the Calendar and the Lane view (0047)', async () => {
+    const calendar = (await read(ana, 'pool'))[0].layout;
+    const lane = (await read(ana, 'pool', 'lane'))[0].layout;
+    expect((await set(ana, { label: { x: 2, tilt: -10 } }, { view: 'swimmers' })).error).toBeNull();
+    expect((await read(ana, 'pool', 'swimmers'))[0].layout).toEqual({ label: { x: 2, tilt: -10 } });
+    expect((await read(ana, 'pool'))[0].layout).toEqual(calendar);
+    expect((await read(ana, 'pool', 'lane'))[0].layout).toEqual(lane);
   });
 
   it('refuses a view it does not know', async () => {

@@ -2,7 +2,7 @@ import { BoardLayout, type BoardLayoutJson } from '@/features/month-board/board-
 import type { DuringClient } from '@/lib/queries/profile';
 
 /** Which view a layout is for (0045): each keeps its own values. */
-export type BoardView = 'calendar' | 'lane';
+export type BoardView = 'calendar' | 'lane' | 'swimmers';
 
 /** A row's layout, read through the shape the database holds it to; anything else is no layout. */
 function parsed(raw: unknown): BoardLayoutJson | null {

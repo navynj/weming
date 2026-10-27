@@ -185,15 +185,24 @@ export function PoolGround({
     [shown],
   );
   const laneDrafts = useLayoutDrafts(laneShown, poolId, 'lane');
+  // Swimmers' own (0047), the same way: apart from the Calendar's and the Lane view's.
   const swimmersShown = useMemo(
-    () => shown.map((card) => ({ ...card, layout: undefined, layoutSource: undefined })),
+    () =>
+      shown.map((card) => ({
+        ...card,
+        layout: card.swimmersLayout?.layout,
+        layoutSource: card.swimmersLayout?.layoutSource,
+        poolLayout: card.swimmersLayout?.poolLayout,
+      })),
     [shown],
   );
+  const swimmersDrafts = useLayoutDrafts(swimmersShown, poolId, 'swimmers');
   // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
   const laneKind = kind === 'lane';
-  const viewDrafts = laneKind ? laneDrafts : drafts;
+  const swimmersKind = kind === 'swimmers';
+  const viewDrafts = laneKind ? laneDrafts : swimmersKind ? swimmersDrafts : drafts;
   const topCard = viewDrafts.drawn.find((card) => card.splash.id === heading) ?? null;
 
   const [ring, setRing] = useState<Ring | null>(() =>
@@ -349,7 +358,7 @@ export function PoolGround({
           ) : (
             <LaneGrid
               view={kind === 'date' ? 'date' : 'lane'}
-              cards={laneKind ? laneDrafts.drawn : kind === 'swimmers' ? swimmersShown : shown}
+              cards={laneKind ? laneDrafts.drawn : swimmersKind ? swimmersDrafts.drawn : shown}
               // The Calendar's pieces in the Lane view and Swimmers (review).
               pieces
               onDrawn={setRecipes}
@@ -383,15 +392,15 @@ export function PoolGround({
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
           {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
-          {/* The Calendar and the Lane view; Swimmers draws by the recipe, no panel. */}
-          {(boardView || laneKind) && wide && topCard ? (
+          {/* The Calendar, the Lane view and Swimmers, each its own layouts. */}
+          {(boardView || laneKind || swimmersKind) && wide && topCard ? (
             <LayoutPanel
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}
               source={viewDrafts.shown(topCard.splash.id).source}
               home={false}
-              view={laneKind ? 'lane' : 'calendar'}
+              view={laneKind ? 'lane' : swimmersKind ? 'swimmers' : 'calendar'}
               message={viewDrafts.message}
               onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
               onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}

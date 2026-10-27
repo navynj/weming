@@ -721,6 +721,14 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
+  // Set by hand (0047): label, icon and wave, offsets measured across the
+  // band's full width — X a share of it, Y in lines — the whole piece's
+  // offset added, as on any piece.
+  const layout = card.layout ?? {};
+  const size = layout.label?.fontSize ?? tape.size;
+  const line = size + 3;
+  const label = nudge(layout.label, layout.piece);
+  const iconSet = layout.icon;
   return (
     <div
       key={ripple ?? 'still'}
@@ -733,6 +741,14 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
       className={`absolute ${tape.muted ? 'opacity-50' : ''} ${motionOf(ripple, false)}`}
       style={placed(tape)}
     >
+      {layout.wave?.on ? (
+        <WaveDecoration
+          label={{ x: 0, y: 0, w: tape.w, h: tape.h }}
+          wave={nudge(layout.wave, layout.piece)!}
+          column={tape.w}
+          line={line}
+        />
+      ) : null}
       <button
         type="button"
         onClick={() => onPick(card.splash.id)}
@@ -740,9 +756,25 @@ export function BoardTapeView({ tape, lanes, onPick, ripple }: Shared & { tape: 
         data-board-pick={tape.id}
         data-board-band
         className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
-        style={{ fontSize: tape.size }}
+        style={{
+          fontSize: size,
+          transform: moveOf(label, tape.w, line),
+          transformOrigin: 'left center',
+        }}
       >
-        {icon ? <span aria-hidden>{icon}</span> : null}
+        {icon ? (
+          <span
+            aria-hidden
+            data-band-icon
+            className="inline-block leading-none"
+            style={{
+              ...(iconSet?.size ? { fontSize: Math.round(iconSet.size * line) } : {}),
+              transform: moveOf(iconSet, tape.w, line),
+            }}
+          >
+            {icon}
+          </span>
+        ) : null}
         <span className="min-w-0 truncate">{caption}</span>
         {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
         {card.joint || card.together ? <Faces card={card} ring="ring-joint" /> : null}

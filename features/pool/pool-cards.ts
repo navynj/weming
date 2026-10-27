@@ -175,19 +175,21 @@ export function poolCards(
     });
   }
   // The calendar's layouts its members set (0025): the pool's, for every splash
-  // in it; and the Lane view's, kept apart (0045). Swimmers has none: there the
-  // board's own recipe draws every post.
+  // in it; the Lane view's (0045) and Swimmers' (0047), each kept apart.
   const layouts = view.layouts ?? {};
   const laneLayouts = view.laneLayouts ?? {};
+  const swimmersLayouts = view.swimmersLayouts ?? {};
   return (
     cards
       .map((card) => {
         const layout = layouts[card.splash.id];
         const lane = laneLayouts[card.splash.id];
+        const swimmers = swimmersLayouts[card.splash.id];
         return {
           ...card,
           ...(layout ? { layout, layoutSource: 'pool' as const } : {}),
           laneLayout: lane ? { layout: lane, layoutSource: 'pool' as const } : {},
+          swimmersLayout: swimmers ? { layout: swimmers, layoutSource: 'pool' as const } : {},
         };
       })
       // What readers left, for the top card and the unseen dots (H25): every

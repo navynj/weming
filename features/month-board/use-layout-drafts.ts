@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { useToast } from '@/components/ui/toast';
 import type { Card } from '@/features/home/grid';
+import type { BoardView } from '@/lib/queries/layouts';
 
 import { revertToPoolLayout, setBoardLayout } from './actions';
 import { clearLayout, mergeLayout, type BoardLayoutJson, type LayoutSource } from './board-layout';
@@ -53,7 +54,7 @@ export function useLayoutDrafts(
   cards: Card[],
   poolId: string | null,
   /** Which view's layouts these are (0045): the Calendar's unless said. */
-  view: 'calendar' | 'lane' = 'calendar',
+  view: BoardView = 'calendar',
 ) {
   const router = useRouter();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});

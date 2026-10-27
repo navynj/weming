@@ -95,6 +95,8 @@ export type PoolView = {
   layouts?: Record<string, BoardLayoutJson>;
   /** The pool's Lane view layouts (0045), kept apart from the Calendar's. */
   laneLayouts?: Record<string, BoardLayoutJson>;
+  /** The pool's Swimmers layouts (0047), apart from both. */
+  swimmersLayouts?: Record<string, BoardLayoutJson>;
   /** What readers left on every ripple here, for the top card (H25), and my locked ones. */
   responded?: RippleResponsesValue;
   lockedIds?: string[];
@@ -354,6 +356,7 @@ export async function getPoolView(
     ),
     layouts: await getPoolLayouts(supabase, poolId),
     laneLayouts: await getPoolLayouts(supabase, poolId, 'lane'),
+    swimmersLayouts: await getPoolLayouts(supabase, poolId, 'swimmers'),
     responded: await getRippleResponses(
       supabase,
       ripples.map((r) => r.id),

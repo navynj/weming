@@ -994,3 +994,43 @@ describe('a pool drawn with the Calendar’s pieces (review)', () => {
     expect(piece.querySelector(`[data-board-photo-card="${ME}/b.webp"]`)).not.toBeNull();
   });
 });
+
+describe('Swimmers layouts (0047)', () => {
+  it('applies a band’s own layout to the band: label across the full width, icon, wave', () => {
+    setView('swimmers');
+    const laidOut: PoolView = {
+      ...EVERYONE,
+      swimmersLayouts: {
+        's-joint': {
+          label: { x: 0.5, y: 1, tilt: 5, fontSize: 14 },
+          icon: { size: 2 },
+          wave: { on: true },
+        },
+      },
+    };
+    const { container } = ground(laidOut);
+    const band = container.querySelector('[data-lane-band="s-joint"]')!;
+    const tape = band.querySelector<HTMLElement>('[data-board-tape]')!;
+    const words = band.querySelector<HTMLElement>('[data-board-band]')!;
+    // X is a share of the band's full width.
+    const half = parseFloat(tape.style.width) / 2;
+    expect(words.style.transform).toContain(`translate(${half}px`);
+    expect(words.style.transform).toContain('rotate(5deg)');
+    expect(words.style.fontSize).toBe('14px');
+    expect(band.querySelector<HTMLElement>('[data-band-icon]')!.style.fontSize).toBe('34px');
+    expect(band.querySelector('[data-board-wave]')).not.toBeNull();
+  });
+
+  it('draws the Calendar’s and the Lane view’s layouts nowhere in Swimmers', () => {
+    setView('swimmers');
+    const elsewhere: PoolView = {
+      ...EVERYONE,
+      layouts: { 's-joint': { label: { tilt: 9 } } },
+      laneLayouts: { 's-joint': { label: { tilt: 9 } } },
+    };
+    const words = ground(elsewhere).container.querySelector<HTMLElement>(
+      '[data-lane-band="s-joint"] [data-board-band]',
+    )!;
+    expect(words.style.transform ?? '').not.toContain('rotate(9deg)');
+  });
+});
