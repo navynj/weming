@@ -304,7 +304,7 @@ Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035
 
 ## 8. Plan: 0035, per-pool invitees on my records (for review, 2026-10-26)
 
-Status: **plan only.** It is built after #13 merges, rehearsed, and stopped before the push. It implements §7 as decided, plus Yoonji's additions: pool deletion, members leaving, and the ROADMAP list afterwards.
+Status: **plan approved** (decisions below). It is built after #13 merges, rehearsed, and stopped before the push. It implements §7 as decided, plus Yoonji's additions: pool deletion, members leaving, and the ROADMAP list afterwards.
 
 ### What it does
 - **Audience:** each pool row that is on shows its own With line ("With · Everyone" and that pool's member faces), none picked by default. My pool record gets the same With in its edit sheet, for its one pool.
@@ -335,7 +335,7 @@ Status: **plan only.** It is built after #13 merges, rehearsed, and stopped befo
   - The author writes with `thread_pool_id` null on my record or on a joint record, as today.
   - An invited current member of P writes with `thread_pool_id = P` on my record, while that placement is shared.
 - **`ripple_in_my_pools`**, a new branch: a thread ripple is readable by P's current members while the placement is shared and its author is `member_visible` there. Leaving with "remove" hides theirs; "keep" keeps them, which matches placements.
-- **My reading of their ripples:** a new branch for the record's owner, while the placement is shared.
+- **My reading of their ripples:** a new branch for the record's owner, on or off. Off, they show in a muted "<Pool> (off)" tab (decision 2).
 - **`_ripple_pools`** (reactions and replies, 0030): a thread ripple's audience is its one pool, not every pool the record is shared to.
 - **`my_thread_ripples()`:** security definer. An author's own thread ripples with the record's title, the pool's name and whether it is still shared, for their Home. It is needed because the record itself is unreadable to them once the placement is off.
 - **`delete_pool`** (Yoonji's addition):
@@ -363,10 +363,12 @@ Status: **plan only.** It is built after #13 merges, rehearsed, and stopped befo
 - **Render tests:** With in Audience, tabs, slot and fill per pool.
 - **Rehearsal:** the fixture and a fresh production dump. Before and after: every placement and every ripple's visibility to each member is unchanged (no thread ripples exist yet).
 
-### Questions before building
-1. **Approval** for the destructive step, quoted in the migration: dropping `joint_invitees`' primary key `(splash_id, user_id)` for a surrogate `id`, with a partial unique key per use.
-2. **Do I see a pool's thread while that placement is off?** I propose no, the same as the pool: hidden for everyone but each ripple's author, back on reshare.
-3. **Deleting my record** after members wrote on it: their ripples would go with it, through the cascade. I propose they go back to each author as a post of one, as on pool deletion, rather than refusing the delete.
-4. **The With control in Audience:** your brief says "With · Everyone (underlined button)", but compose now uses a word and a switch ("With … Everyone ⏺"). I propose the switch in both, for one control.
-5. **Home fill for my record** shared to several pools: filled when any pool has someone with it?
-6. **Tab counts:** count that pool's members' ripples only ("JY · 3"), or include mine?
+### Decisions (Yoonji, 2026-10-26)
+1. **Approved,** to be quoted in the migration and its commit: "Approved: drop joint_invitees' primary key (splash_id, user_id) and use a surrogate id with one unique key per use. Production has 0 rows."
+2. **While a pool's placement is off,** I, the record's owner, still see that pool's members' ripples, in a muted tab labelled "<Pool> (off)". Nobody else in that pool sees them except each ripple's own author. Switching the placement back on restores the tab for members.
+3. **Deleting my record** returns members' ripples to their authors as a post of one per (record, author), as pool deletion does.
+4. **Everyone** is a word plus a switch, in both compose and Audience.
+5. **Home fill:** my record is filled on Home when any pool has someone invited on it.
+6. **Tab counts** include only that pool's members' ripples, not mine.
+
+**Order:** build after #13 merges, rehearse, and stop before the push.
