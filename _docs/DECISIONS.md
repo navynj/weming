@@ -591,11 +591,18 @@ A member's column in Swimmers opens nothing.
   - Joint records are unchanged.
 - **Destructive DDL, approved and quoted in the migration:** `joint_invitees`' primary key moved to a surrogate `id`.
 
-**H26, amended: Pastel, a third mode (0036, 2026-10-26).** Asked by Yoonji.
+**H26, amended: Pastel, a third mode, and mint (0036, 2026-10-26).** Asked by Yoonji, shaped by her mockups.
 - **Why a mode:** pastels cannot carry white words, and dark and light both pair the colour with white, so a pastel can't be a colour in either.
-- **What it looks like:** Pastel is a white ground with every word a soft grey (`#45424D`, not pure black). The colour's pastel is the accent: selected chips, the compose disc, marks and waves, and card edges.
-- **Label fills:** the colour's pastel ("Pink") or a near-white with a pastel edge ("Pale").
-- **Colours:** each colour has a pastel, which keeps the grey at 4.5:1 or better. Pink's is a baby pink, and purple moved a step toward blue (`#6338D8`).
+- **The look:** Pastel is a white ground.
+  - Words and marks on it (the month, day numbers, labels, a card's title and date) take the colour's soft tone.
+  - Fills take its pastel: selected chips, the compose disc, a label's first fill. Words on a fill and body text are a soft grey (`#45424D`).
+  - Cards wear a near-white tint, the ones beneath deepen, and lane rules are the faintest tint.
+  - A label's second fill is a near-white with a pastel edge ("Pale"), as she asked in words; her mockups showed it dark.
+- **Contrast exception:** the soft tones are about 2.0–2.4:1 on white, below the 3:1 rule. They were chosen for this mode by Yoonji ("좋아 이대로 진행") after seeing each beside its nearest 3:1 tone. Each colour keeps that 3:1 alternative on record (the comparison page) if the mode is revisited.
+- **Colours:** twelve now.
+  - Mint joins beside sky; sky's pastel is a powder blue, mint's an aqua.
+  - Orange's pastel moved toward yellow. Brown's is a muted latte, and black's is neutral grey with no blue.
+  - Purple moved a step toward blue (`#6338D8`).
+  - Every pastel fill keeps the grey at 4.5:1 or better.
 - **Settings:** Dark | Light | Pastel, with the swatches shown in pastel there.
-- **Calendar waves:** they take the ground's white in every mode (they were fixed white, which was invisible in light mode).
-
+- **Calendar waves:** they take the ground's white in every mode (they were fixed white, invisible in light mode).

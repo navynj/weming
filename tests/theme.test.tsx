@@ -6,7 +6,7 @@ import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * A person's theme (0032, H26): eleven colours that keep white readable on
+ * A person's theme (0032, H26): twelve colours that keep white readable on
  * them, worn on <html>, chosen in Settings and applied at once.
  */
 const { saved, outcome } = vi.hoisted(() => ({
@@ -45,15 +45,15 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe('the eleven colours', () => {
+describe('the twelve colours', () => {
   it('keep white readable on every one: 3:1 at least, for dark mode’s white labels', () => {
-    expect(THEMES).toHaveLength(11);
+    expect(THEMES).toHaveLength(12);
     for (const t of THEMES) expect(contrast(t.hex, '#ffffff')).toBeGreaterThanOrEqual(3);
   });
 
-  it('keep pastel mode’s soft grey readable on every pastel: 4.5:1 at least (0036)', () => {
+  it('keep the soft grey readable on every pastel fill: 4.5:1 at least (0036)', () => {
     for (const t of THEMES) {
-      expect(contrast(t.pastel, PASTEL_INK), t.key).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.pastel.fill, PASTEL_INK), t.key).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -62,7 +62,8 @@ describe('the eleven colours', () => {
     for (const t of THEMES) {
       expect(css).toContain(`[data-theme='${t.key}']`);
       expect(css).toContain(`--theme-900: ${t.hex.toLowerCase()};`);
-      expect(css).toContain(`--theme-pastel: ${t.pastel.toLowerCase()};`);
+      expect(css).toContain(`--theme-pastel: ${t.pastel.fill.toLowerCase()};`);
+      expect(css).toContain(`--pastel-tone: ${t.pastel.tone.toLowerCase()};`);
     }
     expect(css).toContain(`--pastel-ink: ${PASTEL_INK.toLowerCase()};`);
   });
@@ -83,9 +84,9 @@ function picker() {
 }
 
 describe('choosing a theme in Settings', () => {
-  it('shows the eleven swatches and the mode, the current one chosen in ink', () => {
+  it('shows the twelve swatches and the mode, the current one chosen in ink', () => {
     const { container } = picker();
-    expect(container.querySelectorAll('[data-theme-swatch]')).toHaveLength(11);
+    expect(container.querySelectorAll('[data-theme-swatch]')).toHaveLength(12);
     expect(
       container.querySelector('[data-theme-swatch="blue"]')!.getAttribute('aria-checked'),
     ).toBe('true');
@@ -110,7 +111,7 @@ describe('choosing a theme in Settings', () => {
     fireEvent.click(container.querySelector('[data-theme-mode="pastel"]')!);
     expect(document.documentElement.dataset.mode).toBe('pastel');
     const sky = container.querySelector<HTMLElement>('[data-theme-swatch="sky"]')!;
-    expect(sky.style.backgroundColor).toBe('rgb(168, 213, 240)');
+    expect(sky.style.backgroundColor).toBe('rgb(144, 197, 234)');
     await waitFor(() => expect(saved.at(-1)).toEqual({ color: 'blue', mode: 'pastel' }));
   });
 
