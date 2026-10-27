@@ -1267,34 +1267,50 @@ export function layoutWeekBoard(
 /** The Lane view drawn with the board's pieces (0045): rows of days, columns of lanes. */
 export type LaneBoardLayout = Pick<BoardLayout, 'weeks' | 'pieces' | 'height'> & {
   metrics: BoardMetrics;
+  /** Each row's key, by the row's index (`weeks[i]`). */
+  rowKeys: string[];
 };
+
+/** A Lane view row: a day, or part of one (between two full-width bands). */
+export type LaneRow = { key: string; day: IsoDate };
 
 /**
  * The Lane view (0045, Yoonji, in the session): the Calendar's pieces and
  * recipes, a column per lane and a row per day that has posts, newest first,
  * each row as tall as its tallest lane. A ranged post is one piece on its
  * day in its column, never a band. `columnOf` places a card: its lane, or
- * its pool's column on Home; a card with none is not drawn.
+ * its pool's column on Home; a card with none is not drawn. A row may be
+ * part of a day — Swimmers sets full-width bands between — and `rowOf` then
+ * says which row a card is in (its day, unless said).
  */
 export function layoutLaneBoard(
   cards: Card[],
-  days: IsoDate[],
+  rows: (IsoDate | LaneRow)[],
   columns: string[],
   {
     width,
     measured = {},
     columnOf,
-  }: { width: number; measured?: Measured; columnOf: (card: Card) => string | null },
+    rowOf = (card) => card.day,
+  }: {
+    width: number;
+    measured?: Measured;
+    columnOf: (card: Card) => string | null;
+    rowOf?: (card: Card) => string | null;
+  },
 ): LaneBoardLayout {
   const m = boardMetrics(width, Math.max(1, columns.length));
-  if (days.length === 0 || columns.length === 0) {
-    return { metrics: m, weeks: [], pieces: [], height: 0 };
+  const specs = rows.map((r) => (typeof r === 'string' ? { key: r, day: r } : r));
+  if (specs.length === 0 || columns.length === 0) {
+    return { metrics: m, weeks: [], pieces: [], height: 0, rowKeys: [] };
   }
-  const rows = days.map((day) => columns.map((column) => ({ key: laneCell(day, column), day })));
-  const sorted = [...days].sort();
+  const grid = specs.map((row) =>
+    columns.map((column) => ({ key: laneCell(row.key, column), day: row.day })),
+  );
+  const sorted = specs.map((r) => r.day).sort();
   const laid = layoutBoard(
     cards,
-    rows,
+    grid,
     { first: sorted[0], last: sorted[sorted.length - 1] },
     m,
     'lane',
@@ -1303,14 +1319,21 @@ export function layoutLaneBoard(
       bands: false,
       cellOf: (card) => {
         const column = columnOf(card);
-        return column === null ? null : laneCell(card.day, column);
+        const row = rowOf(card);
+        return column === null || row === null ? null : laneCell(row, column);
       },
     },
   );
-  return { metrics: m, weeks: laid.weeks, pieces: laid.pieces, height: laid.height - FOOT_PX };
+  return {
+    metrics: m,
+    weeks: laid.weeks,
+    pieces: laid.pieces,
+    height: laid.height - FOOT_PX,
+    rowKeys: specs.map((r) => r.key),
+  };
 }
 
-/** A Lane view cell's key: its day and its column. */
-export function laneCell(day: IsoDate, column: string): string {
-  return `${day}|${column}`;
+/** A Lane view cell's key: its row (a day, or part of one) and its column. */
+export function laneCell(row: string, column: string): string {
+  return `${row}|${column}`;
 }

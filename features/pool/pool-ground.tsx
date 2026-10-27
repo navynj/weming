@@ -172,10 +172,29 @@ export function PoolGround({
   // The calendar's hand-set layouts as the panel edits them (review): drawn
   // at once, saved when the sliders rest; the pool's here.
   const drafts = useLayoutDrafts(shown, poolId);
+  // The Lane view's own (0045): the pool's Lane layouts, read as the card's and
+  // saved as the Lane view's. Swimmers has none: its posts draw by the recipe.
+  const laneShown = useMemo(
+    () =>
+      shown.map((card) => ({
+        ...card,
+        layout: card.laneLayout?.layout,
+        layoutSource: card.laneLayout?.layoutSource,
+        poolLayout: card.laneLayout?.poolLayout,
+      })),
+    [shown],
+  );
+  const laneDrafts = useLayoutDrafts(laneShown, poolId, 'lane');
+  const swimmersShown = useMemo(
+    () => shown.map((card) => ({ ...card, layout: undefined, layoutSource: undefined })),
+    [shown],
+  );
   // The recipe the board drew each piece with: what Inline shows while it is the recipe's.
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const wide = useWide();
-  const topCard = drafts.drawn.find((card) => card.splash.id === heading) ?? null;
+  const laneKind = kind === 'lane';
+  const viewDrafts = laneKind ? laneDrafts : drafts;
+  const topCard = viewDrafts.drawn.find((card) => card.splash.id === heading) ?? null;
 
   const [ring, setRing] = useState<Ring | null>(() =>
     initialTop ? { id: initialTop, seq: 0 } : null,
@@ -330,7 +349,10 @@ export function PoolGround({
           ) : (
             <LaneGrid
               view={kind === 'date' ? 'date' : 'lane'}
-              cards={shown}
+              cards={laneKind ? laneDrafts.drawn : kind === 'swimmers' ? swimmersShown : shown}
+              // The Calendar's pieces in the Lane view and Swimmers (review).
+              pieces
+              onDrawn={setRecipes}
               categories={columns}
               today={today}
               ring={ring}
@@ -361,16 +383,18 @@ export function PoolGround({
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
           {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
-          {boardView && wide && topCard ? (
+          {/* The Calendar and the Lane view; Swimmers draws by the recipe, no panel. */}
+          {(boardView || laneKind) && wide && topCard ? (
             <LayoutPanel
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
-              layout={drafts.shown(topCard.splash.id).layout}
-              source={drafts.shown(topCard.splash.id).source}
+              layout={viewDrafts.shown(topCard.splash.id).layout}
+              source={viewDrafts.shown(topCard.splash.id).source}
               home={false}
-              message={drafts.message}
-              onEdit={(patch, clear) => drafts.edit(topCard.splash.id, patch, clear)}
-              onRevert={() => drafts.revertToPool(topCard.splash.id)}
+              view={laneKind ? 'lane' : 'calendar'}
+              message={viewDrafts.message}
+              onEdit={(patch, clear) => viewDrafts.edit(topCard.splash.id, patch, clear)}
+              onRevert={() => viewDrafts.revertToPool(topCard.splash.id)}
             />
           ) : null}
           <GroundFoot

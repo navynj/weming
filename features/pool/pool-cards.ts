@@ -100,6 +100,8 @@ export function poolCards(
       cards.push({
         ...card,
         ...photo,
+        // With Everyone on: a band across Swimmers' members (review).
+        everyone: splash.joint_invite_all,
         // Filled with Everyone on, or once anyone besides its maker is picked (0033).
         together:
           splash.joint_invite_all ||
@@ -114,7 +116,11 @@ export function poolCards(
               (view.together?.[splash.id] ?? []).includes(m.userId),
           )
           .map((m) => ({ authorId: m.userId, initials: m.initials })),
-        column: splash.pool_lane_id ?? undefined,
+        // In Swimmers, picked: its maker's column (review); else its pool lane.
+        column:
+          kind === 'swimmers'
+            ? (splash.created_by ?? wrote[0] ?? undefined)
+            : (splash.pool_lane_id ?? undefined),
         lane: lane ? { icon: lane.icon, name: lane.name } : null,
         origins: lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined,
         branches: blocks.map((r) => ({
@@ -145,6 +151,8 @@ export function poolCards(
     cards.push({
       ...card,
       ...photo,
+      // Shared here with Everyone on: a band across Swimmers' members (review).
+      everyone: Boolean(placement?.inviteAll),
       ...(together
         ? {
             together: true,
@@ -166,13 +174,21 @@ export function poolCards(
       editable: mine,
     });
   }
-  // The calendar's layouts its members set (0025): the pool's, for every splash in it.
+  // The calendar's layouts its members set (0025): the pool's, for every splash
+  // in it; and the Lane view's, kept apart (0045). Swimmers has none: there the
+  // board's own recipe draws every post.
   const layouts = view.layouts ?? {};
+  const laneLayouts = view.laneLayouts ?? {};
   return (
     cards
       .map((card) => {
         const layout = layouts[card.splash.id];
-        return layout ? { ...card, layout, layoutSource: 'pool' as const } : card;
+        const lane = laneLayouts[card.splash.id];
+        return {
+          ...card,
+          ...(layout ? { layout, layoutSource: 'pool' as const } : {}),
+          laneLayout: lane ? { layout: lane, layoutSource: 'pool' as const } : {},
+        };
       })
       // What readers left, for the top card and the unseen dots (H25): every
       // member reads a pool's post, so each takes reactions and replies.

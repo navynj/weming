@@ -16,11 +16,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
-import { BoardPieceView } from '@/features/month-board/board-pieces';
+import { BoardPieceView, BoardTapeView } from '@/features/month-board/board-pieces';
 import { boardPhotos } from '@/features/month-board/board-layout';
 import {
   layoutLaneBoard,
   measureKey,
+  TAPE_PX,
   type Measured,
   type Recipe,
 } from '@/features/month-board/layout';
@@ -205,8 +206,12 @@ export const LaneGrid = forwardRef<
 
   const plusColumn = onCreateLane !== undefined;
   const drawPieces = pieces && view === 'lane';
-  // Drawn with pieces, a joint record is one piece in its column, never a band (0045).
-  const banded = (card: Card): boolean => bands && !drawPieces && card.branches !== undefined;
+  // A full-width band: with marks, a joint splash where columns are people
+  // (H23); with pieces, a record with Everyone on where columns are people —
+  // a joint one, or a member's own shared here with Everyone (review). Any
+  // other is one piece in its column (0045).
+  const banded = (card: Card): boolean =>
+    bands && (drawPieces ? card.everyone === true : card.branches !== undefined);
   const orphans = cards.some((card) => !banded(card) && isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
   const even = dateView || columns <= EVEN_COLUMNS_MAX;
@@ -299,22 +304,54 @@ export const LaneGrid = forwardRef<
       : FIXED_COLUMN_PX
     : share;
   const namedKey = rows.flatMap((r) => (r.kind === 'day' ? [r.day] : [])).join(',');
+  // A day's segments, drawn with pieces: runs of pieces, and the bands between
+  // them in Swimmers, newest first as the stack reads (review).
+  const segmentsOf = useMemo(() => {
+    const map = new Map<IsoDate, PieceSegment[]>();
+    if (!drawPieces) return map;
+    for (const day of namedKey ? (namedKey.split(',') as IsoDate[]) : []) {
+      const list: PieceSegment[] = [];
+      for (const card of byDay.get(day) ?? []) {
+        const last = list[list.length - 1];
+        if (banded(card)) list.push({ kind: 'band', card });
+        else if (last?.kind === 'pieces') last.ids.add(card.splash.id);
+        else
+          list.push({
+            kind: 'pieces',
+            key: `${day}#${list.length}`,
+            ids: new Set([card.splash.id]),
+          });
+      }
+      map.set(day, list);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- banded reads bands and drawPieces
+  }, [drawPieces, namedKey, byDay, bands]);
   const [measured, setMeasured] = useState<Measured>({});
   const laneBoard = useMemo(() => {
     if (!drawPieces) return null;
-    const named = namedKey ? (namedKey.split(',') as IsoDate[]) : [];
+    const pieceRows: { key: string; day: IsoDate }[] = [];
+    const rowOfId = new Map<string, string>();
+    for (const [day, segments] of segmentsOf) {
+      for (const segment of segments) {
+        if (segment.kind !== 'pieces') continue;
+        pieceRows.push({ key: segment.key, day });
+        for (const id of segment.ids) rowOfId.set(id, segment.key);
+      }
+    }
     // A photo hidden from the board (0044) is not on it.
     const drawn = cards.map((card) =>
       card.photos?.length ? { ...card, photos: boardPhotos(card.photos, card.layout) } : card,
     );
-    return layoutLaneBoard(drawn, named, columnIds, {
+    return layoutLaneBoard(drawn, pieceRows, columnIds, {
       width: columnPx * Math.max(columns, 1),
       measured,
       columnOf: (card) => (isOrphanCard(card, categories) ? '' : cardColumn(card)),
+      rowOf: (card) => rowOfId.get(card.splash.id) ?? null,
     });
-  }, [drawPieces, namedKey, cards, columnIds, columnPx, columns, measured, categories]);
+  }, [drawPieces, segmentsOf, cards, columnIds, columnPx, columns, measured, categories]);
   const weekOf = useMemo(
-    () => new Map((laneBoard?.weeks ?? []).map((w) => [w.cells[0]?.day, w])),
+    () => new Map((laneBoard?.weeks ?? []).map((w) => [laneBoard!.rowKeys[w.index], w])),
     [laneBoard],
   );
   const boardPhotosSigned = useBoardPhotos(laneBoard?.pieces ?? NO_PIECES);
@@ -620,58 +657,113 @@ export const LaneGrid = forwardRef<
               else if (last?.kind === 'marks') last.ids.add(card.splash.id);
               else segments.push({ kind: 'marks', ids: new Set([card.splash.id]) });
             }
-            const week = laneBoard ? weekOf.get(day) : undefined;
-            if (laneBoard && week) {
-              const h = Math.max(ROW_PX, week.h + 8);
+            if (laneBoard) {
+              const pieceSegments = segmentsOf.get(day) ?? [];
               return (
-                <DayRow key={day} day={day} monthChanges={monthChanges}>
-                  <div
-                    data-lane-pieces={day}
-                    className="relative"
-                    style={{ gridColumn: `span ${Math.max(columns, 1)}`, height: h }}
-                  >
-                    {Array.from({ length: Math.max(columns - 1, 0) }, (_, at) => (
-                      <span
-                        key={at}
-                        aria-hidden
-                        data-rope
-                        className="pointer-events-none absolute inset-y-0 w-px bg-white/15"
-                        style={{ left: (at + 1) * columnPx }}
-                      />
-                    ))}
-                    {/* The day's pieces, placed as the engine laid them, centred in a short row. */}
-                    <div
-                      className="absolute inset-x-0"
-                      style={{ top: -week.y + (h - week.h) / 2, height: laneBoard.height }}
-                    >
-                      {laneBoard.pieces
-                        .filter((piece) => piece.week === week.index)
-                        .map((piece) => (
-                          // Which lane and day it is in, and whether it rings: for
-                          // finding it, with no box of its own (display: contents).
+                <Fragment key={day}>
+                  {pieceSegments.map((segment, at) => {
+                    if (segment.kind === 'band') {
+                      // Everyone (review): the whole width, as the Calendar's band, with its faces.
+                      const size = laneBoard.metrics.caption.size;
+                      return (
+                        <DayRow
+                          key={`band-${segment.card.splash.id}`}
+                          day={day}
+                          monthChanges={monthChanges}
+                          labelled={at === 0}
+                        >
                           <div
-                            key={piece.id}
-                            data-lane-piece={piece.id}
-                            data-cell={columnIds[piece.col]}
-                            data-ring={ringAt?.id === piece.id ? '' : undefined}
-                            className="contents"
+                            data-lane-band={segment.card.splash.id}
+                            className="relative"
+                            style={{ gridColumn: `span ${Math.max(columns, 1)}`, height: ROW_PX }}
                           >
-                            <BoardPieceView
-                              piece={piece}
-                              photos={boardPhotosSigned}
+                            <BoardTapeView
+                              tape={{
+                                key: segment.card.splash.id,
+                                id: segment.card.splash.id,
+                                card: segment.card,
+                                week: 0,
+                                startCol: 0,
+                                endCol: Math.max(columns - 1, 0),
+                                startsHere: true,
+                                endsHere: true,
+                                muted: false,
+                                x: 0,
+                                y: (ROW_PX - TAPE_PX) / 2,
+                                w: columnPx * Math.max(columns, 1),
+                                h: TAPE_PX,
+                                size,
+                              }}
                               lanes={categories}
                               metrics={laneBoard.metrics}
                               onPick={onPick}
-                              onWrite={onWrite}
-                              ripple={ringAt?.id === piece.id ? ringAt.seq : null}
-                              plunge={false}
+                              ripple={ringAt?.id === segment.card.splash.id ? ringAt.seq : null}
                             />
                           </div>
-                        ))}
-                    </div>
-                  </div>
-                  {plusColumn ? <Cell lane="+" /> : null}
-                </DayRow>
+                          {plusColumn ? <Cell lane="+" /> : null}
+                        </DayRow>
+                      );
+                    }
+                    const week = weekOf.get(segment.key);
+                    if (!week) return null;
+                    const h = Math.max(ROW_PX, week.h + 8);
+                    return (
+                      <DayRow
+                        key={segment.key}
+                        day={day}
+                        monthChanges={monthChanges}
+                        labelled={at === 0}
+                      >
+                        <div
+                          data-lane-pieces={day}
+                          className="relative"
+                          style={{ gridColumn: `span ${Math.max(columns, 1)}`, height: h }}
+                        >
+                          {Array.from({ length: Math.max(columns - 1, 0) }, (_, rope) => (
+                            <span
+                              key={rope}
+                              aria-hidden
+                              data-rope
+                              className="pointer-events-none absolute inset-y-0 w-px bg-white/15"
+                              style={{ left: (rope + 1) * columnPx }}
+                            />
+                          ))}
+                          {/* The segment's pieces, placed as the engine laid them, centred in a short row. */}
+                          <div
+                            className="absolute inset-x-0"
+                            style={{ top: -week.y + (h - week.h) / 2, height: laneBoard.height }}
+                          >
+                            {laneBoard.pieces
+                              .filter((piece) => piece.week === week.index)
+                              .map((piece) => (
+                                // Which lane and day it is in, and whether it rings: for
+                                // finding it, with no box of its own (display: contents).
+                                <div
+                                  key={piece.id}
+                                  data-lane-piece={piece.id}
+                                  data-cell={columnIds[piece.col]}
+                                  data-ring={ringAt?.id === piece.id ? '' : undefined}
+                                  className="contents"
+                                >
+                                  <BoardPieceView
+                                    piece={piece}
+                                    photos={boardPhotosSigned}
+                                    lanes={categories}
+                                    metrics={laneBoard.metrics}
+                                    onPick={onPick}
+                                    onWrite={onWrite}
+                                    ripple={ringAt?.id === piece.id ? ringAt.seq : null}
+                                    plunge={false}
+                                  />
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                        {plusColumn ? <Cell lane="+" /> : null}
+                      </DayRow>
+                    );
+                  })}
+                </Fragment>
               );
             }
             return (
@@ -1000,6 +1092,10 @@ function markSelector(id: string): string {
 }
 
 const NO_PIECES: [] = [];
+
+/** A day drawn with pieces: a run of pieces, or a full-width band (Swimmers, Everyone). */
+type PieceSegment =
+  { kind: 'pieces'; key: string; ids: Set<string> } | { kind: 'band'; card: Card };
 
 /** An element's position within the scroller's content. */
 function offsetIn(el: HTMLElement, scroller: HTMLElement): { top: number; left: number } {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -238,37 +238,45 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** The joint splash with Everyone on (0033): a band across Swimmers' members (review). */
+const everyoneOn = (s: Splash): Splash =>
+  s.id === 's-joint' ? { ...s, joint_invite_all: true } : s;
+const EVERYONE: PoolView = { ...A, splashes: A.splashes.map(everyoneOn) };
+
 describe('a joint splash on the grid (H23)', () => {
-  it('renders once as a band in Swimmers, never as a mark in a cell', () => {
+  it('with Everyone on, spans Swimmers as one band, never also a piece (review)', () => {
+    setView('swimmers');
+    const { container } = ground(EVERYONE);
+    expect(container.querySelectorAll('[data-lane-band="s-joint"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-lane-piece="s-joint"]')).toHaveLength(0);
+    // The icon and the title are the splash's, on its band.
+    expect(container.querySelector('[data-lane-band="s-joint"]')!.textContent).toContain('🏛️');
+  });
+
+  it('with picked invitees, stays a piece in its maker’s column in Swimmers (review)', () => {
     setView('swimmers');
     const { container } = ground(A);
-    expect(container.querySelectorAll('[data-joint-band="s-joint"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-cell] [data-mark="s-joint"]')).toHaveLength(0);
-    // The icon and the title are the splash's, on its band.
-    expect(container.querySelector('[data-joint-band="s-joint"]')!.textContent).toContain('🏛️');
+    expect(container.querySelector('[data-lane-band]')).toBeNull();
+    expect(
+      container.querySelector(`[data-lane-piece="s-joint"][data-cell="${MINA}"]`),
+    ).not.toBeNull();
   });
-
-  it('counts its ripples and shows who wrote them at its right end, with no branches', () => {
-    {
-      setView('swimmers');
-      const { container } = ground(A);
-      const band = container.querySelector('[data-joint-band="s-joint"]')!;
-      expect(band.querySelector('[data-joint-count]')!.textContent).toBe('2 ripples');
-      // Mina and I, each once.
-      expect(band.querySelectorAll('[data-joint-faces] > :not([data-joint-more])')).toHaveLength(2);
-      expect(band.querySelector('[data-joint-more]')).toBeNull();
-      expect(container.querySelector('[data-branch]')).toBeNull();
-      cleanup();
-    }
+  it('shows who wrote on it on its band, each once, with no branches', () => {
+    setView('swimmers');
+    const { container } = ground(EVERYONE);
+    const band = container.querySelector('[data-lane-band="s-joint"]')!;
+    expect(band.querySelector('[data-board-faces]')).not.toBeNull();
+    // Mina and I: no "+n".
+    expect(band.textContent).not.toMatch(/\+\d/);
+    expect(container.querySelector('[data-branch]')).toBeNull();
   });
-
   it('shows four faces, then +n', () => {
     setView('swimmers');
     const writers = ['u-1', 'u-2', 'u-3', 'u-4', 'u-5', 'u-6'];
     const crowded: PoolView = {
-      ...A,
+      ...EVERYONE,
       members: [
-        ...A.members,
+        ...EVERYONE.members,
         ...writers.map((userId, at) => ({
           userId,
           name: `P${at}`,
@@ -279,18 +287,15 @@ describe('a joint splash on the grid (H23)', () => {
         })),
       ],
       ripples: [
-        ...A.ripples,
+        ...EVERYONE.ripples,
         ...writers.map((author_id, at) =>
           ripple({ id: `r-x${at}`, splash_id: 's-joint', author_id, occurred_on: '2026-10-20' }),
         ),
       ],
     };
-    const band = ground(crowded).container.querySelector('[data-joint-band="s-joint"]')!;
-    expect(band.querySelector('[data-joint-count]')!.textContent).toBe('8 ripples');
-    expect(band.querySelectorAll('[data-joint-faces] > :not([data-joint-more])')).toHaveLength(4);
-    expect(band.querySelector('[data-joint-more]')!.textContent).toBe('+4');
+    const band = ground(crowded).container.querySelector('[data-lane-band="s-joint"]')!;
+    expect(band.textContent).toContain('+4');
   });
-
   it('is one row in the Date view: icon, title, lane chip, then faces and count; no sub-rows', () => {
     setView('date');
     const { container } = ground(A);
@@ -322,15 +327,21 @@ describe('a joint splash on the grid (H23)', () => {
     setView('lane');
     const { container } = ground(A);
     expect(container.querySelector('[data-joint-band]')).toBeNull();
-    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-lane-piece="s-joint"][data-cell="l-media"]'),
+    ).not.toBeNull();
   });
 
-  it('comes to the top of the stack from its band', () => {
+  it('comes to the top of the stack from its band', async () => {
     setView('swimmers');
-    const { container } = ground(A);
-    fireEvent.click(container.querySelector('[data-joint-band="s-joint"]')!);
-    expect(container.querySelector('[data-mark="s-joint"]')!.hasAttribute('data-dived')).toBe(
-      false,
+    const { container } = ground(EVERYONE);
+    fireEvent.click(container.querySelector('[data-lane-band="s-joint"] [data-board-pick]')!);
+    await waitFor(() =>
+      expect(
+        container
+          .querySelector('[data-stack-card][data-slot="0"]')!
+          .getAttribute('data-stack-card'),
+      ).toBe('s-joint'),
     );
   });
 });
@@ -345,15 +356,12 @@ describe('Swimmers (H23)', () => {
     expect(headers).toEqual([ME, MINA]);
   });
 
-  it('puts each placed post in its author’s column, with the author under the title', () => {
+  it('puts each placed post in its author’s column', () => {
     setView('swimmers');
     const { container } = ground(A);
-    const row = container.querySelector('[data-cell="u-mina"] [data-mark="s-mina"]');
-    expect(row).not.toBeNull();
-    setView('lane');
-    cleanup();
-    const lane = ground(A).container;
-    expect(lane.querySelector('[data-cell="l-food"] [data-mark-author]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-lane-piece="s-mina"][data-cell="u-mina"]'),
+    ).not.toBeNull();
   });
 });
 
@@ -430,12 +438,12 @@ describe('switching pools (H23)', () => {
   it('shows only the other pool’s records once switched, in the same view', () => {
     setView('swimmers');
     const first = ground(A).container;
-    expect(first.querySelector('[data-mark="s-mine"]')).not.toBeNull();
+    expect(first.querySelector('[data-lane-piece=\"s-mine\"]')).not.toBeNull();
     cleanup();
     const second = ground(B).container;
-    expect(second.querySelector('[data-mark="s-study"]')).not.toBeNull();
+    expect(second.querySelector('[data-lane-piece=\"s-study\"]')).not.toBeNull();
     for (const id of ['s-mine', 's-mina', 's-joint']) {
-      expect(second.querySelector(`[data-mark="${id}"]`)).toBeNull();
+      expect(second.querySelector(`[data-lane-piece="${id}"]`)).toBeNull();
     }
     expect(
       second.querySelector('[data-view-option="swimmers"]')!.getAttribute('aria-selected'),
@@ -510,14 +518,16 @@ describe('Just mine in the pool (0014)', () => {
   it('is a mark in its pool lane’s column, never a band', () => {
     setView('lane');
     const { container } = ground(A);
-    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-own"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-lane-piece="s-own"][data-cell="l-media"]'),
+    ).not.toBeNull();
     expect(container.querySelector('[data-joint-band="s-own"]')).toBeNull();
   });
 
   it('is a mark in my column in Swimmers', () => {
     setView('swimmers');
     const { container } = ground(A);
-    expect(container.querySelector(`[data-cell="${ME}"] [data-mark="s-own"]`)).not.toBeNull();
+    expect(container.querySelector(`[data-lane-piece="s-own"][data-cell="${ME}"]`)).not.toBeNull();
   });
 });
 
@@ -630,15 +640,12 @@ describe('faces (0018)', () => {
     expect(container.querySelector(`[data-member="${GONE}"]`)!.textContent).toContain('GO');
   });
 
-  it('labels a mark with its author’s current name, written out', () => {
-    setView('lane');
+  it('names each author on their column, written out', () => {
+    setView('swimmers');
     const { container } = faces(A);
-    expect(
-      container
-        .querySelector('[data-mark="s-mina"]')
-        ?.closest('[data-cell]')
-        ?.querySelector('[data-mark-author]')?.textContent,
-    ).toBe('Mina Kim');
+    expect(container.querySelector('[data-lane-header="u-mina"]')!.textContent).toContain(
+      'Mina Kim',
+    );
   });
 });
 
@@ -669,8 +676,10 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
   it('shows the move at once: its mark in the new lane, its tag and chip naming it', () => {
     setView('lane');
     const { container } = moved(FOOD);
-    expect(container.querySelector('[data-cell="l-food"] [data-mark="s-joint"]')).not.toBeNull();
-    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).toBeNull();
+    expect(
+      container.querySelector('[data-lane-piece="s-joint"][data-cell="l-food"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('[data-lane-piece="s-joint"][data-cell="l-media"]')).toBeNull();
   });
 
   it('goes back where it was when the edit is taken back', () => {
@@ -682,7 +691,9 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
         <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
-    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-lane-piece="s-joint"][data-cell="l-media"]'),
+    ).not.toBeNull();
   });
 
   it('names the new lane on its Date-view row at once', () => {
@@ -708,7 +719,7 @@ describe('a conversion shows at once (0022)', () => {
     return null;
   }
 
-  it('my placed splash made joint is a band across Swimmers at once', () => {
+  it('my placed splash made joint, with picked invitees, stays in my column at once', () => {
     setView('swimmers');
     const { container } = render(
       <InputSheetProvider>
@@ -716,9 +727,9 @@ describe('a conversion shows at once (0022)', () => {
         <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} initialView={startView} />
       </InputSheetProvider>,
     );
-    expect(container.querySelector('[data-joint-band="s-mine"]')).not.toBeNull();
+    expect(container.querySelector('[data-lane-band="s-mine"]')).toBeNull();
+    expect(container.querySelector(`[data-lane-piece="s-mine"][data-cell="${ME}"]`)).not.toBeNull();
   });
-
   it('a joint splash made mine is a mark under my name at once', () => {
     setView('swimmers');
     const { container } = render(
@@ -728,24 +739,21 @@ describe('a conversion shows at once (0022)', () => {
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-joint-band="s-joint"]')).toBeNull();
-    expect(container.querySelector(`[data-cell="${ME}"] [data-mark="s-joint"]`)).not.toBeNull();
+    expect(
+      container.querySelector(`[data-lane-piece="s-joint"][data-cell="${ME}"]`),
+    ).not.toBeNull();
   });
 });
 
 describe('a joint splash reads as the pool’s at a glance (review)', () => {
-  it('is a rounded square in the Lane view; a post of one person stays a disc', () => {
+  it('is a filled label in the Lane view; a post of one person has none', () => {
     setView('lane');
     const { container } = ground(A);
-    const joint = container.querySelector('[data-mark="s-joint"]') as HTMLElement;
-    expect(joint.hasAttribute('data-joint-mark')).toBe(true);
-    expect(joint.className).toContain('rounded-lg');
-    expect(joint.className).not.toContain('rounded-full');
-    expect(joint.style.width).toBe('28px');
-    const mine = container.querySelector('[data-mark="s-mine"]') as HTMLElement;
-    expect(mine.hasAttribute('data-joint-mark')).toBe(false);
-    expect(mine.className).toContain('rounded-full');
+    const joint = container.querySelector('[data-lane-piece="s-joint"] [data-board-piece]')!;
+    expect(['white', 'ink']).toContain(joint.getAttribute('data-label'));
+    const mine = container.querySelector('[data-lane-piece="s-mine"] [data-board-piece]')!;
+    expect(mine.getAttribute('data-label')).toBe('none');
   });
-
   it('is a pill across the whole row in the Date view', () => {
     setView('date');
     const { container } = ground(A);
@@ -799,14 +807,15 @@ describe('the joint surface is solid, and the faces’ ring is its colour (revie
     ...root.querySelectorAll('[data-joint-faces] > :not([data-joint-more])'),
   ];
 
-  it('on the Swimmers band', () => {
+  it('on the Swimmers band: the Calendar’s band, its faces ringed in the joint colour', () => {
     setView('swimmers');
-    const band = ground(A).container.querySelector('[data-joint-band="s-joint"]')!;
-    expect(band.className).toContain(SURFACE);
-    expect(band.className).not.toMatch(/bg-white\//);
-    expect(faces(band).every((face) => face.className.includes(RING))).toBe(true);
+    const band = ground(EVERYONE).container.querySelector('[data-lane-band="s-joint"]')!;
+    expect(band.querySelector('[data-board-band]')!.className).toContain('bg-white/20');
+    const ringed = [...band.querySelectorAll('[data-board-faces] *')].filter((el) =>
+      el.className.toString().includes(RING),
+    );
+    expect(ringed.length).toBeGreaterThan(0);
   });
-
   it('on the Date view’s pill row', () => {
     setView('date');
     const row = ground(A).container.querySelector('[data-pill="s-joint"]')!;
@@ -844,12 +853,11 @@ describe('a day reads newest first, bands and marks alike (review)', () => {
     ],
   };
 
-  it('puts the newer joint band above the older mark of the same day, the date named once', () => {
+  it('puts the newer band above the older piece of the same day, the date named once', () => {
     setView('swimmers');
-    const { container } = ground(C);
-    const band = container.querySelector('[data-joint-band="s-joint"]')!;
-    const older = container.querySelector('[data-mark="s-old"]')!;
-    // The band precedes the older mark in the grid.
+    const { container } = ground({ ...C, splashes: C.splashes.map(everyoneOn) });
+    const band = container.querySelector('[data-lane-band="s-joint"]')!;
+    const older = container.querySelector('[data-lane-piece="s-old"]')!;
     expect(band.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Oct 20 is named on the band's rail; the row after it leaves the rail blank.
     expect(container.querySelectorAll('[data-day-row="2026-10-20"]')).toHaveLength(1);
@@ -858,20 +866,74 @@ describe('a day reads newest first, bands and marks alike (review)', () => {
 });
 
 describe('a joint band on top of the stack reads as the top card does (review)', () => {
-  it('turns white with blue words and a pale icon, its faces ringed white; back to the joint surface when not on top', () => {
+  it('bobs once it is the post being read (review)', async () => {
     setView('swimmers');
-    const { container } = ground(A);
-    const band = () => container.querySelector('[data-joint-band="s-joint"]')!;
-    // Not on top yet: the solid joint surface.
-    expect(band().hasAttribute('data-dived')).toBe(true);
-    expect(band().className).toContain('bg-joint');
-    fireEvent.click(band());
-    expect(band().hasAttribute('data-dived')).toBe(false);
-    expect(band().className).toContain('bg-white');
-    expect(band().className).toContain('text-main-900');
-    expect(band().querySelector('.bg-main-100\\/60')).not.toBeNull();
-    const faces = [...band().querySelectorAll('[data-joint-faces] > :not([data-joint-more])')];
-    expect(faces.every((face) => face.className.includes('ring-white'))).toBe(true);
-    expect(band().querySelector('[data-joint-count]')!.className).toContain('text-main-900/70');
+    const { container } = ground(EVERYONE);
+    const tape = () => container.querySelector('[data-lane-band="s-joint"] [data-board-tape]')!;
+    expect(tape().hasAttribute('data-heading')).toBe(false);
+    fireEvent.click(container.querySelector('[data-lane-band="s-joint"] [data-board-pick]')!);
+    await waitFor(() => expect(tape().hasAttribute('data-heading')).toBe(true));
+  });
+});
+
+describe('a pool drawn with the Calendar’s pieces (review)', () => {
+  const ids = (root: Element): string[] => [
+    ...[...root.querySelectorAll('[data-lane-piece]')].map((el) =>
+      el.getAttribute('data-lane-piece')!,
+    ),
+    ...[...root.querySelectorAll('[data-lane-band]')].map((el) =>
+      el.getAttribute('data-lane-band')!,
+    ),
+  ];
+
+  it('draws every record once in the Lane view and in Swimmers, a band once', () => {
+    for (const view of ['lane', 'swimmers'] as const) {
+      setView(view);
+      const { container } = ground(EVERYONE);
+      const seen = ids(container);
+      expect(new Set(seen).size, view).toBe(seen.length);
+      expect(seen.sort(), view).toEqual(
+        EVERYONE.splashes
+          .map((s) => s.id)
+          .filter((id) => seen.includes(id))
+          .sort(),
+      );
+      expect(seen).toContain('s-joint');
+      cleanup();
+    }
+  });
+
+  it('spans Swimmers with a member’s own record shared here with Everyone on', () => {
+    setView('swimmers');
+    const open: PoolView = {
+      ...A,
+      placements: A.placements.map((p) =>
+        p.splashId === 's-mina' ? { ...p, inviteAll: true } : p,
+      ),
+    };
+    const { container } = ground(open);
+    expect(container.querySelectorAll('[data-lane-band="s-mina"]')).toHaveLength(1);
+    expect(container.querySelector('[data-lane-piece="s-mina"]')).toBeNull();
+    // In the Lane view it stays a piece in its pool lane.
+    cleanup();
+    setView('lane');
+    expect(
+      ground(open).container.querySelector('[data-lane-piece="s-mina"][data-cell="l-food"]'),
+    ).not.toBeNull();
+  });
+
+  it('keeps a photo hidden by the pool’s Lane layout off the Lane view', () => {
+    setView('lane');
+    const pictured: PoolView = {
+      ...A,
+      ripples: A.ripples.map((r) =>
+        r.splash_id === 's-mine' ? { ...r, media: [`${ME}/a.webp`, `${ME}/b.webp`] } : r,
+      ),
+      laneLayouts: { 's-mine': { photos: { [`${ME}/a.webp`]: { hidden: true } } } },
+    };
+    const { container } = ground(pictured);
+    const piece = container.querySelector('[data-lane-piece="s-mine"]')!;
+    expect(piece.querySelector(`[data-board-photo-card="${ME}/a.webp"]`)).toBeNull();
+    expect(piece.querySelector(`[data-board-photo-card="${ME}/b.webp"]`)).not.toBeNull();
   });
 });

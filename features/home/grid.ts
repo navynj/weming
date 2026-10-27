@@ -47,6 +47,12 @@ export type Card = {
   together?: boolean;
   /** My record on Home: its members' ripples, a count per pool (0035): "JY · 3 · SY · 2". */
   sides?: { label: string; count: number }[];
+  /**
+   * In a pool, with Everyone (review): a joint record with Everyone on, or a
+   * member's own record shared here with Everyone on. In Swimmers, drawn with
+   * pieces, it spans every column as a band.
+   */
+  everyone?: boolean;
   /** A joint splash (H23): drawn as a band across the columns, each ripple a branch. */
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */
