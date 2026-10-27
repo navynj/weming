@@ -298,10 +298,7 @@ export async function setPlacement(
   return { ok: true };
 }
 
-/**
- * Where a post of mine lands in a pool: the pool lane my post's lane is
- * linked to there — its declared lane, else the lane its blocks took most.
- */
+/** Where a post of mine lands in a pool: the pool lane its lane is linked to there (H24). */
 async function poolLaneFor(
   supabase: Awaited<ReturnType<typeof createClient>>,
   me: string,
@@ -314,26 +311,7 @@ async function poolLaneFor(
     .eq('id', splashId)
     .maybeSingle();
   if (!splash || splash.owner_id !== me) return null;
-  let lane = splash.declared_lane_id;
-  if (!lane) {
-    const { data: blocks } = await supabase
-      .from('ripples')
-      .select('category_id, created_at')
-      .eq('splash_id', splashId);
-    const tally = new Map<string, { count: number; latest: string }>();
-    for (const b of blocks ?? []) {
-      if (b.category_id === null) continue;
-      const t = tally.get(b.category_id) ?? { count: 0, latest: '' };
-      tally.set(b.category_id, {
-        count: t.count + 1,
-        latest: b.created_at > t.latest ? b.created_at : t.latest,
-      });
-    }
-    lane =
-      [...tally.entries()].sort(
-        ([, a], [, b]) => b.count - a.count || b.latest.localeCompare(a.latest),
-      )[0]?.[0] ?? null;
-  }
+  const lane = splash.declared_lane_id;
   if (!lane) return null;
   const { data: link } = await supabase
     .from('lane_mappings')
@@ -354,6 +332,25 @@ export async function placeNewSplash(splashId: string, poolIds: string[]): Promi
   return { ok: true };
 }
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A splash's last day, when its range has one: the database's make-functions
+ * take the first day only. Returns a message on failure, else null.
+ */
+async function endRange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  splashId: string,
+  end: string | null,
+): Promise<string | null> {
+  if (!end) return null;
+  const { error } = await supabase
+    .from('splashes')
+    .update({ declared_end: end })
+    .eq('id', splashId);
+  return error ? said(error) : null;
+}
+
 const Joint = z.object({
   id: z.uuid(),
   poolId: z.uuid(),
@@ -361,12 +358,9 @@ const Joint = z.object({
   title: z.string().trim().max(120),
   icon: ICON,
   body: z.string().trim().max(8000),
-  /** My lane for my ripple: the one linked to this pool lane, or none (0016). */
-  myCategoryId: z.uuid().nullable(),
-  occurredOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable(),
+  /** The splash's range, which every ripple on it takes (H24). */
+  declaredStart: z.string().regex(ISO_DAY),
+  declaredEnd: z.string().regex(ISO_DAY).nullable(),
 });
 
 /** A joint splash, opened by a member on a pool lane, with my first ripple on it. */
@@ -386,16 +380,21 @@ export async function createJointSplash(input: z.infer<typeof Joint>): Promise<M
     p_pool_lane: joint.poolLaneId,
     p_title: joint.title,
     ...(joint.icon ? { p_icon: joint.icon } : {}),
-    ...(joint.occurredOn ? { p_declared_start: joint.occurredOn } : {}),
+    p_declared_start: joint.declaredStart,
   });
   if (error) return { ok: false, message: said(error) };
+  const ended = await endRange(supabase, joint.id, joint.declaredEnd);
+  if (ended) {
+    await supabase.rpc('delete_joint_splash', { p_splash: joint.id });
+    return { ok: false, message: ended };
+  }
 
-  if (joint.body && joint.myCategoryId) {
+  // My ripple takes no lane (H24): where the splash shows on my Home is
+  // derived from my link to its pool lane.
+  if (joint.body) {
     const { error: blockError } = await supabase.from('ripples').insert({
       author_id: user.id,
-      category_id: joint.myCategoryId,
       note: joint.body,
-      occurred_on: joint.occurredOn,
       splash_id: joint.id,
     });
     if (blockError) {
@@ -432,16 +431,9 @@ const OwnDrop = z.object({
   icon: ICON,
   body: z.string().trim().max(8000),
   media: z.array(z.string()).max(8),
-  occurredOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable(),
-  occurredTime: z
-    .string()
-    .regex(/^\d{2}:\d{2}$/)
-    .nullable(),
-  startInstant: z.iso.datetime().nullable(),
-  endInstant: z.iso.datetime().nullable(),
+  /** The splash's range, which every ripple on it takes (H24). */
+  declaredStart: z.string().regex(ISO_DAY),
+  declaredEnd: z.string().regex(ISO_DAY).nullable(),
 });
 
 /**
@@ -454,9 +446,6 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
   const parsed = OwnDrop.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That splash is incomplete.' };
   const drop = parsed.data;
-  if (drop.occurredTime !== null && drop.occurredOn === null) {
-    return { ok: false, message: 'A time needs a date.' };
-  }
   const supabase = await createClient();
   const {
     data: { user },
@@ -470,20 +459,20 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
     p_pool_lane: drop.poolLaneId,
     p_title: drop.title,
     ...(drop.icon ? { p_icon: drop.icon } : {}),
-    // With no ripple to carry it, the date is the splash's own (review).
-    ...(!hasBlock && drop.occurredOn ? { p_declared_start: drop.occurredOn } : {}),
+    p_declared_start: drop.declaredStart,
   });
   if (error) return { ok: false, message: said(error) };
+  const ended = await endRange(supabase, drop.id, drop.declaredEnd);
+  if (ended) {
+    await supabase.from('splashes').delete().eq('id', drop.id);
+    return { ok: false, message: ended };
+  }
 
   if (hasBlock) {
     const { error: blockError } = await supabase.from('ripples').insert({
       author_id: user.id,
-      category_id: null,
       note: drop.body || null,
       media: drop.media,
-      occurred_on: drop.occurredOn,
-      occurred_time: drop.occurredTime,
-      ended_at: drop.endInstant ?? drop.startInstant,
       splash_id: drop.id,
     });
     if (blockError) {

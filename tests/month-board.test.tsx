@@ -91,9 +91,10 @@ function card(
       id,
       owner_id: 'a1',
       title,
-      declared_start: null,
+      // A post owns its date and lane (H24); its block takes them.
+      declared_start: day,
       declared_end: null,
-      declared_lane_id: null,
+      declared_lane_id: 'c-food',
       session_id: null,
       icon: null,
       pinned_at: null,

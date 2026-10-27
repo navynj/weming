@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+// Skipped (H24, H20b): these dormant Timer tests write a ripple's own date,
+// time and parent — fields 0029 freezes: a ripple takes its lane and date
+// from its splash, and nothing writes them again. The modules stay dormant
+// and untouched for P3's Swim (H20b); the tests stay too, skipped rather than
+// rewritten, until Swim decides what a live record's time belongs to.
+
 import { getRipplesForDate } from '@/lib/queries/ripples';
 import { asAdmin } from './as-user';
 
@@ -92,7 +98,7 @@ async function session(from: string, to: string) {
   return data![0].id;
 }
 
-describe('overlap is allowed (H20c)', () => {
+describe.skip('overlap is allowed (H20c)', () => {
   it('commits two overlapping spans, both of them', async () => {
     const first = await session('09:00', '10:30');
 
@@ -143,7 +149,7 @@ describe('overlap is allowed (H20c)', () => {
   });
 });
 
-describe('containment (dormant with inner ripples, H20b)', () => {
+describe.skip('containment (dormant with inner ripples, H20b)', () => {
   it('refuses an inner ripple outside its parent span', async () => {
     const parent = await session('09:00', '10:30');
 
@@ -172,7 +178,7 @@ describe('containment (dormant with inner ripples, H20b)', () => {
   });
 });
 
-describe('inner ripples on the axis (dormant, H20b)', () => {
+describe.skip('inner ripples on the axis (dormant, H20b)', () => {
   it('are not returned for the timeline: the parent owns the row', async () => {
     const parent = await session('09:00', '10:30');
     const inner = await insert({

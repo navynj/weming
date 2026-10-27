@@ -6,7 +6,6 @@ import { originTag } from '@/features/pool/origin-tag';
 import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeSplash } from '@/features/splash/summary';
-import { compareFlow } from '@/lib/flow-key';
 import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { getMyLinks, getMyPlacements, getMyPoolNames, getPoolView } from '@/lib/queries/pools';
@@ -60,7 +59,10 @@ export async function PoolSplash({
   const joint = board.owner_id === null;
   const author = board.owner_id ?? board.created_by;
   const zone = view.members.find((m) => m.userId === author)?.timeZone ?? profile.timezone;
-  const blocks = [...ripples.data].sort((a, b) => compareFlow(a, b, zone));
+  // In the order they were written (H24): a ripple's own date places nothing.
+  const blocks = [...ripples.data].sort(
+    (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+  );
   const summary = summarizeSplash(board, blocks, zone, new Date());
 
   const [photoLists, { data: lockRows }] = await Promise.all([

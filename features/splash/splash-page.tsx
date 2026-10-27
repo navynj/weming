@@ -4,9 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
 import { GhostRing } from '@/components/ui/ghost-ring';
-import { commitRipple, type CommitResult } from '@/features/input-sheet/commit';
+import type { CommitResult } from '@/features/input-sheet/commit';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
-import { deleteRipple, setRippleLock, updateRipple } from '@/features/ripple-sheet/actions';
+import { deleteRipple, setRippleLock } from '@/features/ripple-sheet/actions';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
@@ -16,13 +16,14 @@ import { deleteJointSplash } from '@/features/pool/actions';
 import { authorClock } from '@/features/pool/times';
 import { usePoolEditScope } from '@/features/pool/edit-scope';
 
-import { adoptRipple, deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
+import { deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
+import { addBlock, editBlock } from './block-actions';
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
 import { BlockView } from './block';
 import { RippleThread } from './ripple-thread';
 import { useCloseSplash } from './splash-modal';
 import { SplashHeader, type HeaderEdit } from './splash-header';
-import { laneTags, type SplashSummary } from './summary';
+import type { SplashSummary } from './summary';
 
 /**
  * The page read inside a pool (review): the same page as Home's, with each
@@ -69,8 +70,9 @@ type PageState = { splash: SplashSummary; blocks: RippleWithCategory[]; lockedId
  * On a wide screen the page is two halves (review): the header stays on the
  * left, the blocks and the add slot read down the right.
  *
- * A splashless block renders here too, as an untitled post of one; it gets a
- * row of its own the first time it needs one (H21a) and the page moves to it.
+ * A block whose post I can no longer read (a joint splash of a pool I left)
+ * renders here as an untitled post of one: read, and deleted, never written
+ * on — it has no post of mine to write on (H24).
  */
 export function SplashPage({
   splash,
@@ -108,9 +110,7 @@ export function SplashPage({
   // Mine to edit: everything off a pool; in one, my own ripples only.
   const editable = (block: RippleWithCategory): boolean => !pool || block.author_id === pool.me;
   const scope = pool?.scope ?? 'mine';
-  // A joint splash's ripples take my linked lane or none, decided on the
-  // server (0016, 0017): no lane chips, as on a Just-mine splash.
-  const laneless = splash.ownPoolId !== null || scope === 'joint';
+  const orphan = splash.orphan;
   const router = useRouter();
   const { markDeleted, openEdit, pendingEdits } = useInputSheet();
   const editScope = usePoolEditScope();
@@ -129,17 +129,11 @@ export function SplashPage({
     lockedIds,
   });
 
-  /** The post's row, made now if the post is a lone block (H21a). */
-  async function ensureSplash(): Promise<string | null> {
-    if (!page.splash.orphan) return page.splash.id;
-    const result = await adoptRipple(page.splash.id);
-    if (!result.ok) return null;
-    router.replace(`/splash/${result.splash.id}`);
-    return result.splash.id;
-  }
-
-  /** A header change, shown at once; the row is made first if there is none. */
+  /** A header change, shown at once: the post's lane and range are what its blocks take (H24). */
   function editHeader(edit: HeaderEdit): Promise<void> {
+    const range = edit.declaredStart
+      ? { start: edit.declaredStart, end: edit.declaredEnd ?? edit.declaredStart }
+      : null;
     run(
       (current) => ({
         ...current,
@@ -148,16 +142,11 @@ export function SplashPage({
           title: edit.title,
           icon: edit.icon,
           declaredLaneId: edit.declaredLaneId,
-          laneIds: laneTags(edit.declaredLaneId, current.blocks),
-          declaredRange: edit.declaredStart
-            ? { start: edit.declaredStart, end: edit.declaredEnd ?? edit.declaredStart }
-            : null,
+          laneIds: edit.declaredLaneId ? [edit.declaredLaneId] : [],
+          ...(range ? { declaredRange: range, range } : {}),
         },
       }),
-      async () => {
-        const id = await ensureSplash();
-        return id ? updateSplashHeader(id, edit) : { ok: false, message: 'That post is gone.' };
-      },
+      () => updateSplashHeader(page.splash.id, edit),
     );
     return Promise.resolve();
   }
@@ -168,27 +157,17 @@ export function SplashPage({
         ...current,
         splash: { ...current.splash, pinnedAt: pinned ? new Date().toISOString() : null },
       }),
-      async () => {
-        const id = await ensureSplash();
-        return id ? setSplashPinned(id, pinned) : { ok: false, message: 'That post is gone.' };
-      },
+      () => setSplashPinned(page.splash.id, pinned),
     );
     return Promise.resolve();
   }
 
-  /** The block as the screen should show it, from what the editor handed back. */
+  /** The block as the screen should show it: its words and photos; nothing else is its to change. */
   function shaped(base: RippleWithCategory, draft: BlockDraft): RippleWithCategory {
-    const lane = categories.find((c) => c.id === draft.categoryId) ?? null;
     return {
       ...base,
-      category_id: draft.categoryId ?? base.category_id,
-      category: lane ? { name: lane.name, icon: lane.icon } : base.category,
       note: draft.note.trim().length > 0 ? draft.note : null,
       media: draft.media,
-      occurred_on: draft.occurredOn,
-      occurred_time: draft.occurredTime ? `${draft.occurredTime}:00` : null,
-      started_at: draft.startInstant,
-      ended_at: draft.endInstant ?? draft.startInstant,
     };
   }
 
@@ -202,7 +181,7 @@ export function SplashPage({
           blocks: current.blocks.map((b) => (b.id === block.id ? shaped(b, draft) : b)),
         }),
         async () =>
-          outcome(await updateRipple({ ...draft, id: block.id, splashId: block.splash_id })),
+          outcome(await editBlock({ id: block.id, note: draft.note, media: draft.media })),
       );
       return;
     }
@@ -210,7 +189,7 @@ export function SplashPage({
       {
         id: draft.id,
         author_id: pool?.me ?? '',
-        category_id: draft.categoryId ?? '',
+        category_id: null,
         note: null,
         media: [],
         occurred_on: null,
@@ -236,13 +215,17 @@ export function SplashPage({
       (current) => ({
         ...current,
         blocks: [...current.blocks, placeholder],
-        splash: {
-          ...current.splash,
-          count: current.splash.count + 1,
-          laneIds: laneTags(current.splash.declaredLaneId, [...current.blocks, placeholder]),
-        },
+        splash: { ...current.splash, count: current.splash.count + 1 },
       }),
-      async () => outcome(await commitRipple({ ...draft, splashId: target.splashId })),
+      async () =>
+        outcome(
+          await addBlock({
+            id: draft.id,
+            note: draft.note,
+            media: draft.media,
+            splashId: target.splashId,
+          }),
+        ),
     );
   }
 
@@ -271,7 +254,7 @@ export function SplashPage({
   }
 
   function startBlock(): void {
-    void ensureSplash().then((id) => id && setEditor({ kind: 'add', splashId: id }));
+    setEditor({ kind: 'add', splashId: page.splash.id });
   }
 
   // An edit made from the sheet a moment ago shows at once (review).
@@ -301,27 +284,27 @@ export function SplashPage({
           onEdit={editHeader}
           onPin={pin}
           audience={audience}
-          editLevel={scope === 'mine' ? 'all' : scope === 'joint' ? 'title' : 'none'}
-          canPin={scope !== 'theirs'}
+          editLevel={
+            orphan ? 'none' : scope === 'mine' ? 'all' : scope === 'joint' ? 'title' : 'none'
+          }
+          canPin={!orphan && scope !== 'theirs'}
           canDelete={scope === 'mine' || (scope === 'joint' && pool!.canDeleteJoint)}
           laneChip={pool ? pool.laneChip : undefined}
-          // A post of one has no row to edit yet; it gets one from the header itself.
+          // A block read alone has no post of mine to edit.
           onOpenEdit={
-            page.splash.orphan || scope === 'theirs'
-              ? null
-              : () => openEdit(page.splash.id, editScope)
+            orphan || scope === 'theirs' ? null : () => openEdit(page.splash.id, editScope)
           }
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A
-            // lone block is its own post, so deleting it deletes the block.
+            // block read alone is its own post, so deleting it deletes the block.
             markDeleted(page.splash.id);
             if (closeSheet) closeSheet();
             else router.push('/');
             const result =
               scope === 'joint'
                 ? await deleteJointSplash(pool!.poolId, page.splash.id)
-                : page.splash.orphan
+                : orphan
                   ? await deleteRipple(page.splash.id)
                   : await deleteSplash(page.splash.id);
             if (result.ok) router.refresh();
@@ -360,11 +343,6 @@ export function SplashPage({
                   {editor?.kind === 'edit' && editor.block.id === block.id ? (
                     <BlockEditor
                       target={editor}
-                      categories={categories}
-                      defaultLaneId={page.splash.declaredLaneId}
-                      laneless={laneless}
-                      timeZone={timeZone}
-                      today={today}
                       onSubmit={(draft) => saveBlock(editor, draft)}
                       onDelete={() => removeBlock(block)}
                       onLock={(locked) => lockBlock(block, locked)}
@@ -406,16 +384,11 @@ export function SplashPage({
         {/* The add slot: the seat of the next block, at the bottom where the
           story continues. The ring ripples as the one invitation (law 3). */}
         {/* Someone else's splash takes no words of mine (review). */}
-        {scope === 'theirs' ? null : (
+        {scope === 'theirs' || orphan ? null : (
           <div data-add-slot className="border-pool-100 mt-2 border-t pt-4 pb-10">
             {editor?.kind === 'add' ? (
               <BlockEditor
                 target={editor}
-                categories={categories}
-                defaultLaneId={page.splash.declaredLaneId}
-                laneless={laneless}
-                timeZone={timeZone}
-                today={today}
                 onSubmit={(draft) => saveBlock(editor, draft)}
                 onDelete={() => setEditor(null)}
                 onLock={() => {}}

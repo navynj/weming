@@ -42,17 +42,18 @@ afterEach(async () => {
 async function board(over: { declared_lane_id?: string; declared_start?: string } = {}) {
   const { data, error } = await asUser(author)
     .from('splashes')
-    .insert({ owner_id: author, title: 'Whistler', ...over })
+    // A personal post owns its lane (H24).
+    .insert({ owner_id: author, title: 'Whistler', declared_lane_id: PLACE, ...over })
     .select('id')
     .single();
   expect(error).toBeNull();
   return data!.id;
 }
 
-async function fragment(splashId: string | null) {
+async function fragment(splashId: string) {
   const { data, error } = await asUser(author)
     .from('ripples')
-    .insert({ author_id: author, category_id: PLACE, note: 'fixture', splash_id: splashId })
+    .insert({ author_id: author, note: 'fixture', splash_id: splashId })
     .select('id')
     .single();
   expect(error).toBeNull();
@@ -66,7 +67,7 @@ describe('a splash belongs to its owner', () => {
     const { data } = await asUser(author).from('splashes').select('*').eq('id', id).single();
     expect(data?.title).toBe('Whistler');
     expect(data?.declared_start).toBe('2027-03-04');
-    expect(data?.declared_lane_id).toBeNull();
+    expect(data?.declared_lane_id).toBe(PLACE);
     expect(data?.pinned_at).toBeNull();
     expect(data?.session_id).toBeNull();
 
@@ -94,6 +95,7 @@ describe('a splash belongs to its owner', () => {
     const { error } = await asUser(author).from('splashes').insert({
       owner_id: author,
       title: 'x',
+      declared_lane_id: PLACE,
       declared_start: '2027-03-04',
       declared_end: '2027-03-01',
     });

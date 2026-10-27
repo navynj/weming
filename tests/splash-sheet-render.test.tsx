@@ -154,12 +154,14 @@ describe('the first line is the title (SPEC 6)', () => {
     expect(drops[0]).toMatchObject({ declaredStart: '2026-09-20', declaredEnd: null, body: '' });
   });
 
-  it('leaves the declaration empty when the date rides on the first ripple', async () => {
+  it('puts the date on the post, never on its first ripple (H24)', async () => {
     const view = sheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'a' } });
     fireEvent.click(view.drop());
     await waitFor(() => expect(drops).toHaveLength(1));
-    expect(drops[0]).toMatchObject({ declaredStart: null, occurredOn: TODAY });
+    expect(drops[0]).toMatchObject({ declaredStart: TODAY, declaredEnd: null });
+    expect(drops[0]).not.toHaveProperty('occurredOn');
+    expect(drops[0]).not.toHaveProperty('occurredTime');
   });
 
   it('commits a line in the content alone as an untitled post whose line is its block', async () => {
@@ -173,9 +175,8 @@ describe('the first line is the title (SPEC 6)', () => {
       body: 'coffee went cold',
       declaredLaneId: null,
       sessionId: null,
-      // Today is in the field from the start: a date, no clock.
-      occurredOn: TODAY,
-      occurredTime: null,
+      // Today is in the field from the start: the post's date (H24).
+      declaredStart: TODAY,
     });
     // Handed over at once, the post as the ground should show it: a real id,
     // an untitled post of one block resting on today.
@@ -269,16 +270,17 @@ describe('the first line is the title (SPEC 6)', () => {
     expect(document.activeElement).toBe(body);
   });
 
-  it('opens with today in the field, a date and no clock, removable for a plain block', async () => {
+  it('opens with today as the post’s date, days only; removed, the post still rests on today', async () => {
     const view = sheet();
     expect((view.getByLabelText('Date') as HTMLInputElement).value).toBe(TODAY);
-    expect(view.queryByText('+ Add Time')).toBeNull();
+    // The post's days have no clock (H24).
+    expect(view.queryByLabelText('Time')).toBeNull();
     fireEvent.click(view.getByLabelText('Remove the time'));
-    expect(view.getByText('+ Add Time')).toBeTruthy();
+    expect(view.getByText('+ Add Date')).toBeTruthy();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'a' } });
     fireEvent.click(view.drop());
     await waitFor(() => expect(drops).toHaveLength(1));
-    expect(drops[0]).toMatchObject({ occurredOn: null });
+    expect(drops[0]).toMatchObject({ declaredStart: TODAY });
   });
 });
 
@@ -320,14 +322,15 @@ describe('the sheet’s shape', () => {
 });
 
 describe('the affordances under the text', () => {
-  it('annotates the first block, and the ground scopes to that month on commit', async () => {
+  it('dates the post, and the ground scopes to that month on commit', async () => {
     const view = sheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'a' } });
     fireEvent.change(view.getByLabelText('Date'), { target: { value: '2026-08-17' } });
     fireEvent.click(view.drop());
     await waitFor(() => expect(drops).toHaveLength(1));
-    expect(drops[0]).toMatchObject({ occurredOn: '2026-08-17', occurredTime: null });
+    expect(drops[0]).toMatchObject({ declaredStart: '2026-08-17' });
     expect(handoffs[0].month).toBe('2026-08');
+    expect(handoffs[0].splash.range).toEqual({ start: '2026-08-17', end: '2026-08-17' });
   });
 
   it('has no session field: sessions are date-based, a post is shelved by its dates', () => {
@@ -429,12 +432,14 @@ describe('compose from a pool (H23)', () => {
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    // The linked lane files my ripple, with no prompt; nothing is placed.
+    // The splash carries the pool lane and the date; my ripple carries no
+    // lane (H24) — the link decides where it shows on my Home. Nothing placed.
     expect(joints[0]).toMatchObject({
       poolId: 'p-ours',
       poolLaneId: 'pl-trips',
-      myCategoryId: 'c-place',
+      declaredStart: TODAY,
     });
+    expect(joints[0]).not.toHaveProperty('myCategoryId');
     expect(placed).toEqual([]);
   });
 
@@ -450,7 +455,7 @@ describe('compose from a pool (H23)', () => {
     expect(joints).toEqual([]);
   });
 
-  it('drops a joint ripple with no lane on a pool lane linked out only', async () => {
+  it('drops a joint ripple with no lane on a pool lane linked ← out only', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'grey day' } });
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-moods"]')!);
@@ -459,7 +464,8 @@ describe('compose from a pool (H23)', () => {
     );
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-moods', myCategoryId: null });
+    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-moods' });
+    expect(joints[0]).not.toHaveProperty('myCategoryId');
   });
 
   it('makes Just mine on an out-only lane a Just-mine splash with no lane', async () => {
@@ -509,7 +515,8 @@ describe('compose from a pool (H23)', () => {
     expect(view.container.querySelector('[data-link-it]')).toBeNull();
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes', myCategoryId: null });
+    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes' });
+    expect(joints[0]).not.toHaveProperty('myCategoryId');
   });
 
   it('renders one filled row — the lane chips — and no link row', () => {

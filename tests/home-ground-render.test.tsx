@@ -122,20 +122,26 @@ function block(id: string, day: string, category = 'c-day', note = id): SplashBl
     created_at: `${day}T16:00:00.000Z`,
   };
 }
+/**
+ * A post as 0028 leaves it (H24): its range is its blocks' days and its lane
+ * is theirs — the post owns both, and the blocks take them.
+ */
 function post(
   id: string,
   title: string,
   blocks: SplashBlock[],
   over: Partial<Splash> = {},
 ): SplashSummary {
+  const days = blocks.flatMap((b) => (b.occurred_on ? [b.occurred_on] : [])).sort();
+  const last = days[days.length - 1];
   return summarizeSplash(
     written({
       id,
       owner_id: 'a1',
       title,
-      declared_start: null,
-      declared_end: null,
-      declared_lane_id: null,
+      declared_start: days[0] ?? null,
+      declared_end: last && last !== days[0] ? last : null,
+      declared_lane_id: blocks[0]?.category_id ?? null,
       session_id: null,
       icon: null,
       pinned_at: null,

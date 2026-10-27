@@ -12,7 +12,6 @@ export type SplashResult = { ok: true; splash: Splash } | { ok: false; message: 
 export type Done = { ok: true } | { ok: false; message: string };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const CLOCK = /^\d{2}:\d{2}$/;
 
 /** Every path a post touches. The post pages and the ground re-read. */
 function revalidateSplash(id: string | null = null): void {
@@ -24,10 +23,10 @@ function revalidateSplash(id: string | null = null): void {
 
 const Header = z.object({
   title: z.string().trim().max(120),
-  /** A declared range is descriptive, never a deadline (H20e). */
+  /** The post's range, which every block takes (H24). Null leaves it as it is. */
   declaredStart: z.string().regex(ISO_DATE).nullable(),
   declaredEnd: z.string().regex(ISO_DATE).nullable(),
-  /** The default lane of a new block (H21f). */
+  /** The post's lane, which every block takes (H24); none on joint and Just mine. */
   declaredLaneId: z.uuid().nullable(),
   /** The post's own icon, one glyph, else its lane's emoji stands for it (0008). */
   icon: z.string().trim().max(16).nullable(),
@@ -49,11 +48,8 @@ const Drop = Header.extend({
   /** The first block's body; empty makes a titled post with nothing in it yet. */
   body: z.string().trim().max(8000),
   media: z.array(z.string()).max(8),
-  /** The first block's annotation (H20c), or nothing. */
-  occurredOn: z.string().regex(ISO_DATE).nullable(),
-  occurredTime: z.string().regex(CLOCK).nullable(),
-  startInstant: z.iso.datetime().nullable(),
-  endInstant: z.iso.datetime().nullable(),
+  /** Today in the author's zone: the post's date when none is given (H24). */
+  today: z.string().regex(ISO_DATE),
   /** The custom shelf to sit on, if any (H21e). */
   sessionId: z.uuid().nullable(),
 });
@@ -64,6 +60,8 @@ export type Drop = z.infer<typeof Drop>;
  * The post sheet's one commit (SPEC 6): a post and, with it, its first block.
  * A line with no title is an untitled post whose line is its block; a title
  * with nothing under it is a post with nothing in it yet; both are complete.
+ * The post carries the lane and the date (H24): no date given is today, no
+ * lane given is the residual one; the block carries neither.
  */
 export async function dropSplash(input: Drop): Promise<SplashResult> {
   const parsed = Drop.safeParse(input);
@@ -71,9 +69,6 @@ export async function dropSplash(input: Drop): Promise<SplashResult> {
   const drop = parsed.data;
   const refused = refuseRange(drop);
   if (refused) return { ok: false, message: refused };
-  if (drop.occurredTime !== null && drop.occurredOn === null) {
-    return { ok: false, message: 'A time needs a date.' };
-  }
   if (!drop.title && !drop.body && drop.media.length === 0 && !drop.declaredLaneId) {
     return { ok: false, message: 'Nothing to drop.' };
   }
@@ -84,15 +79,18 @@ export async function dropSplash(input: Drop): Promise<SplashResult> {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: 'Sign in again to drop this.' };
 
+  const laneId = drop.declaredLaneId ?? (await residualLane(supabase));
+  if (!laneId) return { ok: false, message: 'There is no lane to drop into.' };
+
   const { data: splash, error } = await supabase
     .from('splashes')
     .insert({
       ...(drop.id ? { id: drop.id } : {}),
       owner_id: user.id,
       title: drop.title,
-      declared_start: drop.declaredStart,
-      declared_end: drop.declaredEnd,
-      declared_lane_id: drop.declaredLaneId,
+      declared_start: drop.declaredStart ?? drop.today,
+      declared_end: drop.declaredStart ? drop.declaredEnd : null,
+      declared_lane_id: laneId,
       icon: drop.icon || null,
       session_id: drop.sessionId,
     })
@@ -102,19 +100,10 @@ export async function dropSplash(input: Drop): Promise<SplashResult> {
 
   const hasBlock = drop.body.length > 0 || drop.media.length > 0;
   if (hasBlock) {
-    const categoryId = drop.declaredLaneId ?? (await residualLane(supabase));
-    if (!categoryId) {
-      await supabase.from('splashes').delete().eq('id', splash.id);
-      return { ok: false, message: 'There is no lane to drop into.' };
-    }
     const { error: blockError } = await supabase.from('ripples').insert({
       author_id: user.id,
-      category_id: categoryId,
       note: drop.body.length > 0 ? drop.body : null,
       media: drop.media,
-      occurred_on: drop.occurredOn,
-      occurred_time: drop.occurredTime,
-      ended_at: drop.endInstant ?? drop.startInstant,
       splash_id: splash.id,
     });
     if (blockError) {
@@ -137,53 +126,9 @@ async function residualLane(
 }
 
 /**
- * A splashless block gets a post of its own the first time it needs one
- * (H21a): titled, pinned, shelved, or extended. The post is made at the
- * block's own time, so it sits where the block always sat.
- */
-export async function adoptRipple(rippleId: string): Promise<SplashResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: 'Sign in again.' };
-
-  const { data: block } = await supabase
-    .from('ripples')
-    .select('id, splash_id, created_at')
-    .eq('id', rippleId)
-    .maybeSingle();
-  if (!block) return { ok: false, message: 'That block is gone.' };
-  if (block.splash_id) {
-    const { data: existing } = await supabase
-      .from('splashes')
-      .select('*')
-      .eq('id', block.splash_id)
-      .single();
-    return existing ? { ok: true, splash: existing } : { ok: false, message: 'That post is gone.' };
-  }
-
-  const { data: splash, error } = await supabase
-    .from('splashes')
-    .insert({ owner_id: user.id, title: '', created_at: block.created_at })
-    .select('*')
-    .single();
-  if (error) return { ok: false, message: error.message };
-
-  const { error: attach } = await supabase
-    .from('ripples')
-    .update({ splash_id: splash.id })
-    .eq('id', rippleId);
-  if (attach) return { ok: false, message: attach.message };
-
-  revalidateSplash(splash.id);
-  return { ok: true, splash };
-}
-
-/**
- * Edits a post's header in place: title, declared range, declared lane. RLS
- * makes it mine; the update touches no block. A changed declaration governs
- * new blocks from here on (H21f) and never rewrites what was written.
+ * Edits a post's header in place: title, range, lane. RLS makes it mine;
+ * the update touches no block, and every block follows at once (H24): a
+ * block's lane and date are its post's.
  */
 export async function updateSplashHeader(id: string, input: Header): Promise<SplashResult> {
   const parsed = Header.safeParse(input);
@@ -197,8 +142,10 @@ export async function updateSplashHeader(id: string, input: Header): Promise<Spl
     .from('splashes')
     .update({
       title: header.title,
-      declared_start: header.declaredStart,
-      declared_end: header.declaredEnd,
+      // A post always has a date (H24): none sent leaves its range as it is.
+      ...(header.declaredStart
+        ? { declared_start: header.declaredStart, declared_end: header.declaredEnd }
+        : {}),
       declared_lane_id: header.declaredLaneId,
       icon: header.icon || null,
     })

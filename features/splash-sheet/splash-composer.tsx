@@ -3,12 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import { AnnotationControl } from '@/features/input-sheet/annotation-control';
-import {
-  annotationVerdict,
-  spanIsEmpty,
-  spanKeys,
-  type Annotation,
-} from '@/features/input-sheet/draft';
+import { annotationVerdict, type Annotation } from '@/features/input-sheet/draft';
 import { LaneChips } from '@/features/input-sheet/lane-chips';
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import {
@@ -27,7 +22,6 @@ import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker'
 import { dropSplash } from '@/features/splash/actions';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
-import { wallClockToInstant } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
 import { usePeople } from '@/features/people/people-provider';
 
@@ -64,8 +58,9 @@ function isComposing(event: React.KeyboardEvent): boolean {
 /**
  * The composer (SPEC 6, H21, review): a large bold blue title field over a
  * smaller, lighter body field — the first line is still the title and Enter
- * still moves on to the body — the lane chip row (the declared lane), the
- * date chip preset to today, `+ Add Image`, and one full-width Drop. The
+ * still moves on to the body — the lane chip row (the post's lane), the
+ * post's date chip preset to today, `+ Add Image`, and one full-width Drop.
+ * The lane and the date are the post's, and every block takes them (H24). The
  * same form inside the phone's bottom sheet and the wide screen's standing
  * panel.
  *
@@ -112,13 +107,14 @@ export function SplashComposer({
       ? []
       : [pool.poolId]
     : (audienceEdited ?? sharedByDefault).filter((poolId) => linkedHere.includes(poolId));
-  // My ripple on a joint splash takes the lane I linked to its pool lane
-  // when the link brings in (both, in), else none (0016, 0017): no prompt.
+  // A joint splash shows on my Home in the lane I linked to its pool lane
+  // when the link brings in (both, in), else in the pool's column — derived
+  // from the link, never stored on a ripple (H24).
   const jointPoolLane = joint ? pool?.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
   const jointLink =
     jointPoolLane && bringsIn(jointPoolLane.direction) ? jointPoolLane.myCategoryId : null;
-  // Today is in the field from the start (review): the chip opens set to the
-  // date, no clock, and is removed with its × for a plain posted block.
+  // Today is in the field from the start (review): the post's date, days
+  // only (H24). Removed with its ×, the post rests on today all the same.
   const [annotation, setAnnotation] = useState<Annotation | null>(fresh);
   const [mediaPaths, setMediaPaths] = useState<string[]>([]);
   const media = useMediaAttach(mediaPaths, setMediaPaths);
@@ -149,19 +145,12 @@ export function SplashComposer({
 
   function drop(): void {
     const a = annotation;
-    const startInstant =
-      a && a.time ? wallClockToInstant(a.date, a.time, timeZone).toISOString() : null;
-    const span = a && !spanIsEmpty(a) ? spanKeys(a) : null;
-    const endInstant = span?.end
-      ? wallClockToInstant(span.end.slice(0, 10), span.end.slice(11), timeZone).toISOString()
-      : null;
     const id = crypto.randomUUID();
     const now = new Date();
-    // With no ripple to carry it, the date is the post's own declaration
-    // (review): days only, as a declaration has no clock.
     const hasBlock = body.length > 0 || mediaPaths.length > 0;
-    const declaredStart = !hasBlock && a ? a.date : null;
-    const declaredEnd = !hasBlock && a?.endDate && a.endDate !== a.date ? a.endDate : null;
+    // The post's range (H24): the chip's days, else today.
+    const declaredStart = a?.date ?? today;
+    const declaredEnd = a?.endDate && a.endDate !== a.date ? a.endDate : null;
     const input = {
       id,
       title,
@@ -171,10 +160,7 @@ export function SplashComposer({
       declaredEnd,
       declaredLaneId: laneId,
       icon: icon || null,
-      occurredOn: a?.date ?? null,
-      occurredTime: a?.time ?? null,
-      startInstant,
-      endInstant,
+      today,
       sessionId: null,
     };
 
@@ -206,11 +192,10 @@ export function SplashComposer({
         ? [
             {
               id: `${id}-first`,
-              category_id: own ? null : (laneId ?? ''),
+              category_id: null,
               note: body.length > 0 ? body : null,
-              occurred_on: a?.date ?? null,
-              occurred_time: a?.time ? `${a.time}:00` : null,
-              ended_at: endInstant ?? startInstant,
+              occurred_on: null,
+              occurred_time: null,
               created_at: now.toISOString(),
             },
           ]
@@ -288,7 +273,7 @@ export function SplashComposer({
 
     onDrop({
       splash,
-      month: (a?.date ?? today).slice(0, 7),
+      month: declaredStart.slice(0, 7),
       note: body.length > 0 ? body : null,
       ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
       ...(home ? { home } : {}),
@@ -302,10 +287,8 @@ export function SplashComposer({
               icon: icon || null,
               body,
               media: mediaPaths,
-              occurredOn: a?.date ?? null,
-              occurredTime: a?.time ?? null,
-              startInstant,
-              endInstant,
+              declaredStart,
+              declaredEnd,
             })
         : joint
           ? () =>
@@ -316,8 +299,8 @@ export function SplashComposer({
                 title,
                 icon: icon || null,
                 body,
-                myCategoryId: jointLink,
-                occurredOn: a?.date ?? null,
+                declaredStart,
+                declaredEnd,
               })
           : async () => {
               const made = await dropSplash(input);
@@ -399,7 +382,13 @@ export function SplashComposer({
 
       {/* The date and a photo come first, above the lane (review). */}
       <div className="flex flex-wrap items-center gap-2">
-        <AnnotationControl annotation={annotation} today={today} onChange={setAnnotation} />
+        <AnnotationControl
+          annotation={annotation}
+          today={today}
+          onChange={setAnnotation}
+          clock={false}
+          label="+ Add Date"
+        />
         <AddImageAffordance attach={media.attach} busy={media.busy} input={media.input} />
       </div>
       <MediaPreviews
@@ -409,7 +398,7 @@ export function SplashComposer({
         onChange={setMediaPaths}
       />
 
-      {/* The declared lane: where every block of this post starts (H21f).
+      {/* The post's lane: every block of it takes this one (H24).
           From a pool: Pool lanes | My lanes, and no audience (H23). */}
       {pool ? (
         <PoolLanePicker

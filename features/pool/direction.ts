@@ -14,9 +14,30 @@ export function sharesOut(direction: LinkDirection | null | undefined): boolean 
   return direction === 'out' || direction === 'both';
 }
 
-/** Brings my joint ripples on the pool lane into my lane: both and in. */
+/** Brings the pool lane's joint splashes into my lane: both and in. */
 export function bringsIn(direction: LinkDirection | null | undefined): boolean {
   return direction === 'both' || direction === 'in';
+}
+
+/**
+ * Where a joint splash on this pool lane shows on my Home (H24): my lane
+ * linked to it when the link brings in (↔ both, → in), else null — the
+ * pool's own column (← out, or no link). Derived from the links, never
+ * stored on a ripple. Several links may bring one pool lane in (0019): both
+ * wins, then the first. The database's copy is `_joint_lane_for` (0028).
+ */
+export function jointLaneFor(
+  poolLaneId: string | null,
+  links: { myCategoryId: string; poolLaneId?: string; direction?: LinkDirection }[],
+): string | null {
+  if (!poolLaneId) return null;
+  const bringing = links.filter(
+    (l) => l.poolLaneId === poolLaneId && bringsIn(l.direction ?? DEFAULT_DIRECTION),
+  );
+  return (
+    (bringing.find((l) => (l.direction ?? DEFAULT_DIRECTION) === 'both') ?? bringing[0])
+      ?.myCategoryId ?? null
+  );
 }
 
 export const DIRECTION_GLYPH: Record<LinkDirection, string> = { out: '←', both: '↔', in: '→' };

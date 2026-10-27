@@ -26,26 +26,26 @@ export type SplashBlock = FlowKeyed & {
 export type DateRange = { start: IsoDate; end: IsoDate };
 
 /**
- * A post as the surfaces read it (H21a): declared where declared, derived
- * from its blocks where not, its lane tags accumulated, its range the union
- * of what it declares and what its blocks say.
+ * A post as the surfaces read it (H21a, H24): its lane and its range are its
+ * own, and every block inherits them. A block's own lane and date are frozen
+ * metadata (0028, 0029): read back on the block, never used to place it.
  */
 export type SplashSummary = {
   id: string;
   title: string;
   /** For an untitled post: the first block's first words, else null. */
   ghostTitle: string | null;
-  /** The default lane of a new block (H21f), or none. */
+  /** Its lane (H24); none for joint and Just mine, whose lane is their pool lane. */
   declaredLaneId: string | null;
   /** The post's own icon (0008), or none: its lane's emoji stands in. */
   icon: string | null;
-  /** Derived tags: the declared lane first, then every lane the blocks took, by frequency. */
+  /** Its lane, alone (H24): blocks take no lane of their own to add a tag. */
   laneIds: string[];
   declaredRange: DateRange | null;
-  /** Display range: declared ∪ block-derived. Null for an empty, undeclared post. */
+  /** Where it is placed (H24): its own range, else the day it was made. */
   range: DateRange | null;
   count: number;
-  /** Each block's resting day, the last day of its span, and its instant, oldest first. */
+  /** Each block on the post's last day, ordered by when it was written, oldest first. */
   blocks: { day: IsoDate; endDay: IsoDate; instant: number }[];
   /** When the post last received something, for recency and the open rule. */
   latestCreatedAt: string;
@@ -67,42 +67,6 @@ export function isSplashOpen(count: number, latestCreatedAt: string | null, now:
   return now.getTime() - Date.parse(latestCreatedAt) < OPEN_WINDOW_HOURS * 60 * 60 * 1000;
 }
 
-/**
- * The lanes a post's blocks took, most frequent first; a tie goes to the most
- * recently written, because that is the one the author was just thinking
- * about.
- */
-export function lanesByFrequency(
-  blocks: Pick<SplashBlock, 'category_id' | 'created_at'>[],
-): string[] {
-  const tally = new Map<string, { count: number; latest: number }>();
-  for (const block of blocks) {
-    // A block with no lane of mine (Just mine, 0014) takes no tag.
-    if (block.category_id === null) continue;
-    const at = Date.parse(block.created_at);
-    const current = tally.get(block.category_id) ?? { count: 0, latest: 0 };
-    tally.set(block.category_id, {
-      count: current.count + 1,
-      latest: Math.max(current.latest, at),
-    });
-  }
-  return [...tally.entries()]
-    .sort(([, a], [, b]) => b.count - a.count || b.latest - a.latest)
-    .map(([id]) => id);
-}
-
-/**
- * The tags a post carries (H21f): the declared lane first and representative,
- * then every other lane its blocks took. Accumulation, never rejection.
- */
-export function laneTags(
-  declaredLaneId: string | null,
-  blocks: Pick<SplashBlock, 'category_id' | 'created_at'>[],
-): string[] {
-  const taken = lanesByFrequency(blocks).filter((id) => id !== declaredLaneId);
-  return declaredLaneId ? [declaredLaneId, ...taken] : taken;
-}
-
 /** The first few words of a note, for a post with no title. */
 export function ghostTitle(note: string | null): string | null {
   const words = (note ?? '').trim().split(/\s+/).filter(Boolean);
@@ -122,54 +86,23 @@ function spanEndDay(block: SplashBlock, day: IsoDate, timeZone: string): IsoDate
   return end > day ? end : day;
 }
 
-function union(a: DateRange | null, b: DateRange | null): DateRange | null {
-  if (!a) return b;
-  if (!b) return a;
-  return { start: a.start < b.start ? a.start : b.start, end: a.end > b.end ? a.end : b.end };
-}
-
 export function summarizeSplash(
   splash: Splash,
   blocks: SplashBlock[],
   timeZone: string,
   now: Date,
 ): SplashSummary {
-  // The blocks read the post's declared date through the join the queries
-  // make; summarised here from the row itself so a post just created, with
-  // no join yet, summarises the same way.
-  const keyed = blocks.map((block) => ({
-    ...block,
-    splash: block.splash ?? { declared_start: splash.declared_start },
-  }));
-  const placed = keyed
-    .map((block) => {
-      const day = dayOf(block, timeZone);
-      return {
-        day,
-        endDay: spanEndDay(block, day, timeZone),
-        instant: flowInstant(block, timeZone),
-        createdAt: block.created_at,
-        note: block.note,
-      };
-    })
-    // The day first: an in-day instant means nothing across days (0013).
-    .sort(
-      (a, b) =>
-        (a.day < b.day ? -1 : a.day > b.day ? 1 : 0) ||
-        a.instant - b.instant ||
-        a.createdAt.localeCompare(b.createdAt),
-    );
-
+  // H24: the post is placed by its own range; with none (a row from before
+  // 0028 that the backfill has not reached), by the day it was made.
+  const writtenOn = splash.written_on ?? todayIn(timeZone, new Date(splash.created_at));
   const declaredRange = splash.declared_start
     ? { start: splash.declared_start, end: splash.declared_end ?? splash.declared_start }
     : null;
-  const derived =
-    placed.length > 0
-      ? {
-          start: placed[0].day,
-          end: placed.reduce((latest, b) => (b.endDay > latest ? b.endDay : latest), placed[0].day),
-        }
-      : null;
+  const range = declaredRange ?? { start: writtenOn, end: writtenOn };
+  // Blocks order by when they were written; their own dates place nothing.
+  const written = [...blocks].sort(
+    (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+  );
 
   const latestCreatedAt = blocks.reduce<string | null>(
     (latest, b) => (latest === null || b.created_at > latest ? b.created_at : latest),
@@ -179,16 +112,20 @@ export function summarizeSplash(
   return {
     id: splash.id,
     title: splash.title,
-    ghostTitle: splash.title.trim() ? null : ghostTitle(placed[0]?.note ?? null),
+    ghostTitle: splash.title.trim() ? null : ghostTitle(written[0]?.note ?? null),
     declaredLaneId: splash.declared_lane_id,
     icon: splash.icon ?? null,
-    laneIds: laneTags(splash.declared_lane_id, blocks),
+    laneIds: splash.declared_lane_id ? [splash.declared_lane_id] : [],
     declaredRange,
-    range: union(declaredRange, derived),
+    range,
     count: blocks.length,
-    blocks: placed.map(({ day, endDay, instant }) => ({ day, endDay, instant })),
+    blocks: written.map((b) => ({
+      day: range.end,
+      endDay: range.end,
+      instant: Date.parse(b.created_at),
+    })),
     latestCreatedAt: latestCreatedAt ?? splash.created_at,
-    writtenOn: splash.written_on ?? todayIn(timeZone, new Date(splash.created_at)),
+    writtenOn,
     ownPoolId: splash.own_pool_id ?? null,
     open: isSplashOpen(blocks.length, latestCreatedAt, now),
     createdAt: splash.created_at,
@@ -199,8 +136,10 @@ export function summarizeSplash(
 }
 
 /**
- * A block with no post renders as an untitled post of one (H21a). It has no
- * row of its own until it needs one; its id is the block's.
+ * A block whose post I cannot read — on a joint splash of a pool I left
+ * (H23) — renders as an untitled post of one, so nothing I wrote vanishes
+ * from my own surfaces. Every block has a post since 0028 (H24); this is the
+ * one way one still reads alone. Its id is the block's.
  */
 export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date): SplashSummary {
   const day = dayOf(block, timeZone);
@@ -266,7 +205,7 @@ export function byRecency(a: SplashSummary, b: SplashSummary): number {
   return Date.parse(b.latestCreatedAt) - Date.parse(a.latestCreatedAt);
 }
 
-/** The lane that stands for the post: the declared one, else the one its blocks took most. */
+/** The lane that stands for the post (H24): its own; a lone block's, read alone. */
 export function representativeLane(summary: Pick<SplashSummary, 'laneIds'>): string | null {
   return summary.laneIds[0] ?? null;
 }
@@ -308,36 +247,26 @@ export function monthsOf(summary: SplashSummary): string[] {
 }
 
 /**
- * Where a post sits within a month (H21e): at its latest block in that month;
- * with no block there, at the end of its range clipped to the month; with no
- * range at all, where it was made. `span` is what the pill reads: that
- * block's own period when it spans days (review), clipped to the month, else
- * the one date.
+ * Where a post sits within a month (H21e, H24): at the end of its range
+ * clipped to the month, ordered by its latest block; `span` is its range
+ * clipped to the month, what the pill reads. A post with no range of its
+ * own sits where it was made.
  */
 export function positionInMonth(
   summary: SplashSummary,
   month: string,
 ): { instant: number; date: IsoDate; span: DateRange } {
+  const first: IsoDate = `${month}-01`;
   const last = lastDayOf(month);
-  const inMonth = summary.blocks.filter((block) => monthKey(block.day) === month);
-  if (inMonth.length > 0) {
-    const latest = inMonth[inMonth.length - 1];
-    return {
-      instant: latest.instant,
-      date: latest.day,
-      span: { start: latest.day, end: latest.endDay < last ? latest.endDay : last },
-    };
-  }
-  if (summary.range) {
-    const date = summary.range.end < last ? summary.range.end : last;
-    return {
-      instant: restingInstant(date),
-      date,
-      span: { start: date, end: date },
-    };
-  }
-  const made = summary.writtenOn;
-  return { instant: Date.parse(summary.createdAt), date: made, span: { start: made, end: made } };
+  const range = summary.range ?? { start: summary.writtenOn, end: summary.writtenOn };
+  const date = range.end < last ? range.end : last;
+  const start = range.start > first ? range.start : first;
+  const latest = summary.blocks[summary.blocks.length - 1];
+  return {
+    instant: latest && date === range.end ? latest.instant : restingInstant(date),
+    date,
+    span: { start, end: date },
+  };
 }
 
 /** `2026. 8. 17 ~ 2026. 8. 20`, or one date, as the mockups write it. */

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   formatPillDate,
   ghostTitle,
-  laneTags,
   lastDayOf,
   monthsBetween,
   monthsOf,
@@ -67,34 +66,50 @@ describe('a declaration is a default, never an override (H21f)', () => {
     // date-only one — a rank, so no reader's zone can move it (0013).
     expect(flowInstant(resting, TZ)).toBe(restingInstant('2026-08-17'));
   });
+});
 
-  it('summarises its blocks against its own declared date before any join exists', () => {
+describe('a block inherits its post’s lane and date (H24)', () => {
+  it('places its blocks on its own range, before any join exists', () => {
     const summary = summarizeSplash(
       splash({ declared_start: '2026-08-17', declared_end: '2026-08-20' }),
-      [block({ id: 'a' })],
+      [block({ id: 'a', occurred_on: '2026-09-02' })],
       TZ,
       NOW,
     );
-    expect(summary.blocks[0].day).toBe('2026-08-17');
+    expect(summary.blocks[0].day).toBe('2026-08-20');
   });
 
-  it('turns a declared lane into tags when a block takes another: declared first', () => {
+  it('carries its own lane alone: a block’s frozen lane adds no tag', () => {
     const blocks = [
       block({ id: 'a', category_id: 'c-media', created_at: '2026-09-21T16:00:00Z' }),
-      block({ id: 'b', category_id: 'c-media', created_at: '2026-09-22T16:00:00Z' }),
-      block({ id: 'c', category_id: 'c-day', created_at: '2026-09-23T16:00:00Z' }),
+      block({ id: 'b', category_id: 'c-day', created_at: '2026-09-23T16:00:00Z' }),
     ];
-    expect(laneTags('c-day', blocks)).toEqual(['c-day', 'c-media']);
-    expect(laneTags(null, blocks)).toEqual(['c-media', 'c-day']);
-    expect(laneTags('c-place', [])).toEqual(['c-place']);
     expect(summarizeSplash(splash({ declared_lane_id: 'c-day' }), blocks, TZ, NOW).laneIds).toEqual(
-      ['c-day', 'c-media'],
+      ['c-day'],
     );
+    // Joint and Just mine have no lane of mine: their pool lane stands in elsewhere.
+    expect(summarizeSplash(splash(), blocks, TZ, NOW).laneIds).toEqual([]);
+  });
+
+  it('orders its blocks by when they were written, not by their own dates', () => {
+    const summary = summarizeSplash(
+      splash({ declared_start: '2026-09-01' }),
+      [
+        block({ id: 'later', occurred_on: '2026-08-01', created_at: '2026-09-22T16:00:00Z' }),
+        block({ id: 'earlier', occurred_on: '2026-09-30', created_at: '2026-09-21T16:00:00Z' }),
+      ],
+      TZ,
+      NOW,
+    );
+    expect(summary.blocks.map((b) => b.instant)).toEqual([
+      Date.parse('2026-09-21T16:00:00Z'),
+      Date.parse('2026-09-22T16:00:00Z'),
+    ]);
   });
 });
 
 describe('a post’s range and months (H21e)', () => {
-  it('unions the declared range with what the blocks say', () => {
+  it('is placed by its own range: a block’s date outside it moves nothing', () => {
     const summary = summarizeSplash(
       splash({ declared_start: '2026-08-17', declared_end: '2026-08-20' }),
       [block({ id: 'late', occurred_on: '2026-09-02' })],
@@ -102,68 +117,47 @@ describe('a post’s range and months (H21e)', () => {
       NOW,
     );
     expect(summary.declaredRange).toEqual({ start: '2026-08-17', end: '2026-08-20' });
-    expect(summary.range).toEqual({ start: '2026-08-17', end: '2026-09-02' });
-    expect(monthsOf(summary)).toEqual(['2026-08', '2026-09']);
+    expect(summary.range).toEqual({ start: '2026-08-17', end: '2026-08-20' });
+    expect(monthsOf(summary)).toEqual(['2026-08']);
   });
 
-  it('appears in every month it touches, positioned by its latest block in each', () => {
-    const summary = summarizeSplash(
-      splash(),
-      [
-        block({ id: 'aug1', occurred_on: '2026-08-28' }),
-        block({ id: 'aug2', occurred_on: '2026-08-30' }),
-        block({ id: 'sep', occurred_on: '2026-09-03' }),
-      ],
-      TZ,
-      NOW,
-    );
-    expect(monthsOf(summary)).toEqual(['2026-08', '2026-09']);
-    expect(positionInMonth(summary, '2026-08').date).toBe('2026-08-30');
-    expect(positionInMonth(summary, '2026-09').date).toBe('2026-09-03');
-  });
-
-  it('sits at the clipped end of its range in a month it declares but has no block in', () => {
+  it('appears in every month its range touches, at the range’s end clipped to each', () => {
     const summary = summarizeSplash(
       splash({ declared_start: '2026-08-28', declared_end: '2026-09-03' }),
       [block({ id: 'a', occurred_on: '2026-08-29' })],
       TZ,
       NOW,
     );
+    expect(monthsOf(summary)).toEqual(['2026-08', '2026-09']);
+    expect(positionInMonth(summary, '2026-08').date).toBe('2026-08-31');
     expect(positionInMonth(summary, '2026-09').date).toBe('2026-09-03');
-    expect(positionInMonth(summary, '2026-08').date).toBe('2026-08-29');
   });
 
-  it('counts a span’s last day into the range, and reads the period on the pill', () => {
-    // A span by dates alone, Sep 12 to 14: the end is the close of Sep 14.
+  it('reads its own range as the period on the pill', () => {
+    // A block's own span (frozen) adds nothing: the post's range is the period.
     const span = block({
       id: 'trip',
       occurred_on: '2026-09-12',
-      ended_at: '2026-09-15T06:59:59.999Z',
+      ended_at: '2026-09-20T06:59:59.999Z',
       created_at: '2026-09-12T16:00:00.000Z',
     });
-    const summary = summarizeSplash(splash(), [span], TZ, NOW);
-    expect(summary.range).toEqual({ start: '2026-09-12', end: '2026-09-14' });
-    expect(summary.blocks[0].endDay).toBe('2026-09-14');
-    const at = positionInMonth(summary, '2026-09');
-    expect(at.date).toBe('2026-09-12');
-    expect(at.span).toEqual({ start: '2026-09-12', end: '2026-09-14' });
-    expect(formatPillDate(at.span)).toBe('Sep 12–14');
-    // A point block reads one date.
-    const point = summarizeSplash(
-      splash(),
-      [block({ id: 'p', occurred_on: '2026-09-03' })],
+    const summary = summarizeSplash(
+      splash({ declared_start: '2026-09-12', declared_end: '2026-09-14' }),
+      [span],
       TZ,
       NOW,
     );
-    expect(positionInMonth(point, '2026-09').span).toEqual({
-      start: '2026-09-03',
-      end: '2026-09-03',
-    });
+    expect(summary.range).toEqual({ start: '2026-09-12', end: '2026-09-14' });
+    const at = positionInMonth(summary, '2026-09');
+    expect(at.date).toBe('2026-09-14');
+    expect(at.span).toEqual({ start: '2026-09-12', end: '2026-09-14' });
+    expect(formatPillDate(at.span)).toBe('Sep 12–14');
   });
 
-  it('sits where it was made while it has nothing and declares nothing', () => {
+  it('sits on the day it was made while it has no range of its own', () => {
     const summary = summarizeSplash(splash({ created_at: '2026-09-23T16:00:00Z' }), [], TZ, NOW);
-    expect(summary.range).toBeNull();
+    expect(summary.declaredRange).toBeNull();
+    expect(summary.range).toEqual({ start: '2026-09-23', end: '2026-09-23' });
     expect(monthsOf(summary)).toEqual(['2026-09']);
     expect(positionInMonth(summary, '2026-09').date).toBe('2026-09-23');
   });

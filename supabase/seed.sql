@@ -93,12 +93,13 @@ select v.id, '11111111-1111-1111-1111-111111111111', v.kind::public.session_kind
        ) as v(id, kind, title, month, from_date, to_date, lane);
 
 -- ---------------------------------------------------------------------------
--- splashes — posts (H21a): a declared lane and range, a spanning one, a
--- mixed-lane one, an untitled one, a pinned one
+-- splashes — posts (H21a, H24): each owns its lane and its range, and every
+-- block on it takes both. A spanning one, a pinned one, an untitled one, a
+-- future-dated one, and posts of one where a block stands alone.
 -- ---------------------------------------------------------------------------
 
--- Dates are relative to today so the ground, the scrubber, the shelves and
--- the inheritance defaults are visible whenever this is run.
+-- Dates are relative to today so the ground, the shelves and the board are
+-- visible whenever this is run.
 with day as (select (now() at time zone 'America/Vancouver')::date as d)
 insert into public.splashes (id, owner_id, title, declared_start, declared_end, declared_lane_id, session_id, pinned_at, created_at)
 select v.id, '11111111-1111-1111-1111-111111111111', v.title,
@@ -107,162 +108,122 @@ select v.id, '11111111-1111-1111-1111-111111111111', v.title,
        (day.d - v.made) + time '09:00'
   from day,
        lateral (values
-         -- Declared range and declared lane: a new block defaults to Place
-         -- and to the declared date (H21f). On the Trips shelf.
+         -- Two nights in Place, on the Trips shelf.
          ('c1000000-0000-0000-0000-000000000001'::uuid, 'Whistler, two nights',
           day.d - 40, day.d - 37, 'a1000000-0000-0000-0000-000000000001'::uuid,
           'd1000000-0000-0000-0000-000000000002'::uuid, false, 41),
-         -- Declared lane Day, but its blocks took Media too: the lane turns
-         -- into tags, Day first (H21f). Pinned: still being written.
+         -- Pinned: still being written, every block on the day it began.
          ('c1000000-0000-0000-0000-000000000002', 'During redesign',
-          null, null, 'a1000000-0000-0000-0000-000000000006', null, true, 26),
-         -- A declared range across the month boundary: on both shelves,
-         -- positioned by its latest block in each (H21e).
+          day.d - 26, null, 'a1000000-0000-0000-0000-000000000006', null, true, 26),
+         -- A range across the month boundary: on both shelves (H21e).
          ('c1000000-0000-0000-0000-000000000003', 'The long weekend that ran over',
           (date_trunc('month', day.d) - interval '3 days')::date,
           (date_trunc('month', day.d) + interval '2 days')::date,
           'a1000000-0000-0000-0000-000000000005', 'd1000000-0000-0000-0000-000000000002', false, 3),
          -- Untitled: a one-line post. Its ghost title is its block's first words.
-         ('c1000000-0000-0000-0000-000000000004', '', null, null, null, null, false, 0)
+         ('c1000000-0000-0000-0000-000000000004', '', day.d, null,
+          'a1000000-0000-0000-0000-000000000006', null, false, 0),
+         -- Posts of one (0028): a block that stood alone, titled by its first line.
+         ('c1000000-0000-0000-0000-000000000011', 'kitsilano beach', day.d, null,
+          'a1000000-0000-0000-0000-000000000001', null, false, 0),
+         ('c1000000-0000-0000-0000-000000000012', 'parannoul on repeat', day.d, null,
+          'a1000000-0000-0000-0000-000000000003', null, false, 0),
+         -- Untitled on purpose: its one block is locked, and a title is not.
+         ('c1000000-0000-0000-0000-000000000013', '', day.d, null,
+          'a1000000-0000-0000-0000-000000000006', null, false, 0),
+         ('c1000000-0000-0000-0000-000000000014', 'slept badly, worked anyway', day.d, null,
+          'a1000000-0000-0000-0000-000000000002', null, false, 0),
+         -- Two posts on one evening: overlapping things are both true (H20c).
+         ('c1000000-0000-0000-0000-000000000015', 'dinner at the long table', day.d - 1, null,
+          'a1000000-0000-0000-0000-000000000005', null, false, 1),
+         ('c1000000-0000-0000-0000-000000000016', 'call from mom, halfway through', day.d - 1, null,
+          'a1000000-0000-0000-0000-000000000001', null, false, 1),
+         ('c1000000-0000-0000-0000-000000000017', 'that one song again', day.d - 1, null,
+          'a1000000-0000-0000-0000-000000000003', null, false, 1),
+         -- Future-dated: a post on a day still to come.
+         ('c1000000-0000-0000-0000-000000000018', 'dinner with mina', day.d + 3, null,
+          'a1000000-0000-0000-0000-000000000005', null, false, 0)
        ) as v(id, title, from_date, to_date, lane, session, pinned, made);
 
+-- Mina, in Seoul, and Jae, who went quiet five days ago: a post each per block.
+insert into public.splashes (id, owner_id, title, declared_start, declared_lane_id)
+values
+  ('c2000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'seongsu, again',
+   (now() at time zone 'Asia/Seoul')::date, 'a2000000-0000-0000-0000-000000000001'),
+  ('c2000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'thesis playlist, again',
+   (now() at time zone 'Asia/Seoul')::date, 'a2000000-0000-0000-0000-000000000003'),
+  ('c2000000-0000-0000-0000-000000000003', '22222222-2222-2222-2222-222222222222', 'rained all afternoon',
+   (now() at time zone 'Asia/Seoul')::date, 'a2000000-0000-0000-0000-000000000006'),
+  ('c3000000-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333', 'see you when I see you',
+   ((now() - interval '5 days') at time zone 'America/Vancouver')::date,
+   'a3000000-0000-0000-0000-000000000006');
+
 -- ---------------------------------------------------------------------------
--- ripples
---
--- Every shape the flow has to render (H20c): unannotated fragments flowing by
--- created_at, a date-only fragment, placed fragments, a manual span, two
--- overlapping spans (legal now), a future-dated fragment, a backfill created
--- this month but placed last month, splash members, loose fragments, locked.
+-- ripples — a block is its words, photos, author and when it was written
+-- (H24): its lane and date are its post's, so it carries neither.
 -- ---------------------------------------------------------------------------
 
--- The Whistler post: four placed blocks inside its declared range, all in
--- its declared lane, made when they happened.
+-- Every block of Yoonji's: its post, and when it was written (`made` days
+-- back, at `wrote`). Blocks of one post read in the order they were written.
 with day as (select (now() at time zone 'America/Vancouver')::date as d)
-insert into public.ripples (id, author_id, category_id, note, occurred_on, occurred_time, ended_at, splash_id, created_at)
-select v.id, '11111111-1111-1111-1111-111111111111', 'a1000000-0000-0000-0000-000000000001', v.note,
-       day.d - v.ago, v.at, (day.d - v.ago + v.at) at time zone 'America/Vancouver',
-       'c1000000-0000-0000-0000-000000000001',
-       (day.d - v.ago + v.at) at time zone 'America/Vancouver'
-  from day,
-       (values
-         ('b1000000-0000-0000-0000-000000000021'::uuid, 'sea to sky, fog the whole way up', 40, '11:30'::time),
-         ('b1000000-0000-0000-0000-000000000022', 'the village at night, empty', 40, '21:15'),
-         ('b1000000-0000-0000-0000-000000000023', 'peak chair', 39, '10:05'),
-         ('b1000000-0000-0000-0000-000000000024', 'last coffee before the drive', 37, '08:40')
-       ) as v(id, note, ago, at);
-
--- The redesign post: blocks across two months, plus one BACKFILL — made
--- today, placed last month — so the post surfaces on both shelves while the
--- diary remembers it was written now.
-with day as (select (now() at time zone 'America/Vancouver')::date as d)
-insert into public.ripples (id, author_id, category_id, note, occurred_on, occurred_time, ended_at, splash_id, created_at)
-select v.id, '11111111-1111-1111-1111-111111111111', v.category, v.note,
-       case when v.placed is null then null else day.d - v.placed end,
-       null, null,
-       'c1000000-0000-0000-0000-000000000002',
-       (day.d - v.made) at time zone 'America/Vancouver' + v.at
-  from day,
-       (values
-         ('b1000000-0000-0000-0000-000000000031'::uuid, 'a1000000-0000-0000-0000-000000000004'::uuid,
-          'watched the whole dogfood month back as one scroll', 25, null::int, interval '20 hours'),
-         ('b1000000-0000-0000-0000-000000000032', 'a1000000-0000-0000-0000-000000000006',
-          'the record is a fragment, not a timesheet', 12, null, interval '9 hours 30 minutes'),
-         ('b1000000-0000-0000-0000-000000000033', 'a1000000-0000-0000-0000-000000000006',
-          'two modes, one scroll', 2, null, interval '14 hours'),
-         -- Backfill: created today, annotated 35 days ago.
-         ('b1000000-0000-0000-0000-000000000034', 'a1000000-0000-0000-0000-000000000006',
-          'the sketch that started it, found in a notebook', 0, 35, interval '8 hours')
-       ) as v(id, category, note, made, placed, at);
-
--- The spanning post: one block in each month it touches, so each shelf
--- positions it by its own latest block (H21e).
-with day as (select (now() at time zone 'America/Vancouver')::date as d)
-insert into public.ripples (id, author_id, category_id, note, occurred_on, occurred_time, ended_at, splash_id, created_at)
-select v.id, '11111111-1111-1111-1111-111111111111', 'a1000000-0000-0000-0000-000000000005', v.note,
-       v.placed, null, null, 'c1000000-0000-0000-0000-000000000003',
-       v.placed + time '20:00'
-  from day,
-       lateral (values
-         ('b1000000-0000-0000-0000-000000000041'::uuid, 'the drive down, nothing but radio',
-          (date_trunc('month', day.d) - interval '3 days')::date),
-         ('b1000000-0000-0000-0000-000000000042', 'home a day late and glad of it',
-          (date_trunc('month', day.d) + interval '2 days')::date)
-       ) as v(id, note, placed);
-
--- The untitled post: one block, no annotation, written this morning.
-with day as (select (now() at time zone 'America/Vancouver')::date as d)
-insert into public.ripples (id, author_id, category_id, note, splash_id, created_at)
-select 'b1000000-0000-0000-0000-000000000051', '11111111-1111-1111-1111-111111111111',
-       'a1000000-0000-0000-0000-000000000006', 'coffee went cold while I read the whole thing',
-       'c1000000-0000-0000-0000-000000000004', (day.d) at time zone 'America/Vancouver' + interval '8 hours 10 minutes'
-  from day;
-
--- Loose blocks with no post, today and yesterday: each renders as an untitled
--- post of one (H21a). `on_day` counts days back from today (null =
--- unannotated); `made` is when it was written.
-with day as (select (now() at time zone 'America/Vancouver')::date as d)
-insert into public.ripples (id, author_id, category_id, note, occurred_on, occurred_time, ended_at, created_at)
-select v.id, '11111111-1111-1111-1111-111111111111', v.category, v.note,
-       case when v.on_day is null then null else day.d - v.on_day end,
-       v.at,
-       case when v.at is null then null
-            else (day.d - v.on_day + coalesce(v.ends, v.at)) at time zone 'America/Vancouver' end,
+insert into public.ripples (id, author_id, note, splash_id, created_at)
+select v.id, '11111111-1111-1111-1111-111111111111', v.note, v.splash,
        (day.d - v.made) at time zone 'America/Vancouver' + v.wrote
   from day,
        (values
-         -- Unannotated: the default. They flow in posting order.
-         ('b1000000-0000-0000-0000-000000000002'::uuid, 'a1000000-0000-0000-0000-000000000001'::uuid,
-          'kitsilano beach', null::int, null::time, null::time, 0, interval '12 hours 15 minutes'),
-         ('b1000000-0000-0000-0000-000000000003', 'a1000000-0000-0000-0000-000000000003',
-          'parannoul on repeat', null, null, null, 0, interval '14 hours 40 minutes'),
+         ('b1000000-0000-0000-0000-000000000021'::uuid, 'c1000000-0000-0000-0000-000000000001'::uuid,
+          'sea to sky, fog the whole way up', 40, interval '11 hours 30 minutes'),
+         ('b1000000-0000-0000-0000-000000000022', 'c1000000-0000-0000-0000-000000000001',
+          'the village at night, empty', 40, interval '21 hours 15 minutes'),
+         ('b1000000-0000-0000-0000-000000000023', 'c1000000-0000-0000-0000-000000000001',
+          'peak chair', 39, interval '10 hours 5 minutes'),
+         ('b1000000-0000-0000-0000-000000000024', 'c1000000-0000-0000-0000-000000000001',
+          'last coffee before the drive', 37, interval '8 hours 40 minutes'),
+         ('b1000000-0000-0000-0000-000000000031', 'c1000000-0000-0000-0000-000000000002',
+          'watched the whole dogfood month back as one scroll', 25, interval '20 hours'),
+         ('b1000000-0000-0000-0000-000000000032', 'c1000000-0000-0000-0000-000000000002',
+          'the record is a fragment, not a timesheet', 12, interval '9 hours 30 minutes'),
+         ('b1000000-0000-0000-0000-000000000033', 'c1000000-0000-0000-0000-000000000002',
+          'two modes, one scroll', 2, interval '14 hours'),
+         ('b1000000-0000-0000-0000-000000000034', 'c1000000-0000-0000-0000-000000000002',
+          'the sketch that started it, found in a notebook', 0, interval '8 hours'),
+         ('b1000000-0000-0000-0000-000000000041', 'c1000000-0000-0000-0000-000000000003',
+          'the drive down, nothing but radio', 3, interval '20 hours'),
+         ('b1000000-0000-0000-0000-000000000042', 'c1000000-0000-0000-0000-000000000003',
+          'home a day late and glad of it', 0, interval '9 hours'),
+         ('b1000000-0000-0000-0000-000000000051', 'c1000000-0000-0000-0000-000000000004',
+          'coffee went cold while I read the whole thing', 0, interval '8 hours 10 minutes'),
+         ('b1000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000011',
+          'kitsilano beach', 0, interval '12 hours 15 minutes'),
+         ('b1000000-0000-0000-0000-000000000003', 'c1000000-0000-0000-0000-000000000012',
+          'parannoul on repeat', 0, interval '14 hours 40 minutes'),
          -- Locked: the audience row is added below.
-         ('b1000000-0000-0000-0000-000000000004', 'a1000000-0000-0000-0000-000000000006',
-          'the thing I am not saying out loud yet', null, null, null, 0, interval '16 hours'),
-         -- Date-only: belongs to today, sorts at the day's end.
-         ('b1000000-0000-0000-0000-000000000007', 'a1000000-0000-0000-0000-000000000002',
-          'slept badly, worked anyway', 0, null, null, 0, interval '7 hours'),
-         -- A manual span, and a second span overlapping it: both legal (H20c).
-         ('b1000000-0000-0000-0000-000000000011', 'a1000000-0000-0000-0000-000000000005',
-          'dinner at the long table', 1, '19:00'::time, '21:00'::time, 1, interval '22 hours'),
-         ('b1000000-0000-0000-0000-000000000012', 'a1000000-0000-0000-0000-000000000001',
-          'call from mom, halfway through', 1, '19:40', '20:05', 1, interval '22 hours 5 minutes'),
-         ('b1000000-0000-0000-0000-000000000013', 'a1000000-0000-0000-0000-000000000003',
-          'that one song again', null, null, null, 1, interval '20 hours 10 minutes'),
-         -- Future-dated: a normal fragment with a future date chip.
-         ('b1000000-0000-0000-0000-000000000006', 'a1000000-0000-0000-0000-000000000005',
-          'dinner with mina', -3, '19:30', null, 0, interval '15 hours')
-       ) as v(id, category, note, on_day, at, ends, made, wrote);
+         ('b1000000-0000-0000-0000-000000000004', 'c1000000-0000-0000-0000-000000000013',
+          'the thing I am not saying out loud yet', 0, interval '16 hours'),
+         ('b1000000-0000-0000-0000-000000000007', 'c1000000-0000-0000-0000-000000000014',
+          'slept badly, worked anyway', 0, interval '7 hours'),
+         ('b1000000-0000-0000-0000-000000000011', 'c1000000-0000-0000-0000-000000000015',
+          'dinner at the long table', 1, interval '22 hours'),
+         ('b1000000-0000-0000-0000-000000000012', 'c1000000-0000-0000-0000-000000000016',
+          'call from mom, halfway through', 1, interval '22 hours 5 minutes'),
+         ('b1000000-0000-0000-0000-000000000013', 'c1000000-0000-0000-0000-000000000017',
+          'that one song again', 1, interval '20 hours 10 minutes'),
+         ('b1000000-0000-0000-0000-000000000006', 'c1000000-0000-0000-0000-000000000018',
+          'dinner with mina', 0, interval '15 hours')
+       ) as v(id, splash, note, made, wrote);
 
--- Mina, today in Seoul. Gives the friend rail something to sit at an hour
--- against, across a sixteen-hour offset from Yoonji's day.
-with day as (select (now() at time zone 'Asia/Seoul')::date as d)
-insert into public.ripples (id, author_id, category_id, note, occurred_on, occurred_time, ended_at)
-select v.id, '22222222-2222-2222-2222-222222222222', v.category, v.note,
-       case when v.today then day.d end, v.at,
-       case when v.at is null then null else (day.d + v.at) at time zone 'Asia/Seoul' end
-  from day,
-       (values
-         ('b2000000-0000-0000-0000-000000000001'::uuid, 'a2000000-0000-0000-0000-000000000001'::uuid,
-          'seongsu, again', true, '11:20'::time),
-         ('b2000000-0000-0000-0000-000000000002', 'a2000000-0000-0000-0000-000000000003',
-          'thesis playlist, again', false, null),
-         ('b2000000-0000-0000-0000-000000000003', 'a2000000-0000-0000-0000-000000000006',
-          'rained all afternoon', true, null)
-       ) as v(id, category, note, today, at);
-
--- Jae went quiet five days ago: a Ripple that persists (C7 — presence expires,
--- records do not) behind a profile that is past its TTL.
-insert into public.ripples (id, author_id, category_id, note, occurred_on, occurred_time, ended_at)
-values (
-  'b3000000-0000-0000-0000-000000000001',
-  '33333333-3333-3333-3333-333333333333',
-  'a3000000-0000-0000-0000-000000000006',
-  'see you when I see you',
-  ((now() - interval '5 days') at time zone 'America/Vancouver')::date,
-  '18:00',
-  ((((now() - interval '5 days') at time zone 'America/Vancouver')::date + '18:00'::time)
-    at time zone 'America/Vancouver')
-);
+insert into public.ripples (id, author_id, note, splash_id)
+values
+  ('b2000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'seongsu, again',
+   'c2000000-0000-0000-0000-000000000001'),
+  ('b2000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'thesis playlist, again',
+   'c2000000-0000-0000-0000-000000000002'),
+  ('b2000000-0000-0000-0000-000000000003', '22222222-2222-2222-2222-222222222222', 'rained all afternoon',
+   'c2000000-0000-0000-0000-000000000003'),
+  -- A Ripple that persists (C7 — presence expires, records do not) behind a
+  -- profile that is past its TTL.
+  ('b3000000-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333', 'see you when I see you',
+   'c3000000-0000-0000-0000-000000000001');
 
 -- ---------------------------------------------------------------------------
 -- audience — one locked Ripple, the fixture the RLS test is written against

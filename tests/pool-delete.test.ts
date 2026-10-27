@@ -83,7 +83,7 @@ beforeAll(async () => {
   });
   await asUser(ana)
     .from('ripples')
-    .insert({ author_id: ana, category_id: ANA_TRIPS, note: 'sea to sky', splash_id: ANA_SHARED });
+    .insert({ author_id: ana, note: 'sea to sky', splash_id: ANA_SHARED });
   await asUser(ana)
     .from('splash_placements')
     .insert({ splash_id: ANA_SHARED, pool_id: pool, pool_lane_id: lane.Trips });
@@ -101,7 +101,7 @@ beforeAll(async () => {
     });
     await asUser(ben)
       .from('ripples')
-      .insert({ author_id: ben, category_id: null, note: `own ${id}`, splash_id: id });
+      .insert({ author_id: ben, note: `own ${id}`, splash_id: id });
   }
 
   // A joint splash: three ripples of Ben's, one of Ana's.
@@ -121,19 +121,15 @@ beforeAll(async () => {
       .from('ripples')
       .insert({
         author_id: ben,
-        category_id: BEN_TRIPS,
         note: `ben ${n}`,
         splash_id: JOINT,
         created_at: at,
       });
   }
-  await asUser(ana)
-    .from('ripples')
-    .insert({ author_id: ana, category_id: ANA_TRIPS, note: 'ana in', splash_id: JOINT });
-  // Ben's most recent ripple there: lane-less, Games being unlinked for him (0016).
+  await asUser(ana).from('ripples').insert({ author_id: ana, note: 'ana in', splash_id: JOINT });
+  // Ben's most recent ripple there. Games is linked to no lane of his.
   await asUser(ben).from('ripples').insert({
     author_id: ben,
-    category_id: null,
     note: 'ben unlinked',
     splash_id: JOINT,
     created_at: '2026-10-23T18:00:00.000Z',
@@ -225,8 +221,8 @@ describe('deleting a pool (0015)', () => {
     expect(data).toHaveLength(3);
     const posts = new Set(data!.map((r) => r.splash_id));
     expect(posts.size).toBe(1);
-    // Each keeps its own lane.
-    expect(data!.every((r) => r.category_id === BEN_TRIPS)).toBe(true);
+    // None carries a lane of its own (H24): they take the post's.
+    expect(data!.every((r) => r.category_id === null)).toBe(true);
     const post = await asUser(ben)
       .from('splashes')
       .select('owner_id, title, icon')
@@ -249,7 +245,7 @@ describe('deleting a pool (0015)', () => {
     expect(anas.data!.splash_id).not.toBe([...posts][0]);
   });
 
-  it('puts a lane-less joint ripple into the lane made from the pool lane, beside the linked ones (0016)', async () => {
+  it('files an author’s post in a lane made from the pool lane when no link brings it in (H24)', async () => {
     const lanes = await asUser(ben).from('my_categories').select('id, name');
     const games = lanes.data!.find((l) => l.name === 'Games (Delete Me)')!;
     const late = await asUser(ben)
@@ -257,20 +253,20 @@ describe('deleting a pool (0015)', () => {
       .select('category_id, splash_id')
       .eq('note', 'ben unlinked')
       .single();
-    expect(late.data!.category_id).toBe(games.id);
+    expect(late.data!.category_id).toBeNull();
     const early = await asUser(ben)
       .from('ripples')
       .select('splash_id')
       .eq('note', 'ben 1')
       .single();
-    // One post for all four, each ripple keeping its own lane.
+    // One post for all four of Ben's.
     expect(late.data!.splash_id).toBe(early.data!.splash_id);
     const post = await asUser(ben)
       .from('splashes')
       .select('declared_lane_id')
       .eq('id', late.data!.splash_id!)
       .single();
-    // Its declared lane is its most recent ripple's: the lane made from Games.
+    // Games is linked to no lane of Ben's: the post takes the lane made from it.
     expect(post.data!.declared_lane_id).toBe(games.id);
     // One lane for Ben from Games, for Just mine and joint alike.
     expect(lanes.data!.filter((l) => l.name.startsWith('Games (')).length).toBe(1);
@@ -292,8 +288,9 @@ describe('deleting a pool (0015)', () => {
         .eq('id', id)
         .single();
       expect(post.data).toEqual({ declared_lane_id: laneId, own_pool_id: null });
+      // The post takes the lane; its ripple carries none (H24).
       const blocks = await asUser(ben).from('ripples').select('category_id').eq('splash_id', id);
-      expect(blocks.data).toEqual([{ category_id: laneId }]);
+      expect(blocks.data).toEqual([{ category_id: null }]);
     }
     const tag = await asUser(ben)
       .from('splash_origins')

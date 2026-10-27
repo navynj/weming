@@ -124,9 +124,10 @@ const A: PoolView = {
     { splashId: 's-own', poolId: 'p-a', poolLaneId: 'l-media', shared: true, ownerId: ME },
   ],
   splashes: [
-    splash({ id: 's-mine', title: 'Fried egg' }),
-    splash({ id: 's-mina', owner_id: MINA, title: 'Hiking' }),
-    splash({ id: 's-own', own_pool_id: 'p-a', title: 'Just mine' }),
+    // Each owns its date (H24): the day its ripples used to say.
+    splash({ id: 's-mine', title: 'Fried egg', declared_start: '2026-10-22' }),
+    splash({ id: 's-mina', owner_id: MINA, title: 'Hiking', declared_start: '2026-10-21' }),
+    splash({ id: 's-own', own_pool_id: 'p-a', title: 'Just mine', declared_start: '2026-10-21' }),
     splash({
       id: 's-joint',
       owner_id: null,
@@ -135,6 +136,7 @@ const A: PoolView = {
       created_by: MINA,
       title: 'Lost Ruins of Arnak',
       icon: '🏛️',
+      declared_start: '2026-10-20',
     }),
   ],
   ripples: [
@@ -774,7 +776,12 @@ describe('a day reads newest first, bands and marks alike (review)', () => {
     ...A,
     splashes: [
       ...A.splashes,
-      splash({ id: 's-old', title: 'Older', created_at: '2026-10-19T18:00:00.000Z' }),
+      splash({
+        id: 's-old',
+        title: 'Older',
+        declared_start: '2026-10-20',
+        created_at: '2026-10-19T18:00:00.000Z',
+      }),
     ],
     ripples: [
       ...A.ripples,
