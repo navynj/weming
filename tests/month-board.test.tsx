@@ -589,6 +589,36 @@ describe('three recipes, always readable (review)', () => {
     expect([joint.pad.left, joint.pad.right]).toEqual([8, 8]);
   });
 
+  it('on a phone, reaches left from the last lane into empty lanes, never over a lane with anything in it', () => {
+    // Saturday alone: no lane to its right, Thursday and Friday empty.
+    const last = layoutWeekBoard([card('sat', 'dinner with mina', '2026-10-24')], TODAY, {
+      width: 358,
+    });
+    const piece = last.pieces[0];
+    expect(piece.col).toBe(6);
+    expect(piece.span).toBe(0);
+    // Two lanes back, less a sticker's inset when it has one.
+    const back = -piece.labelBox.x / last.metrics.column;
+    expect(back).toBeGreaterThan(1.5);
+    expect(back).toBeLessThanOrEqual(2);
+    // It still ends on its own lane's line.
+    expect(piece.labelBox.x + piece.labelBox.w).toBeCloseTo(last.metrics.column, 5);
+    readable(last);
+    // Friday taken: it stays in its own lane.
+    const beside = layoutWeekBoard(
+      [card('sat', 'dinner with mina', '2026-10-24'), card('fri', 'Hoppers', '2026-10-23')],
+      TODAY,
+      { width: 358 },
+    );
+    expect(beside.pieces.find((p) => p.id === 'sat')!.labelBox.x).toBeGreaterThanOrEqual(0);
+    readable(beside);
+    // On a desktop, lanes are wide enough: no reach either way.
+    const wide = layoutWeekBoard([card('sat', 'dinner with mina', '2026-10-24')], TODAY, {
+      width: 980,
+    });
+    expect(wide.pieces[0].labelBox.x).toBeGreaterThanOrEqual(0);
+  });
+
   it('on a phone, reaches a label across empty lanes beside it, up to two, so short words read whole', () => {
     // Sunday alone, Monday and Tuesday empty.
     const lone = layoutWeekBoard(

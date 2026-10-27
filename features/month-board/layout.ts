@@ -385,8 +385,19 @@ export function onBoard(piece: Pick<BoardPiece, 'x' | 'y'>, box: Box): Box {
 }
 
 /** True when two boxes share any area (touching edges do not). */
+/**
+ * Boxes that meet within this much only touch: lane edges are fractions of
+ * the board's width, and a box measured back from one can land a float past it.
+ */
+const TOUCH_PX = 1e-6;
+
 export function intersects(a: Box, b: Box): boolean {
-  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  return (
+    a.x < b.x + b.w - TOUCH_PX &&
+    b.x < a.x + a.w - TOUCH_PX &&
+    a.y < b.y + b.h - TOUCH_PX &&
+    b.y < a.y + a.h - TOUCH_PX
+  );
 }
 
 /** Everything a piece draws on the board: its label, its photos, its sticker. */
@@ -497,6 +508,12 @@ type Context = {
   /** True when the lanes to the right are empty over this band (relative to the lane's left line and the piece's top). */
   room: (band: Box) => boolean;
   measured: Measured;
+  /**
+   * How many lanes just to its left hold nothing at all in this row: a label
+   * that cannot reach right may reach into them (review: the last lane).
+   * They are laid out after it, so only lanes that stay empty are safe.
+   */
+  emptyLeft: number;
 };
 
 /**
@@ -547,25 +564,44 @@ function padY(label: LabelStyle, m: BoardMetrics): { top: number; bottom: number
 }
 
 /**
+ * Where a lane's right line is, from its own left line: the next lane's x
+ * less this one's, as the board places them — so a label measured back from
+ * it ends exactly on that line, never a float past it into the next lane.
+ */
+function laneEnd(ctx: Context): number {
+  return (ctx.col + 1) * ctx.m.column - ctx.col * ctx.m.column;
+}
+
+/**
  * A label's width, on a phone reaching across up to two empty lanes to its
  * right so short words read in a line or two, not fragments (review): the
- * widest the lanes allow, from two lanes down to none.
+ * widest the lanes allow, from two lanes down to none. With no room to the
+ * right — the last lane, or the next one taken — it reaches left instead,
+ * by the same rule, into lanes with nothing in this row (`lead` lanes): never
+ * over another lane's items (review).
  */
 function spanLabel(
   x: number,
   pad: { top: number; bottom: number; left: number; right: number },
   heightFor: (w: number) => { lines: number; h: number },
   ctx: Context,
-): { w: number; span: number; lines: number; h: number } {
+): { w: number; span: number; lead: number; lines: number; h: number } {
   const { m, col } = ctx;
   const own = m.column - x;
   const most = m.narrow ? Math.min(PHONE_SPAN_MAX, m.columns - 1 - col) : 0;
   for (let k = most; k > 0; k -= 1) {
     const w = own + k * m.column;
     const fit = heightFor(w);
-    if (ctx.room({ x: m.column, y: 0, w: k * m.column, h: fit.h })) return { w, span: k, ...fit };
+    if (ctx.room({ x: m.column, y: 0, w: k * m.column, h: fit.h })) {
+      return { w, span: k, lead: 0, ...fit };
+    }
   }
-  return { w: own, span: 0, ...heightFor(own) };
+  const back = m.narrow ? Math.min(PHONE_SPAN_MAX, ctx.emptyLeft) : 0;
+  if (back > 0) {
+    const w = own + back * m.column;
+    return { w, span: 0, lead: back, ...heightFor(w) };
+  }
+  return { w: own, span: 0, lead: 0, ...heightFor(own) };
 }
 
 /**
@@ -703,8 +739,12 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
   });
   const hand = (x: number) => handWidth(card, x, fitFor, m);
   if (m.narrow) {
-    const fit = hand(0) ?? spanLabel(0, pad, fitFor, ctx);
-    return shape({ x: 0, y: 0, w: fit.w, h: fit.h }, fit.lines, fit.span > 0, fit.span);
+    const set = hand(0);
+    const fit = set ? { ...set, lead: 0 } : spanLabel(0, pad, fitFor, ctx);
+    // Reaching left, the label starts that many lanes back from its own.
+    const x = fit.lead > 0 ? -fit.lead * m.column : 0;
+    const w = fit.lead > 0 ? laneEnd(ctx) - x : fit.w;
+    return shape({ x, y: 0, w, h: fit.h }, fit.lines, fit.span > 0, fit.span);
   }
   if (col < m.columns - 1) {
     const x = Math.round(
@@ -767,10 +807,20 @@ function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
         return { lines, h: v.top + lines * m.caption.line + bottom, bottom };
       };
       const pad0 = { top: v.top, bottom: v.bottom, left, right: m.pad.right };
-      const fit = handWidth(card, x, fitFor, m) ?? spanLabel(x, pad0, (w) => fitFor(w), ctx);
+      const set = handWidth(card, x, fitFor, m);
+      const fit = set ? { ...set, lead: 0 } : spanLabel(x, pad0, (w) => fitFor(w), ctx);
       const bottom = fitFor(fit.w).bottom;
       const pad = { ...pad0, bottom };
-      const labelBox = { x, y: 0, w: fit.w, h: fit.h };
+      // Reaching left, the label and its sticker start that many lanes back.
+      const back = fit.lead * m.column;
+      const startX = x - back;
+      const labelBox = {
+        x: startX,
+        y: 0,
+        w: fit.lead > 0 ? laneEnd(ctx) - startX : fit.w,
+        h: fit.h,
+      };
+      stickerBox.x -= back;
       const shape: Shape = {
         ...base(card),
         recipe: 'B',
@@ -787,7 +837,7 @@ function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
         center: false,
         inlineIcon: false,
         captionLines: fit.lines,
-        w: x + fit.w,
+        w: labelBox.x + labelBox.w,
         h: fit.h,
       };
       fallback = shape;
@@ -1009,6 +1059,13 @@ function layoutBoard(
     // Pieces: right to left, so each lane decides its reach against lanes
     // already final; each lane stacked in time order with no gap.
     const byCol = new Map<number, BoardPiece[]>();
+    // Lanes with nothing of their own in this row: a label may reach left into them.
+    const holds = cells.map((c) => (byDay.get(c.key)?.length ?? 0) > 0);
+    const emptyLeftOf = (col: number): number => {
+      let n = 0;
+      for (let j = col - 1; j >= 0 && !holds[j]; j -= 1) n += 1;
+      return n;
+    };
     let tallest = span === 'month' ? m.rowBase : 0;
     for (const cell of [...cells].reverse()) {
       const list = byDay.get(cell.key) ?? [];
@@ -1034,6 +1091,7 @@ function layoutBoard(
             above: lane[at - 1],
             room: room(y0),
             measured,
+            emptyLeft: emptyLeftOf(cell.col),
           };
           return plan.recipe === 'C'
             ? shapeC(card, plan, ctx)
@@ -1056,6 +1114,7 @@ function layoutBoard(
           above: lane[at - 1],
           room: room(top + hang - drawn.tuck),
           measured,
+          emptyLeft: emptyLeftOf(cell.col),
         };
         const shape = withSlot(drawn, card, ctx);
         const pieceY = top + hang - shape.tuck;
