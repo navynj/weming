@@ -49,11 +49,15 @@ export function SplashEditSheet({
 
   useEffect(() => {
     let live = true;
-    void loadSplashEdit(splashId).then((state) => {
-      if (!live) return;
-      if (state.ok) setLoaded(state);
-      else setMessage(state.message);
-    });
+    loadSplashEdit(splashId)
+      .then((state) => {
+        if (!live) return;
+        if (state.ok) setLoaded(state);
+        else setMessage(state.message);
+      })
+      .catch(() => {
+        if (live) setMessage('This splash did not open. Try again.');
+      });
     return () => {
       live = false;
     };

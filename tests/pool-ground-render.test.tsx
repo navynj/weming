@@ -757,12 +757,24 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
     expect(plain.className).toContain('border-b');
   });
 
-  it('is a plain row while nobody besides its maker is invited (0033)', () => {
+  it('is a plain row with Everyone off and nobody besides its maker picked (0033)', () => {
     setView('date');
     const { container } = ground({ ...A, together: { 's-joint': [MINA] } });
     const row = container.querySelector('[data-pill="s-joint"]')!;
     expect(row.hasAttribute('data-joint-pill')).toBe(false);
     expect(row.className).toContain('border-b');
+  });
+
+  it('is a pill with Everyone on, even in a pool of one (0033)', () => {
+    setView('date');
+    const { container } = ground({
+      ...A,
+      splashes: A.splashes.map((s) => (s.id === 's-joint' ? { ...s, joint_invite_all: true } : s)),
+      together: { 's-joint': [MINA] },
+    });
+    expect(container.querySelector('[data-pill="s-joint"]')!.hasAttribute('data-joint-pill')).toBe(
+      true,
+    );
   });
 });
 

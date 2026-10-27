@@ -98,8 +98,10 @@ export function poolCards(
       cards.push({
         ...card,
         ...photo,
-        // Filled once someone besides its maker is invited (0033).
-        together: (view.together?.[splash.id] ?? []).some((id) => id !== splash.created_by),
+        // Filled with Everyone on, or once anyone besides its maker is picked (0033).
+        together:
+          splash.joint_invite_all ||
+          (view.together?.[splash.id] ?? []).some((id) => id !== splash.created_by),
         writers: wrote.map((id) => ({ authorId: id, initials: initialsOf.get(id) ?? '' })),
         // Together's open slots (0033): who it is with, less those who wrote.
         awaiting: view.members

@@ -18,9 +18,12 @@ export function useSignedPhotos(refs: { rippleId: string; path: string }[]): Sig
     const photos = JSON.parse(key) as { rippleId: string; path: string }[];
     if (photos.length === 0) return;
     let live = true;
-    void signBoardPhotos(photos).then((urls) => {
-      if (live) setSigned((current) => ({ ...current, ...urls }));
-    });
+    // A call that fails on the way (a timeout, a deploy) leaves placeholders.
+    signBoardPhotos(photos)
+      .then((urls) => {
+        if (live) setSigned((current) => ({ ...current, ...urls }));
+      })
+      .catch((error: unknown) => console.error('[during] board photos not signed', error));
     return () => {
       live = false;
     };

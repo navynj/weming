@@ -201,7 +201,8 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 - **Together:** under the chips, a line reading "With", then the member faces, none selected.
   - **Everyone** sits at the right of the "With" line as a word and a small switch, so it reads as an option that turns on and off. When on, the switch and the word are in the primary colour. It is not a chip: the faces are the only round items in the row.
   - **How it selects:** Everyone selects every face; deselecting any face turns it off and keeps the rest. Selecting every face one by one does not turn it on.
-  - **Default:** off, unless the pool's setting "Invite everyone to new posts by default" is on.
+  - **Default:** off, unless the pool's setting "Invite everyone to new posts by default" is on, or the pool has nobody else in it: a solo pool starts on Everyone (Yoonji, in the session).
+  - **Always shown:** even in a pool of one, the With line shows, Everyone alone with no faces.
   - With none selected, the summary reads "Yours · in <Pool>", and Drop makes **my pool record**.
   - Selecting faces reads "Together with Mina, Jae", or "Together with everyone", and Drop makes a **joint record** whose "Add your side" slots are those members, or every current member.
 
@@ -209,7 +210,7 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 - **Home record:** lane, title, icon and dates; Audience per pool with its lane chip. **Make it joint…** picks the pool, a pool lane and who's together.
 - **Pool record (mine):** title, icon, dates and pool lane chip. In the pool: **Together** makes it joint. On Home: picking a lane of mine moves it to Home.
 - **Joint:** title and icon for any member; pool lane; **Together** to add people (decision 6). **Make it mine** is on Home only (Yoonji, in the session), while every ripple is mine: picking a lane of mine makes it mine.
-- **The fill** (Yoonji, in the session) follows invitees, not ownership. A record is filled (the Calendar's white or ink label, the List's pill) once someone besides its maker is invited. A joint record with nobody else, Everyone in a pool of one, stays unfilled like any record, and fills when someone joins.
+- **The fill** (Yoonji, in the session) follows invitees, not ownership. A record is filled (the Calendar's white or ink label, the List's pill) when Everyone is on, even in a pool of one, or once anyone besides its maker is picked. With Everyone off and nobody picked, it stays unfilled like any record.
 - **Becoming mine on Home**, for a pool record or a joint record, sets its lane and its Audience anew. Audience starts as a new record's would (Only me, unless the lane's link shares by default), and it leaves its pool unless Audience shares it there.
 
 ### Home pool columns

@@ -42,20 +42,39 @@ export type SplashEditState =
     }
   | { ok: false; message: string };
 
+/**
+ * Everything the sheet opens with, read in one round of parallel requests
+ * (review: "Opening…" waited on five in a row). RLS decides what each one
+ * returns; nothing here depends on another answer but the split at the end.
+ */
 export async function loadSplashEdit(id: string): Promise<SplashEditState> {
   if (!z.uuid().safeParse(id).success) return { ok: false, message: 'No such splash.' };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    { data: splash },
+    { data: placements },
+    { data: writers },
+    invited,
+    { data: allLanes },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('splashes')
+      .select(
+        'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id, joint_invite_all',
+      )
+      .eq('id', id)
+      .maybeSingle(),
+    supabase.from('splash_placements').select('pool_id, pool_lane_id, shared').eq('splash_id', id),
+    supabase.from('ripples').select('author_id').eq('splash_id', id),
+    getJointInvitees(supabase, [id]),
+    // RLS: the lanes of pools I am a current member of.
+    supabase.from('pool_lanes').select('id, name, icon, pool_id, position').order('position'),
+  ]);
   if (!user) return { ok: false, message: 'Sign in again to edit this.' };
-  const { data: splash } = await supabase
-    .from('splashes')
-    .select(
-      'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id, joint_invite_all',
-    )
-    .eq('id', id)
-    .maybeSingle();
   if (!splash) return { ok: false, message: 'That splash is gone.' };
 
   const joint = splash.owner_id === null;
@@ -63,50 +82,18 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     return { ok: false, message: 'Only its author edits this splash.' };
   }
   const ownPool = splash.pool_id ?? splash.own_pool_id;
-  const [{ data: lanes }, { data: placed }] = await Promise.all([
-    ownPool
-      ? supabase
-          .from('pool_lanes')
-          .select('id, name, icon')
-          .eq('pool_id', ownPool)
-          .order('position')
-      : Promise.resolve({ data: [] }),
-    splash.own_pool_id
-      ? supabase
-          .from('splash_placements')
-          .select('pool_lane_id')
-          .eq('splash_id', id)
-          .eq('pool_id', splash.own_pool_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const placed = (placements ?? []).find((p) => p.pool_id === splash.own_pool_id);
   // The splash's own days (H24): its ripples take them and carry none.
   const annotation: Annotation | null = splash.declared_start
     ? { date: splash.declared_start, time: null, endDate: splash.declared_end, endTime: null }
     : null;
-
-  const [{ data: placements }, { count: others }, { data: allLanes }] = await Promise.all([
+  // Mine: each pool it is shared to now. A pool's own has none to list.
+  const sharedIn =
     !joint && !splash.own_pool_id
-      ? supabase
-          .from('splash_placements')
-          .select('pool_id, pool_lane_id')
-          .eq('splash_id', id)
-          .eq('shared', true)
-      : Promise.resolve({ data: [] as { pool_id: string; pool_lane_id: string }[] }),
-    supabase
-      .from('ripples')
-      .select('id', { count: 'exact', head: true })
-      .eq('splash_id', id)
-      .neq('author_id', user.id),
-    // RLS: the lanes of pools I am a current member of.
-    supabase.from('pool_lanes').select('id, name, icon, pool_id'),
-  ]);
-  const invitees = joint ? ((await getJointInvitees(supabase, [id]))[id] ?? []) : [];
-  const sharedIn = (placements ?? []).map((p) => ({
-    poolId: p.pool_id,
-    poolLaneId: p.pool_lane_id,
-  }));
-  const shared = sharedIn.map((p) => p.poolId);
+      ? (placements ?? [])
+          .filter((p) => p.shared)
+          .map((p) => ({ poolId: p.pool_id, poolLaneId: p.pool_lane_id }))
+      : [];
   return {
     ok: true,
     kind: joint ? 'joint' : splash.own_pool_id ? 'own' : 'mine',
@@ -115,14 +102,16 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     declaredStart: splash.declared_start,
     declaredEnd: splash.declared_end,
     declaredLaneId: splash.declared_lane_id,
-    shared,
-    poolId: splash.pool_id ?? splash.own_pool_id,
+    shared: sharedIn.map((p) => p.poolId),
+    poolId: ownPool,
     annotation,
-    poolLanes: lanes ?? [],
+    poolLanes: (allLanes ?? [])
+      .filter((l) => ownPool && l.pool_id === ownPool)
+      .map(({ id: laneId, name, icon }) => ({ id: laneId, name, icon })),
     poolLaneId: splash.pool_lane_id ?? placed?.pool_lane_id ?? null,
     sharedIn,
-    othersWrote: (others ?? 0) > 0,
-    invitees,
+    othersWrote: (writers ?? []).some((w) => w.author_id !== user.id),
+    invitees: joint ? (invited[id] ?? []) : [],
     inviteAll: splash.joint_invite_all,
     laneNames: Object.fromEntries(
       (allLanes ?? []).map((l) => [l.id, { name: l.name, icon: l.icon, poolId: l.pool_id }]),

@@ -80,21 +80,22 @@ export function PoolLanePicker({
           );
         })}
       </div>
-      {others.length > 0 ? (
-        <div data-together className="flex flex-col gap-2">
-          <span className="text-pool-500 flex items-center justify-between gap-3 text-xs">
-            With
-            <label data-together-everyone className="flex items-center gap-2">
-              <span className={everyone ? 'text-main-900 font-semibold' : ''}>Everyone</span>
-              <Switch
-                on={everyone}
-                label="Everyone"
-                size="sm"
-                disabled={fixedEveryone || togetherLocked !== null}
-                onChange={() => change(toggleEveryone(together, otherIds))}
-              />
-            </label>
-          </span>
+      {/* Even alone in a pool, Everyone is a choice (Yoonji, in the session). */}
+      <div data-together className="flex flex-col gap-2">
+        <span className="text-pool-500 flex items-center justify-between gap-3 text-xs">
+          With
+          <label data-together-everyone className="flex items-center gap-2">
+            <span className={everyone ? 'text-main-900 font-semibold' : ''}>Everyone</span>
+            <Switch
+              on={everyone}
+              label="Everyone"
+              size="sm"
+              disabled={fixedEveryone || togetherLocked !== null}
+              onChange={() => change(toggleEveryone(together, otherIds))}
+            />
+          </label>
+        </span>
+        {others.length > 0 ? (
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
             {others.map((member) => {
               const on = picked.includes(member.id);
@@ -117,8 +118,8 @@ export function PoolLanePicker({
               );
             })}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <span data-landing-hint className="text-pool-500 min-w-0 truncate text-xs">
         {togetherLocked ?? (pick ? landingHint(scope.poolName, names, everyone) : null)}
       </span>
