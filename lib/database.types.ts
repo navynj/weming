@@ -98,21 +98,41 @@ export type Database = {
       }
       joint_invitees: {
         Row: {
+          id: string
           invited_at: string
+          pool_id: string | null
           splash_id: string
           user_id: string
         }
         Insert: {
+          id?: string
           invited_at?: string
+          pool_id?: string | null
           splash_id: string
           user_id: string
         }
         Update: {
+          id?: string
           invited_at?: string
+          pool_id?: string | null
           splash_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "joint_invitees_placement_fkey"
+            columns: ["splash_id", "pool_id"]
+            isOneToOne: false
+            referencedRelation: "splash_placements"
+            referencedColumns: ["splash_id", "pool_id"]
+          },
+          {
+            foreignKeyName: "joint_invitees_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "joint_invitees_splash_id_fkey"
             columns: ["splash_id"]

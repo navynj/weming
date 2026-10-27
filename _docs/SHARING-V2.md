@@ -245,9 +245,25 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 
 ---
 
-## 7. Next, after v2 ships: open splashes
+## 7. Next, after v2 ships: open splashes, as per-pool invitees (0035)
 
-Not for now: no implementation in 0033, 0034 or the switch.
+Scheduled as **0035**, after v2 ships (Yoonji, in the session). 0033 already widens `joint_invitees` to carry a pool, so 0035 adds no table for invitees. 0034 is the contract.
+
+**As decided:** instead of one "Open to everyone in <Pool>" switch, each pool my Home record is shared to gets its own **With**: Everyone, or faces picked. These are the same controls as a joint record's. Only those invited in a pool add their side there. The fill follows those invitees, as for any record.
+
+**The shape in 0033** (`joint_invitees`):
+- `pool_id` is null for a joint record's invitees, and set for invitees on my record in one pool.
+- A per-pool row references its placement, `(splash_id, pool_id) → splash_placements`, on delete cascade.
+- Keys: unique `(splash_id, user_id)` where `pool_id` is null; unique `(splash_id, pool_id, user_id)` where it is set.
+- Read by that pool's current members and by me, its author. `joint_together` reads joint rows alone.
+
+**Decided for 0035: unsharing hides, never deletes** (Yoonji, in the session).
+- **Hidden, not deleted:** when my record stops being shared to a pool (its placement switched off), the ripples its members wrote there are hidden from that pool.
+- **Back on reshare:** they reappear if I share it to that pool again.
+- **The author still sees theirs:** each author keeps their own ripple on their Home, under the record's title, with a note that it is no longer shared.
+- **What this needs:** a placement is switched off, never deleted, while a member's ripple hangs off it. The Audience functions already switch off rather than delete. 0035 must hold that for a placement with ripples, and also for `splash_to_together`, which today deletes placements (into joint is refused once others have written, so it never meets one).
+
+Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035 to settle.
 
 **The idea:** my record, open to several pools.
 - **The switch:** on a shared placement of my record, "Open to everyone in <Pool>". An open placement shows the record with a joint-style fill and "Add your side" for that pool's members.
@@ -258,7 +274,7 @@ Not for now: no implementation in 0033, 0034 or the switch.
 - **Tabs:** my Home and the detail sheet show per-pool threads as tabs ("Church · 5 | College · 3"). Members see only their pool's thread plus my ripples.
 
 **Schema sketch:**
-- `splash_placements.open boolean not null default false`.
+- `splash_placements.invite_all boolean not null default false`: Everyone in that pool (replaces the earlier `open` switch). Picks are `joint_invitees` rows with that `pool_id`.
 - `ripples.thread_pool_id`: null for the owner's ripples, set for others'.
 - RLS: a ripple with a `thread_pool_id` is readable by current members of that pool and by the splash owner.
 
@@ -271,7 +287,7 @@ Not for now: no implementation in 0033, 0034 or the switch.
 | `ripple_in_my_pools` (ripple select) | joint ripples by pool; on my record, only the owner's ripples, read through any shared placement | A third case: `thread_pool_id` is a pool I'm a current member of, and its placement is still shared. The owner reads through "readable by … the splash owner", a new policy |
 | `_ripple_pools` and reactions (0030) | the joint pool, or every shared placement | For a thread ripple, that one pool alone. Otherwise a member's ripple would show in the record's other pools |
 | `hold_ripple_inheritance` (0029/0031) | takes the date and lane from the splash, with no author check | Fits as is |
-| Unsharing or removing a placement | v2's `_set_links` switches nothing off, and `set_splash_lane` moves nothing; Audience can still turn a placement off or remove it | Off: the thread hides with it. Removed: the thread is orphaned. Needs a rule, either restrict removal while the thread has ripples (switch off instead) or a composite FK `(splash_id, thread_pool_id) → splash_placements` |
+| Unsharing or removing a placement | v2's `_set_links` switches nothing off, and `set_splash_lane` moves nothing; Audience turns a placement off | **Decided:** off hides the pool's ripples, never deletes them, and resharing brings them back. Removal is refused while members' ripples hang off it (see above) |
 | `_require_only_mine` (to joint, Move to Home) | refuses once others have written | Fits by default: an open record with threads cannot become joint. Whether that is wanted needs deciding then |
 | `delete_pool`, `leave_pool` | v2 rewrites `delete_pool` for pool records and joint (home lane) | The pool's thread ripples on others' records need a destination: as for joint, each author's ripples become a post of theirs. `leave_pool` hides them as for joint |
 | 0034 drops | `direction`, the 0009/0019 indexes, `_sending_lane`, `_joint_lane_for`, `_place_history`, `invite_lanes`, the two summaries | None of these is needed. H24 release 2 dropping `ripples.category_id` is neutral |
