@@ -46,14 +46,12 @@ vi.mock('@/lib/supabase/client', () => ({
 
 import { CreateFlow } from '@/features/pool/create-flow';
 import { dropHeldPhoto, PHOTO_FAILED, PhotoRetryToast } from '@/features/pool/photo-retry';
-import type { MyCategory } from '@/lib/queries/profile';
 
 /**
  * A new pool's photo that did not upload (review): the pool is still made
  * and opened, its screen says the photo did not upload, "Try again" sends
  * the same crop again, and a second failure points to settings.
  */
-const MINE = [{ id: 'c-trips', name: 'Trips', icon: '🏕' }] as unknown as MyCategory[];
 
 beforeEach(() => {
   calls.uploads.length = 0;
@@ -86,7 +84,7 @@ afterEach(() => {
 /** Makes a pool with a cropped photo whose first upload fails, then opens its screen. */
 async function createWithFailingPhoto() {
   calls.answers.push('network down');
-  const flow = render(<CreateFlow categories={MINE} />);
+  const flow = render(<CreateFlow />);
   const root = flow.container;
   await act(async () => {
     fireEvent.change(root.querySelector('[data-pool-photo-input]')!, {
@@ -99,7 +97,7 @@ async function createWithFailingPhoto() {
   });
   fireEvent.click(root.querySelector('[data-save-lane]')!);
   await act(async () => {
-    fireEvent.click(root.querySelector('[data-create-step="2"] [data-primary]')!);
+    fireEvent.click(root.querySelector('[data-create-step="1"] [data-primary]')!);
   });
   // The pool was made and opened all the same; the row never named a photo.
   await waitFor(() => expect(calls.replaced).toEqual(['/pool/p-new']));

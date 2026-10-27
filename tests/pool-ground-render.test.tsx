@@ -54,6 +54,7 @@ function splash(over: Partial<Splash> & { id: string }): Splash {
     pool_id: null,
     pool_lane_id: null,
     own_pool_id: null,
+    joint_invite_all: false,
     created_by: null,
     type: 'free',
     prompt: null,
@@ -117,7 +118,15 @@ const A: PoolView = {
     },
   ],
   lanes: [LANE('l-food', 'p-a', 'Food', '🍽️', 0), LANE('l-media', 'p-a', 'Media', '🎬', 1)],
-  myLinks: [{ poolLaneId: 'l-food', myCategoryId: 'my-lane', direction: 'both' }],
+  myLinks: [
+    {
+      poolLaneId: 'l-food',
+      myCategoryId: 'my-lane',
+      isDefault: true,
+      shareByDefault: false,
+      isHome: true,
+    },
+  ],
   placements: [
     { splashId: 's-mine', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: ME },
     { splashId: 's-mina', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: MINA },

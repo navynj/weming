@@ -14,13 +14,14 @@ import {
 import { HomeGround } from '@/features/home/home-ground';
 import { homeViewParam, scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { jointLaneFor } from '@/features/pool/direction';
+import { homeLaneFor } from '@/features/pool/links';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import {
   getJointSplashes,
   getMyJointShells,
   getMyLinks,
   getMyOriginTags,
+  getJointTogether,
   getMyPlacements,
   getMyPoolNames,
 } from '@/lib/queries/pools';
@@ -94,15 +95,28 @@ export async function HomeScreen({
   const summaries = summarizeSplashes(boards, ripples, profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
-  // A joint entry sits in my lane its pool lane is brought into (both, in),
-  // else in its pool's column (H24): derived from my links, never a ripple.
-  const linkedLane = new Map(joints.map((j) => [j.id, jointLaneFor(j.pool_lane_id, links)]));
-  // Who has written on each joint splash and which current members have not,
+  // A joint entry sits in my home lane for its pool lane, else in its pool's
+  // column (H24, 0033): derived from my marker, never a ripple.
+  const linkedLane = new Map(joints.map((j) => [j.id, homeLaneFor(j.pool_lane_id, links)]));
+  // My pool records too (0033): the home lane for the pool lane they are on.
+  const myPlacements = mine.some((s) => s.own_pool_id)
+    ? await getMyPlacements(supabase, profile.id)
+    : [];
+  const ownLane = new Map(
+    mine.flatMap((s) => {
+      const at = myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
+      return s.own_pool_id && at ? [[s.id, at.poolLaneId] as const] : [];
+    }),
+  );
+  const ownHome = new Map(
+    [...ownLane].map(([id, poolLaneId]) => [id, homeLaneFor(poolLaneId, links)] as const),
+  );
+  // Who has written on each joint splash and which invitees have not (0033),
   // for its faces and its open slot on the Board. A pool I left shows neither
   // anyone else's ripples nor its members: only my own face, no slot.
   const jointFaces = new Map<string, { writers: CardFace[]; awaiting: CardFace[] }>();
   if (joints.length > 0) {
-    const [{ data: wrote }, { data: members }] = await Promise.all([
+    const [{ data: wrote }, { data: members }, together] = await Promise.all([
       supabase
         .from('ripples')
         .select('splash_id, author_id, created_at')
@@ -117,6 +131,10 @@ export async function HomeScreen({
         .select('pool_id, user_id')
         .in('pool_id', [...new Set(joints.map((j) => j.pool_id!))])
         .is('left_at', null),
+      getJointTogether(
+        supabase,
+        joints.map((j) => j.id),
+      ),
     ]);
     const face = (id: string): CardFace => ({
       authorId: id,
@@ -129,7 +147,10 @@ export async function HomeScreen({
       const current = (members ?? []).filter((m) => m.pool_id === j.pool_id).map((m) => m.user_id);
       jointFaces.set(j.id, {
         writers: writers.map(face),
-        awaiting: current.filter((id) => !writers.includes(id)).map(face),
+        // Together's slots (0033): who it is with now, less those who wrote.
+        awaiting: (together[j.id] ?? [])
+          .filter((id) => current.includes(id) && !writers.includes(id))
+          .map(face),
       });
     }
   }
@@ -148,29 +169,26 @@ export async function HomeScreen({
     }
   }
 
-  // Just mine (0014): a column per pool after my lanes, headed by the pool's
-  // monogram and name — "A pool you left" with a neutral tile once I cannot
-  // read it — and each mark showing its pool lane's emoji while I can.
+  // My pool records and joint records (0014, 0033): a column per pool after
+  // my lanes, headed by the pool's monogram and name — "A pool you left" with
+  // a neutral tile once I cannot read it — each mark showing its pool lane's
+  // emoji while I can; one whose pool lane has a home lane of mine sits there.
   const ownPools = [
     ...new Set([
-      ...mine.flatMap((s) => (s.own_pool_id ? [s.own_pool_id] : [])),
-      // A joint entry whose pool lane no link of mine brings in lives there too (H24).
+      ...mine.flatMap((s) =>
+        s.own_pool_id && (ownHome.get(s.id) ?? null) === null ? [s.own_pool_id] : [],
+      ),
       ...joints.flatMap((j) => ((linkedLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
     ]),
   ];
   const ownLaneIcon = new Map<string, string | null>();
-  if (ownPools.length > 0) {
-    const placed = await getMyPlacements(supabase, profile.id);
-    const laneOf = new Map(placed.map((p) => [p.splashId, p.poolLaneId]));
+  if (ownLane.size > 0) {
     const { data: lanes } = await supabase
       .from('pool_lanes')
       .select('id, icon')
-      .in('id', [...new Set(placed.map((p) => p.poolLaneId))]);
+      .in('id', [...new Set(ownLane.values())]);
     const iconOf = new Map((lanes ?? []).map((l) => [l.id, l.icon]));
-    for (const s of mine) {
-      const lane = laneOf.get(s.id);
-      if (s.own_pool_id && lane) ownLaneIcon.set(s.id, iconOf.get(lane) ?? null);
-    }
+    for (const [id, lane] of ownLane) ownLaneIcon.set(id, iconOf.get(lane) ?? null);
   }
   // A pool I am in shows its photo (0024); one I left keeps the neutral tile.
   // A joint splash's pool shows its photo on Home too, where its mark is (review).
@@ -230,8 +248,10 @@ export async function HomeScreen({
       };
       if (summary.ownPoolId) {
         // No badge: the column header says where it lives.
+        const home = ownHome.get(summary.id) ?? null;
         return {
           ...card,
+          ...(home ? { column: home } : {}),
           lane: {
             icon: ownLaneIcon.get(summary.id) ?? null,
             name: poolName.get(summary.ownPoolId) ?? 'A pool you left',

@@ -3,10 +3,14 @@
 import { useState, type ReactNode } from 'react';
 
 import { LaneChips } from '@/features/input-sheet/lane-chips';
-import { linkedPools } from '@/features/pool/audience';
+import { usePeople } from '@/features/people/people-provider';
+import { preselectLane, withPick, type AudiencePick } from '@/features/pool/audience';
 import { AudienceChip } from '@/features/pool/audience-sheet';
 import type { PoolScope } from '@/features/pool/compose-scope';
-import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker';
+import { lastPicked, rememberPick } from '@/features/pool/last-pick';
+import { Switch } from '@/features/pool/lane-match';
+import { PoolLanePicker } from '@/features/pool/pool-lane-picker';
+import type { Together } from '@/features/pool/pool-pick';
 
 import {
   homeWarnings,
@@ -25,8 +29,11 @@ export type EditLanes = {
   conversion: Conversion;
   /** Mine from Home: the lane chosen (its declaration). */
   laneId: string | null;
-  /** Mine from Home: the Audience as set. */
-  shared: string[];
+  /** Mine from Home: the Audience as set, a pool lane per pool. */
+  shared: AudiencePick[];
+  /** A joint record: the members added in Together (0033), and Everyone turned on. */
+  invite: string[];
+  inviteEveryone: boolean;
   changed: boolean;
   /** Becoming joint asks first (review): the pool, and the other pools it leaves. */
   confirm: { pool: string; removed: string[] } | null;
@@ -34,10 +41,11 @@ export type EditLanes = {
 };
 
 /**
- * The edit sheet's lanes (0022). Opened from a pool the splash is in: that
- * pool's lane chips and Just mine, by the compose table. Opened from Home: my
- * lanes — with the Audience for mine, a warning per pool when the lane
- * changes, and for a joint splash someone else wrote in, its pool's lanes only.
+ * The edit sheet's lanes (0022, 0033). Opened from a pool the record is in:
+ * that pool's lane chips and Together, and for a joint record only I wrote
+ * in, "Make it mine". Opened from Home: my lanes — with the Audience for my
+ * Home record, and for a pool or joint record a move to Home; a joint record
+ * someone else wrote in keeps to its pool's lanes.
  */
 export function useEditLanes(
   initial: Loaded,
@@ -45,8 +53,8 @@ export function useEditLanes(
   pool: PoolScope | null,
 ): EditLanes {
   const { categories, links, pools } = context;
+  const { me } = usePeople();
   const poolName = (id: string): string => pools.find((p) => p.id === id)?.name ?? 'its Pool';
-  const laneName = (id: string): string => initial.laneNames[id]?.name ?? 'its lane';
   const current: Current = {
     kind: initial.kind,
     poolLaneId: initial.poolLaneId,
@@ -62,32 +70,44 @@ export function useEditLanes(
       : initial.poolLaneId
     : null;
 
-  // From a pool: the chosen pool lane and the switch.
-  const [pick, setPick] = useState<PoolPick>(null);
-  const [justMine, setJustMine] = useState(initial.kind !== 'joint');
-  const chosenPoolLane = pick?.poolLaneId ?? hereLane;
+  // From a pool: the chosen pool lane, Together, and Make it mine.
+  const [chosenLane, setChosenLane] = useState<string | null>(null);
+  const [together, setTogether] = useState<Together>({ everyone: false, picked: [] });
+  const [toPoolRecord, setToPoolRecord] = useState(false);
+  const poolLane = chosenLane ?? hereLane;
   // From Home: my lane, the Audience, or (a joint someone else wrote in) a pool lane.
   const [laneId, setLaneId] = useState<string | null>(
     initial.kind === 'mine' ? initial.declaredLaneId : null,
   );
-  const [shared, setShared] = useState<string[]>(initial.shared);
+  const [shared, setShared] = useState<AudiencePick[]>(initial.sharedIn);
   const [poolLaneId, setPoolLaneId] = useState(initial.poolLaneId);
   const stuck = initial.kind === 'joint' && initial.othersWrote;
 
   if (pool && inPool) {
-    const conversion = chosenPoolLane
-      ? planFromPool(current, pool, chosenPoolLane, justMine)
+    const joint = initial.kind === 'joint';
+    const fixed = joint ? initial.invitees.filter((id) => id !== me) : [];
+    const conversion = poolLane
+      ? planFromPool(
+          current,
+          pool,
+          poolLane,
+          joint ? [] : together.picked,
+          toPoolRecord,
+          !joint && together.everyone,
+        )
       : ({ op: 'none' } as const);
     const removed = removedFrom(current, pool.poolId).map(poolName);
-    const notes =
-      conversion.op === 'to_just_mine' && removed.length > 0
-        ? [`It will be removed from ${removed.join(', ')}.`]
-        : [];
+    const adding = joint && !toPoolRecord && !initial.inviteAll;
+    const inviteEveryone = adding && together.everyone;
+    const invite =
+      adding && !together.everyone ? together.picked.filter((id) => !fixed.includes(id)) : [];
     return {
       conversion,
       laneId: null,
-      shared: initial.shared,
-      changed: conversion.op !== 'none',
+      shared: initial.sharedIn,
+      invite,
+      inviteEveryone,
+      changed: conversion.op !== 'none' || invite.length > 0 || inviteEveryone,
       confirm:
         conversion.op === 'to_joint' && initial.kind !== 'joint'
           ? { pool: pool.poolName, removed }
@@ -96,14 +116,33 @@ export function useEditLanes(
         <div data-edit-pool-lanes className="flex flex-col gap-2">
           <PoolLanePicker
             scope={pool}
-            categories={categories}
-            pick={pick ?? (hereLane ? { kind: 'joint', poolLaneId: hereLane } : null)}
-            onPick={(next) => next && setPick(next)}
-            initialJustMine={justMine}
-            onJustMine={setJustMine}
-            justMineLocked={stuck ? 'Others have written here.' : null}
+            pick={poolLane ? { kind: joint ? 'joint' : 'own', poolLaneId: poolLane } : null}
+            onPick={(next) => next && setChosenLane(next.poolLaneId)}
+            together={toPoolRecord ? { everyone: false, picked: [] } : together}
+            onTogether={setTogether}
+            fixed={toPoolRecord ? [] : fixed}
+            fixedEveryone={!toPoolRecord && joint && initial.inviteAll}
+            togetherLocked={toPoolRecord ? `Yours · in ${pool.poolName}` : null}
           />
-          <Notes lines={notes} />
+          {joint && !stuck ? (
+            <label data-make-mine className="text-ink flex items-center justify-between text-xs">
+              Make it mine
+              <Switch
+                on={toPoolRecord}
+                onChange={setToPoolRecord}
+                label="Make it mine"
+                tone="ink"
+                size="sm"
+              />
+            </label>
+          ) : null}
+          <Notes
+            lines={
+              conversion.op === 'to_joint' && removed.length > 0
+                ? [`It will be removed from ${removed.join(', ')}.`]
+                : []
+            }
+          />
         </div>
       ),
     };
@@ -118,7 +157,9 @@ export function useEditLanes(
     return {
       conversion,
       laneId: null,
-      shared: initial.shared,
+      shared: initial.sharedIn,
+      invite: [],
+      inviteEveryone: false,
       changed: conversion.op !== 'none',
       confirm: null,
       node: (
@@ -138,22 +179,20 @@ export function useEditLanes(
   }
 
   const conversion = planFromHome(current, laneId);
-  const warnings = homeWarnings(
-    { ...current, poolId: initial.poolId },
-    laneId,
-    links.flatMap((l) => (l.poolLaneId ? [{ ...l, poolLaneId: l.poolLaneId }] : [])),
-    poolName,
-    laneName,
-  );
-  const linked = linkedPools(laneId, links);
+  const warnings = homeWarnings({ ...current, poolId: initial.poolId }, laneId, poolName);
   const mine = initial.kind === 'mine';
+  const key = (list: AudiencePick[]): string =>
+    list
+      .map((p) => `${p.poolId}:${p.poolLaneId}`)
+      .sort()
+      .join();
   return {
     conversion,
     laneId,
     shared,
-    changed:
-      conversion.op !== 'none' ||
-      (mine && [...shared].sort().join() !== [...initial.shared].sort().join()),
+    invite: [],
+    inviteEveryone: false,
+    changed: conversion.op !== 'none' || (mine && key(shared) !== key(initial.sharedIn)),
     confirm: null,
     node: (
       <div data-edit-my-lanes className="flex flex-col gap-2">
@@ -168,24 +207,27 @@ export function useEditLanes(
           </div>
           {mine && pools.length > 0 ? (
             <AudienceChip
-              shared={shared.filter((id) => linked.includes(id))}
-              linked={pools
-                .filter((p) => linked.includes(p.id))
-                .map((p) => ({ poolId: p.id, name: p.name }))}
-              unlinked={pools
-                .filter((p) => !linked.includes(p.id))
-                .map((p) => ({ poolId: p.id, name: p.name }))}
-              onToggle={(poolId, on) =>
-                setShared((list) =>
-                  on ? [...new Set([...list, poolId])] : list.filter((id) => id !== poolId),
+              shared={shared}
+              pools={pools}
+              preselect={(poolId) =>
+                preselectLane(
+                  laneId,
+                  poolId,
+                  links,
+                  lastPicked(laneId, poolId),
+                  pools.find((p) => p.id === poolId)?.lanes.map((l) => l.id) ?? [],
                 )
               }
+              onChange={(poolId, chip) => {
+                if (chip) rememberPick(laneId, poolId, chip);
+                setShared((list) => withPick(list, poolId, chip));
+              }}
             />
           ) : null}
         </div>
         {initial.kind === 'own' && !laneId ? (
           <p data-edit-just-mine className="text-pool-500 text-xs">
-            Just mine · {poolName(initial.poolId ?? '')}
+            Yours · in {poolName(initial.poolId ?? '')}. Pick a lane to move it to Home.
           </p>
         ) : null}
         <Notes lines={warnings} />

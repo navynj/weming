@@ -4,13 +4,22 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { LaneMatch } from '@/features/pool/lane-match';
-import type { Directions, Links } from '@/features/pool/match';
+import type { Links, Markers } from '@/features/pool/match';
 
 afterEach(cleanup);
 
+const marker = (root: Element, kind: 'home' | 'default' | 'share', key: string) =>
+  root.querySelector(`[data-match-marker="${kind}"][data-match-marker-lane="${key}"]`);
+const toggle = (root: Element, kind: 'home' | 'default' | 'share', key: string) =>
+  marker(root, kind, key)!.querySelector('[role="switch"]') as HTMLButtonElement;
+const isOn = (root: Element, kind: 'home' | 'default' | 'share', key: string) =>
+  toggle(root, kind, key).getAttribute('aria-checked') === 'true';
+const state = (root: Element): Markers =>
+  JSON.parse(root.querySelector('[data-marker-state]')!.textContent!) as Markers;
+
 function Match() {
   const [links, setLinks] = useState<Links>({ games: 'my-games', notes: null });
-  const [directions, setDirections] = useState<Directions>({});
+  const [markers, setMarkers] = useState<Markers>({});
   return (
     <LaneMatch
       poolName="Our Pool"
@@ -21,51 +30,60 @@ function Match() {
       categories={[{ id: 'my-games', name: 'Games', icon: '🎲' }]}
       links={links}
       onLinksChange={setLinks}
-      directions={directions}
-      onDirectionsChange={setDirections}
+      markers={markers}
+      onMarkersChange={setMarkers}
       onCreateLane={() => Promise.resolve({ message: 'not here' })}
-      action={<span data-direction-state>{JSON.stringify(directions)}</span>}
+      action={<span data-marker-state>{JSON.stringify(markers)}</span>}
     />
   );
 }
 
-describe('a link’s direction (0017)', () => {
-  it('starts at ↔ and cycles ← then →, its caption always shown', () => {
+describe('Connect your lanes (0033)', () => {
+  it('says what lanes are, and shows no directions, arrows or captions', () => {
     const { container } = render(<Match />);
-    const control = container.querySelector('[data-match-direction="games"]')!;
-    const caption = (): string | null =>
-      container.querySelector('[data-match-caption="games"]')!.textContent;
-    expect(control.textContent).toBe('↔');
-    expect(caption()).toBe('Share both ways');
-    fireEvent.click(control);
-    expect(control.textContent).toBe('←');
-    expect(caption()).toBe('Share my records to the pool');
-    fireEvent.click(control);
-    expect(control.textContent).toBe('→');
-    expect(caption()).toBe('Bring pool records to my lane');
-    expect(container.querySelector('[data-direction-state]')!.textContent).toContain(
-      '"games":"in"',
-    );
+    expect(container.textContent).toContain('Connect your lanes');
+    expect(container.textContent).toContain('Lanes are your own columns on Home.');
+    expect(container.querySelector('[data-match-direction]')).toBeNull();
+    expect(container.querySelector('[data-match-caption]')).toBeNull();
+    expect(container.textContent).not.toMatch(/[↔←→]/);
   });
 
-  it('has no direction on an unconnected row', () => {
+  it('gives a connected row its switches, all off when made', () => {
     const { container } = render(<Match />);
-    expect(container.querySelector('[data-match-direction="notes"]')).toBeNull();
-    expect(container.querySelector('[data-match-caption="notes"]')).toBeNull();
+    expect(marker(container, 'home', 'games')!.textContent).toBe('Show on Home in Games');
+    expect(marker(container, 'share', 'games')!.textContent).toBe('Share new Games records');
+    // A lane of mine on one row only: that row is its default without asking.
+    expect(marker(container, 'default', 'games')).toBeNull();
+    expect(isOn(container, 'home', 'games')).toBe(false);
+    expect(isOn(container, 'share', 'games')).toBe(false);
+  });
+
+  it('turns Home and sharing on, row by row', () => {
+    const { container } = render(<Match />);
+    fireEvent.click(toggle(container, 'home', 'games'));
+    fireEvent.click(toggle(container, 'share', 'games'));
+    expect(isOn(container, 'home', 'games')).toBe(true);
+    expect(isOn(container, 'share', 'games')).toBe(true);
+    expect(state(container).games).toEqual({ isDefault: true, shareByDefault: true, isHome: true });
+  });
+
+  it('has no switches on an unconnected row', () => {
+    const { container } = render(<Match />);
+    expect(container.querySelector('[data-match-marker-lane="notes"]')).toBeNull();
   });
 });
 
 function Church() {
-  // As name matching or a hurried hand leaves it: one lane of mine on three pool lanes.
+  // As a hurried hand leaves it: one lane of mine on three pool lanes.
   const [links, setLinks] = useState<Links>({ word: 'church', prayer: 'church', thanks: 'church' });
-  const [directions, setDirections] = useState<Directions>({});
+  const [markers, setMarkers] = useState<Markers>({});
   return (
     <LaneMatch
       poolName="Sarang"
       lanes={[
-        { key: 'word', name: '말씀', icon: '📖', description: null },
-        { key: 'prayer', name: '기도', icon: '🙏', description: null },
-        { key: 'thanks', name: '감사', icon: '🥹', description: null },
+        { key: 'word', name: 'Word', icon: '📖', description: null },
+        { key: 'prayer', name: 'Prayer', icon: '🙏', description: null },
+        { key: 'thanks', name: 'Thanks', icon: '🥹', description: null },
       ]}
       categories={[
         { id: 'church', name: 'Church', icon: '⛪' },
@@ -73,52 +91,53 @@ function Church() {
       ]}
       links={links}
       onLinksChange={setLinks}
-      directions={directions}
-      onDirectionsChange={setDirections}
+      markers={markers}
+      onMarkersChange={setMarkers}
       onCreateLane={() => Promise.resolve({ message: 'not here' })}
-      action={<span data-direction-state>{JSON.stringify(directions)}</span>}
+      action={<span data-marker-state>{JSON.stringify(markers)}</span>}
     />
   );
 }
 
-describe('one sender per lane of mine (review)', () => {
-  const glyph = (root: Element, key: string) =>
-    root.querySelector(`[data-match-direction="${key}"]`)!;
-
-  it('lets only the first row share a lane; the rest bring in only, and say why', () => {
+describe('one default per lane of mine (0033)', () => {
+  it('asks which row is the default, starting on the first; only it may share', () => {
     const { container } = render(<Church />);
-    expect(glyph(container, 'word').textContent).toBe('↔');
-    expect(glyph(container, 'prayer').textContent).toBe('→');
-    expect(glyph(container, 'thanks').textContent).toBe('→');
-    expect((glyph(container, 'prayer') as HTMLButtonElement).disabled).toBe(true);
-    expect(container.querySelector('[data-match-caption="prayer"]')!.textContent).toContain(
-      'Already shared to 말씀',
-    );
+    for (const key of ['word', 'prayer', 'thanks']) {
+      expect(marker(container, 'default', key)!.textContent).toBe('Default for Church');
+    }
+    expect(isOn(container, 'default', 'word')).toBe(true);
+    expect(isOn(container, 'default', 'prayer')).toBe(false);
+    expect(marker(container, 'share', 'word')).not.toBeNull();
+    expect(marker(container, 'share', 'prayer')).toBeNull();
+    expect(marker(container, 'share', 'thanks')).toBeNull();
   });
 
-  it('unlocks the next row once the first stops sending, without sharing for you', () => {
+  it('moves the default, and its sharing with it', () => {
     const { container } = render(<Church />);
-    // ↔ → ← → →: the first row now only brings in.
-    fireEvent.click(glyph(container, 'word'));
-    fireEvent.click(glyph(container, 'word'));
-    expect(glyph(container, 'word').textContent).toBe('→');
-    // Unlocked, but never sharing on its own: sending is a choice made here.
-    expect((glyph(container, 'prayer') as HTMLButtonElement).disabled).toBe(false);
-    expect(glyph(container, 'prayer').textContent).toBe('→');
-    fireEvent.click(glyph(container, 'prayer'));
-    expect(glyph(container, 'prayer').textContent).toBe('↔');
-    // And now it is 기도 that holds the lane.
-    expect((glyph(container, 'thanks') as HTMLButtonElement).disabled).toBe(true);
-    expect(container.querySelector('[data-match-caption="thanks"]')!.textContent).toContain(
-      'Already shared to 기도',
-    );
+    fireEvent.click(toggle(container, 'share', 'word'));
+    fireEvent.click(toggle(container, 'default', 'prayer'));
+    expect(isOn(container, 'default', 'word')).toBe(false);
+    expect(isOn(container, 'default', 'prayer')).toBe(true);
+    expect(marker(container, 'share', 'word')).toBeNull();
+    expect(isOn(container, 'share', 'prayer')).toBe(true);
+    const saved = state(container);
+    expect(saved.word).toEqual({ isDefault: false, shareByDefault: false, isHome: false });
+    expect(saved.prayer).toEqual({ isDefault: true, shareByDefault: true, isHome: false });
   });
 
-  it('lets a row share again once it connects a different lane', () => {
+  it('cannot turn the default off: another row is picked instead', () => {
+    const { container } = render(<Church />);
+    fireEvent.click(toggle(container, 'default', 'word'));
+    expect(isOn(container, 'default', 'word')).toBe(true);
+  });
+
+  it('drops the default question once a lane of mine is on one row', () => {
     const { container } = render(<Church />);
     fireEvent.change(container.querySelector('[data-match-select="thanks"]')!, {
       target: { value: 'day' },
     });
-    expect(glyph(container, 'thanks').textContent).toBe('↔');
+    expect(marker(container, 'default', 'thanks')).toBeNull();
+    expect(marker(container, 'share', 'thanks')!.textContent).toBe('Share new Day records');
+    expect(marker(container, 'default', 'word')).not.toBeNull();
   });
 });

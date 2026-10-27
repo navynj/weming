@@ -1,55 +1,74 @@
 import { describe, expect, it } from 'vitest';
 
-import { joinLabel, linkedCount, prefillLinks, settleDirections } from '@/features/pool/match';
+import { linkedCount, settleMarkers, siblings, type Markers } from '@/features/pool/match';
 
-const lanes = [
-  { key: 'a', name: 'Focus', icon: null, description: null },
-  { key: 'b', name: 'day', icon: null, description: 'A line a day' },
-  { key: 'c', name: 'Prayer', icon: null, description: null },
-];
-const mine = [
-  { id: 'focus', name: 'focus' },
-  { id: 'day', name: 'Day' },
-  { id: 'media', name: 'Media' },
-];
+const OFF = { isDefault: false, shareByDefault: false, isHome: false };
 
-describe('the join contract’s prefill (H23)', () => {
-  it('links exact name matches, case aside', () => {
-    expect(prefillLinks(lanes, mine).a).toBe('focus');
-  });
-
-  it('never prefills the residual Day', () => {
-    expect(prefillLinks(lanes, mine).b).toBeNull();
-  });
-
-  it('leaves everything else unconnected', () => {
-    expect(prefillLinks(lanes, mine).c).toBeNull();
+describe('linkedCount', () => {
+  it('counts connected rows only', () => {
+    expect(linkedCount({ a: 'x', b: null, c: 'y' })).toBe(2);
+    expect(linkedCount({ a: null })).toBe(0);
+    expect(linkedCount({})).toBe(0);
   });
 });
 
-describe('the primary button', () => {
-  it('counts linked lanes, singular for one', () => {
-    expect(joinLabel(linkedCount({ a: 'x', b: null, c: 'y' }))).toBe('Connect 2 lanes and join');
-    expect(joinLabel(1)).toBe('Connect 1 lane and join');
-  });
-});
-
-describe('settleDirections (review)', () => {
-  it('lets one row send each lane of mine; later rows bring in; in-only is unlimited', () => {
+describe('siblings (0033)', () => {
+  it('lists every row connecting the same lane of mine, itself among them', () => {
+    const links = { a: 'church', b: 'day', c: 'church', d: null };
     const keys = ['a', 'b', 'c', 'd'];
-    const links = { a: 'church', b: 'church', c: 'church', d: 'day' };
-    expect(settleDirections(keys, links, { a: 'in', b: 'out', c: 'both' })).toEqual({
-      a: 'in',
-      b: 'out',
-      c: 'in',
-      d: 'both',
+    expect(siblings('a', keys, links)).toEqual(['a', 'c']);
+    expect(siblings('b', keys, links)).toEqual(['b']);
+    expect(siblings('d', keys, links)).toEqual([]);
+  });
+});
+
+describe('settleMarkers (0033)', () => {
+  const keys = ['a', 'b', 'c'];
+
+  it('makes the first row a lane of mine connects its default, sharing nothing', () => {
+    expect(settleMarkers(keys, { a: 'church', b: 'church', c: 'day' }, {})).toEqual({
+      a: { ...OFF, isDefault: true },
+      b: OFF,
+      c: { ...OFF, isDefault: true },
     });
   });
 
-  it('leaves unconnected rows as they are', () => {
-    expect(settleDirections(['a', 'b'], { a: null, b: null }, {})).toEqual({
-      a: 'both',
-      b: 'both',
-    });
+  it('keeps the row marked default, and only one per lane of mine', () => {
+    const markers: Markers = {
+      b: { isDefault: true, shareByDefault: true, isHome: false },
+      c: { isDefault: true, shareByDefault: false, isHome: false },
+    };
+    const settled = settleMarkers(keys, { a: 'church', b: 'church', c: 'church' }, markers);
+    expect(settled.a.isDefault).toBe(false);
+    expect(settled.b).toEqual({ isDefault: true, shareByDefault: true, isHome: false });
+    expect(settled.c.isDefault).toBe(false);
+  });
+
+  it('lets only the default row share by default', () => {
+    const markers: Markers = {
+      a: { isDefault: true, shareByDefault: false, isHome: false },
+      b: { isDefault: false, shareByDefault: true, isHome: false },
+    };
+    const settled = settleMarkers(keys, { a: 'church', b: 'church', c: null }, markers);
+    expect(settled.a.shareByDefault).toBe(false);
+    expect(settled.b.shareByDefault).toBe(false);
+  });
+
+  it('keeps Home per row, on any connected row', () => {
+    const markers: Markers = {
+      a: { ...OFF, isHome: true },
+      b: { ...OFF, isHome: true },
+    };
+    const settled = settleMarkers(keys, { a: 'church', b: 'church', c: 'day' }, markers);
+    expect(settled.a.isHome).toBe(true);
+    expect(settled.b.isHome).toBe(true);
+    expect(settled.c.isHome).toBe(false);
+  });
+
+  it('leaves unconnected rows out, whatever they were marked', () => {
+    const markers: Markers = { b: { isDefault: true, shareByDefault: true, isHome: true } };
+    const settled = settleMarkers(keys, { a: 'church', b: null }, markers);
+    expect(Object.keys(settled)).toEqual(['a']);
+    expect(settled.a).toEqual({ ...OFF, isDefault: true });
   });
 });

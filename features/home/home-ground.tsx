@@ -90,8 +90,8 @@ export function HomeGround({
   /** `?manage=lanes`: open with lane management up, from a lane page. */
   manageLanes?: boolean;
   /**
-   * After my lanes, one column per pool holding my Just-mine splashes
-   * (0014), headed by the pool's monogram and name.
+   * After my lanes, one column per pool holding my pool records and joint
+   * records with no home lane (0014, 0033), headed by the pool's monogram and name.
    */
   poolColumns?: GridColumn[];
   board?: Board;

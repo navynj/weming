@@ -13,12 +13,19 @@ import {
 } from '@/features/input-sheet/media-field';
 import { placeCard, type Card, ownPoolColumn } from '@/features/home/grid';
 import { createJointSplash, dropOwnPoolSplash, placeNewSplash } from '@/features/pool/actions';
-import { defaultAudience, linkedPools, type AudienceLink } from '@/features/pool/audience';
-import { bringsIn } from '@/features/pool/direction';
-import { AudienceChip } from '@/features/pool/audience-sheet';
+import {
+  defaultAudience,
+  preselectLane,
+  withPick,
+  type AudienceLink,
+  type AudiencePick,
+} from '@/features/pool/audience';
+import { AudienceChip, type AudiencePool } from '@/features/pool/audience-sheet';
+import { lastPicked, rememberPick } from '@/features/pool/last-pick';
 import type { PoolScope } from '@/features/pool/compose-scope';
 import { poolSplashHref } from '@/features/pool/pool-cards';
 import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker';
+import type { Together } from '@/features/pool/pool-pick';
 import { dropSplash } from '@/features/splash/actions';
 import { defaultBlockDay, isRange } from '@/features/splash/block-day';
 import { DayChip } from '@/features/splash/day-chip';
@@ -26,6 +33,7 @@ import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 import { usePeople } from '@/features/people/people-provider';
+import type { PendingDrop } from '@/features/input-sheet/sheet-provider';
 
 import { composeDrop } from './split-title';
 
@@ -33,10 +41,10 @@ export type SheetContext = {
   categories: MyCategory[];
   timeZone: string;
   today: IsoDate;
-  /** My lane links across my pools: the Audience chip's default (H23). */
+  /** My advanced links across my pools: Audience's defaults (0033). */
   links: AudienceLink[];
-  /** The pools I am in now, for the Audience sheet. */
-  pools: { id: string; name: string }[];
+  /** The pools I am in now, with their lanes, for the Audience sheet. */
+  pools: AudiencePool[];
   /** My initials, for a card dropped into a pool. */
   initials: string;
 };
@@ -49,6 +57,8 @@ export type DropHandoff = {
   note: string | null;
   /** Dropped from a pool (H23): the card that pool seats at once; the page stays there. */
   pool?: { poolId: string; card: Card };
+  /** Dropped from a pool: where Home seats it before the server has it (0033). */
+  home?: PendingDrop['home'];
   commit: () => Promise<{ ok: true } | { ok: false; message: string }>;
 };
 
@@ -90,31 +100,25 @@ export function SplashComposer({
   const [icon, setIcon] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [laneId, setLaneId] = useState<string | null>(null);
-  // From a pool: a pool lane (a joint splash), or one of my linked lanes (H23).
+  // From a pool: a pool lane, and Together (0033).
   const [pick, setPick] = useState<PoolPick>(null);
+  const noOne = (): Together => ({ everyone: pool?.inviteAllByDefault ?? false, picked: [] });
+  const [together, setTogether] = useState<Together>(noOne);
   // Edited by hand, the audience stays as set; untouched, it follows the lane.
-  const [audienceEdited, setAudienceEdited] = useState<string[] | null>(null);
+  const [audienceEdited, setAudienceEdited] = useState<AudiencePick[] | null>(null);
   const joint = pick?.kind === 'joint';
-  // "Just mine" (0014): my splash on the pool lane, with no lane of mine.
+  // My pool record (0033): mine, on the pool lane, with no lane of mine.
   const own = pick?.kind === 'own';
-  // Only pools where the lane is linked can take the post (C5), edited or not.
-  // Every pool the lane is linked in gets a switch; only out and both links
-  // are on by default (0017).
-  const linkedHere = linkedPools(laneId, links);
+  // Only me, unless an advanced link of the lane shares by default (0033).
   const sharedByDefault = defaultAudience(laneId, links);
   // From a pool there is no audience to choose: what is written there is in
   // that pool, and only there.
-  const audience = pool
-    ? joint || own
-      ? []
-      : [pool.poolId]
-    : (audienceEdited ?? sharedByDefault).filter((poolId) => linkedHere.includes(poolId));
-  // A joint splash shows on my Home in the lane I linked to its pool lane
-  // when the link brings in (both, in), else in the pool's column — derived
-  // from the link, never stored on a ripple (H24).
-  const jointPoolLane = joint ? pool?.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
-  const jointLink =
-    jointPoolLane && bringsIn(jointPoolLane.direction) ? jointPoolLane.myCategoryId : null;
+  const audience: AudiencePick[] = pool ? [] : (audienceEdited ?? sharedByDefault);
+  // A pool or joint record shows on my Home in my home lane for its pool
+  // lane, else in the pool's column — derived from the marker, never stored
+  // on a ripple (H24, 0033).
+  const poolLane = pool && pick ? pool.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
+  const homeLane = poolLane?.homeLaneId ?? null;
   // Today is in the field from the start (review): the post's date, days
   // only (H24). Removed with its ×, the post rests on today all the same.
   const [annotation, setAnnotation] = useState<Annotation | null>(fresh);
@@ -146,14 +150,14 @@ export function SplashComposer({
   const { title, body } = composeDrop(titleText, bodyText);
   const hasContent =
     title.length > 0 || body.length > 0 || mediaPaths.length > 0 || laneId !== null;
-  // From a pool a lane must be chosen, or the post would not land there.
+  // From a pool a pool lane must be chosen, or the record would not land there.
   const poolReady =
     !pool ||
     (joint
       ? title.length > 0 || body.length > 0
       : own
         ? title.length > 0 || body.length > 0 || mediaPaths.length > 0
-        : laneId !== null);
+        : false);
   const annotationOk = !annotation || annotationVerdict(annotation) === 'ok';
 
   function drop(): void {
@@ -197,6 +201,7 @@ export function SplashComposer({
         pool_lane_id: null,
         own_pool_id: own && pool ? pool.poolId : null,
         created_by: null,
+        joint_invite_all: false,
         type: 'free',
         prompt: null,
         ends_at: null,
@@ -221,16 +226,9 @@ export function SplashComposer({
     );
 
     const shared = audience;
-    const poolLane = pool
-      ? pool.lanes.find((l) =>
-          joint || own
-            ? l.id === pick.poolLaneId
-            : l.myCategoryId !== null && l.myCategoryId === laneId,
-        )
-      : undefined;
     // The card this pool seats before the server has it (H23).
     const poolCard: Card | null =
-      pool && poolLane && (joint || own || shared.includes(pool.poolId))
+      pool && poolLane && (joint || own)
         ? {
             ...placeCard(splash, body, timeZone),
             column: poolLane.id,
@@ -254,9 +252,9 @@ export function SplashComposer({
           }
         : null;
 
-    // Home seats it where the server will (review): a joint splash with no
-    // lane of mine, and Just mine, in the pool's column with the pool lane's
-    // emoji; a joint ripple in my linked lane, in that lane.
+    // Home seats it where the server will (review, 0033): in my home lane for
+    // its pool lane when marked, else in the pool's column with the pool
+    // lane's emoji.
     const poolColumn = pool
       ? {
           id: ownPoolColumn(pool.poolId),
@@ -273,17 +271,17 @@ export function SplashComposer({
             card: {
               ...(joint
                 ? {
-                    column: jointLink ?? poolColumn.id,
+                    column: homeLane ?? poolColumn.id,
                     joint: true,
                     pools: [pool.poolName],
                     href: poolSplashHref(pool.poolId, id),
                     menu: { pin: false, delete: false },
                     editable: true,
                   }
-                : {}),
-              ...(fallback && !(joint && jointLink) ? { lane: fallback } : {}),
+                : { column: homeLane ?? poolColumn.id }),
+              ...(fallback && !homeLane ? { lane: fallback } : {}),
             },
-            ...(joint && jointLink ? {} : { column: poolColumn }),
+            ...(homeLane ? {} : { column: poolColumn }),
           }
         : undefined;
 
@@ -319,6 +317,8 @@ export function SplashComposer({
                 declaredStart,
                 declaredEnd,
                 blockDay,
+                invitees: together.everyone ? [] : together.picked,
+                everyone: together.everyone,
               })
           : async () => {
               const made = await dropSplash(input);
@@ -335,6 +335,7 @@ export function SplashComposer({
     setBodyText('');
     setLaneId(null);
     setPick(null);
+    setTogether(noOne());
     setAudienceEdited(null);
     setAnnotation(fresh());
     setChosenDay(null);
@@ -422,16 +423,14 @@ export function SplashComposer({
       />
 
       {/* The post's lane: every block of it takes this one (H24).
-          From a pool: Pool lanes | My lanes, and no audience (H23). */}
+          From a pool: its lanes and Together, and no audience (H23, 0033). */}
       {pool ? (
         <PoolLanePicker
           scope={pool}
-          categories={categories}
           pick={pick}
-          onPick={(next) => {
-            setPick(next);
-            setLaneId(next?.kind === 'lane' ? next.myCategoryId : null);
-          }}
+          onPick={setPick}
+          together={together}
+          onTogether={setTogether}
         />
       ) : (
         <div className="flex items-start gap-2">
@@ -447,17 +446,19 @@ export function SplashComposer({
           {pools.length > 0 ? (
             <AudienceChip
               shared={audience}
-              linked={pools
-                .filter((p) => linkedHere.includes(p.id))
-                .map((p) => ({ poolId: p.id, name: p.name }))}
-              unlinked={pools
-                .filter((p) => !linkedHere.includes(p.id))
-                .map((p) => ({ poolId: p.id, name: p.name }))}
-              onToggle={(poolId, on) => {
-                const base = audienceEdited ?? sharedByDefault;
-                setAudienceEdited(
-                  on ? [...new Set([...base, poolId])] : base.filter((id) => id !== poolId),
-                );
+              pools={pools}
+              preselect={(poolId) =>
+                preselectLane(
+                  laneId,
+                  poolId,
+                  links,
+                  lastPicked(laneId, poolId),
+                  pools.find((p) => p.id === poolId)?.lanes.map((l) => l.id) ?? [],
+                )
+              }
+              onChange={(poolId, poolLaneId) => {
+                if (poolLaneId) rememberPick(laneId, poolId, poolLaneId);
+                setAudienceEdited(withPick(audienceEdited ?? sharedByDefault, poolId, poolLaneId));
               }}
             />
           ) : null}

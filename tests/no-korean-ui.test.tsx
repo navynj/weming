@@ -40,21 +40,7 @@ describe('no Korean in the UI (H23)', () => {
   });
 
   it('appears on no rendered pool screen', () => {
-    const lanes = [
-      { id: 'c1', name: 'Food', icon: '🍽️' },
-      { id: 'c2', name: 'Day', icon: '🖋' },
-    ];
-    const create = render(
-      <CreateFlow
-        categories={lanes.map((l, position) => ({
-          ...l,
-          user_id: 'u',
-          default_mode: 'drop' as const,
-          position,
-          created_at: '2026-01-01T00:00:00Z',
-        }))}
-      />,
-    );
+    const create = render(<CreateFlow />);
     expect(create.container.textContent).not.toMatch(HANGUL);
     // The kind is no longer asked (2026-10-23).
     expect(create.container.textContent).not.toMatch(/What kind of Pool/);

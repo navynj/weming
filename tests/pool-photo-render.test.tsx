@@ -32,7 +32,6 @@ vi.mock('@/lib/supabase/client', () => ({
 import { Monogram } from '@/components/ui/monogram';
 import { UNSUPPORTED_PHOTO } from '@/features/people/crop';
 import { CreateFlow } from '@/features/pool/create-flow';
-import type { MyCategory } from '@/lib/queries/profile';
 
 /**
  * A pool's photo (0024) in the app: the tile draws it in the monogram's
@@ -71,7 +70,6 @@ describe('the pool tile (0024)', () => {
 });
 
 describe('choosing a pool photo (0024)', () => {
-  const MINE = [{ id: 'c-trips', name: 'Trips', icon: '🏕' }] as unknown as MyCategory[];
   const pick = async (root: HTMLElement, file: File) => {
     await act(async () => {
       fireEvent.change(root.querySelector('[data-pool-photo-input]')!, {
@@ -82,7 +80,7 @@ describe('choosing a pool photo (0024)', () => {
 
   it('says so when the browser cannot read the file (HEIC outside Safari)', async () => {
     HTMLImageElement.prototype.decode = () => Promise.reject(new Error('EncodingError'));
-    const { container, findByRole } = render(<CreateFlow categories={MINE} />);
+    const { container, findByRole } = render(<CreateFlow />);
     await pick(container, new File(['heic'], 'IMG.HEIC', { type: 'image/heic' }));
     expect((await findByRole('alert')).textContent).toBe(UNSUPPORTED_PHOTO);
   });
@@ -91,7 +89,7 @@ describe('choosing a pool photo (0024)', () => {
     HTMLImageElement.prototype.decode = () => Promise.resolve();
     vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(800);
     vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(600);
-    const { container } = render(<CreateFlow categories={MINE} />);
+    const { container } = render(<CreateFlow />);
     await pick(container, new File(['jpg'], 'pool.jpg', { type: 'image/jpeg' }));
     const frame = container.querySelector('[data-crop-frame]')!;
     // The mask is the pool's rounded square, not a person's circle.
@@ -104,7 +102,7 @@ describe('choosing a pool photo (0024)', () => {
     });
     fireEvent.click(container.querySelector('[data-save-lane]')!);
     await act(async () => {
-      fireEvent.click(container.querySelector('[data-create-step="2"] [data-primary]')!);
+      fireEvent.click(container.querySelector('[data-create-step="1"] [data-primary]')!);
     });
     await waitFor(() => expect(calls.set).toEqual([['p-new', true]]));
     // The pool's one file is named by the pool's id.

@@ -1,23 +1,22 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import { DIRECTION_CAPTION, DIRECTION_GLYPH, nextDirection, type LinkDirection } from './direction';
-import { sentBy, settleDirections, type Directions, type Links, type MatchLane } from './match';
+import { settleMarkers, siblings, type Links, type Markers, type MatchLane } from './match';
 
 /**
- * Step 2 of 2 (1d), shared by create, join and Pool settings: one row per
- * pool lane — its name and description, an arrow, and a dropdown of my
- * lanes. *Don't connect* greys the row and turns the arrow into a cross.
- * At the end, a lane of mine made on the spot and connected; then whether
- * my earlier records come along, and the one primary button.
- *
- * Only connected lanes leak (C5): the subtitle says so, and nothing is
- * connected that the author did not leave connected.
+ * Pool settings → Advanced → Connect your lanes (0033): one row per pool
+ * lane, and a dropdown of my lanes. A connected row can carry two defaults:
+ * **Show on Home in <my lane>** (its home lane: this pool lane's pool and
+ * joint records sit in that column on Home), and, on the row that is my
+ * lane's default here, **Share new <my lane> records** (Audience starts on
+ * this pool lane). A lane of mine connected on several rows picks which one
+ * is its default. Never part of joining or composing; unlinking moves no
+ * record.
  */
 export function LaneMatch({
   poolName,
@@ -25,10 +24,8 @@ export function LaneMatch({
   categories,
   links,
   onLinksChange,
-  directions,
-  onDirectionsChange,
-  includeHistory,
-  onIncludeHistoryChange,
+  markers,
+  onMarkersChange,
   onCreateLane,
   footer,
   action,
@@ -38,12 +35,8 @@ export function LaneMatch({
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   links: Links;
   onLinksChange: (links: Links) => void;
-  /** Each link's direction (0017); a lane not in it reads as both. */
-  directions: Directions;
-  onDirectionsChange: (directions: Directions) => void;
-  /** Absent in settings: earlier records are a choice made at joining. */
-  includeHistory?: boolean;
-  onIncludeHistoryChange?: (on: boolean) => void;
+  markers: Markers;
+  onMarkersChange: (markers: Markers) => void;
   /** Makes one of my lanes and returns its id, or a refusal. */
   onCreateLane: (lane: { name: string; icon: string }) => Promise<string | { message: string }>;
   footer?: ReactNode;
@@ -51,20 +44,36 @@ export function LaneMatch({
 }) {
   const [making, setMaking] = useState(false);
   const keys = lanes.map((lane) => lane.key);
-  // What is shown is what is saved: the flows settle the same way.
-  const settled = settleDirections(keys, links, directions);
-  const direction = (key: string): LinkDirection => settled[key];
-  const nameOf = (key: string): string => lanes.find((lane) => lane.key === key)?.name ?? '';
+  // What is shown is what is saved: the settings save settles the same way.
+  const settled = settleMarkers(keys, links, markers);
+  const mineName = (id: string | null): string =>
+    categories.find((c) => c.id === id)?.name ?? 'your lane';
   const unconnected = lanes.filter((lane) => !links[lane.key]);
+  const mark = (key: string, patch: Partial<Markers[string]>): void => {
+    const next: Markers = { ...settled, [key]: { ...settled[key], ...patch } };
+    if (patch.isDefault) {
+      // One default per lane of mine: the others let go, and the new one
+      // carries the old one's sharing.
+      const rows = siblings(key, keys, links);
+      const carried = rows.some((o) => settled[o]?.isDefault && settled[o]?.shareByDefault);
+      for (const other of rows) {
+        if (other !== key)
+          next[other] = { ...next[other], isDefault: false, shareByDefault: false };
+      }
+      next[key] = { ...next[key], isDefault: true, shareByDefault: carried };
+    }
+    onMarkersChange(next);
+  };
 
   return (
     <div data-lane-match className="flex min-h-0 flex-1 flex-col">
-      <h1 className="text-main-900 text-3xl/tight font-semibold">Connect your lanes?</h1>
-      <p className="text-pool-500 mt-3 text-sm/relaxed">
-        Only records from connected lanes appear in this Pool. Unconnected lanes stay yours alone.
+      <h2 className="text-ink font-semibold">Connect your lanes</h2>
+      <p className="text-pool-500 mt-2 text-sm/relaxed">
+        Lanes are your own columns on Home. Connecting one to this pool can preselect sharing and
+        show this pool&apos;s records in it.
       </p>
 
-      <div className="text-pool-500 mt-10 flex justify-between text-xs">
+      <div className="text-pool-500 mt-6 flex justify-between text-xs">
         <span data-pool-lanes-label className="truncate">
           {poolName.trim() || 'Pool'} lanes
         </span>
@@ -75,14 +84,14 @@ export function LaneMatch({
         {lanes.map((lane) => {
           const chosen = links[lane.key] ?? null;
           const off = chosen === null;
-          // Its lane already sends to another pool lane: this one only brings in.
-          const held = sentBy(lane.key, keys, links, settled);
+          const marks = settled[lane.key];
+          const several = siblings(lane.key, keys, links).length > 1;
           return (
             <li
               key={lane.key}
               data-match-row={lane.key}
               data-connected={off ? undefined : ''}
-              className={`grid grid-cols-[minmax(0,1fr)_2rem_8.5rem] items-center gap-2 rounded-2xl px-5 py-5 ${
+              className={`grid grid-cols-[minmax(0,1fr)_8.5rem] items-center gap-3 rounded-2xl px-5 py-4 ${
                 off ? 'bg-pool-100/60' : 'bg-pool-100'
               }`}
             >
@@ -95,30 +104,6 @@ export function LaneMatch({
                   <span className="text-pool-500 truncate text-xs">{lane.description}</span>
                 ) : null}
               </span>
-              {off ? (
-                <span aria-hidden className="flex justify-center">
-                  <X size={18} className="text-pool-500/50" />
-                </span>
-              ) : (
-                // The link's direction (0017): a tap cycles ↔ ← →. Ink, the
-                // selection channel; blue stays for actions. Held to → while
-                // another row sends this lane.
-                <button
-                  type="button"
-                  data-match-direction={lane.key}
-                  aria-label={`Direction: ${DIRECTION_CAPTION[direction(lane.key)]}`}
-                  disabled={held !== null}
-                  onClick={() =>
-                    onDirectionsChange({
-                      ...settled,
-                      [lane.key]: nextDirection(direction(lane.key)),
-                    })
-                  }
-                  className="text-ink flex h-9 w-9 items-center justify-center justify-self-center rounded-full bg-white text-lg/none font-semibold disabled:opacity-60"
-                >
-                  {DIRECTION_GLYPH[direction(lane.key)]}
-                </button>
-              )}
               <label className="relative flex min-w-0">
                 <span className="sr-only">Your lane for {lane.name}</span>
                 <select
@@ -127,7 +112,7 @@ export function LaneMatch({
                   onChange={(event) =>
                     onLinksChange({ ...links, [lane.key]: event.target.value || null })
                   }
-                  className={`h-14 w-full min-w-0 appearance-none truncate rounded-xl bg-white pr-7 pl-3 text-center text-sm font-semibold outline-none ${
+                  className={`h-12 w-full min-w-0 appearance-none truncate rounded-xl bg-white pr-7 pl-3 text-center text-sm font-semibold outline-none ${
                     off
                       ? 'border-pool-200 text-pool-500/60 border'
                       : 'border-main-900 text-main-900 border-2'
@@ -149,18 +134,34 @@ export function LaneMatch({
                   }`}
                 />
               </label>
-              {off ? null : (
-                <span
-                  data-match-caption={lane.key}
-                  className="text-pool-500 col-span-3 text-center text-[10px]"
-                >
-                  {DIRECTION_CAPTION[direction(lane.key)]}
-                  {held !== null ? (
-                    <span data-match-held className="block">
-                      Already shared to {nameOf(held)}
-                    </span>
+              {off || !marks ? null : (
+                <div className="col-span-2 flex flex-col gap-2 pt-1">
+                  <Marker
+                    label={`Show on Home in ${mineName(chosen)}`}
+                    data="home"
+                    lane={lane.key}
+                    on={marks.isHome}
+                    onChange={(on) => mark(lane.key, { isHome: on })}
+                  />
+                  {several ? (
+                    <Marker
+                      label={`Default for ${mineName(chosen)}`}
+                      data="default"
+                      lane={lane.key}
+                      on={marks.isDefault}
+                      onChange={(on) => on && mark(lane.key, { isDefault: true })}
+                    />
                   ) : null}
-                </span>
+                  {marks.isDefault ? (
+                    <Marker
+                      label={`Share new ${mineName(chosen)} records`}
+                      data="share"
+                      lane={lane.key}
+                      on={marks.shareByDefault}
+                      onChange={(on) => mark(lane.key, { shareByDefault: on })}
+                    />
+                  ) : null}
+                </div>
               )}
             </li>
           );
@@ -193,24 +194,6 @@ export function LaneMatch({
         </div>
       )}
 
-      {onIncludeHistoryChange ? (
-        <label className="mt-6 flex items-center justify-between gap-4">
-          <span className="flex flex-col gap-0.5">
-            <span className="text-ink text-sm font-medium">Include my earlier records</span>
-            <span className="text-pool-500 text-xs">
-              {includeHistory
-                ? 'Posts already in connected lanes appear here too.'
-                : 'Only what you write from now on appears here.'}
-            </span>
-          </span>
-          <Switch
-            on={includeHistory ?? false}
-            onChange={onIncludeHistoryChange}
-            label="Include my earlier records"
-          />
-        </label>
-      ) : null}
-
       <div className="mt-auto flex flex-col items-center gap-4 pt-10">
         {footer}
         {action}
@@ -219,9 +202,35 @@ export function LaneMatch({
   );
 }
 
+/** One default on a connected row: a line and a small ink switch (it selects; H20f). */
+function Marker({
+  label,
+  data,
+  lane,
+  on,
+  onChange,
+}: {
+  label: string;
+  data: 'home' | 'default' | 'share';
+  lane: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <label
+      data-match-marker={data}
+      data-match-marker-lane={lane}
+      className="text-ink flex items-center justify-between gap-3 text-xs"
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      <Switch on={on} onChange={onChange} label={label} tone="ink" size="sm" />
+    </label>
+  );
+}
+
 /**
  * A switch: blue when on — it commits a choice — pale when off; `tone="ink"`
- * when it selects rather than commits (H20f), as Just mine does.
+ * when it selects rather than commits (H20f), as a link's defaults do.
  */
 export function Switch({
   on,

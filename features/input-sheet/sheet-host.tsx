@@ -23,7 +23,13 @@ function useDrop(): (drop: DropHandoff) => void {
   const router = useRouter();
   const pathname = usePathname();
   return (drop) => {
-    markDropped({ splash: drop.splash, month: drop.month, note: drop.note, pool: drop.pool });
+    markDropped({
+      splash: drop.splash,
+      month: drop.month,
+      note: drop.note,
+      pool: drop.pool,
+      home: drop.home,
+    });
     // Dropped from a pool, the pool seats it where we are (H23); else Home.
     if (!drop.pool && !pathname.startsWith('/pool/') && pathname !== '/') router.push('/');
     void drop.commit().then((result) => {

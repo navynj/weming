@@ -175,7 +175,7 @@ export function cardLane(splash: SplashSummary): string | null {
   return splash.declaredLaneId ?? representativeLane(splash);
 }
 
-/** Home's column for my Just-mine splashes in one pool (0014). */
+/** Home's column for my pool records and joint records in one pool (0014, 0033). */
 export function ownPoolColumn(poolId: string): string {
   return `pool:${poolId}`;
 }
@@ -183,7 +183,7 @@ export function ownPoolColumn(poolId: string): string {
 /** The column a mark sits in: the pool's choice where there is one (H23), else its lane. */
 export function cardColumn(card: Card): string | null {
   if (card.column) return card.column;
-  // Just mine: no lane of mine, so its pool's column on Home (0014).
+  // My pool record: no lane of mine, so its pool's column on Home (0014).
   if (card.splash.ownPoolId) return ownPoolColumn(card.splash.ownPoolId);
   return cardLane(card.splash);
 }

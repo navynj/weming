@@ -110,23 +110,22 @@ async function categoryFor(
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
-  // Just mine (0014): no lane of mine, and no Day to fall into.
+  // My pool record (0014, 0033): no lane of mine, and no Day to fall into.
   if (splash?.own_pool_id) return 'none';
-  // A joint splash (0016, 0017): my lane linked to its pool lane when the
-  // link brings in (both, in), else none — never a lane I happened to pick.
+  // A joint splash (0016, 0033): my home lane for its pool lane, else none
+  // — never a lane I happened to pick.
   if (splash && splash.owner_id === null && splash.pool_lane_id) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     const { data: link } = await supabase
       .from('lane_mappings')
-      .select('my_category_id, direction')
+      .select('my_category_id')
       .eq('user_id', user?.id ?? '')
       .eq('pool_lane_id', splash.pool_lane_id)
+      .eq('is_home', true)
       .maybeSingle();
-    return link && (link.direction === 'both' || link.direction === 'in')
-      ? link.my_category_id
-      : 'none';
+    return link ? link.my_category_id : 'none';
   }
 
   const rule = laneRule(splash ? { declaredLaneId: splash.declared_lane_id } : null);

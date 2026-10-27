@@ -7,22 +7,27 @@ import {
   planFromPool,
   removedFrom,
   type Current,
-  type Link,
 } from '@/features/splash-sheet/conversion';
 
 /**
- * Converting a splash (0022) as the edit sheet decides it. From a pool: the
- * compose table — Just mine off is joint; on is mine in my lane linked by
- * both or in, placed on that pool lane, else Just mine. From Home: my lanes,
- * and a warning per pool by whether the new lane sends there (both, out).
+ * Converting a record (0022, 0033) as the edit sheet decides it. From a
+ * pool: its lane chips and Together — nobody picked keeps a pool record a
+ * pool record, anyone picked (or Everyone) makes it joint, and "Make it
+ * mine" turns a joint record into my pool record. From Home: my lanes; a
+ * Home record's lane change moves no placement, and a pool or joint record
+ * moved to my lane stays shared to its pool.
  */
 const POOL: PoolScope = {
   poolId: 'p-a',
   poolName: 'Sarang',
   lanes: [
-    { id: 'pl-word', name: '말씀', icon: '📖', myCategoryId: 'church', direction: 'both' },
-    { id: 'pl-thanks', name: '감사', icon: '🥹', myCategoryId: 'church', direction: 'in' },
-    { id: 'pl-free', name: 'Free', icon: null, myCategoryId: null, direction: null },
+    { id: 'pl-word', name: '말씀', icon: '📖', homeLaneId: 'church' },
+    { id: 'pl-thanks', name: '감사', icon: '🥹', homeLaneId: null },
+    { id: 'pl-free', name: 'Free', icon: null, homeLaneId: null },
+  ],
+  members: [
+    { id: 'me', name: 'Yoonji', initials: 'YL' },
+    { id: 'u-mina', name: 'Mina', initials: 'MK' },
   ],
 };
 const mine = (over: Partial<Current> = {}): Current => ({
@@ -35,50 +40,75 @@ const mine = (over: Partial<Current> = {}): Current => ({
 const joint: Current = { kind: 'joint', poolLaneId: 'pl-word', declaredLaneId: null, sharedIn: [] };
 const own: Current = { kind: 'own', poolLaneId: 'pl-free', declaredLaneId: null, sharedIn: [] };
 
-describe('from a pool: the compose table', () => {
-  it('Just mine off makes my splash joint on the chosen pool lane', () => {
-    expect(planFromPool(mine(), POOL, 'pl-word', false)).toEqual({
+describe('from a pool: lane chips and Together', () => {
+  it('turns a Home record or a pool record joint once anyone is picked, with those invitees', () => {
+    expect(planFromPool(mine(), POOL, 'pl-word', ['u-mina'])).toEqual({
       op: 'to_joint',
       poolLaneId: 'pl-word',
+      invitees: ['u-mina'],
+      everyone: false,
     });
-    expect(planFromPool(own, POOL, 'pl-free', false)).toEqual({
+    expect(planFromPool(own, POOL, 'pl-free', ['u-mina'])).toEqual({
       op: 'to_joint',
       poolLaneId: 'pl-free',
+      invitees: ['u-mina'],
+      everyone: false,
     });
   });
 
-  it('Just mine on with a lane linked by both or in keeps it mine there, placed on that pool lane', () => {
-    expect(planFromPool(mine(), POOL, 'pl-word', true)).toEqual({ op: 'none' });
-    expect(planFromPool(mine(), POOL, 'pl-thanks', true)).toEqual({
+  it('turns it joint with Everyone, naming no invitees: everyone is every member, later ones too', () => {
+    expect(planFromPool(own, POOL, 'pl-thanks', ['u-mina'], false, true)).toEqual({
+      op: 'to_joint',
+      poolLaneId: 'pl-thanks',
+      invitees: [],
+      everyone: true,
+    });
+    expect(planFromPool(mine(), POOL, 'pl-word', [], false, true)).toEqual({
+      op: 'to_joint',
+      poolLaneId: 'pl-word',
+      invitees: [],
+      everyone: true,
+    });
+  });
+
+  it('with nobody picked, places my Home record on the chosen pool lane, keeping its lane', () => {
+    expect(planFromPool(mine(), POOL, 'pl-word', [])).toEqual({ op: 'none' });
+    expect(planFromPool(mine(), POOL, 'pl-thanks', [])).toEqual({
       op: 'set_lane',
       myLaneId: 'church',
       placeOn: 'pl-thanks',
     });
-    expect(planFromPool(joint, POOL, 'pl-word', true)).toEqual({
-      op: 'to_mine',
-      myLaneId: 'church',
-      placeOn: 'pl-word',
+  });
+
+  it('with nobody picked, only moves my pool record among the pool lanes', () => {
+    expect(planFromPool(own, POOL, 'pl-free', [])).toEqual({ op: 'none' });
+    expect(planFromPool(own, POOL, 'pl-word', [])).toEqual({
+      op: 'move_pool',
+      poolLaneId: 'pl-word',
     });
   });
 
-  it('Just mine on with no lane linked makes it Just mine', () => {
-    expect(planFromPool(mine(), POOL, 'pl-free', true)).toEqual({
-      op: 'to_just_mine',
-      poolLaneId: 'pl-free',
-    });
-    expect(planFromPool(joint, POOL, 'pl-free', true)).toEqual({
-      op: 'to_just_mine',
-      poolLaneId: 'pl-free',
-    });
-  });
-
-  it('a joint or Just-mine splash staying what it is only moves among the lanes', () => {
-    expect(planFromPool(joint, POOL, 'pl-word', false)).toEqual({ op: 'none' });
-    expect(planFromPool(joint, POOL, 'pl-free', false)).toEqual({
+  it('only moves a joint record among the lanes: Together adds people, never a conversion', () => {
+    expect(planFromPool(joint, POOL, 'pl-word', [])).toEqual({ op: 'none' });
+    expect(planFromPool(joint, POOL, 'pl-free', ['u-mina'])).toEqual({
       op: 'move_pool',
       poolLaneId: 'pl-free',
     });
-    expect(planFromPool(own, POOL, 'pl-free', true)).toEqual({ op: 'none' });
+  });
+
+  it('makes a joint record my pool record on "Make it mine", on the lane chosen', () => {
+    expect(planFromPool(joint, POOL, 'pl-word', [], true)).toEqual({
+      op: 'to_pool_record',
+      poolLaneId: 'pl-word',
+    });
+    expect(planFromPool(joint, POOL, 'pl-thanks', [], true)).toEqual({
+      op: 'to_pool_record',
+      poolLaneId: 'pl-thanks',
+    });
+  });
+
+  it('does nothing on a lane that is not this pool’s', () => {
+    expect(planFromPool(mine(), POOL, 'pl-elsewhere', ['u-mina'])).toEqual({ op: 'none' });
   });
 
   it('lists the other pools a conversion takes it out of', () => {
@@ -92,17 +122,10 @@ describe('from a pool: the compose table', () => {
   });
 });
 
-describe('from Home: my lanes, and what each pool will do', () => {
-  const LINKS: Link[] = [
-    { myCategoryId: 'church', poolId: 'p-a', poolLaneId: 'pl-word', direction: 'both' },
-    { myCategoryId: 'study', poolId: 'p-a', poolLaneId: 'pl-thanks', direction: 'in' },
-    { myCategoryId: 'study', poolId: 'p-b', poolLaneId: 'pb-notes', direction: 'out' },
-  ];
+describe('from Home: my lanes, and what stays shared', () => {
   const poolName = (id: string) => ({ 'p-a': 'Sarang', 'p-b': 'Study Crew' })[id] ?? id;
-  const laneName = (id: string) =>
-    ({ 'pl-word': '말씀', 'pl-thanks': '감사', 'pb-notes': 'Notes' })[id] ?? id;
 
-  it('says, per pool it is shared to, whether it moves or stops being shared', () => {
+  it('changes a Home record’s lane and says nothing: placements never move', () => {
     const shared = mine({
       declaredLaneId: 'church',
       sharedIn: [
@@ -115,32 +138,28 @@ describe('from Home: my lanes, and what each pool will do', () => {
       myLaneId: 'study',
       placeOn: null,
     });
-    expect(homeWarnings({ ...shared, poolId: null }, 'study', LINKS, poolName, laneName)).toEqual([
-      // Study only brings in from Sarang: it stops being shared there.
-      'It will stop being shared to Sarang.',
-      // Study sends to Study Crew's Notes.
-      'It will move to Notes in Study Crew.',
-    ]);
-    expect(homeWarnings({ ...shared, poolId: null }, 'church', LINKS, poolName, laneName)).toEqual(
-      [],
-    );
+    expect(homeWarnings({ ...shared, poolId: null }, 'study', poolName)).toEqual([]);
+    expect(planFromHome(shared, 'church')).toEqual({ op: 'none' });
+    expect(planFromHome(shared, null)).toEqual({ op: 'none' });
   });
 
-  it('says what becoming mine costs a joint splash, then where it lands', () => {
+  it('says what becoming mine costs a joint record, then that it stays shared to its pool', () => {
     expect(planFromHome(joint, 'church')).toEqual({
       op: 'to_mine',
       myLaneId: 'church',
       placeOn: null,
     });
-    expect(homeWarnings({ ...joint, poolId: 'p-a' }, 'church', LINKS, poolName, laneName)).toEqual([
+    expect(homeWarnings({ ...joint, poolId: 'p-a' }, 'church', poolName)).toEqual([
       'This is a joint splash in Sarang. Moving it to your lane makes it yours alone; members can no longer add to it.',
-      'It will move to 말씀 in Sarang.',
+      'It stays shared to Sarang.',
     ]);
   });
 
-  it('says a Just-mine splash leaves its pool for a lane that does not send there', () => {
-    expect(homeWarnings({ ...own, poolId: 'p-a' }, 'study', LINKS, poolName, laneName)).toEqual([
-      'It will leave Sarang.',
+  it('moves a pool record to my lane, staying shared to its pool', () => {
+    expect(planFromHome(own, 'study')).toEqual({ op: 'to_mine', myLaneId: 'study', placeOn: null });
+    expect(homeWarnings({ ...own, poolId: 'p-a' }, 'study', poolName)).toEqual([
+      'It stays shared to Sarang.',
     ]);
+    expect(homeWarnings({ ...own, poolId: 'p-a' }, null, poolName)).toEqual([]);
   });
 });

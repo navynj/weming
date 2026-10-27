@@ -3,38 +3,52 @@
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { setPlacement } from './actions';
-import { AudienceChip } from './audience-sheet';
+import { preselectLane, withPick, type AudienceLink, type AudiencePick } from './audience';
+import { AudienceChip, type AudiencePool } from './audience-sheet';
+import { lastPicked, rememberPick } from './last-pick';
 
 /**
- * A post's Audience chip on its own page (H23): the pools it is shared to,
- * switched on and off in place. Each switch shows at once and the
- * placement follows behind it; a refusal (a lane unlinked meanwhile) takes
- * it back and says why.
+ * A record's Audience chip on its own page (H23, 0033): the pools it is
+ * shared to, each on a pool lane, switched in place. Each change shows at
+ * once and the placement follows behind it; a refusal takes it back and
+ * says why. A pick is remembered on this device for my lane and that pool.
  */
 export function SplashAudience({
   splashId,
+  myLaneId,
   shared,
-  linked,
-  unlinked,
+  pools,
+  links,
 }: {
   splashId: string;
-  shared: string[];
-  linked: { poolId: string; name: string }[];
-  unlinked: { poolId: string; name: string }[];
+  /** The record's lane: what a link's default and my last pick are kept by. */
+  myLaneId: string | null;
+  shared: AudiencePick[];
+  pools: AudiencePool[];
+  links: AudienceLink[];
 }) {
   const audience = useOptimisticAction(shared);
   return (
     <span className="flex flex-col items-end gap-1">
       <AudienceChip
         shared={audience.value}
-        linked={linked}
-        unlinked={unlinked}
-        onToggle={(poolId, on) =>
-          audience.run(
-            (current) => (on ? [...current, poolId] : current.filter((id) => id !== poolId)),
-            () => setPlacement(splashId, poolId, on),
+        pools={pools}
+        preselect={(poolId) =>
+          preselectLane(
+            myLaneId,
+            poolId,
+            links,
+            lastPicked(myLaneId, poolId),
+            pools.find((p) => p.id === poolId)?.lanes.map((l) => l.id) ?? [],
           )
         }
+        onChange={(poolId, poolLaneId) => {
+          if (poolLaneId) rememberPick(myLaneId, poolId, poolLaneId);
+          audience.run(
+            (current) => withPick(current, poolId, poolLaneId),
+            () => setPlacement(splashId, poolId, poolLaneId !== null, poolLaneId),
+          );
+        }}
       />
       {audience.message ? (
         <span role="alert" className="text-pool-500 text-[10px]">

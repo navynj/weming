@@ -99,8 +99,14 @@ export function poolCards(
         ...card,
         ...photo,
         writers: wrote.map((id) => ({ authorId: id, initials: initialsOf.get(id) ?? '' })),
+        // Together's open slots (0033): who it is with, less those who wrote.
         awaiting: view.members
-          .filter((m) => !m.former && !wrote.includes(m.userId))
+          .filter(
+            (m) =>
+              !m.former &&
+              !wrote.includes(m.userId) &&
+              (view.together?.[splash.id] ?? []).includes(m.userId),
+          )
           .map((m) => ({ authorId: m.userId, initials: m.initials })),
         column: splash.pool_lane_id ?? undefined,
         lane: lane ? { icon: lane.icon, name: lane.name } : null,

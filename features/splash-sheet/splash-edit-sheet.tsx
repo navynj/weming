@@ -23,9 +23,9 @@ const SETTLE_MS = 2500;
 /**
  * The compose sheet in edit mode (review), from the pencil on the top card
  * or a splash's page: title, icon, dates, lane and Audience for my own
- * splash; title, icon and dates for Just mine (its pool fixed); title and
+ * record; title, icon and dates for my pool record (its pool fixed); title and
  * icon for a joint splash. Ripples are edited on the splash's page, not
- * here. Opened from a pool, its lanes are that pool's with Just mine; from
+ * here. Opened from a pool, its lanes are that pool's with Together; from
  * Home, mine (0022, edit-lanes.tsx). Save shows the change at once
  * everywhere the splash is drawn — a conversion included — and the save runs
  * behind it; a refusal takes it back and says why.
@@ -120,7 +120,10 @@ type Edit = {
   declaredStart: string | null;
   declaredEnd: string | null;
   declaredLaneId: string | null;
-  share: { poolId: string; on: boolean }[];
+  share: { poolId: string; on: boolean; poolLaneId: string | null }[];
+  /** A joint record: members added in Together (0033), and Everyone turned on. */
+  invite: string[];
+  inviteEveryone: boolean;
   poolId: string | null;
   /** Only when it moved: a pool's own splash's new pool lane (0020). */
   poolLaneId: string | null;
@@ -139,7 +142,7 @@ function pendingFor(conversion: Conversion, loaded: Loaded): Partial<PendingEdit
       return { poolLane: poolLane(conversion.poolLaneId) };
     case 'to_joint':
       return { kind: 'joint', poolLane: poolLane(conversion.poolLaneId) };
-    case 'to_just_mine':
+    case 'to_pool_record':
       return { kind: 'own', poolLane: poolLane(conversion.poolLaneId) };
     case 'to_mine':
       return {
@@ -301,17 +304,24 @@ function EditForm({
       icon: icon || null,
       ...dates(),
       declaredLaneId: mine ? laneId : null,
-      // Only the switches that moved.
+      // Only the pools that changed: on, moved to another pool lane, or off.
       share: mine
         ? [
             ...shared
-              .filter((id) => !initial.shared.includes(id))
-              .map((poolId) => ({ poolId, on: true })),
-            ...initial.shared
-              .filter((id) => !shared.includes(id))
-              .map((poolId) => ({ poolId, on: false })),
+              .filter(
+                (pick) =>
+                  !initial.sharedIn.some(
+                    (was) => was.poolId === pick.poolId && was.poolLaneId === pick.poolLaneId,
+                  ),
+              )
+              .map((pick) => ({ poolId: pick.poolId, on: true, poolLaneId: pick.poolLaneId })),
+            ...initial.sharedIn
+              .filter((was) => !shared.some((pick) => pick.poolId === was.poolId))
+              .map((was) => ({ poolId: was.poolId, on: false, poolLaneId: null })),
           ]
         : [],
+      invite: lanes.invite,
+      inviteEveryone: lanes.inviteEveryone,
       poolId: initial.poolId,
       poolLaneId: null,
       conversion: lanes.conversion,

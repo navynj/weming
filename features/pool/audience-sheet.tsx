@@ -1,54 +1,58 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Users } from 'lucide-react';
 
-import { audienceLabel } from './audience';
+import type { PoolLaneChip } from '@/lib/queries/pools';
+
+import { audienceLabel, type AudiencePick } from './audience';
 import { Switch } from './lane-match';
 import { PoolSheet, SheetTitle } from './sheet';
 
-type Row = { poolId: string; name: string };
+/** A pool I am in, with its lanes: one row in Audience. */
+export type AudiencePool = { id: string; name: string; lanes: PoolLaneChip[] };
 
 /**
- * The Audience chip (H23): one compact chip beside the lane picker in the
- * composer and in a post's header, saying where the post is shared — *Only
- * me*, the pool's name, or *N pools*. A tap opens the sheet. A joint
- * splash has no chip: it belongs to its pool.
+ * The Audience chip (H23, 0033): one compact chip beside the lane picker in
+ * the composer and in a record's header, saying where it is shared — *Only
+ * me*, "<Pool> · <emoji> <pool lane>", or *N pools*. A tap opens the sheet.
+ * A joint record has no chip: it belongs to its pool.
  */
 export function AudienceChip({
   shared,
-  linked,
-  unlinked,
-  onToggle,
+  pools,
+  preselect,
+  onChange,
 }: {
-  /** Pool ids the post is shared to now. */
-  shared: string[];
-  /** Pools where the post's lane is linked: a switch each. */
-  linked: Row[];
-  /** Pools I am in where it is not: a note each. */
-  unlinked: Row[];
-  onToggle: (poolId: string, on: boolean) => void;
+  /** Where the record is shared now: a pool lane per pool. */
+  shared: AudiencePick[];
+  /** Every pool I am in: a row each. */
+  pools: AudiencePool[];
+  /** The chip a pool starts on when turned on (a link's default, my last pick), or none. */
+  preselect: (poolId: string) => string | null;
+  /** A pool on a pool lane, or off (null). */
+  onChange: (poolId: string, poolLaneId: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const names = linked.filter((r) => shared.includes(r.poolId)).map((r) => r.name);
+  const on = shared.filter((pick) => pools.some((p) => p.id === pick.poolId));
   return (
     <>
       <button
         type="button"
         data-audience-chip
-        aria-label={`Audience: ${audienceLabel(names)}`}
+        aria-label={`Audience: ${chipLabel(on, pools)}`}
         onClick={() => setOpen(true)}
         className="border-pool-200 text-ink inline-flex h-8 max-w-[12rem] shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm"
       >
         <Users aria-hidden size={14} className="text-pool-500 shrink-0" />
-        <span className="truncate">{audienceLabel(names)}</span>
+        <span className="truncate">{chipLabel(on, pools)}</span>
       </button>
       {open ? (
         <AudienceSheet
-          sections={[{ title: 'Pools', linked, unlinked }]}
-          shared={shared}
-          onToggle={onToggle}
+          pools={pools}
+          shared={on}
+          preselect={preselect}
+          onChange={onChange}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -56,8 +60,20 @@ export function AudienceChip({
   );
 }
 
+/** "Only me", "Our Pool · 🎲 Games", or "N pools". */
+export function chipLabel(shared: AudiencePick[], pools: AudiencePool[]): string {
+  if (shared.length === 1) {
+    const pool = pools.find((p) => p.id === shared[0].poolId);
+    const lane = pool?.lanes.find((l) => l.id === shared[0].poolLaneId);
+    if (pool && lane) return `${pool.name} · ${lane.icon ? `${lane.icon} ` : ''}${lane.name}`;
+  }
+  return audienceLabel(
+    shared.map((pick) => pools.find((p) => p.id === pick.poolId)?.name ?? 'A pool'),
+  );
+}
+
 /**
- * A "Just mine" splash's audience (0014): always its pool, so a plain chip
+ * My pool record's audience (0033; once Just mine, 0014): always its pool, so a plain chip
  * naming it, with nothing to switch.
  */
 export function FixedAudienceChip({ poolName }: { poolName: string }) {
@@ -75,65 +91,101 @@ export function FixedAudienceChip({ poolName }: { poolName: string }) {
 }
 
 /**
- * Where a post is shared, as switches. Sections, so a *Followers* row can
- * join *Pools* later without reshaping this; only Pools is built.
+ * Where a record is shared (0033): a row per pool I am in, each with a
+ * switch. Turned on, the row shows that pool's lane chips, and one must be
+ * picked: the switch starts on the preselected chip, or waits for a pick
+ * with nothing shared yet. Sections, so a *Followers* row can join *Pools*
+ * later without reshaping this; only Pools is built.
  */
 function AudienceSheet({
-  sections,
+  pools,
   shared,
-  onToggle,
+  preselect,
+  onChange,
   onClose,
 }: {
-  sections: { title: string; linked: Row[]; unlinked: Row[] }[];
-  shared: string[];
-  onToggle: (poolId: string, on: boolean) => void;
+  pools: AudiencePool[];
+  shared: AudiencePick[];
+  preselect: (poolId: string) => string | null;
+  onChange: (poolId: string, poolLaneId: string | null) => void;
   onClose: () => void;
 }) {
+  // Turned on with no chip to start on: shown on, shared only once picked.
+  const [waiting, setWaiting] = useState<string[]>([]);
+  const laneOf = (poolId: string): string | null =>
+    shared.find((pick) => pick.poolId === poolId)?.poolLaneId ?? null;
   return (
     <PoolSheet label="Audience" onClose={onClose}>
       <SheetTitle>Audience</SheetTitle>
       <p className="text-pool-500 -mt-2 mb-5 text-sm">
         Every ripple on this splash follows it. With every switch off, it is yours alone.
       </p>
-      {sections.map((section) => (
-        <section key={section.title} data-audience-section={section.title} className="mb-6">
-          <h3 className="text-pool-500 mb-1 text-xs">{section.title}</h3>
-          <ul className="flex flex-col">
-            {section.linked.map((row) => (
+      <section data-audience-section="Pools" className="mb-6">
+        <h3 className="text-pool-500 mb-1 text-xs">Pools</h3>
+        <ul className="flex flex-col">
+          {pools.map((pool) => {
+            const lane = laneOf(pool.id);
+            const on = lane !== null || waiting.includes(pool.id);
+            return (
               <li
-                key={row.poolId}
-                data-audience-row={row.poolId}
-                className="border-pool-100 flex items-center justify-between gap-4 border-b py-3"
+                key={pool.id}
+                data-audience-row={pool.id}
+                className="border-pool-100 flex flex-col gap-3 border-b py-3"
               >
-                <span className="text-ink min-w-0 truncate">Shared to {row.name}</span>
-                <Switch
-                  on={shared.includes(row.poolId)}
-                  onChange={(on) => onToggle(row.poolId, on)}
-                  label={`Shared to ${row.name}`}
-                />
+                <span className="flex items-center justify-between gap-4">
+                  <span className="text-ink min-w-0 truncate">Shared to {pool.name}</span>
+                  <Switch
+                    on={on}
+                    label={`Shared to ${pool.name}`}
+                    onChange={(next) => {
+                      if (!next) {
+                        setWaiting((list) => list.filter((id) => id !== pool.id));
+                        onChange(pool.id, null);
+                        return;
+                      }
+                      const start = preselect(pool.id);
+                      if (start) onChange(pool.id, start);
+                      else setWaiting((list) => [...list, pool.id]);
+                    }}
+                  />
+                </span>
+                {on ? (
+                  <span
+                    data-audience-lanes={pool.id}
+                    className="no-scrollbar flex gap-2 overflow-x-auto"
+                  >
+                    {pool.lanes.map((chip) => {
+                      const selected = chip.id === lane;
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          aria-pressed={selected}
+                          data-audience-lane={chip.id}
+                          onClick={() => {
+                            setWaiting((list) => list.filter((id) => id !== pool.id));
+                            onChange(pool.id, chip.id);
+                          }}
+                          className={`h-9 shrink-0 rounded-full px-3 text-sm font-semibold ${
+                            // Selection is ink (H20f).
+                            selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
+                          }`}
+                        >
+                          {chip.icon ? `${chip.icon} ` : ''}
+                          {chip.name}
+                        </button>
+                      );
+                    })}
+                  </span>
+                ) : null}
               </li>
-            ))}
-            {section.unlinked.map((row) => (
-              <li
-                key={row.poolId}
-                data-audience-unlinked={row.poolId}
-                className="border-pool-100 flex items-center justify-between gap-4 border-b py-3 text-sm"
-              >
-                <span className="text-pool-500 min-w-0 truncate">Not linked in {row.name}</span>
-                <Link
-                  href={`/pool/${row.poolId}/settings`}
-                  className="text-main-900 shrink-0 font-semibold"
-                >
-                  Lane settings
-                </Link>
-              </li>
-            ))}
-            {section.linked.length + section.unlinked.length === 0 ? (
-              <li className="text-pool-500 py-3 text-sm">You are in no Pool yet.</li>
-            ) : null}
-          </ul>
-        </section>
-      ))}
+            );
+          })}
+          {pools.length === 0 ? (
+            <li className="text-pool-500 py-3 text-sm">You are in no Pool yet.</li>
+          ) : null}
+        </ul>
+      </section>
     </PoolSheet>
   );
 }
