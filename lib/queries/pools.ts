@@ -549,6 +549,16 @@ export async function getMyThreadRipples(supabase: DuringClient): Promise<MyThre
 }
 
 /**
+ * My ripples on a joint splash I can no longer read (0041), each with the
+ * pool it was in: Home places them in that pool's column, "A pool you left".
+ */
+export async function getMyLeftPoolRipples(supabase: DuringClient): Promise<Map<string, string>> {
+  const { data, error } = await supabase.rpc('my_left_pool_ripples');
+  if (error) throw error;
+  return new Map((data ?? []).map((r) => [r.ripple_id, r.pool_id]));
+}
+
+/**
  * Who each joint record is together with now (0033, `joint_together`): every
  * current member under Everyone — later joiners included — else its picked
  * invitees still in the pool. "Add your side" waits for these, less writers.

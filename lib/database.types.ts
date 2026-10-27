@@ -1234,6 +1234,13 @@ export type Database = {
         Args: { p_pool_lane: string; p_splash: string }
         Returns: undefined
       }
+      my_left_pool_ripples: {
+        Args: never
+        Returns: {
+          pool_id: string
+          ripple_id: string
+        }[]
+      }
       my_thread_ripples: {
         Args: never
         Returns: {

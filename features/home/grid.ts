@@ -188,6 +188,14 @@ export function ownPoolColumn(poolId: string): string {
   return `pool:${poolId}`;
 }
 
+/**
+ * My ripple on a joint splash of a pool I left (0041): shown alone, in that
+ * pool's column, never laneless (H24 release 2 leaves it no lane of its own).
+ */
+export function inLeftPool(card: Card, poolId: string): Card {
+  return { ...card, column: ownPoolColumn(poolId), lane: { icon: null, name: 'A pool you left' } };
+}
+
 /** The column a mark sits in: the pool's choice where there is one (H23), else its lane. */
 export function cardColumn(card: Card): string | null {
   if (card.column) return card.column;
