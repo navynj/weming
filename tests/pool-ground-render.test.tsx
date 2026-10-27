@@ -329,7 +329,7 @@ describe('a joint splash on the grid (H23)', () => {
     const band = ground(crowded).container.querySelector('[data-lane-band="s-joint"]')!;
     expect(band.textContent).toContain('+4');
   });
-  it('is one row in the Date view: icon, title, lane chip, then faces and count; no sub-rows', () => {
+  it('is one row in the List view: icon, title, lane chip, then faces; no sub-rows', () => {
     setView('date');
     const { container } = ground(A);
     const rows = container.querySelectorAll('[data-pill="s-joint"]');
@@ -339,14 +339,35 @@ describe('a joint splash on the grid (H23)', () => {
     expect(row.textContent).toContain('Lost Ruins of Arnak');
     expect(row.textContent).toContain('Media');
     expect(row.querySelectorAll('[data-joint-faces] > :not([data-joint-more])')).toHaveLength(2);
-    expect(row.querySelector('[data-joint-count]')!.textContent).toBe('2 ripples');
-    // The faces and the count come after the lane chip.
-    const text = row.textContent!;
-    expect(text.indexOf('Media')).toBeLessThan(text.indexOf('2 ripples'));
+    // The faces come after the lane chip; no ripple count (review: reactions instead).
+    expect(row.querySelector('[data-joint-count]')).toBeNull();
+    const chip = [...row.querySelectorAll('span')].find(
+      (el) => el.className.includes('rounded-full') && el.textContent?.includes('Media'),
+    )!;
+    const faces = row.querySelector('[data-joint-faces]')!;
+    expect(chip.compareDocumentPosition(faces) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector('[data-joint-sub]')).toBeNull();
     expect(container.querySelector('[data-joint-rows]')).toBeNull();
   });
 
+  it('counts its reactions on its row, and shows none when there are none', () => {
+    setView('date');
+    const reacted: PoolView = {
+      ...A,
+      responded: {
+        reactions: [
+          { ripple_id: 'r-j1', user_id: ME, emoji: '❤️', created_at: '2026-10-21T01:00:00Z' },
+          { ripple_id: 'r-j2', user_id: MINA, emoji: '🔥', created_at: '2026-10-21T02:00:00Z' },
+        ],
+        replies: [],
+      },
+    };
+    const { container } = ground(reacted);
+    expect(container.querySelector('[data-pill="s-joint"] [data-row-reactions]')!.textContent).toBe(
+      '2',
+    );
+    expect(container.querySelector('[data-pill="s-mine"] [data-row-reactions]')).toBeNull();
+  });
   it('comes to the top of the stack from its Date-view row', () => {
     setView('date');
     const { container } = ground(A);
@@ -787,26 +808,30 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
     const mine = container.querySelector('[data-lane-piece="s-mine"] [data-board-piece]')!;
     expect(mine.getAttribute('data-label')).toBe('none');
   });
-  it('is a pill across the whole row in the Date view', () => {
+  it('is a plain row in the List view, as every other: no pill, no background (review)', () => {
     setView('date');
     const { container } = ground(A);
     const row = container.querySelector('[data-pill="s-joint"]')!;
     expect(row.hasAttribute('data-joint-pill')).toBe(true);
-    expect(row.className).toContain('rounded-full');
-    expect(row.className).toContain('w-full');
+    expect(row.className).not.toMatch(/rounded-full|bg-/);
     const plain = container.querySelector('[data-pill="s-mine"]')!;
     expect(plain.hasAttribute('data-joint-pill')).toBe(false);
-    expect(plain.className).toContain('border-b');
+    expect(plain.className).not.toMatch(/rounded-full|bg-|border-b/);
   });
 
-  it('is a plain row with Everyone off and nobody besides its maker picked (0033)', () => {
+  it('groups rows under a date divider: the day and its weekday, then a thin line', () => {
+    setView('date');
+    const { container } = ground(A);
+    const divider = container.querySelector('[data-day-row="2026-10-20"]')!;
+    expect(divider.textContent).toContain('20');
+    expect(divider.querySelector('[data-day-divider]')!.className).toContain('bg-white/20');
+  });
+  it('is not marked joint-filled with Everyone off and nobody besides its maker picked (0033)', () => {
     setView('date');
     const { container } = ground({ ...A, together: { 's-joint': [MINA] } });
     const row = container.querySelector('[data-pill="s-joint"]')!;
     expect(row.hasAttribute('data-joint-pill')).toBe(false);
-    expect(row.className).toContain('border-b');
   });
-
   it('is a pill for my record with someone with it in this pool, a plain row without (0035)', () => {
     setView('date');
     const plain = ground(A);
@@ -849,11 +874,10 @@ describe('the joint surface is solid, and the faces’ ring is its colour (revie
     );
     expect(ringed.length).toBeGreaterThan(0);
   });
-  it('on the Date view’s pill row', () => {
+  it('on the List view’s row: no surface, its faces ringed in the joint colour', () => {
     setView('date');
     const row = ground(A).container.querySelector('[data-pill="s-joint"]')!;
-    expect(row.className).toContain(SURFACE);
-    expect(row.className).not.toMatch(/bg-white\//);
+    expect(row.className).not.toContain(SURFACE);
     expect(faces(row).every((face) => face.className.includes(RING))).toBe(true);
   });
 });

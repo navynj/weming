@@ -10,14 +10,12 @@ export const DAY_RAIL_PX = 56;
 export const DAY_LIST_TEMPLATE = `${DAY_RAIL_PX}px minmax(0, 1fr)`;
 
 /**
- * A day in a day list (review) — the Date view and a lane's page alike:
- * every day spaced the same. The month, when it changes, is a line of its
- * own above the day rather than a taller rail, so no day's rows sit apart
- * differently; the rail is the day number over its weekday, aligned with
- * the day's first row; one fixed space follows each day. Laid out in a
- * grid of `DAY_LIST_TEMPLATE`. A day list never scrolls sideways, so the
- * rail is neither sticky nor filled: a fill would cut the ring that plays
- * around a row's icon, which reaches across the rail (review).
+ * A day in a day list (review) — the List view and a lane's page alike:
+ * a date divider, then the day's rows. The divider is the day's number and
+ * weekday as one unit at the left, then a thin white line at 20% across the
+ * rest; the month, when it changes, is a line of its own above it. No
+ * backgrounds: the dividers alone join the rows. Laid out across the whole
+ * of a `DAY_LIST_TEMPLATE` grid.
  */
 export function DateDay({
   day,
@@ -41,12 +39,15 @@ export function DateDay({
       <div
         data-day-row={day}
         data-labelled=""
-        className="flex min-w-0 flex-col gap-0.5 pt-3 pr-1 pl-6 text-white/70"
+        className="col-span-full flex min-w-0 items-center gap-3 pt-4 pr-4 pb-1 pl-6"
       >
-        <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
-        <span className="text-[10px]/none font-medium text-white/50">{weekdayOf(day)}</span>
+        <span className="flex shrink-0 items-baseline gap-1 text-white/70">
+          <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
+          <span className="text-[10px]/none font-medium text-white/50">{weekdayOf(day)}</span>
+        </span>
+        <span aria-hidden data-day-divider className="h-px min-w-0 flex-1 bg-white/20" />
       </div>
-      <div data-cell="date" className="flex min-w-0 flex-col pr-4 pb-5">
+      <div data-cell="date" className="col-span-full flex min-w-0 flex-col pr-4 pb-1 pl-6">
         {children}
       </div>
     </>

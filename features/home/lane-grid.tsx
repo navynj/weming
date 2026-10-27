@@ -51,7 +51,7 @@ import {
   type GridColumn,
 } from './grid';
 import { DAY_RAIL_PX, DateDay } from './date-day';
-import { JointBand, JointCount, JointFaces } from './joint-band';
+import { JointBand, JointFaces } from './joint-band';
 import { PostRow } from './post-row';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
@@ -634,12 +634,10 @@ export const LaneGrid = forwardRef<
                       onPick={onPick}
                       // A joint splash is one row, as on the grid (review): its
                       // writers' faces and ripple count, never its ripples.
+                      // A joint record's faces (review); its reactions count themselves.
                       after={
                         card.branches ? (
-                          <>
-                            <JointFaces branches={card.branches} size={26} />
-                            <JointCount count={card.branches.length} />
-                          </>
+                          <JointFaces branches={card.branches} size={26} />
                         ) : undefined
                       }
                     />

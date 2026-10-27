@@ -214,9 +214,11 @@ describe('a lane’s page (round 3)', () => {
     ).toBe('noodles');
     const top = container.querySelector('[data-pill="noodles"]')!;
     expect(top.hasAttribute('data-dived')).toBe(false);
-    expect(top.className).toContain('border-white/15');
-    expect(top.className).not.toMatch(/rounded-full|bg-white /);
-    expect(container.querySelector('[data-pill="ramen"]')!.className).toContain('opacity-60');
+    // A plain row: full white on top, the rest at 85%; no background, no line of its own.
+    expect(top.className).toContain('text-white');
+    expect(top.className).not.toContain('text-white/85');
+    expect(top.className).not.toMatch(/rounded-full|bg-|border-b/);
+    expect(container.querySelector('[data-pill="ramen"]')!.className).toContain('text-white/85');
     // The top card opens the post as a sheet over this page (review).
     expect(stack.querySelector('[data-card-link]')!.getAttribute('href')).toBe('/splash/noodles');
     fireEvent.click(container.querySelector('[data-pill="soup"]')!);

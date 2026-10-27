@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { Heart } from 'lucide-react';
 
 import { CommitRing } from '@/components/ui/waves';
 import { Monogram } from '@/components/ui/monogram';
@@ -8,18 +9,18 @@ import { PersonName } from '@/features/people/avatar';
 
 import { postIcon, type Card, type CardLane } from './grid';
 
-/** The icon disc's diameter, and the ring's bound around it. */
+/** The icon's room, and the ring's bound around it. */
 const DISC_PX = 28;
 const RING_PX = 96;
 
 /**
- * A post as a row (review): in a day list — the Date view and a lane's
- * page alike — no pill
- * background, only a faint white line beneath each row. The post the stack
- * is reading is the one row at full white, its icon on a white disc; every
- * other row sits back, as every other mark does on the grid. The ring plays
- * around the icon when Home says so. A tap brings the post to the top of
- * the stack.
+ * A post as a row (review): in a day list — the List view and a lane's page
+ * alike — a plain line with no background of any kind: its icon, its title,
+ * its lane chip (its pool's monogram instead, on Home, where it is shared),
+ * a joint record's faces, and how many reactions it has, if any. The date
+ * dividers above join the rows. The post the stack is reading is the one row
+ * in full white; the others at 85%. The ring plays around the icon when Home
+ * says so. A tap brings the post to the top of the stack.
  */
 export function PostRow({
   card,
@@ -44,6 +45,8 @@ export function PostRow({
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   const glyph = postIcon(card.splash, lane);
+  // What readers left on it (H25), counted; nothing when nobody has.
+  const reactions = card.responded?.value.reactions.length ?? 0;
   return (
     <button
       type="button"
@@ -52,15 +55,9 @@ export function PostRow({
       data-ring={ring !== null ? '' : undefined}
       onClick={() => onPick(card.splash.id)}
       data-joint-pill={card.together ? '' : undefined}
-      // A record with invitees is one pill across the whole row (review,
-      // 0033), so the Date view shows it is shared work; every other row
-      // keeps its faint line.
-      className={`flex w-full min-w-0 items-center gap-3 text-left text-white ${
-        card.together
-          ? // The joint surface, solid (JOINT_SURFACE), as on the band.
-            'bg-joint my-1 rounded-full py-1.5 pr-3 pl-1.5'
-          : 'border-b border-white/15 py-2.5'
-      } ${current ? '' : 'opacity-60'}`}
+      className={`flex w-full min-w-0 items-center gap-3 py-2 text-left ${
+        current ? 'text-white' : 'text-white/85'
+      }`}
     >
       <span className="relative flex shrink-0 items-center justify-center">
         {ring !== null ? (
@@ -77,9 +74,7 @@ export function PostRow({
         ) : null}
         <span
           aria-hidden
-          className={`relative flex items-center justify-center rounded-full text-sm/none ${
-            current ? 'bg-white' : 'bg-white/20'
-          }`}
+          className="relative flex items-center justify-center text-base/none"
           style={{ width: DISC_PX, height: DISC_PX }}
         >
           {glyph ?? ''}
@@ -93,7 +88,7 @@ export function PostRow({
         {title}
       </span>
       {(card.pools ?? []).map((pool) => (
-        // Shared to a pool (H23), as on the mark and the card.
+        // Shared to a pool (H23), in the lane chip's place on Home.
         <Monogram key={pool} name={pool} size="chip" photo={card.poolPhoto ?? null} />
       ))}
       {card.author ? (
@@ -105,13 +100,23 @@ export function PostRow({
           <PersonName id={card.authorId} name={card.authorName ?? card.author} />
         </span>
       ) : null}
-      {showLane && lane ? (
+      {showLane && lane && !card.pools?.length ? (
         <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-white/25 px-2 text-[10px] text-white/80">
           {lane.icon ? <span aria-hidden>{lane.icon}</span> : null}
           {lane.name}
         </span>
       ) : null}
       {after}
+      {reactions > 0 ? (
+        <span
+          data-row-reactions
+          aria-label={`${reactions} reaction${reactions === 1 ? '' : 's'}`}
+          className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-medium text-white/70"
+        >
+          <Heart aria-hidden size={10} />
+          {reactions}
+        </span>
+      ) : null}
     </button>
   );
 }
