@@ -67,3 +67,15 @@ export function supabaseAnonKey(): string {
 export function supabaseServiceRoleKey(): string {
   return requireEnv('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
+
+/**
+ * Web Push's keys (H32), or null. Optional on purpose, unlike SERVER_ENV: a
+ * deploy that lands before the keys are set must not take the site down, so
+ * without them the bell still works and nothing is pushed.
+ */
+export function vapidKeys(): { publicKey: string; privateKey: string; subject: string } | null {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+  return publicKey && privateKey && subject ? { publicKey, privateKey, subject } : null;
+}

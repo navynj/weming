@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import type { ActionOutcome } from '@/lib/use-optimistic-action';
 import { createClient } from '@/lib/supabase/server';
+import { pushAfter } from '@/lib/notifications/after';
 
 import { isOneEmoji, REPLY_MAX } from './model';
 
@@ -31,6 +32,7 @@ const Reaction = z.object({
 
 /** A chip tapped: my reaction with that emoji is added, or taken back. */
 export async function setReaction(input: z.input<typeof Reaction>): Promise<ActionOutcome> {
+  pushAfter();
   const parsed = Reaction.safeParse(input);
   if (!parsed.success) return refused('That is not one emoji.');
   const { rippleId, emoji, on } = parsed.data;
@@ -62,6 +64,7 @@ const NewReply = z.object({ id: z.uuid(), rippleId: z.uuid(), body: Body });
 
 /** A reply, its id minted in the browser so the one on screen is the real one. */
 export async function addReply(input: z.input<typeof NewReply>): Promise<ActionOutcome> {
+  pushAfter();
   const parsed = NewReply.safeParse(input);
   if (!parsed.success) return refused(parsed.error.issues[0]?.message);
   const supabase = await createClient();

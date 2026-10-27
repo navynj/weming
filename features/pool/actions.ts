@@ -7,6 +7,7 @@ import type { Database } from '@/lib/database.types';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
+import { pushAfter } from '@/lib/notifications/after';
 
 export type Done = { ok: true } | { ok: false; message: string };
 export type Made = { ok: true; id: string } | { ok: false; message: string };
@@ -284,6 +285,7 @@ export async function setPlacement(
   shared: boolean,
   poolLaneId: string | null = null,
 ): Promise<Done> {
+  pushAfter();
   const parsed = z
     .object({
       splashId: z.uuid(),
@@ -340,6 +342,7 @@ export async function setPlacementTogether(
   picked: string[],
   everyone: boolean,
 ): Promise<Done> {
+  pushAfter();
   const parsed = z
     .object({ splashId: z.uuid(), poolId: z.uuid(), picked: z.array(z.uuid()).max(64) })
     .safeParse({ splashId, poolId, picked });
@@ -385,6 +388,7 @@ export async function addJointInvitees(
   users: string[],
   everyone = false,
 ): Promise<Done> {
+  pushAfter();
   const parsed = z
     .object({ splashId: z.uuid(), users: z.array(z.uuid()).max(64) })
     .safeParse({ splashId, users });
@@ -447,6 +451,7 @@ export async function createJointSplash(input: z.input<typeof Joint>): Promise<M
 }
 
 async function createJointSplashWork(input: z.input<typeof Joint>): Promise<Made> {
+  pushAfter();
   const parsed = Joint.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That joint splash is incomplete.' };
   const joint = parsed.data;
@@ -546,6 +551,7 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
 }
 
 async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Made> {
+  pushAfter();
   const parsed = OwnDrop.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That splash is incomplete.' };
   const drop = parsed.data;
