@@ -51,3 +51,6 @@ backups/
 # age private keys for backups: kept offline, never committed
 *.key
 weming-backup.key
+
+# Agent worktrees (Claude Code): separate checkouts, never part of this one.
+.claude/worktrees/
