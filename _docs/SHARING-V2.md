@@ -299,3 +299,74 @@ Still sketched below (the per-pool Everyone flag and the ripple's pool) for 0035
 | 0036 drops | `direction`, the 0009/0019 indexes, `_sending_lane`, `_joint_lane_for`, `_place_history`, `invite_lanes`, the two summaries | None of these is needed. H24 release 2 dropping `ripples.category_id` is neutral |
 
 **Adjustments to v2:** none needed. One thing to keep in mind while writing 0033: placement removal is the only path that could orphan a thread later, so the new Audience functions should keep turning a placement off (`shared = false`) rather than deleting the row. That is already today's behaviour, and 0033 will keep it.
+
+---
+
+## 8. Plan: 0035, per-pool invitees on my records (for review, 2026-10-26)
+
+Status: **plan only.** It is built after #13 merges, rehearsed, and stopped before the push. It implements §7 as decided, plus Yoonji's additions: pool deletion, members leaving, and the ROADMAP list afterwards.
+
+### What it does
+- **Audience:** each pool row that is on shows its own With line ("With · Everyone" and that pool's member faces), none picked by default. My pool record gets the same With in its edit sheet, for its one pool.
+- **Writing:** invited members of that pool get "Add your side" on my record there. Their ripples carry that pool (`ripples.thread_pool_id`).
+- **Reading:**
+  - A member's ripple is visible only to that pool's current members and to me.
+  - My own ripples stay visible in every pool the record is shared to.
+  - My Home and the detail sheet show per-pool threads as tabs ("JY · 3 | SY · 2"). A pool's members see that pool's thread plus my ripples, with no tabs.
+- **Unsharing:** turning a pool's placement off hides that pool's members' ripples and never deletes them. Turning it on again restores them. Each author still sees their own ripple on their Home, under my record's title, with a note that it is no longer shared.
+- **Fill and slot:** follow the joint rule, per pool.
+  - In a pool, my record is filled once that placement has Everyone or anyone picked.
+  - Its "Add your side" slot waits for invited current members of that pool who have not written there.
+
+### Schema
+| Change | Kind | Notes |
+| --- | --- | --- |
+| `joint_invitees`: primary key from `(splash_id, user_id)` to a new `id`; unique `(splash_id, user_id)` where `pool_id` is null (the per-pool key exists since 0034) | **Destructive** (drops a primary key) | Needs Yoonji's quoted approval. One person invited in two pools of one record needs it. Production: 0 rows today |
+| `joint_invitees.pool_id` comment | — | 0034's comment names the per-pool migration "0036"; rewritten to 0035 |
+| `splash_placements.invite_all boolean not null default false` | additive | Everyone in that pool |
+| `ripples.thread_pool_id uuid` | additive | Null for my ripples and on joint records. Set for a member's ripple on my record: the pool it was written in |
+| FK `(splash_id, thread_pool_id) → splash_placements (splash_id, pool_id)`, **on delete restrict** | additive | A placement holding members' ripples can be switched off, never deleted. "Never deletes" is held by the database |
+| `hold_ripple_thread` (trigger) | additive | `thread_pool_id` is null exactly when the author owns the record, or the record is joint. It never changes after insert |
+
+### Functions and policies (no policy is removed; two are altered)
+- **`placement_together(splash ids)`:** who each (record, pool) is together with now. It is `joint_together`'s twin: under Everyone, the pool's current members; otherwise the pool's picked rows for people still in the pool.
+- **`set_placement_together(splash, pool, users[], everyone)`:** the author alone, on a shared placement. Picks are replaced, since unlike a joint record the author may also take people off. An invitee who already wrote keeps their side.
+- **Ripple insert and update policies** (`alter policy … with check`):
+  - The author writes with `thread_pool_id` null on my record or on a joint record, as today.
+  - An invited current member of P writes with `thread_pool_id = P` on my record, while that placement is shared.
+- **`ripple_in_my_pools`**, a new branch: a thread ripple is readable by P's current members while the placement is shared and its author is `member_visible` there. Leaving with "remove" hides theirs; "keep" keeps them, which matches placements.
+- **My reading of their ripples:** a new branch for the record's owner, while the placement is shared.
+- **`_ripple_pools`** (reactions and replies, 0030): a thread ripple's audience is its one pool, not every pool the record is shared to.
+- **`my_thread_ripples()`:** security definer. An author's own thread ripples with the record's title, the pool's name and whether it is still shared, for their Home. It is needed because the record itself is unreadable to them once the placement is off.
+- **`delete_pool`** (Yoonji's addition):
+  - Ripples members wrote on my record in that pool go back to each author as a post of one per (record, author), titled like my record.
+  - Each lands in a lane made from the pool lane, the same way detached joint ripples are handled.
+  - My record loses that placement. The ripples move before the pool's rows go, so the restrict never fires.
+- **`leave_pool`** (Yoonji's addition): their thread ripples follow `keep_on_leave` through `member_visible`, like their placements. No change to the function.
+- **Conversions:** they refuse while members have written on my record: "Make it a joint record of…" (`_require_only_mine`, already the case) and Move to Home (a placement it would drop holds their ripples).
+
+### App
+- **Audience sheet:** a With line per pool row that is on; faces come from that pool's members (`getMyPoolNames` gains members).
+- **Edit sheet:** my pool record gets With for its pool. My Home record's With lives in Audience.
+- **Writing:** "Add your side" on my record in a pool passes the pool; `addBlock` takes `threadPoolId`.
+- **Home and the detail sheet:** tabs per pool for my record: "JY · 3 | SY · 2", my ripples in every tab. A member's own thread ripples show on their Home from `my_thread_ripples`.
+- **Board:** pool cards' fill and slot from `placement_together`; Home's fill too (below).
+
+### Tests and rehearsal
+- **DB tests:**
+  - an invitee can write and a non-invitee can't;
+  - a thread ripple is visible only in its pool and to me;
+  - switching the placement off hides it and switching back restores it, and a delete is refused;
+  - leaving with keep or remove;
+  - `delete_pool` returns posts to authors;
+  - reactions follow the thread's pool.
+- **Render tests:** With in Audience, tabs, slot and fill per pool.
+- **Rehearsal:** the fixture and a fresh production dump. Before and after: every placement and every ripple's visibility to each member is unchanged (no thread ripples exist yet).
+
+### Questions before building
+1. **Approval** for the destructive step, quoted in the migration: dropping `joint_invitees`' primary key `(splash_id, user_id)` for a surrogate `id`, with a partial unique key per use.
+2. **Do I see a pool's thread while that placement is off?** I propose no, the same as the pool: hidden for everyone but each ripple's author, back on reshare.
+3. **Deleting my record** after members wrote on it: their ripples would go with it, through the cascade. I propose they go back to each author as a post of one, as on pool deletion, rather than refusing the delete.
+4. **The With control in Audience:** your brief says "With · Everyone (underlined button)", but compose now uses a word and a switch ("With … Everyone ⏺"). I propose the switch in both, for one control.
+5. **Home fill for my record** shared to several pools: filled when any pool has someone with it?
+6. **Tab counts:** count that pool's members' ripples only ("JY · 3"), or include mine?
