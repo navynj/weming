@@ -152,6 +152,14 @@ export function handMoved(layout: BoardLayoutJson | undefined): boolean {
   );
 }
 
+/**
+ * A ranged post (review): a band along its days, whose one hand-set field
+ * is its words' size; the panel and the board's handles both offer it alone.
+ */
+export function isPeriod(splash: { range: { start: string; end: string } | null }): boolean {
+  return splash.range != null && splash.range.start < splash.range.end;
+}
+
 /** The photos a card shows on the board: every one but those hidden from it (0044). */
 export function boardPhotos<P extends { path: string }>(
   photos: P[] | undefined,
