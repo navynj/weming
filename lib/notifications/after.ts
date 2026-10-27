@@ -12,15 +12,20 @@ import { dispatchPushes } from './dispatch';
  * here loses a buzz, never a row in the list.
  */
 export function pushAfter(): void {
-  after(async () => {
-    try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) await dispatchPushes(user.id);
-    } catch (error) {
-      reportFailure('push', error);
-    }
-  });
+  try {
+    after(async () => {
+      try {
+        const supabase = await createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) await dispatchPushes(user.id);
+      } catch (error) {
+        reportFailure('push', error);
+      }
+    });
+  } catch {
+    // Outside a request (an action called from a script or a test) there is
+    // no response to wait for and nobody to push for; the write goes on.
+  }
 }

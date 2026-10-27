@@ -14,6 +14,13 @@ vi.mock('@/features/people/actions', () => ({
   },
 }));
 const uploads: { path: string; blob: Blob; contentType?: string }[] = [];
+// The sheet's notifications section (H32) reads and saves its own settings.
+vi.mock('@/features/notifications/actions', () => ({
+  loadNotificationSettings: () => Promise.resolve({ paused: false, showTitles: false }),
+  setNotificationSettings: () => Promise.resolve({ ok: true }),
+  savePushSubscription: () => Promise.resolve({ ok: true }),
+  removePushSubscription: () => Promise.resolve({ ok: true }),
+}));
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     storage: {

@@ -1,11 +1,14 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 
+import { InstallOffer } from '@/features/install/install-offer';
 import { setBadge } from '@/lib/notifications/badge';
 
 import { loadUnreadCount } from './actions';
 import { NotificationsSheet } from './notifications-sheet';
+import { resyncPush } from './push-client';
 
 type Notifications = {
   unread: number;
@@ -49,10 +52,31 @@ export function NotificationsProvider({
 
   useEffect(() => setBadge(unread), [unread]);
 
+  // A notification clicked while the app is open: the worker focuses this
+  // window and says where to go, and the app routes in place (public/sw.js).
+  const router = useRouter();
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    function onMessage(event: MessageEvent): void {
+      const data = event.data as { type?: unknown; url?: unknown } | null;
+      if (
+        data?.type === 'weming:open' &&
+        typeof data.url === 'string' &&
+        data.url.startsWith('/')
+      ) {
+        router.push(data.url);
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    void resyncPush().catch(() => {});
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [router]);
+
   return (
     <Context.Provider value={{ unread, setUnread, open: () => setOpen(true) }}>
       {children}
       {open ? <NotificationsSheet onClose={() => setOpen(false)} /> : null}
+      <InstallOffer />
     </Context.Provider>
   );
 }

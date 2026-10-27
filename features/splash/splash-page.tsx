@@ -13,6 +13,7 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
 import { deleteJointSplash } from '@/features/pool/actions';
+import { offerInstall } from '@/features/install/install-state';
 import { usePeople } from '@/features/people/people-provider';
 import { latestFromOthers, type RippleResponsesValue } from '@/features/responses/model';
 import { RippleResponses } from '@/features/responses/ripple-responses';
@@ -160,6 +161,13 @@ export function SplashPage({
     blocks.some((b) => b.id === id && b.author_id === me),
   );
   useEffect(() => rememberSeen(splash.id), [splash.id]);
+  // Invited to add my side, with none written yet (opened from "Add your
+  // side", or a record shared to me with With): the moment install and
+  // notifications are offered (H32), at most every 14 days.
+  const invitedToSide = writing || (Boolean(sidePool) && !blocks.some((b) => b.author_id === me));
+  useEffect(() => {
+    if (invitedToSide) offerInstall();
+  }, [invitedToSide]);
   useEffect(() => {
     if (!openedAt) return;
     // The badge opens at the first block anyone reacted or replied to (H25).

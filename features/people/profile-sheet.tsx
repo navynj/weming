@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { saveProfile } from './actions';
 import { AVATAR_ACCEPT, decodePhoto, encodeAvatar, sourceRect, type CropView } from './crop';
 import { ThemePicker } from './theme-picker';
+import { NotificationSettings } from '@/features/notifications/notification-settings';
 import { CropFrame, FRAME_PX } from './crop-frame';
 import { displayName, NAME_MAX } from './name';
 import { usePeople } from './people-provider';
@@ -25,7 +26,8 @@ type Photo =
 
 /**
  * Settings (0018, 0032): a bottom sheet from the strip's gear, before my
- * face, at every width — my photo and name, then my theme. The theme applies
+ * face, at every width — my photo and name, then my theme, then
+ * notifications (H32). The theme applies
  * the moment it is picked and saves on its own; Save is for the profile.
  *
  * My profile (0018): a bottom sheet, at every width.
@@ -201,6 +203,8 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
           </label>
 
           <ThemePicker />
+
+          <NotificationSettings />
 
           <div className="flex w-full gap-3">
             <button
