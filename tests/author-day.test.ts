@@ -58,7 +58,6 @@ function ripple(
     occurred_time: null,
     ended_at: null,
     started_at: null,
-    category_id: 'c',
     ...over,
   };
 }

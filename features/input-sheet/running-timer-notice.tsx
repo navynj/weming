@@ -3,7 +3,7 @@
 // DORMANT (H20b): no surface reaches this since the Splash pivot. Kept, with
 // its tests, for P3's Swim. Do not wire it back in; do not delete it.
 
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 /**
  * H10 allows one running timer per author, and the exclusion constraint makes
@@ -18,7 +18,7 @@ export function RunningTimerNotice({
   onSwap,
   onCancel,
 }: {
-  running: RippleWithCategory;
+  running: RippleWithSplash;
   pending: boolean;
   onSwap: () => void;
   onCancel: () => void;
@@ -26,7 +26,6 @@ export function RunningTimerNotice({
   return (
     <div role="alert" className="bg-pool-100 flex flex-col gap-2 rounded-lg px-3 py-2 text-sm">
       <p className="text-ink">
-        {running.category?.icon ? <span aria-hidden>{running.category.icon} </span> : null}
         <span className="font-medium">{running.note ?? 'A session'}</span> is still running.
       </p>
       <div className="flex gap-3">

@@ -84,7 +84,6 @@ function card(id: string, title: string, day: string, over: Partial<Card> = {}):
     [
       {
         id: `${id}-b`,
-        category_id: 'c-food',
         note: id,
         occurred_on: day,
         occurred_time: null,

@@ -336,17 +336,13 @@ describe('Just mine (0014)', () => {
     expect((await asUser(cal).from('ripples').select('id').eq('splash_id', OWN)).data).toEqual([]);
   });
 
-  it('is always shared to its pool, and takes no lane of mine', async () => {
+  it('is always shared to its pool', async () => {
     const off = await asUser(ben)
       .from('splash_placements')
       .update({ shared: false })
       .eq('splash_id', OWN)
       .eq('pool_id', pool);
     expect(off.error?.code).toBe('42501');
-    const laned = await asUser(ben)
-      .from('ripples')
-      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'with a lane', splash_id: OWN });
-    expect(laned.error?.code).toBe('23514');
     // Every ripple belongs to a splash (H24).
     const lone = await asUser(ben).from('ripples').insert({ author_id: ben, note: 'no lane' });
     expect(lone.error?.code).toBe('23514');
@@ -379,14 +375,14 @@ describe('a ripple carries no lane of its own (H24)', () => {
     const saved = await asUser(ben)
       .from('ripples')
       .insert({ author_id: ben, note: 'unlinked day', splash_id: DAYS_JOINT })
-      .select('id, category_id')
+      .select('id, splash_id')
       .single();
     expect(saved.error).toBeNull();
-    expect(saved.data!.category_id).toBeNull();
 
+    // A ripple has no lane of its own (0042): what a link could move is its splash.
     const lane = async (): Promise<string | null> =>
-      (await asUser(ben).from('ripples').select('category_id').eq('id', saved.data!.id).single())
-        .data!.category_id;
+      (await asUser(ben).from('ripples').select('splash_id').eq('id', saved.data!.id).single())
+        .data!.splash_id;
     // → in: where the joint splash shows on Home is derived from this link;
     // the ripple itself stays as it is.
     const linked = await asUser(ben).rpc('set_lane_links', {
@@ -397,20 +393,17 @@ describe('a ripple carries no lane of its own (H24)', () => {
       ],
     });
     expect(linked.error).toBeNull();
-    expect(await lane()).toBeNull();
+    expect(await lane()).toBe(DAYS_JOINT);
 
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
       p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
     });
-    expect(await lane()).toBeNull();
+    expect(await lane()).toBe(DAYS_JOINT);
   });
 
-  it('refuses a lane or a date of a ripple’s own, on any splash', async () => {
-    const laned = await asUser(ben)
-      .from('ripples')
-      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'my lane', splash_id: BEN_OLD_POST });
-    expect(laned.error?.code).toBe('23514');
+  // A lane of its own is gone with the column (0042); a date is still refused.
+  it('refuses a date of a ripple’s own, on any splash', async () => {
     const dated = await asUser(ben).from('ripples').insert({
       author_id: ben,
       occurred_on: '2026-10-20',
@@ -478,10 +471,10 @@ describe('links and their markers (0033)', () => {
     expect((await markers(ben)).find((l) => l.pool_lane_id === days)!.is_home).toBe(true);
     const after = await asUser(ben)
       .from('ripples')
-      .select('category_id')
+      .select('splash_id')
       .eq('id', ripple.data!.id)
       .single();
-    expect(after.data!.category_id).toBeNull();
+    expect(after.data!.splash_id).toBe(HOME_JOINT);
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
       p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],

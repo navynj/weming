@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { InputSheet, type SheetContext } from '@/features/input-sheet/input-sheet';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 import { DetailSheet } from './detail-sheet';
 
@@ -32,7 +32,7 @@ export function RippleSheetHost({
   sheetContext,
   children,
 }: {
-  ripples: RippleWithCategory[];
+  ripples: RippleWithSplash[];
   lockedIds: string[];
   sheetContext: SheetContext;
   children: ReactNode;

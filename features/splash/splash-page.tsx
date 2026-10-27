@@ -8,7 +8,7 @@ import type { CommitResult } from '@/features/input-sheet/commit';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { deleteRipple, setRippleLock } from '@/features/ripple-sheet/actions';
 import type { MyCategory } from '@/lib/queries/profile';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
@@ -64,7 +64,7 @@ function outcome(result: CommitResult): ActionOutcome {
 const NO_RESPONSES: RippleResponsesValue = { reactions: [], replies: [] };
 
 /** What the page holds and edits: the post and its blocks, as one value. */
-type PageState = { splash: SplashSummary; blocks: RippleWithCategory[]; lockedIds: string[] };
+type PageState = { splash: SplashSummary; blocks: RippleWithSplash[]; lockedIds: string[] };
 
 /**
  * A post's detail (SPEC 5, H21c), shown in the splash sheet over the screen it
@@ -104,7 +104,7 @@ export function SplashPage({
 }: {
   splash: SplashSummary;
   /** Oldest first. */
-  blocks: RippleWithCategory[];
+  blocks: RippleWithSplash[];
   photos: Record<string, (string | null)[]>;
   lockedIds: string[];
   categories: MyCategory[];
@@ -146,7 +146,7 @@ export function SplashPage({
   const closeSheet = useCloseSplash();
   const { me } = usePeople();
   // Mine to edit: my own ripples only — on Home others' are read there too (0035).
-  const editable = (block: RippleWithCategory): boolean =>
+  const editable = (block: RippleWithSplash): boolean =>
     pool ? block.author_id === pool.me : !me || block.author_id === me;
   const answered = useRippleResponses(responses);
   // Opened at a reply from the board: its block's replies open in full (H25).
@@ -177,7 +177,7 @@ export function SplashPage({
   // Which blocks show: in a pool, the owner's and that pool's members'; on
   // Home with tabs, the owner's and the tab's; else every one I can read.
   const shownPool = pool ? pool.poolId : threads.length > 0 ? tab : null;
-  const showsBlock = (block: RippleWithCategory): boolean =>
+  const showsBlock = (block: RippleWithSplash): boolean =>
     !block.thread_pool_id || shownPool === null || block.thread_pool_id === shownPool;
   const {
     value: page,
@@ -233,7 +233,7 @@ export function SplashPage({
   }
 
   /** The block as the screen should show it: its words, photos, and its day on a range (0031). */
-  function shaped(base: RippleWithCategory, draft: BlockDraft): RippleWithCategory {
+  function shaped(base: RippleWithSplash, draft: BlockDraft): RippleWithSplash {
     return {
       ...base,
       note: draft.note.trim().length > 0 ? draft.note : null,
@@ -263,11 +263,10 @@ export function SplashPage({
       );
       return;
     }
-    const placeholder: RippleWithCategory = shaped(
+    const placeholder: RippleWithSplash = shaped(
       {
         id: draft.id,
         author_id: pool?.me ?? '',
-        category_id: null,
         note: null,
         media: [],
         occurred_on: null,
@@ -282,7 +281,6 @@ export function SplashPage({
         parent_ripple_id: null,
         thread_pool_id: sidePool,
         splash_id: target.splashId,
-        category: null,
         splash: {
           declared_start: page.splash.declaredRange?.start ?? null,
           title: page.splash.title,
@@ -310,7 +308,7 @@ export function SplashPage({
     );
   }
 
-  function removeBlock(block: RippleWithCategory): void {
+  function removeBlock(block: RippleWithSplash): void {
     setEditor(null);
     run(
       (current) => ({
@@ -322,7 +320,7 @@ export function SplashPage({
     );
   }
 
-  function lockBlock(block: RippleWithCategory, locked: boolean): void {
+  function lockBlock(block: RippleWithSplash, locked: boolean): void {
     run(
       (current) => ({
         ...current,

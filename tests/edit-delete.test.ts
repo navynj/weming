@@ -82,7 +82,6 @@ async function insert(row: {
     .insert({
       id,
       author_id: author,
-      category_id: FOCUS,
       note: 'fixture',
       occurred_on: DAY,
       occurred_time: row.time,

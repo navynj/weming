@@ -43,7 +43,7 @@ import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash, type Splash } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
@@ -66,11 +66,10 @@ const LANES = [
   lane('c-media', 'Media', '🎬', 1),
   lane('c-day', 'Day', '🖋', 2),
 ];
-function block(over: Partial<RippleWithCategory> & { id: string }): RippleWithCategory {
+function block(over: Partial<RippleWithSplash> & { id: string }): RippleWithSplash {
   return written({
     author_id: 'a1',
     thread_pool_id: null,
-    category_id: 'c-place',
     note: 'fixture',
     media: [],
     occurred_on: null,
@@ -82,7 +81,6 @@ function block(over: Partial<RippleWithCategory> & { id: string }): RippleWithCa
     created_at: '2026-08-18T16:00:00.000Z',
     parent_ripple_id: null,
     splash_id: 's1',
-    category: { name: 'Place', icon: '📍' },
     ...over,
   });
 }
@@ -123,8 +121,6 @@ const blocks = [
   block({
     id: 'later',
     note: 'watched it back',
-    category_id: 'c-media',
-    category: { name: 'Media', icon: '🎬' },
     occurred_on: '2026-08-20',
   }),
 ];

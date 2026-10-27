@@ -218,13 +218,11 @@ describe('deleting a pool (0015)', () => {
   it('gives an author one post holding their three ripples from a joint shell, titled like it', async () => {
     const { data } = await asUser(ben)
       .from('ripples')
-      .select('note, splash_id, category_id')
+      .select('note, splash_id')
       .in('note', ['ben 1', 'ben 2', 'ben 3']);
     expect(data).toHaveLength(3);
     const posts = new Set(data!.map((r) => r.splash_id));
     expect(posts.size).toBe(1);
-    // None carries a lane of its own (H24): they take the post's.
-    expect(data!.every((r) => r.category_id === null)).toBe(true);
     const post = await asUser(ben)
       .from('splashes')
       .select('owner_id, title, icon')
@@ -252,10 +250,9 @@ describe('deleting a pool (0015)', () => {
     const games = lanes.data!.find((l) => l.name === 'Games (Delete Me)')!;
     const late = await asUser(ben)
       .from('ripples')
-      .select('category_id, splash_id')
+      .select('splash_id')
       .eq('note', 'ben unlinked')
       .single();
-    expect(late.data!.category_id).toBeNull();
     const early = await asUser(ben)
       .from('ripples')
       .select('splash_id')
@@ -290,9 +287,9 @@ describe('deleting a pool (0015)', () => {
         .eq('id', id)
         .single();
       expect(post.data).toEqual({ declared_lane_id: laneId, own_pool_id: null });
-      // The post takes the lane; its ripple carries none (H24).
-      const blocks = await asUser(ben).from('ripples').select('category_id').eq('splash_id', id);
-      expect(blocks.data).toEqual([{ category_id: null }]);
+      // The post takes the lane (H24); its one ripple stays on it.
+      const blocks = await asUser(ben).from('ripples').select('splash_id').eq('splash_id', id);
+      expect(blocks.data).toHaveLength(1);
     }
     const tag = await asUser(ben)
       .from('splash_origins')

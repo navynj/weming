@@ -6,7 +6,7 @@
 import Link from 'next/link';
 
 import { WaveBundle } from '@/components/ui/waves';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 import { ROW_GRID } from './row-grid';
 import { StopControl } from './stop-control';
@@ -30,7 +30,7 @@ export function NowBand({
   startedAt,
   openBreakId,
 }: {
-  ripple: RippleWithCategory;
+  ripple: RippleWithSplash;
   clock: string;
   elapsedMinutes: number;
   startedAt: string;
@@ -52,9 +52,7 @@ export function NowBand({
           <span
             aria-hidden
             className="text-main-900 mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm"
-          >
-            {ripple.category?.icon}
-          </span>
+          ></span>
           {/* Same bundle as any timed record; only the ink inverts (H15c). */}
           <WaveBundle durationMinutes={elapsedMinutes} state="active" />
         </span>

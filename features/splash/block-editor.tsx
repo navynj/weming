@@ -8,7 +8,7 @@ import {
   MediaPreviews,
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 
 import { blockDay, defaultBlockDay, isRange } from './block-day';
@@ -16,7 +16,7 @@ import { DayChip } from './day-chip';
 import type { DateRange } from './summary';
 
 export type EditorTarget =
-  { kind: 'edit'; block: RippleWithCategory; locked: boolean } | { kind: 'add'; splashId: string };
+  { kind: 'edit'; block: RippleWithSplash; locked: boolean } | { kind: 'add'; splashId: string };
 
 /** What the editor hands back: the block's words and photos, with a fresh id when it is new. */
 export type BlockDraft = {

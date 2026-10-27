@@ -169,7 +169,6 @@ describe('write paths', () => {
   it('refuses a ripple authored as someone else', async () => {
     const { error } = await asUser(MINA).from('ripples').insert({
       author_id: YOONJI,
-      category_id: 'a1000000-0000-0000-0000-000000000004',
       occurred_on: '2026-01-01',
     });
 

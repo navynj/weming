@@ -100,7 +100,6 @@ beforeAll(async () => {
     .insert({
       author_id: ana,
       splash_id: splash,
-      category_id: null,
       note: 'two photos',
       media: [PHOTO_A, PHOTO_B],
     });

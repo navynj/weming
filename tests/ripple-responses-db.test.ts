@@ -51,7 +51,7 @@ async function join(who: string): Promise<void> {
 async function block(note: string): Promise<string> {
   const { data, error } = await asUser(ana)
     .from('ripples')
-    .insert({ author_id: ana, category_id: null, note, splash_id: joint })
+    .insert({ author_id: ana, note, splash_id: joint })
     .select('id')
     .single();
   expect(error).toBeNull();

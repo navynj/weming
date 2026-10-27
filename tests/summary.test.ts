@@ -21,7 +21,6 @@ const NOW = new Date('2026-09-25T20:00:00.000Z');
 
 function block(over: Partial<SplashBlock> & { id: string }): SplashBlock {
   return {
-    category_id: 'c-day',
     note: 'fixture words',
     occurred_on: null,
     occurred_time: null,
@@ -83,8 +82,8 @@ describe('a block inherits its post’s lane and date (H24)', () => {
 
   it('carries its own lane alone: a block’s frozen lane adds no tag', () => {
     const blocks = [
-      block({ id: 'a', category_id: 'c-media', created_at: '2026-09-21T16:00:00Z' }),
-      block({ id: 'b', category_id: 'c-day', created_at: '2026-09-23T16:00:00Z' }),
+      block({ id: 'a', created_at: '2026-09-21T16:00:00Z' }),
+      block({ id: 'b', created_at: '2026-09-23T16:00:00Z' }),
     ];
     expect(summarizeSplash(splash({ declared_lane_id: 'c-day' }), blocks, TZ, NOW).laneIds).toEqual(
       ['c-day'],
@@ -196,13 +195,13 @@ describe('an untitled post (H21a)', () => {
     expect(summarizeSplash(splash(), [block({ id: 'a' })], TZ, NOW).ghostTitle).toBeNull();
   });
 
-  it('is what a splashless block becomes, with the block’s own id and lane', () => {
-    const lone = summarizeOrphan(block({ id: 'r-lone', category_id: 'c-place' }), TZ, NOW);
+  it('is what a splashless block becomes, with the block’s own id and no lane (0042)', () => {
+    const lone = summarizeOrphan(block({ id: 'r-lone' }), TZ, NOW);
     expect(lone).toMatchObject({
       id: 'r-lone',
       orphan: true,
       title: '',
-      laneIds: ['c-place'],
+      laneIds: [],
       count: 1,
       range: { start: '2026-09-20', end: '2026-09-20' },
     });

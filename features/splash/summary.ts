@@ -16,8 +16,6 @@ const GHOST_TITLE_WORDS = 6;
 /** What a block contributes to its post: its key, its lane, its words. */
 export type SplashBlock = FlowKeyed & {
   id: string;
-  /** Null only on a "Just mine" splash (0014): a block with no lane of mine. */
-  category_id: string | null;
   note: string | null;
   /** A span's end, when the block has one: its last day counts for the range. */
   ended_at?: string | null;
@@ -153,7 +151,8 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
     description: null,
     declaredLaneId: null,
     icon: null,
-    laneIds: block.category_id ? [block.category_id] : [],
+    // Read alone, a block has no lane (H24, 0042): a pool I left places it (0041).
+    laneIds: [],
     declaredRange: null,
     range: { start: day, end: day },
     count: 1,

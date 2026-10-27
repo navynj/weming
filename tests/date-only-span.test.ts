@@ -47,7 +47,7 @@ afterEach(async () => {
 function insert(row: Record<string, unknown>) {
   return asUser(author)
     .from('ripples')
-    .insert({ author_id: author, category_id: PLACE, note: 'fixture', ...row })
+    .insert({ author_id: author, note: 'fixture', ...row })
     .select('id, occurred_on, occurred_time, started_at, ended_at')
     .single();
 }

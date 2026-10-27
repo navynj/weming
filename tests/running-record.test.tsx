@@ -14,7 +14,7 @@ import { FocusScreen } from '@/features/focus/focus-screen';
 import { NowBand } from '@/features/home-daily/now-band';
 import { formatStopwatch } from '@/features/home-daily/use-elapsed';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { wallClockToInstant } from '@/lib/ripple-kind';
 import { written } from './written-on';
 
@@ -38,12 +38,11 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
+function ripple(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
   return written({
     id: 'r1',
     author_id: 'a1',
     thread_pool_id: null,
-    category_id: 'c1',
     note: 'session 2',
     media: [],
     occurred_on: '2026-09-19',
@@ -55,12 +54,11 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     parent_ripple_id: null,
     splash_id: null,
     started_at: wallClockToInstant('2026-09-19', '09:00', TZ).toISOString(),
-    category: { name: 'Focus', icon: '🔍' },
     ...over,
   });
 }
 
-function band(row: RippleWithCategory, openBreakId: string | null = null) {
+function band(row: RippleWithSplash, openBreakId: string | null = null) {
   return render(
     <InputSheetProvider>
       <ol>

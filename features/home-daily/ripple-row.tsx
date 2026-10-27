@@ -3,7 +3,7 @@
 import { DurationChip } from '@/components/ui/chips/duration-chip';
 import { WaveBundle, WaveLine } from '@/components/ui/waves';
 import { useRippleSheet } from '@/features/ripple-sheet/sheet-host';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { elapsedMinutes, rippleDurationMinutes, rippleKind, rippleState } from '@/lib/ripple-kind';
 
 import { ROW_SURFACE } from './depth';
@@ -30,13 +30,12 @@ export function RippleRow({
   timeZone,
   now,
 }: {
-  ripple: RippleWithCategory;
+  ripple: RippleWithSplash;
   timeZone: string;
   now: Date;
 }) {
   const kind = rippleKind(ripple, timeZone);
   const state = rippleState(ripple);
-  const emoji = ripple.category?.icon ?? undefined;
   const fade = state === 'planned' ? PLANNED_OPACITY : undefined;
   const { openRipple } = useRippleSheet();
 
@@ -73,10 +72,9 @@ export function RippleRow({
           {kind === 'timed' ? (
             // The bundle fades itself, badge included, so the fade is not
             // applied here as well — twice would land it at 0.12.
-            <WaveBundle durationMinutes={duration} state={state} emoji={emoji} />
+            <WaveBundle durationMinutes={duration} state={state} />
           ) : (
             <span className="flex flex-col items-center" style={{ opacity: fade }}>
-              {emoji ? <Badge emoji={emoji} /> : null}
               <WaveLine />
             </span>
           )}
@@ -94,16 +92,5 @@ export function RippleRow({
         {kind === 'timed' ? <DurationChip minutes={duration} /> : null}
       </div>
     </li>
-  );
-}
-
-function Badge({ emoji }: { emoji: string }) {
-  return (
-    <span
-      aria-hidden
-      className="bg-pool-100 mb-1 flex h-7 w-7 items-center justify-center rounded-full text-sm"
-    >
-      {emoji}
-    </span>
   );
 }

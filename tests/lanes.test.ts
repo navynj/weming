@@ -5,7 +5,7 @@ import { groupByDay } from '@/lib/queries/trail';
 import { depthSurface, DEPTH_SURFACES } from '@/lib/depth';
 import { impressionLineCount, MAX_IMPRESSION_LINES } from '@/components/ui/waves';
 import { tallyLaneCounts, type LaneCounts } from '@/lib/queries/lanes';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { written } from './written-on';
 
 const FOCUS = 'c-focus';
@@ -47,7 +47,7 @@ describe('a cell reads the coalesced day (H20c, H21f)', () => {
     occurred_on: null,
     occurred_time: null,
     created_at: '2027-07-08T16:00:00.000Z',
-    category_id: PLACE,
+    lane_id: PLACE,
     ...over,
   });
 
@@ -159,12 +159,11 @@ describe('the past sinks, by month (law 1)', () => {
 });
 
 describe("the Trail groups by the author's own days", () => {
-  function ripple(over: Partial<RippleWithCategory>): RippleWithCategory {
+  function ripple(over: Partial<RippleWithSplash>): RippleWithSplash {
     return written({
       id: 'r',
       author_id: 'a1',
       thread_pool_id: null,
-      category_id: FOCUS,
       note: 'fixture',
       media: [],
       occurred_on: '2027-07-08',
@@ -176,7 +175,6 @@ describe("the Trail groups by the author's own days", () => {
       created_at: '2027-07-08T16:00:00.000Z',
       parent_ripple_id: null,
       splash_id: null,
-      category: { name: 'Focus', icon: '🔍' },
       ...over,
     });
   }

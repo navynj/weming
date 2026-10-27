@@ -74,7 +74,6 @@ const FOOD: MyCategory = {
 function post(id: string, title: string, day: string) {
   const block: SplashBlock = {
     id: `${id}-b`,
-    category_id: 'c-food',
     note: id,
     occurred_on: day,
     occurred_time: null,

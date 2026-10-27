@@ -1,5 +1,5 @@
 import type { DuringClient } from '@/lib/queries/profile';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 
 /** Postgres exclusion-constraint violation. */
@@ -12,7 +12,7 @@ export const EXCLUSION_VIOLATION = '23P01';
 export async function getRunningSession(
   supabase: DuringClient,
   authorId: string,
-): Promise<RippleWithCategory | null> {
+): Promise<RippleWithSplash | null> {
   const { data, error } = await supabase
     .from('ripples')
     .select('*, category:my_categories(name, icon)')
@@ -23,7 +23,7 @@ export async function getRunningSession(
     .eq('planned', false)
     .order('started_at', { ascending: false })
     .limit(1)
-    .returns<RippleWithCategory[]>();
+    .returns<RippleWithSplash[]>();
 
   if (error) throw error;
   return data[0] ?? null;
@@ -46,7 +46,7 @@ export async function findCollision(
   authorId: string,
   at: Date,
   until: Date | null = null,
-): Promise<RippleWithCategory | null> {
+): Promise<RippleWithSplash | null> {
   const from = at.toISOString();
   const to = (until ?? at).toISOString();
 
@@ -65,7 +65,7 @@ export async function findCollision(
   )
     .order('started_at', { ascending: false })
     .limit(1)
-    .returns<RippleWithCategory[]>();
+    .returns<RippleWithSplash[]>();
 
   if (error) throw error;
   const candidate = data[0];
@@ -88,8 +88,8 @@ export async function findCollision(
 
 /** Today's Ripples, for the sheet's rail. Same query the timeline uses. */
 export type ComposeContext = {
-  ripples: RippleWithCategory[];
-  running: RippleWithCategory | null;
+  ripples: RippleWithSplash[];
+  running: RippleWithSplash | null;
   date: IsoDate;
 };
 
@@ -101,7 +101,7 @@ export type ComposeContext = {
 export async function getInnerRipples(
   supabase: DuringClient,
   parentIds: string[],
-): Promise<RippleWithCategory[]> {
+): Promise<RippleWithSplash[]> {
   if (parentIds.length === 0) return [];
 
   const { data, error } = await supabase
@@ -109,13 +109,13 @@ export async function getInnerRipples(
     .select('*, category:my_categories(name, icon)')
     .in('parent_ripple_id', parentIds)
     .order('started_at', { ascending: true })
-    .returns<RippleWithCategory[]>();
+    .returns<RippleWithSplash[]>();
 
   if (error) throw error;
   return data;
 }
 
 /** The break currently running inside a session, if any. */
-export function runningBreak(inner: RippleWithCategory[]): RippleWithCategory | null {
+export function runningBreak(inner: RippleWithSplash[]): RippleWithSplash | null {
   return inner.find((child) => child.ended_at === null && child.occurred_time !== null) ?? null;
 }

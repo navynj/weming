@@ -75,7 +75,6 @@ function ripple(over: Partial<PoolRipple> & { id: string; splash_id: string }): 
     occurred_time: null,
     ended_at: null,
     created_at: '2026-10-21T18:00:00.000Z',
-    category_id: 'my-lane',
     started_at: null,
     ...over,
   });
@@ -153,7 +152,7 @@ const A: PoolView = {
   ripples: [
     ripple({ id: 'r-mine', splash_id: 's-mine', occurred_on: '2026-10-22' }),
     ripple({ id: 'r-mina', splash_id: 's-mina', author_id: MINA }),
-    ripple({ id: 'r-own', splash_id: 's-own', category_id: null }),
+    ripple({ id: 'r-own', splash_id: 's-own' }),
     ripple({ id: 'r-j1', splash_id: 's-joint', author_id: MINA, occurred_on: '2026-10-20' }),
     ripple({ id: 'r-j2', splash_id: 's-joint', author_id: ME, occurred_on: '2026-10-20' }),
   ],

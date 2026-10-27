@@ -17,7 +17,7 @@ vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { SplashPage, type PoolContext } from '@/features/splash/splash-page';
 import { summarizeSplash, type Splash } from '@/features/splash/summary';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 
 beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -63,12 +63,11 @@ const JOINT: Splash = {
   written_on: '2026-10-22',
 };
 
-function ripple(id: string, author: string, note: string): RippleWithCategory {
+function ripple(id: string, author: string, note: string): RippleWithSplash {
   return {
     id,
     author_id: author,
     thread_pool_id: null,
-    category_id: author === ME ? 'c-media' : null,
     note,
     media: [],
     occurred_on: null,
@@ -81,7 +80,6 @@ function ripple(id: string, author: string, note: string): RippleWithCategory {
     written_on: '2026-10-22',
     parent_ripple_id: null,
     splash_id: 's-joint',
-    category: null,
     splash: { declared_start: null, title: 'Lost Ruins of Arnak' },
   };
 }
