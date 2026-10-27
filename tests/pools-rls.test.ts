@@ -1010,6 +1010,38 @@ describe('one sender per lane of mine (0019)', () => {
   });
 });
 
+describe('keeping a pool off my Home (0039)', () => {
+  it('changes my own membership alone, and nobody outside can', async () => {
+    const mine = async () =>
+      (
+        await asAdmin()
+          .from('pool_members')
+          .select('on_home')
+          .eq('pool_id', pool)
+          .eq('user_id', ben)
+          .single()
+      ).data!.on_home;
+    expect(await mine()).toBe(true);
+    expect(
+      (await asUser(ben).rpc('set_pool_on_home', { p_pool: pool, p_on: false })).error,
+    ).toBeNull();
+    expect(await mine()).toBe(false);
+    // Nobody writes a membership row directly.
+    const direct = await asUser(ben)
+      .from('pool_members')
+      .update({ on_home: true })
+      .eq('pool_id', pool)
+      .eq('user_id', ben)
+      .select('on_home');
+    expect(direct.data ?? []).toEqual([]);
+    expect(await mine()).toBe(false);
+    expect(
+      (await asUser(cal).rpc('set_pool_on_home', { p_pool: pool, p_on: false })).error?.code,
+    ).toBe('42501');
+    await asUser(ben).rpc('set_pool_on_home', { p_pool: pool, p_on: true });
+  });
+});
+
 describe('renaming a pool (0021)', () => {
   it('is refused to a member who is not its creator', async () => {
     const { error } = await asUser(ben).rpc('rename_pool', { p_pool: pool, p_name: 'Bens' });

@@ -105,8 +105,10 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
   const cards = summarizeSplashes([...mine, ...joints], ripples, profile.timezone, new Date())
     .filter((summary) => {
       const joint = jointOf.get(summary.id);
-      if (joint) return homeLaneFor(joint.pool_lane_id, links) === id;
-      if (summary.ownPoolId) return ownHome.get(summary.id) === id;
+      // A pool switched off my Home (0039) stays off its lanes too.
+      const off = new Set(pools.filter((p) => !p.onHome).map((p) => p.id));
+      if (joint) return !off.has(joint.pool_id!) && homeLaneFor(joint.pool_lane_id, links) === id;
+      if (summary.ownPoolId) return !off.has(summary.ownPoolId) && ownHome.get(summary.id) === id;
       return cardLane(summary) === id;
     })
     .map((summary) => {

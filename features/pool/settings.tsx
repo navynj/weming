@@ -9,9 +9,10 @@ import type { PoolView } from '@/lib/queries/pools';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { PoolPhotoField, previewOf, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
-import { renamePool, setLaneLinks, setPoolInviteAll } from './actions';
+import { renamePool, setLaneLinks, setPoolInviteAll, setPoolOnHome } from './actions';
 import { DeletePool } from './delete-pool';
 import { InvitePanel } from './invite-panel';
+import { LeaveSheet } from './members-sheet';
 import { LaneMatch, Switch } from './lane-match';
 import { settleMarkers, type Links, type Markers } from './match';
 import { PrimaryButton, StepPage } from './step-page';
@@ -59,6 +60,8 @@ export function PoolSettings({
   const name = useOptimisticAction(view.pool.name);
   const photo = useOptimisticAction<string | null>(view.pool.photo ?? null);
   const inviteAll = useOptimisticAction(view.pool.inviteAllByDefault ?? false);
+  const onHome = useOptimisticAction(view.pool.myOnHome ?? true);
+  const [leaving, setLeaving] = useState(false);
   const changed =
     JSON.stringify(links) !== JSON.stringify(initial) ||
     JSON.stringify(settleMarkers(keys, links, markers)) !== JSON.stringify(initialMarkers);
@@ -126,6 +129,34 @@ export function PoolSettings({
         {inviteAll.message ? (
           <p role="alert" className="text-pool-500 mt-2 text-xs">
             {inviteAll.message}
+          </p>
+        ) : null}
+      </section>
+
+      {/* Mine alone (0039): what I wrote here, on my Home or not. Nothing moves. */}
+      <section data-settings-on-home className="mt-6">
+        <label className="flex items-center justify-between gap-4">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-ink text-sm font-medium">Show on my Home</span>
+            <span className="text-pool-500 text-xs">
+              What you write in this Pool also shows on your Home. Only you see this choice.
+            </span>
+          </span>
+          <Switch
+            on={onHome.value}
+            label="Show on my Home"
+            onChange={(on) =>
+              onHome.run(
+                () => on,
+                () => setPoolOnHome(poolId, on),
+                'Saved',
+              )
+            }
+          />
+        </label>
+        {onHome.message ? (
+          <p role="alert" className="text-pool-500 mt-2 text-xs">
+            {onHome.message}
           </p>
         ) : null}
       </section>
@@ -202,12 +233,22 @@ export function PoolSettings({
         ) : null}
       </section>
 
-      {/* The creator alone deletes the pool (0015). */}
-      {view.pool.ownerId === me ? (
-        <section className="border-pool-100 mt-12 border-t pt-6">
+      {/* The creator alone deletes the pool (0015); a member leaves it there instead. */}
+      <section className="border-pool-100 mt-12 border-t pt-6">
+        {view.pool.ownerId === me ? (
           <DeletePool poolId={poolId} poolName={view.pool.name} />
-        </section>
-      ) : null}
+        ) : (
+          <button
+            type="button"
+            data-settings-leave-pool
+            onClick={() => setLeaving(true)}
+            className="text-pool-500 self-start py-2 text-sm"
+          >
+            Leave Pool
+          </button>
+        )}
+      </section>
+      {leaving ? <LeaveSheet poolId={poolId} onClose={() => setLeaving(false)} /> : null}
     </StepPage>
   );
 }

@@ -148,6 +148,16 @@ export async function setPoolInviteAll(poolId: string, on: boolean): Promise<Don
   return { ok: true };
 }
 
+/** Pool settings: what I wrote in this pool shows on my Home, or not (0039). Mine alone. */
+export async function setPoolOnHome(poolId: string, on: boolean): Promise<Done> {
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_pool_on_home', { p_pool: poolId, p_on: on });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  return { ok: true };
+}
+
 /** The creator sets or clears the pool's photo (0024); the bytes went up from the browser first. */
 export async function setPoolPhoto(poolId: string, on: boolean): Promise<Done> {
   if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };

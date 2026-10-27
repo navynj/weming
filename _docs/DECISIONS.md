@@ -621,3 +621,10 @@ A member's column in Swimmers opens nothing.
   - `useOptimisticAction`'s `run` takes the toast's words as a third argument.
 - **Replies:** the reply field is no longer always open under a ripple. "Reply" sits at the right end of the reactions row and opens it with Cancel and Save; Save (or Enter) sends and closes it, Cancel (or Escape) closes it with nothing sent. Amends H25.
 
+**H30. A pool kept off my Home; Leave Pool in settings (0039, 2026-10-27).** Asked by Yoonji.
+- **Show on my Home** (Pool settings, `pool_members.on_home`, on by default): switched off, what I wrote in that pool stays off my Home and its lane pages. That covers my pool records there, its joint records, and my side on someone's record there.
+  - It is display only and mine alone: nothing moves, and nobody else's view changes.
+  - A Home record of mine shared to that pool stays, since it was written on Home.
+  - Members cannot write their membership rows; `set_pool_on_home` changes the caller's own row.
+- **Leave Pool in settings:** a member who isn't the pool's creator finds "Leave Pool" where the creator finds "Delete Pool". It asks the same question as the member list's: keep my records there, or remove them.
+

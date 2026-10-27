@@ -72,6 +72,8 @@ export type PoolView = {
     ownerId: string | null;
     /** Pool settings: Everyone preselected in this pool's compose (0033). */
     inviteAllByDefault?: boolean;
+    /** Pool settings: what I wrote here shows on my Home (0039). */
+    myOnHome?: boolean;
     /** Its photo (0024): the version the row names, and the signed URL once the screen signs it. */
     photoVersion?: number | null;
     photo?: string | null;
@@ -236,7 +238,7 @@ export async function getPoolView(
   if (error) throw error;
   if (!pool) return null;
 
-  const [members, lanes, links, placements, joints, invites] = await Promise.all([
+  const [members, lanes, links, placements, joints, invites, myRow] = await Promise.all([
     membersOf(supabase, [poolId]),
     supabase.from('pool_lanes').select('*').eq('pool_id', poolId).order('position'),
     supabase
@@ -267,6 +269,12 @@ export async function getPoolView(
       .is('revoked_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false }),
+    supabase
+      .from('pool_members')
+      .select('on_home')
+      .eq('pool_id', poolId)
+      .eq('user_id', me)
+      .maybeSingle(),
   ]);
   for (const result of [lanes, links, placements, joints, invites]) {
     if (result.error) throw result.error;
@@ -307,6 +315,7 @@ export async function getPoolView(
       name: pool.name,
       ownerId: pool.owner_id,
       inviteAllByDefault: pool.invite_all_by_default,
+      myOnHome: myRow.data?.on_home ?? true,
       photoVersion: pool.photo_version,
       photo: null,
     },
@@ -421,16 +430,21 @@ export async function getMyPoolNames(
     photoVersion: number | null;
     lanes: PoolLaneChip[];
     members: PoolFace[];
+    /** What I wrote here shows on my Home (0039). */
+    onHome: boolean;
   }[]
 > {
   const { data, error } = await supabase
     .from('pool_members')
-    .select('pool:pools(id, name, photo_version, lanes:pool_lanes(id, name, icon, position))')
+    .select(
+      'on_home, pool:pools(id, name, photo_version, lanes:pool_lanes(id, name, icon, position))',
+    )
     .eq('user_id', me)
     .is('left_at', null)
     .order('joined_at', { ascending: false })
     .returns<
       {
+        on_home: boolean;
         pool: {
           id: string;
           name: string;
@@ -458,6 +472,7 @@ export async function getMyPoolNames(
               .filter((m) => m.pool_id === row.pool!.id && m.left_at === null)
               .map(toMember)
               .map((m) => ({ id: m.userId, name: m.name, initials: m.initials })),
+            onHome: row.on_home,
           },
         ]
       : [],

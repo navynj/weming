@@ -8,6 +8,7 @@ vi.mock('next/navigation', () => ({
 }));
 const renamed: [string, string][] = [];
 const invitedAll: [string, boolean][] = [];
+const onHome: [string, boolean][] = [];
 vi.mock('@/features/pool/actions', () => ({
   renamePool: (poolId: string, name: string) => {
     renamed.push([poolId, name]);
@@ -18,6 +19,11 @@ vi.mock('@/features/pool/actions', () => ({
     invitedAll.push([poolId, on]);
     return Promise.resolve({ ok: true });
   },
+  setPoolOnHome: (poolId: string, on: boolean) => {
+    onHome.push([poolId, on]);
+    return Promise.resolve({ ok: true });
+  },
+  leavePool: () => Promise.resolve({ ok: true }),
   createInvite: () => Promise.resolve({ ok: false, message: 'not in tests' }),
   revokeInvite: () => Promise.resolve({ ok: true }),
   deletePool: () => Promise.resolve({ ok: true }),
@@ -31,6 +37,7 @@ afterEach(() => {
   cleanup();
   renamed.length = 0;
   invitedAll.length = 0;
+  onHome.length = 0;
 });
 
 const view = (ownerId: string, inviteAllByDefault = false): PoolView => ({
@@ -98,5 +105,26 @@ describe('Connect your lanes, under Advanced (0033)', () => {
     expect(container.querySelector('[data-lane-match]')!.textContent).toContain(
       'Connect your lanes',
     );
+  });
+});
+
+describe('my own settings for a pool (0039)', () => {
+  it('keeps what I wrote here off my Home with one switch, on by default', () => {
+    const { container } = render(<PoolSettings view={view('u-other')} categories={[]} me="u-me" />);
+    const toggle = container.querySelector('[data-settings-on-home] [role="switch"]')!;
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle);
+    expect(onHome).toEqual([['p-a', false]]);
+  });
+
+  it('offers a member Leave Pool where the creator has Delete Pool', () => {
+    const member = render(<PoolSettings view={view('u-other')} categories={[]} me="u-me" />);
+    expect(member.container.querySelector('[data-delete-pool]')).toBeNull();
+    fireEvent.click(member.container.querySelector('[data-settings-leave-pool]')!);
+    expect(member.getByText('Keep your records in this Pool?')).toBeTruthy();
+    member.unmount();
+    const creator = render(<PoolSettings view={view('u-me')} categories={[]} me="u-me" />);
+    expect(creator.container.querySelector('[data-delete-pool]')).not.toBeNull();
+    expect(creator.container.querySelector('[data-settings-leave-pool]')).toBeNull();
   });
 });

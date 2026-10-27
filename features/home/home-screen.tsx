@@ -262,17 +262,19 @@ export async function HomeScreen({
       .filter((p) => ownPools.includes(p.id) || jointPools.has(p.id))
       .map((p) => ({ id: p.id, version: p.photoVersion })),
   );
-  const poolColumns: GridColumn[] = ownPools.map((id) => {
-    const name = poolName.get(id);
-    return {
-      id: ownPoolColumn(id),
-      name: name ?? 'A pool you left',
-      icon: null,
-      monogram: name ?? '',
-      photo: name ? (columnPhotos[id] ?? null) : null,
-      href: null,
-    };
-  });
+  const poolColumns: GridColumn[] = ownPools
+    .filter((id) => pools.find((p) => p.id === id)?.onHome !== false)
+    .map((id) => {
+      const name = poolName.get(id);
+      return {
+        id: ownPoolColumn(id),
+        name: name ?? 'A pool you left',
+        icon: null,
+        monogram: name ?? '',
+        photo: name ? (columnPhotos[id] ?? null) : null,
+        href: null,
+      };
+    });
 
   // A card's ripples: its blocks with words or photos, oldest first — the
   // top card shows each one's photos under its words. A lone block's is its own.
@@ -315,7 +317,18 @@ export async function HomeScreen({
     list.push(...ripple.media.map((path) => ({ rippleId: ripple.id, path })));
     photos.set(key, list);
   }
+  // A pool switched off my Home (0039): what I wrote there stays off it —
+  // my pool records, its joint records, my side on someone's record there.
+  const offHome = new Set(pools.filter((p) => !p.onHome).map((p) => p.id));
+  const writtenIn = (summary: { id: string; ownPoolId: string | null }): string | null =>
+    summary.ownPoolId ??
+    jointPool.get(summary.id) ??
+    (friendIdSet.has(summary.id) ? (threadOf.get(summary.id)?.poolId ?? null) : null);
   const cards: Card[] = summaries
+    .filter((summary) => {
+      const pool = writtenIn(summary);
+      return !pool || !offHome.has(pool);
+    })
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];
       const placed = placeCard(

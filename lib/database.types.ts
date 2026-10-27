@@ -433,6 +433,7 @@ export type Database = {
           joined_at: string
           keep_on_leave: boolean | null
           left_at: string | null
+          on_home: boolean
           pool_id: string
           user_id: string
         }
@@ -441,6 +442,7 @@ export type Database = {
           joined_at?: string
           keep_on_leave?: boolean | null
           left_at?: string | null
+          on_home?: boolean
           pool_id: string
           user_id: string
         }
@@ -449,6 +451,7 @@ export type Database = {
           joined_at?: string
           keep_on_leave?: boolean | null
           left_at?: string | null
+          on_home?: boolean
           pool_id?: string
           user_id?: string
         }
@@ -1348,6 +1351,10 @@ export type Database = {
         Returns: undefined
       }
       set_pool_invite_all: {
+        Args: { p_on: boolean; p_pool: string }
+        Returns: undefined
+      }
+      set_pool_on_home: {
         Args: { p_on: boolean; p_pool: string }
         Returns: undefined
       }
