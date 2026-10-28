@@ -24,6 +24,7 @@ import {
   COLUMNS,
   C_TUCK_PX,
   extentOf,
+  halfOf,
   HEADER_PX,
   intersects,
   layoutMonthBoard,
@@ -32,6 +33,8 @@ import {
   layoutLaneBoard,
   laneCell,
   onBoard,
+  rangeTitle,
+  stepHalf,
   weekTitle,
   type BoardLayout,
   type Box,
@@ -359,9 +362,10 @@ describe('the week board (the default)', () => {
 
 describe('the week board, drawn', () => {
   it('opens on this week, Week selected in white, headed weekday over number, and never scrolls sideways', () => {
+    // A tablet's board keeps all seven days (review).
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
       configurable: true,
-      get: () => 358,
+      get: () => 728,
     });
     try {
       const { container } = board();
@@ -421,6 +425,157 @@ describe('the week board, drawn', () => {
       'Nothing this week yet.',
     );
     expect(container.querySelector('[data-board-title]')!.className).toContain('text-sm');
+  });
+});
+
+describe('half weeks on a phone (review)', () => {
+  // A 390px phone, less its 16px gutters.
+  const PHONE = 358;
+  const atWidth = (px: number): (() => void) => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => px,
+    });
+    return () => delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+  };
+  const shown = (container: HTMLElement): string[] =>
+    [...container.querySelectorAll('[data-board-header]')].map((h) =>
+      h.getAttribute('data-board-header')!,
+    );
+
+  it('steps Sun–Wed → Wed–Sat → next Sun–Wed and back, Wednesday in both halves', () => {
+    expect(halfOf('2026-10-25')).toBe('2026-10-25');
+    expect(halfOf('2026-10-28')).toBe('2026-10-25');
+    expect(halfOf('2026-10-29')).toBe('2026-10-28');
+    expect(halfOf('2026-10-31')).toBe('2026-10-28');
+    expect(stepHalf('2026-10-25', 1)).toBe('2026-10-28');
+    expect(stepHalf('2026-10-28', 1)).toBe('2026-11-01');
+    expect(stepHalf('2026-11-01', -1)).toBe('2026-10-28');
+    expect(stepHalf('2026-10-28', -1)).toBe('2026-10-25');
+    expect(rangeTitle('2026-10-25', '2026-10-28')).toBe('Oct 25 – 28');
+    expect(rangeTitle('2026-09-30', '2026-10-03')).toBe('Sep 30 – Oct 3');
+  });
+
+  it('lays out four columns a quarter of the board wide, a range clipped to the half', () => {
+    const layout = layoutWeekBoard(WEEK, '2026-10-21', { width: PHONE, half: true });
+    expect(layout.metrics.columns).toBe(4);
+    expect(layout.metrics.column).toBe(PHONE / 4);
+    expect(layout.headers.map((h) => `${h.weekday} ${h.number}`)).toEqual([
+      'WED 21',
+      'THU 22',
+      'FRI 23',
+      'SAT 24',
+    ]);
+    expect(layout.title).toBe('Oct 21 – 24');
+    expect(layout.pieces.map((p) => p.id)).toEqual(['two', 'four']);
+    expect(layout.tapes.map((t) => [t.id, t.startCol, t.endCol, t.startsHere])).toEqual([
+      ['trip', 0, 3, false],
+    ]);
+    readable(layout);
+  });
+
+  it('renders four columns at 390px, opening on the half that holds today', () => {
+    const restore = atWidth(PHONE);
+    try {
+      const { container } = board();
+      expect(shown(container)).toEqual(['2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24']);
+      expect(container.querySelector('[data-board-title]')!.textContent).toBe('Oct 21 – 24');
+      expect(container.querySelectorAll('[data-board-rule]')).toHaveLength(3);
+      expect(container.querySelector('[data-board-next]')!.getAttribute('aria-label')).toBe(
+        'Next half week',
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it('steps half a week on the arrows and on a sideways swipe, Wednesday shared', () => {
+    const restore = atWidth(PHONE);
+    try {
+      const { container } = board();
+      const title = () => container.querySelector('[data-board-title]')!.textContent;
+      fireEvent.click(container.querySelector('[data-board-next]')!);
+      expect(shown(container)[0]).toBe('2026-10-25');
+      expect(title()).toBe('Oct 25 – 28');
+      fireEvent.click(container.querySelector('[data-board-next]')!);
+      expect(shown(container)[0]).toBe('2026-10-28');
+      expect(title()).toBe('Oct 28 – 31');
+      const scroller = container.querySelector('[data-board-scroller]')!;
+      const swipe = (from: [number, number], to: [number, number]): void => {
+        fireEvent.touchStart(scroller, { touches: [{ clientX: from[0], clientY: from[1] }] });
+        fireEvent.touchMove(scroller, { touches: [{ clientX: to[0], clientY: to[1] }] });
+        fireEvent.touchEnd(scroller, { changedTouches: [{ clientX: to[0], clientY: to[1] }] });
+      };
+      // Back a half: Sun 25 – Wed 28, Wednesday the day both share.
+      swipe([100, 300], [220, 290]);
+      expect(shown(container)).toEqual(['2026-10-25', '2026-10-26', '2026-10-27', '2026-10-28']);
+      swipe([220, 300], [100, 310]);
+      expect(shown(container)).toEqual(['2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31']);
+      // A vertical drag turns nothing.
+      swipe([200, 300], [120, 420]);
+      expect(shown(container)[0]).toBe('2026-10-28');
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps all seven days from 600px', () => {
+    const restore = atWidth(600);
+    try {
+      expect(shown(board().container)).toHaveLength(7);
+    } finally {
+      restore();
+    }
+  });
+
+  it('draws Month compact at 390px: stickers and thumbnails, no labels, no faces', () => {
+    window.localStorage.setItem('weming.board-span', 'month');
+    const restore = atWidth(PHONE);
+    try {
+      const { container } = board();
+      expect(container.querySelectorAll('[data-board-header]')).toHaveLength(7);
+      expect(container.querySelector('[data-board-label]')).toBeNull();
+      expect(container.querySelector('[data-board-text]')).toBeNull();
+      expect(container.querySelector('[data-board-faces]')).toBeNull();
+      expect(container.querySelector('[data-board-slot]')).toBeNull();
+      expect(
+        container.querySelector('[data-board-piece="hoppers"] [data-board-sticker]'),
+      ).not.toBeNull();
+      expect(
+        container.querySelectorAll('[data-board-piece="four"] [data-board-photo-card]'),
+      ).toHaveLength(1);
+      // A band keeps its icon, not its words.
+      expect(container.querySelector('[data-board-tape="trip"]')!.textContent).not.toContain(
+        'Island trip',
+      );
+      // A day opens Week on the half holding it.
+      fireEvent.click(container.querySelector('[data-board-day="2026-10-29"]')!);
+      expect(shown(container)[0]).toBe('2026-10-28');
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps a hand-set wave on a compact piece', () => {
+    const waved = WEEK.map((c) =>
+      c.splash.id === 'hoppers' ? { ...c, layout: { wave: { on: true } } } : c,
+    );
+    const layout = layoutMonthBoard(waved, '2026-10', { width: PHONE, compact: true });
+    for (const piece of layout.pieces) {
+      expect(piece.compact).toBe(true);
+      expect(piece.captionLines).toBe(0);
+      expect(piece.x + piece.w).toBeLessThanOrEqual(piece.x + layout.metrics.column);
+    }
+    window.localStorage.setItem('weming.board-span', 'month');
+    const restore = atWidth(PHONE);
+    try {
+      const { container } = board(waved);
+      expect(
+        container.querySelector('[data-board-piece="hoppers"] [data-board-wave]'),
+      ).not.toBeNull();
+    } finally {
+      restore();
+    }
   });
 });
 
@@ -879,8 +1034,9 @@ describe('labels, photos and bands, drawn', () => {
       get: () => 358,
     });
     try {
+      // A phone opens on today's half, Wed 21 – Sat 24 (review).
       const phone = board().container.querySelector(
-        '[data-board-header="2026-10-20"] [data-wave-glyph]',
+        '[data-board-header="2026-10-22"] [data-wave-glyph]',
       )!;
       expect(phone.getAttribute('width')).toBe('22');
     } finally {

@@ -881,85 +881,99 @@ export function BoardPieceView({
             frame={selected?.kind === 'wave' ? frame : null}
           />
         ) : null}
-        <span
-          data-board-label
-          className={`pointer-events-auto absolute z-[1] block cursor-pointer ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
-          data-reading-outline={reading && still ? '' : undefined}
-          style={{
-            ...placed(label),
-            transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
-            zIndex: zFor('label', 'label'),
-            ...stillIf('label'),
-            ...(reading && still
-              ? { outline: '2px solid var(--color-white)', outlineOffset: 2 }
-              : {}),
-            paddingTop: piece.pad.top,
-            paddingRight: piece.pad.right,
-            paddingBottom: piece.pad.bottom,
-            paddingLeft: piece.pad.left,
-          }}
-        >
+        {/* A phone's month (review): no label, no words, no faces. */}
+        {piece.compact ? null : (
           <span
-            data-board-text
-            // Clamped to the lines its box was sized for (three at most), so the words never
-            // spill into the padding a sticker hangs in (review: text is never covered).
-            className={`block overflow-hidden font-medium break-words ${piece.center ? 'text-center' : ''}`}
-            data-lines={piece.captionLines}
+            data-board-label
+            className={`pointer-events-auto absolute z-[1] block cursor-pointer ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
+            data-reading-outline={reading && still ? '' : undefined}
             style={{
-              fontSize: piece.type.size,
-              lineHeight: `${line}px`,
-              // The icon and the faces take the words' own line (review: they scale with the text).
-              ['--line' as string]: `${line}px`,
-              // A corner sticker's room, on the first line only (review).
-              textIndent: piece.indent || undefined,
-              display: '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: piece.captionLines,
-              maxHeight: piece.captionLines * line,
+              ...placed(label),
+              transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
+              zIndex: zFor('label', 'label'),
+              ...stillIf('label'),
+              ...(reading && still
+                ? { outline: '2px solid var(--color-white)', outlineOffset: 2 }
+                : {}),
+              paddingTop: piece.pad.top,
+              paddingRight: piece.pad.right,
+              paddingBottom: piece.pad.bottom,
+              paddingLeft: piece.pad.left,
             }}
           >
-            {piece.inlineIcon && icon ? (
-              // Held to the words' line, so it never stretches it (review).
-              <span
-                aria-hidden
-                data-board-icon
-                className={`mr-1 inline-block h-[var(--line)] align-top leading-[var(--line)] ${NO_INDENT}`}
-                // Inline it only turns, in its place on the line (review: icon tilt).
-                style={
-                  layout.icon?.tilt ? { transform: `rotate(${layout.icon.tilt}deg)` } : undefined
-                }
-              >
-                {icon}
-              </span>
-            ) : null}
-            {caption}
-            {card.joint || card.together || card.side ? (
-              // My side on someone's record shows its pool there (review).
-              <Faces card={card} ring={FACE_RING[piece.label]} />
-            ) : card.authorFace && card.authorId ? (
-              <AuthorFace card={card} px={metrics.narrow ? 12 : 14} />
-            ) : null}
+            <span
+              data-board-text
+              // Clamped to the lines its box was sized for (three at most), so the words never
+              // spill into the padding a sticker hangs in (review: text is never covered).
+              className={`block overflow-hidden font-medium break-words ${piece.center ? 'text-center' : ''}`}
+              data-lines={piece.captionLines}
+              style={{
+                fontSize: piece.type.size,
+                lineHeight: `${line}px`,
+                // The icon and the faces take the words' own line (review: they scale with the text).
+                ['--line' as string]: `${line}px`,
+                // A corner sticker's room, on the first line only (review).
+                textIndent: piece.indent || undefined,
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: piece.captionLines,
+                maxHeight: piece.captionLines * line,
+              }}
+            >
+              {piece.inlineIcon && icon ? (
+                // Held to the words' line, so it never stretches it (review).
+                <span
+                  aria-hidden
+                  data-board-icon
+                  className={`mr-1 inline-block h-[var(--line)] align-top leading-[var(--line)] ${NO_INDENT}`}
+                  // Inline it only turns, in its place on the line (review: icon tilt).
+                  style={
+                    layout.icon?.tilt ? { transform: `rotate(${layout.icon.tilt}deg)` } : undefined
+                  }
+                >
+                  {icon}
+                </span>
+              ) : null}
+              {caption}
+              {card.joint || card.together || card.side ? (
+                // My side on someone's record shows its pool there (review).
+                <Faces card={card} ring={FACE_RING[piece.label]} />
+              ) : card.authorFace && card.authorId ? (
+                <AuthorFace card={card} px={metrics.narrow ? 12 : 14} />
+              ) : null}
+            </span>
           </span>
-        </span>
+        )}
         {reading && !still ? (
           // Out from the sticker, or the front of the label when the icon is inline.
           // Moved and turned exactly as what it rings: the sticker, or the label
           // whose front holds an inline icon.
-          <ReadingRipple
-            key={ripple}
-            box={piece.stickerBox && icon ? piece.stickerBox : label}
-            transform={
-              piece.stickerBox && icon
-                ? moveOf(nudge(layout.icon, layout.piece), metrics.column, line)
-                : moveOf(nudge(layout.label, layout.piece), metrics.column, line)
-            }
-            ring={
-              piece.stickerBox && icon
-                ? { x: 0, y: 0, w: piece.stickerBox.w, h: piece.stickerBox.h }
-                : { x: piece.pad.left, y: piece.pad.top, w: piece.type.line, h: piece.type.line }
-            }
-            z={zOf(order, 'sticker')}
-          />
+          piece.compact && piece.photoBox ? (
+            // A compact thumbnail has no label: the ring goes out from the photo.
+            <ReadingRipple
+              key={ripple}
+              box={piece.photoBox}
+              transform={moveOf(layout.piece, metrics.column, line)}
+              ring={{ x: 0, y: 0, w: piece.photoBox.w, h: piece.photoBox.h }}
+              z={zOf(order, 'sticker')}
+            />
+          ) : (
+            <ReadingRipple
+              key={ripple}
+              box={piece.stickerBox && icon ? piece.stickerBox : label}
+              transform={
+                piece.stickerBox && icon
+                  ? moveOf(nudge(layout.icon, layout.piece), metrics.column, line)
+                  : moveOf(nudge(layout.label, layout.piece), metrics.column, line)
+              }
+              ring={
+                piece.stickerBox && icon
+                  ? { x: 0, y: 0, w: piece.stickerBox.w, h: piece.stickerBox.h }
+                  : { x: piece.pad.left, y: piece.pad.top, w: piece.type.line, h: piece.type.line }
+              }
+              z={zOf(order, 'sticker')}
+            />
+          )
         ) : null}
         {piece.stickerBox && icon ? (
           <span
@@ -978,6 +992,17 @@ export function BoardPieceView({
             }}
           >
             {icon}
+          </span>
+        ) : piece.compact && piece.stickerBox ? (
+          // No lane to take an emoji from: a compact post is still something to tap.
+          <span
+            aria-hidden
+            data-board-sticker
+            data-board-dot
+            className={`pointer-events-auto absolute flex cursor-pointer items-center justify-center ${fade} ${moving}`}
+            style={{ ...placed(piece.stickerBox), zIndex: zFor('sticker', 'icon') }}
+          >
+            <span className="block h-2 w-2 rounded-full bg-white" />
           </span>
         ) : null}
         {overlay()}
@@ -1111,9 +1136,12 @@ export function BoardTapeView({
               {frameOf('icon')}
             </span>
           ) : null}
-          <span className="min-w-0 truncate">{caption}</span>
+          {/* A phone's month (review): the band and its icon, no words, no faces. */}
+          {tape.compact ? null : <span className="min-w-0 truncate">{caption}</span>}
           {/* Over the band the water reads as the joint surface: the faces' ring takes it. */}
-          {card.joint || card.together ? <Faces card={card} ring="ring-joint" /> : null}
+          {!tape.compact && (card.joint || card.together) ? (
+            <Faces card={card} ring="ring-joint" />
+          ) : null}
           {frameOf('label')}
         </button>
       </div>

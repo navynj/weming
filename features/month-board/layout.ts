@@ -43,6 +43,16 @@ export const DAY_NUMBER_PX = 28;
 /** How many waves a day shows at most. */
 export const DAY_WAVES_MAX = 3;
 const FOOT_PX = 24;
+/**
+ * A phone's board (review): under this width the week shows half of
+ * itself at a time, Sun–Wed and Wed–Sat, four columns, Wednesday in both;
+ * the month keeps its seven and draws its pieces compact.
+ */
+export const HALF_WEEK_BELOW_PX = 600;
+/** A half week's columns: Wednesday shared, so the step keeps a day of context. */
+export const HALF_COLUMNS = 4;
+/** Between two compact pieces in a month's cell. */
+const COMPACT_GAP_PX = 3;
 
 /** The three recipes. */
 export type Recipe = 'A' | 'B' | 'C';
@@ -247,6 +257,8 @@ export type BoardPiece = {
   /** The small icon before the words (A, C), or B's sticker. */
   inlineIcon: boolean;
   captionLines: number;
+  /** A phone's month (review): its sticker or one photo, no label, no faces. */
+  compact: boolean;
   x: number;
   y: number;
   w: number;
@@ -284,6 +296,8 @@ export type BoardTape = Box & {
   muted: boolean;
   /** Its words' size: the board's, or a text size set by hand, the band growing with it (review). */
   size: number;
+  /** A phone's month (review): the band and its icon, no words. */
+  compact?: boolean;
 };
 
 export type BoardLayout = {
@@ -344,7 +358,11 @@ export function boardTitle(month: string): string {
 /** `Oct 19 – 25`, or `Oct 26 – Nov 1` across a month. */
 export function weekTitle(start: IsoDate, weekStart: number = WEEK_START): string {
   const first = weekOf(start, weekStart);
-  const last = addDays(first, COLUMNS - 1);
+  return rangeTitle(first, addDays(first, COLUMNS - 1));
+}
+
+/** The days shown, first to last: `Oct 25 – 28`, or `Sep 30 – Oct 3` across a month. */
+export function rangeTitle(first: IsoDate, last: IsoDate): string {
   const short = (day: IsoDate): string =>
     new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
   const number = (day: IsoDate): number => Number(day.slice(8));
@@ -363,6 +381,26 @@ export function shiftMonth(month: string, by: number): string {
 /** The first day of the week holding `day`. */
 export function weekOf(day: IsoDate, weekStart: number = WEEK_START): IsoDate {
   return addDays(day, -((weekdayIndex(day) - weekStart + 7) % 7));
+}
+
+/**
+ * The first day of the half week holding `day` on a phone: Sun–Wed for
+ * Sunday to Wednesday, Wed–Sat for the rest — Wednesday, in both, lands on
+ * the first.
+ */
+export function halfOf(day: IsoDate, weekStart: number = WEEK_START): IsoDate {
+  const first = weekOf(day, weekStart);
+  return (weekdayIndex(day) - weekStart + 7) % 7 < HALF_COLUMNS
+    ? first
+    : addDays(first, HALF_COLUMNS - 1);
+}
+
+/** Half a week on or back from a half's first day: Sun–Wed → Wed–Sat → next Sun–Wed. */
+export function stepHalf(start: IsoDate, by: 1 | -1, weekStart: number = WEEK_START): IsoDate {
+  const first = weekOf(start, weekStart);
+  const second = start !== first;
+  if (by === 1) return second ? addDays(first, COLUMNS) : addDays(first, HALF_COLUMNS - 1);
+  return second ? first : addDays(first, -(COLUMNS - HALF_COLUMNS + 1));
 }
 
 /** The days on a month's board: whole weeks from the one holding the 1st to the one holding the last. */
@@ -666,8 +704,10 @@ function base(
   | 'slotAt'
   | 'slotRotate'
   | 'tuck'
+  | 'compact'
 > {
   return {
+    compact: false,
     fan: [],
     morePhotos: 0,
     photoBox: null,
@@ -989,6 +1029,63 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
 }
 
 /**
+ * A phone's month (review): seven lanes too narrow for words, so a post is
+ * its icon as a sticker, centred in its lane, or its newest photo as a
+ * thumbnail the lane wide, never cropped; no label, no faces, no slot. The
+ * label's box is kept, empty, where a wave hangs: under the sticker or
+ * the photo. Stacked in time order, a breath apart.
+ */
+function shapeCompact(card: Card, ctx: Context): Shape {
+  const { m } = ctx;
+  const room = Math.max(8, m.column - m.pad.side * 2);
+  const common = {
+    ...base(card),
+    compact: true,
+    slot: false,
+    overhang: false,
+    span: 0,
+    stickerAt: null,
+    indent: 0,
+    textBoxes: [],
+    pad: { top: 0, right: 0, bottom: 0, left: 0 },
+    center: false,
+    inlineIcon: false,
+    captionLines: 0,
+  };
+  const photo = card.photos?.[0];
+  if (photo) {
+    const ratio = ctx.measured[aspectKey(photo.path)] ?? PLACEHOLDER_ASPECT;
+    const w = room;
+    const h = Math.round(Math.min(w * MAX_TALL, w / ratio));
+    const x = Math.round((m.column - w) / 2);
+    return {
+      ...common,
+      recipe: 'C',
+      variant: 'photo',
+      stickerSize: null,
+      fan: [{ ...photo, size: w, x: 0, y: 0, w, h, tilt: 0 }],
+      photoBox: { x, y: 0, w, h },
+      labelBox: { x, y: h, w, h: 0 },
+      stickerBox: null,
+      w: m.column,
+      h: h + COMPACT_GAP_PX,
+    };
+  }
+  const s = Math.min(m.stickers.medium, room);
+  const box = { x: Math.round((m.column - s) / 2), y: 0, w: s, h: s };
+  return {
+    ...common,
+    recipe: 'B',
+    variant: 'sticker',
+    stickerSize: 'medium',
+    labelBox: box,
+    stickerBox: { ...box },
+    w: m.column,
+    h: s + COMPACT_GAP_PX,
+  };
+}
+
+/**
  * The board: lanes of days in rows, each post on its day, ranged posts as
  * bands along the top of each row they cross. A row is laid out right to
  * left, so an A label decides its overhang against a next lane already
@@ -1004,11 +1101,14 @@ function layoutBoard(
   {
     cellOf = (card) => card.day,
     bands = true,
+    compact = false,
   }: {
     /** The cell a card sits in: its day on the Calendar; its day and lane in the Lane view. */
     cellOf?: (card: Card) => string | null;
     /** Ranged posts as bands across their days (the Calendar); else one piece on its day. */
     bands?: boolean;
+    /** A phone's month: every piece compact (shapeCompact), every band without words. */
+    compact?: boolean;
   } = {},
 ): Pick<BoardLayout, 'weeks' | 'pieces' | 'tapes' | 'height'> {
   const inScope = (day: IsoDate): boolean => day >= scope.first && day <= scope.last;
@@ -1109,6 +1209,7 @@ function layoutBoard(
         w: (endCol - startCol + 1) * m.column,
         h,
         size,
+        ...(compact ? { compact: true } : {}),
       });
     }
     // Under the bands, room for a first sticker to hang into without touching their words.
@@ -1163,6 +1264,7 @@ function layoutBoard(
             measured,
             emptyLeft: emptyLeftOf(cell.col),
           };
+          if (compact) return shapeCompact(card, ctx);
           return plan.recipe === 'C'
             ? shapeC(card, plan, ctx)
             : plan.recipe === 'A'
@@ -1260,12 +1362,15 @@ export function layoutMonthBoard(
     fill,
     weekStart = WEEK_START,
     measured = {},
+    compact = false,
   }: {
     width: number;
     /** The board's visible height, header included: a month that fits fills it, with no scroll. */
     fill?: number;
     weekStart?: number;
     measured?: Measured;
+    /** A phone's month (review): stickers and photo thumbnails, no words. */
+    compact?: boolean;
   },
 ): BoardLayout {
   const m = boardMetrics(width);
@@ -1279,6 +1384,7 @@ export function layoutMonthBoard(
     m,
     'month',
     measured,
+    { compact },
   );
   const laid = fill === undefined ? natural : fillRows(natural, fill - MONTH_HEADER_PX);
   return {
@@ -1296,7 +1402,13 @@ export function layoutMonthBoard(
   };
 }
 
-/** One week (the default): seven full-height lanes headed by weekday and number, the week's range as the title. */
+/**
+ * One week (the default): seven full-height lanes headed by weekday and
+ * number, the week's range as the title. On a phone (`half`), four of
+ * them from `day` — a half's first day (halfOf, stepHalf) — each a quarter
+ * of the width, so pieces get room; hand-set offsets are in column widths
+ * and lines, so a layout keeps its proportions.
+ */
 export function layoutWeekBoard(
   cards: Card[],
   day: IsoDate,
@@ -1304,15 +1416,18 @@ export function layoutWeekBoard(
     width,
     weekStart = WEEK_START,
     measured = {},
-  }: { width: number; weekStart?: number; measured?: Measured },
+    half = false,
+  }: { width: number; weekStart?: number; measured?: Measured; half?: boolean },
 ): BoardLayout {
-  const m = boardMetrics(width);
-  const first = weekOf(day, weekStart);
-  const days = Array.from({ length: COLUMNS }, (_, i) => addDays(first, i));
+  const columns = half ? HALF_COLUMNS : COLUMNS;
+  const m = boardMetrics(width, columns);
+  const first = half ? day : weekOf(day, weekStart);
+  const days = Array.from({ length: columns }, (_, i) => addDays(first, i));
+  const last = days[columns - 1];
   const laid = layoutBoard(
     cards,
     [days.map((d) => ({ key: d, day: d }))],
-    { first, last: days[COLUMNS - 1] },
+    { first, last },
     m,
     'week',
     measured,
@@ -1321,7 +1436,7 @@ export function layoutWeekBoard(
     span: 'week',
     metrics: m,
     key: first,
-    title: weekTitle(first, weekStart),
+    title: rangeTitle(first, last),
     headers: days.map((d) => ({
       day: d,
       number: Number(d.slice(8)),

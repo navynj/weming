@@ -31,6 +31,8 @@ import {
   COLUMNS,
   DAY_NUMBER_PX,
   DAY_WAVES_MAX,
+  HALF_WEEK_BELOW_PX,
+  halfOf,
   HEADER_PX,
   layoutMonthBoard,
   layoutWeekBoard,
@@ -39,6 +41,7 @@ import {
   type Measured,
   type Recipe,
   shiftMonth,
+  stepHalf,
   weekOf,
 } from './layout';
 import type { BoardEditing } from './use-board-editing';
@@ -92,7 +95,9 @@ export function BoardFrame({ children }: { children: ReactNode }) {
  * corner), stacked flush in time order; a ranged post a band along the top
  * of each row it crosses. The week (the default) heads each lane with its
  * weekday, its number and its waves, and is titled by its range, the
- * arrows and a sideways swipe turning it; the month, rows that grow to
+ * arrows and a sideways swipe turning it — on a phone, half a week at a
+ * time (Sun–Wed, Wed–Sat), its pieces a quarter of the width; the month,
+ * rows that grow to
  * their tallest lane, a day's number opening its week. Week or Month is
  * remembered per device. Laid out at the room's own width, scrolling
  * down, never sideways. A tap brings the post's card to the top of the
@@ -133,17 +138,21 @@ export function MonthBoard({
   fixturePhotos?: SignedMedia;
 }) {
   const [span, setSpan] = useBoardSpan();
-  // The week shown: this one on open (review), unless the ground was opened on another month.
+  // The first day shown in Week: a half's first day (halfOf), so a phone
+  // opens on the half holding today (review), unless the ground was opened
+  // on another month; a wider board shows the whole week around it.
   const [week, setWeek] = useState<IsoDate>(() =>
-    weekOf(monthKey(today) === month ? today : `${month}-01`),
+    halfOf(monthKey(today) === month ? today : `${month}-01`),
   );
   // A new `?m=` while open moves the week there, set as it renders.
   const [seenMonth, setSeenMonth] = useState(month);
   if (month !== seenMonth) {
     setSeenMonth(month);
-    setWeek(weekOf(monthKey(today) === month ? today : `${month}-01`));
+    setWeek(halfOf(monthKey(today) === month ? today : `${month}-01`));
   }
   const [room, setRoom] = useState<number | null>(null);
+  // A phone's board (review): half a week in Week, compact pieces in Month.
+  const phone = room !== null && room < HALF_WEEK_BELOW_PX;
   // The board's visible height: a month that fits fills it (review).
   const [tall, setTall] = useState<number | null>(null);
   // The words' lines as the browser wrapped them, fed back so every label hugs them (review).
@@ -166,13 +175,15 @@ export function MonthBoard({
         ? layoutWeekBoard(drawn, week, {
             width: room ?? 980,
             measured: withAspects(measured, aspects),
+            half: phone,
           })
         : layoutMonthBoard(drawn, month, {
             width: room ?? 980,
             fill: tall ?? undefined,
             measured: withAspects(measured, aspects),
+            compact: phone,
           }),
-    [drawn, span, week, month, room, tall, measured, aspects],
+    [drawn, span, week, month, room, tall, measured, aspects, phone],
   );
   const { metrics } = layout;
   // One stacking order for the whole view: every piece's parts compete in it (stacking.ts).
@@ -281,23 +292,26 @@ export function MonthBoard({
     return () => observer.disconnect();
   }, []);
 
-  // Turning the page: a week or a month either way.
+  // Turning the page: a week or a month either way; half a week on a phone,
+  // Wednesday shown on both sides of the step (review).
   const turn = useCallback(
     (by: 1 | -1): void => {
-      if (span === 'week') setWeek((current) => addDays(current, by * COLUMNS));
-      else onMonth(shiftMonth(month, by));
+      if (span === 'month') onMonth(shiftMonth(month, by));
+      else if (phone) setWeek((current) => stepHalf(current, by));
+      else setWeek((current) => addDays(weekOf(current), by * COLUMNS));
     },
-    [span, month, onMonth],
+    [span, month, onMonth, phone],
   );
   const switchSpan = (next: BoardSpan): void => {
     if (next === span) return;
     // Month shows the week's month; Week shows the month's first week, or this one.
-    if (next === 'month') onMonth(monthKey(addDays(week, 3)));
-    else setWeek(weekOf(monthKey(today) === month ? today : `${month}-01`));
+    if (next === 'month') onMonth(monthKey(addDays(weekOf(week), 3)));
+    else setWeek(halfOf(monthKey(today) === month ? today : `${month}-01`));
     setSpan(next);
   };
+  // A day in Month opens Week on it: on a phone, the half holding it (review).
   const openWeek = (day: IsoDate): void => {
-    setWeek(weekOf(day));
+    setWeek(halfOf(day));
     setSpan('week');
   };
 
@@ -314,7 +328,7 @@ export function MonthBoard({
     setSeenSeq(seq);
     const card = ring ? cards.find((c) => c.splash.id === ring.id) : undefined;
     if (card && !onBoard(card.splash.id)) {
-      if (span === 'week') setWeek(weekOf(card.day));
+      if (span === 'week') setWeek(halfOf(card.day));
       else setWanted({ seq: ring!.seq, month: monthKey(card.day) });
     }
   }
@@ -386,7 +400,9 @@ export function MonthBoard({
       <div className="flex shrink-0 items-center gap-1 pb-2 text-white">
         <button
           type="button"
-          aria-label={span === 'week' ? 'Previous week' : 'Previous month'}
+          aria-label={
+            span === 'month' ? 'Previous month' : phone ? 'Previous half week' : 'Previous week'
+          }
           data-board-prev
           onClick={() => turn(-1)}
           className="flex h-8 w-8 items-center justify-center rounded-full"
@@ -398,7 +414,7 @@ export function MonthBoard({
         </h2>
         <button
           type="button"
-          aria-label={span === 'week' ? 'Next week' : 'Next month'}
+          aria-label={span === 'month' ? 'Next month' : phone ? 'Next half week' : 'Next week'}
           data-board-next
           onClick={() => turn(1)}
           className="flex h-8 w-8 items-center justify-center rounded-full"
@@ -490,7 +506,11 @@ export function MonthBoard({
                       {header.number}
                     </span>
                     <span className="flex items-start pt-1.5">
-                      <DayWaves count={layout.weeks[0].cells[col].count} narrow={metrics.narrow} />
+                      <DayWaves
+                        count={layout.weeks[0].cells[col].count}
+                        // A phone's glyph, though its half week's columns are wide.
+                        narrow={metrics.narrow || phone}
+                      />
                     </span>
                   </>
                 ) : (
@@ -539,7 +559,7 @@ export function MonthBoard({
 
             {/* The lane lines, once for the whole grid, from the header to its bottom edge:
               over the rows' water, under every item, so an overhang lies across them. */}
-            {Array.from({ length: COLUMNS - 1 }, (_, at) => (
+            {Array.from({ length: metrics.columns - 1 }, (_, at) => (
               <span
                 key={at}
                 aria-hidden
@@ -555,7 +575,11 @@ export function MonthBoard({
                 className="absolute inset-x-0 text-center text-sm text-white/80"
                 style={{ top: (span === 'week' ? HEADER_PX : MONTH_HEADER_PX) + 44 }}
               >
-                {span === 'week' ? 'Nothing this week yet.' : 'Nothing this month yet.'}
+                {span === 'month'
+                  ? 'Nothing this month yet.'
+                  : phone
+                    ? 'Nothing on these days yet.'
+                    : 'Nothing this week yet.'}
               </p>
             ) : null}
 
