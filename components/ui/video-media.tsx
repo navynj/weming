@@ -7,14 +7,17 @@ import { playerUrl, thumbnailUrl, videoAspect, type YouTubeVideo } from '@/lib/y
 
 /**
  * A YouTube video's thumbnail (part 5): YouTube's own image, cropped to the
- * video's shape (its 4:3 file carries bars), with a play mark. Nothing is
- * asked of YouTube until this is drawn; no player, no tracking.
+ * video's shape (its 4:3 file carries bars), with a play mark where it plays.
+ * Nothing is asked of YouTube until this is drawn; no player, no tracking.
  */
 export function VideoThumb({
   url,
+  play = true,
   className = '',
 }: {
   url: string | null | undefined;
+  /** The play mark; off on the board, where a video is a sticker (H42c). */
+  play?: boolean;
   className?: string;
 }) {
   return (
@@ -27,12 +30,14 @@ export function VideoThumb({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" draggable={false} className="block h-full w-full object-cover" />
       ) : null}
-      <span
-        aria-hidden
-        className="text-main-900 absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white"
-      >
-        <Play size={14} className="translate-x-px" fill="currentColor" />
-      </span>
+      {play ? (
+        <span
+          aria-hidden
+          className="text-main-900 absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white"
+        >
+          <Play size={14} className="translate-x-px" fill="currentColor" />
+        </span>
+      ) : null}
     </span>
   );
 }

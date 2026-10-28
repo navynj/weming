@@ -439,8 +439,10 @@ function PhotoCardView({
       }}
     >
       {photo.video ? (
-        // A video (part 5): its thumbnail in its own shape; a tap brings the post up, as ever.
-        <VideoThumb url={url} />
+        // A video is decoration here (H42c): its thumbnail in its own shape, a
+        // sticker with no play mark, tapped like any part. It plays on the
+        // stack card and in the detail sheet.
+        <VideoThumb url={url} play={false} />
       ) : url ? (
         // A signed URL for a few minutes: next/image would cache it past its life.
         // eslint-disable-next-line @next/next/no-img-element

@@ -1718,10 +1718,12 @@ describe('a YouTube video on the board (part 5)', () => {
     expect(front.w / front.h).toBeCloseTo(16 / 9, 1);
   });
 
-  it('draws its thumbnail with a play mark and no player', () => {
+  it('draws its thumbnail as a sticker: no play mark, no play button, no player (H42c)', () => {
     const { container } = board([withVideo]);
     const drawn = container.querySelector(`[data-board-photo-card="yt:${VIDEO.id}"]`)!;
-    expect(drawn.querySelector('[data-video-thumb]')).not.toBeNull();
+    expect(drawn.querySelector('[data-video-thumb] img')).not.toBeNull();
+    expect(drawn.querySelector('svg')).toBeNull();
+    expect(container.querySelector('[data-video-play], [data-video-player]')).toBeNull();
     expect(container.querySelector('iframe')).toBeNull();
   });
 });

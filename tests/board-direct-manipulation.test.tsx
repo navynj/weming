@@ -296,6 +296,28 @@ describe('direct manipulation: which tap does what (review, 2026-10-27)', () => 
     expect(q(container, '[data-stack-card="s1"]').dataset.stair).toBe('top');
   });
 
+  it('taps a YouTube video like any part: up first, then edited; it never plays (H42c)', () => {
+    const video = { id: 'dQw4w9WgXcQ', start: null, short: false };
+    const path = `yt:${video.id}`;
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22'),
+      card('s1', 'Song for the walk', '2026-10-21', {
+        photos: [{ rippleId: 's1-b', path, video }],
+      }),
+    ]);
+    const thumb = () => q(container, `[data-board-photo-card="${path}"]`);
+    const board = q(container, '[data-board-canvas]');
+    fireEvent.click(thumb());
+    expect(q(container, '[data-stack-card="s1"]').dataset.stair).toBe('top');
+    expect(container.querySelector('[data-edit-frame]')).toBeNull();
+    fireEvent.click(thumb());
+    expect(q(container, '[data-board-piece="s1"] [data-edit-frame="piece"]')).not.toBeNull();
+    fireEvent.click(thumb());
+    expect(q(container, '[data-board-piece="s1"] [data-edit-frame="photo"]')).not.toBeNull();
+    // No play button on the board, and no player loaded by any of it.
+    expect(board.querySelector('[data-video-play], [data-video-player], iframe')).toBeNull();
+  });
+
   it('never shows handles on a piece I cannot edit: a second tap does what a first does', () => {
     const { container } = render(<Board cards={TWO} canEdit={false} />);
     fireEvent.click(label(container, 's2'));
