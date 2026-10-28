@@ -193,11 +193,11 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
             together: { everyone: p.invite_all, picked: picks[p.pool_id] ?? [] },
           }))
       : [],
-    othersWrote: (writers ?? []).some((w) => w.author_id !== user.id),
+    othersWrote: (writers ?? []).some((w) => w.author_id && w.author_id !== user.id),
     invitees: joint ? (invited[id] ?? []) : [],
     inviteAll: splash.joint_invite_all,
     isMaker: joint && splash.created_by === user.id,
-    writerIds: [...new Set((writers ?? []).map((w) => w.author_id))],
+    writerIds: [...new Set((writers ?? []).flatMap((w) => (w.author_id ? [w.author_id] : [])))],
     laneNames: Object.fromEntries(
       (allLanes ?? []).map((l) => [l.id, { name: l.name, icon: l.icon, poolId: l.pool_id }]),
     ),

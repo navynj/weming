@@ -69,8 +69,8 @@ const JOINT: Splash = {
 
 function ripple(
   id: string,
-  author: string,
-  note: string,
+  author: string | null,
+  note: string | null,
   createdAt = '2026-10-22T18:00:00.000Z',
 ): RippleWithSplash {
   return {
@@ -109,17 +109,17 @@ const POOL: PoolContext = {
   zoneOf: { [ME]: 'America/Vancouver', [MINA]: 'Asia/Seoul' },
 };
 
-function page() {
+function page(blocks: RippleWithSplash[] = BLOCKS) {
   return render(
     <InputSheetProvider>
       <SplashPage
         splash={summarizeSplash(
           JOINT,
-          BLOCKS,
+          blocks,
           'America/Vancouver',
           new Date('2026-10-23T00:00:00Z'),
         )}
-        blocks={BLOCKS}
+        blocks={blocks}
         photos={{}}
         lockedIds={[]}
         categories={[]}
@@ -183,5 +183,21 @@ describe('a pool’s splash on Home’s page (review)', () => {
       expect(readFileSync(route, 'utf8')).toContain('<SplashModal');
     }
     expect(existsSync('features/pool/pool-splash-page.tsx')).toBe(false);
+  });
+});
+
+describe('a part removed by a hand-over (0061, H46)', () => {
+  it('reads "This part was removed" in its ripple’s place, with no author, words or editor', () => {
+    // Its owner's ripple came first; members' ripples follow it, as before.
+    const removed = ripple('r-gone', null, null, '2026-10-22T16:00:00.000Z');
+    const view = page([removed, ...BLOCKS]);
+    const entries = [...view.container.querySelectorAll('[data-block-entry]')].map((e) =>
+      e.getAttribute('data-block-entry'),
+    );
+    expect(entries).toEqual(['r-gone', 'r-mina', 'r-me']);
+    const part = view.container.querySelector('[data-block-entry="r-gone"]')!;
+    expect(part.querySelector('[data-removed-part]')!.textContent).toBe('This part was removed');
+    expect(part.textContent).not.toContain('YO');
+    expect(part.querySelector('button[aria-label="Edit"]')).toBeNull();
   });
 });

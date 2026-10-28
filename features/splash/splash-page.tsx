@@ -465,13 +465,16 @@ export function SplashPage({
               (block) => ({
                 id: block.id,
                 // Each ripple keeps its author in a pool (H23), and on Home
-                // someone else's on my record (0035).
-                initials: pool
-                  ? (pool.initialsOf[block.author_id] ?? '')
-                  : block.author_id !== me && initialsOf[block.author_id]
-                    ? initialsOf[block.author_id]
-                    : undefined,
-                authorId: block.author_id,
+                // someone else's on my record (0035). A removed part has none.
+                initials:
+                  block.author_id === null
+                    ? ''
+                    : pool
+                      ? (pool.initialsOf[block.author_id] ?? '')
+                      : block.author_id !== me && initialsOf[block.author_id]
+                        ? initialsOf[block.author_id]
+                        : undefined,
+                authorId: block.author_id ?? undefined,
                 // Something new from someone else on my ripple since I last opened it (H25).
                 dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
                 body: (
@@ -486,6 +489,24 @@ export function SplashPage({
                         onLock={(locked) => lockBlock(block, locked)}
                         onCancel={() => setEditor(null)}
                       />
+                    ) : block.author_id === null ? (
+                      // Its author's part, gone with them; what others said
+                      // to it stays (0061, H46).
+                      <>
+                        <p data-removed-part className="text-pool-500 py-1 text-sm">
+                          This part was removed
+                        </p>
+                        <RippleResponses
+                          rippleId={block.id}
+                          rippleAuthor=""
+                          value={thread}
+                          canRespond={false}
+                          expanded={isExpanded(block.id)}
+                          onExpand={() => setExpanded((ids) => [...ids, block.id])}
+                          onReact={(emoji) => answered.react(block.id, emoji)}
+                          on={answered.handlers(block.id)}
+                        />
+                      </>
                     ) : (
                       <>
                         <BlockView

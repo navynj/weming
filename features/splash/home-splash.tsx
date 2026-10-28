@@ -78,7 +78,7 @@ export async function HomeSplash({ id }: { id: string }) {
     ? await supabase
         .from('profiles')
         .select('id, display_name')
-        .in('id', [...new Set(others.map((r) => r.author_id))])
+        .in('id', [...new Set(others.flatMap((r) => (r.author_id ? [r.author_id] : [])))])
     : { data: [] as { id: string; display_name: string }[] };
 
   // The one order (H42g): by day inside a range, else as written; a frozen date places nothing.

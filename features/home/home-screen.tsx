@@ -163,7 +163,7 @@ export async function HomeScreen({
     ? supabase
         .from('profiles')
         .select('id, display_name')
-        .in('id', [...new Set(theirs.map((r) => r.author_id))])
+        .in('id', [...new Set(theirs.flatMap((r) => (r.author_id ? [r.author_id] : [])))])
     : Promise.resolve({ data: [] as { id: string; display_name: string }[] });
   const jointReads =
     joints.length > 0
@@ -256,7 +256,9 @@ export async function HomeScreen({
     });
     for (const j of joints) {
       const writers = [
-        ...new Set((wrote ?? []).filter((r) => r.splash_id === j.id).map((r) => r.author_id)),
+        ...new Set(
+          (wrote ?? []).flatMap((r) => (r.splash_id === j.id && r.author_id ? [r.author_id] : [])),
+        ),
       ];
       const current = (members ?? []).filter((m) => m.pool_id === j.pool_id).map((m) => m.user_id);
       jointFaces.set(j.id, {
@@ -356,15 +358,16 @@ export async function HomeScreen({
   }
   const inOrder = [...byKey].flatMap(([key, rows]) => orderBlocks(rows, rangeOf.get(key) ?? null));
   for (const ripple of inOrder) {
-    if (!ripple.note && ripple.media.length === 0) continue;
+    // A part removed by a hand-over (0061) has no words, so no line here.
+    if ((!ripple.note && ripple.media.length === 0) || !ripple.author_id) continue;
     const key = ripple.splash_id ?? ripple.id;
-    const theirsToo = ripple.author_id !== profile.id;
+    const author = ripple.author_id;
     const entry = {
       id: ripple.id,
       note: ripple.note ?? '',
       createdAt: ripple.created_at,
-      ...(theirsToo
-        ? { authorId: ripple.author_id, initials: initialsBy.get(ripple.author_id) ?? '' }
+      ...(author !== profile.id
+        ? { authorId: author, initials: initialsBy.get(author) ?? '' }
         : {}),
     };
     const list = threads.get(key);

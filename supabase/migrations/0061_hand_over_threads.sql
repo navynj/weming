@@ -24,11 +24,23 @@
 -- and the pool's notifications follow. The owner's ripples stay where they
 -- are. Each pool is its own hand-over; threads were already apart.
 --
+-- Replies and reactions members left in that pool on the owner's own
+-- ripples are kept (Yoonji, in the session, before the merge): "On the
+-- joint record, put a placeholder ripple in the owner's ripple's place,
+-- authored by nobody, reading 'This part was removed', with no text, media
+-- or reactions of the owner, and move those members' replies and reactions
+-- onto it. Order stays as it was. If no other member replied or reacted to
+-- an owner ripple, no placeholder is created." A placeholder is a ripple
+-- with no author (the one widening below), no words and no media, carrying
+-- the owner's ripple's day and moment so it sits where that ripple did.
+--
 -- A pool's deletion is untouched: there is no pool left to hand over to, so
 -- delete_pool still returns members' ripples to their authors (0035).
 --
--- Additive: two columns, a function, a trigger, functions replaced with
--- their signatures unchanged. No DDL beyond that.
+-- Additive: two columns, ripples.author_id made nullable (a widening: every
+-- writer still sets it; only a placeholder has none, and a check keeps a
+-- placeholder empty), a function, a trigger, functions replaced with their
+-- signatures unchanged.
 
 alter table public.splash_placements
   add column handed_to uuid,
@@ -36,6 +48,17 @@ alter table public.splash_placements
 
 comment on column public.splash_placements.handed_to is
   'The joint record this placement''s thread was handed to when its owner left the pool with remove (0061). The placement stays, switched off. No foreign key: a second path from placements to splashes would make every embed between them ambiguous, the running app''s included.';
+
+-- A part removed by a hand-over: no author, nothing of theirs on it.
+alter table public.ripples alter column author_id drop not null;
+alter table public.ripples
+  add constraint ripples_removed_is_empty check (
+    author_id is not null
+    or (note is null and media = '{}' and splash_id is not null and parent_ripple_id is null)
+  );
+
+comment on column public.ripples.author_id is
+  'Who wrote it. Null only on a placeholder left by a hand-over (0061): "This part was removed", holding members'' replies and reactions on the owner''s ripple that was there.';
 
 -- ---------------------------------------------------------------------------
 -- the hand-over
@@ -53,6 +76,8 @@ declare
   writers uuid[];
   opener uuid;
   jid uuid;
+  part record;
+  holder uuid;
 begin
   select * into s from public.splashes where id = p_splash;
   select * into pl from public.splash_placements where splash_id = p_splash and pool_id = p_pool;
@@ -98,6 +123,41 @@ begin
   update public.ripples
      set splash_id = jid, thread_pool_id = null
    where splash_id = p_splash and thread_pool_id = p_pool;
+
+  -- What members said in this pool on the owner's own ripples: kept on a
+  -- placeholder in each such ripple's place, none for one nobody answered.
+  -- The owner's own replies and reactions stay with their ripple.
+  perform set_config('weming.inherit_backfill', 'on', true);
+  for part in
+    select r.id, r.occurred_on, r.created_at, r.written_on
+      from public.ripples r
+     where r.splash_id = p_splash
+       and r.author_id = s.owner_id
+       and r.parent_ripple_id is null
+       and (
+         exists (select 1 from public.ripple_replies x
+                  where x.ripple_id = r.id and x.thread_pool_id = p_pool
+                    and x.author_id <> s.owner_id)
+         or exists (select 1 from public.ripple_reactions x
+                     where x.ripple_id = r.id and x.thread_pool_id = p_pool
+                       and x.user_id <> s.owner_id)
+       )
+  loop
+    insert into public.ripples
+      (author_id, splash_id, note, media, occurred_on, created_at, written_on)
+    values (null, jid, null, '{}', part.occurred_on, part.created_at, part.written_on)
+    returning id into holder;
+    update public.ripple_replies
+       set ripple_id = holder
+     where ripple_id = part.id and thread_pool_id = p_pool and author_id <> s.owner_id;
+    update public.ripple_reactions
+       set ripple_id = holder
+     where ripple_id = part.id and thread_pool_id = p_pool and user_id <> s.owner_id;
+    update public.notifications
+       set ripple_id = holder
+     where ripple_id = part.id and pool_id = p_pool and recipient_id <> s.owner_id;
+  end loop;
+  perform set_config('weming.inherit_backfill', 'off', true);
 
   -- It looks the same in the pool, and on each writer's Home. A layout
   -- never changes splash (stamp_board_layout), so it is copied and the
@@ -250,7 +310,8 @@ AS $function$
        and (
          (s.owner_id is null
            and public.is_current_member(s.pool_id)
-           and public.member_visible(s.pool_id, r.author_id))
+           -- A placeholder (0061) has no author: the pool reads it.
+           and (r.author_id is null or public.member_visible(s.pool_id, r.author_id)))
          or (s.owner_id = r.author_id and public.splash_in_my_pools(s.id))
          -- A member's ripple on someone's record (0035): followed by
          -- keep_on_leave; read by the record's owner, on or off, and by
@@ -270,6 +331,7 @@ AS $function$
          -- A thread handed over when I left its pool with remove (0061):
          -- mine to read on my record as it stood then, nothing written after.
          or (s.owner_id is null
+           and r.author_id is not null
            and exists (
              select 1 from public.splash_placements p
                join public.splashes o on o.id = p.splash_id
