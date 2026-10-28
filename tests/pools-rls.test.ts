@@ -151,6 +151,32 @@ describe('outside the pool', () => {
   });
 });
 
+describe('reordering the pool’s lanes (H42b)', () => {
+  it('is any current member’s, not only its creator’s, and no outsider’s', async () => {
+    const { data: lanes } = await asUser(ben)
+      .from('pool_lanes')
+      .select('id, position')
+      .eq('pool_id', pool)
+      .order('position');
+    expect(lanes!.length).toBeGreaterThan(1);
+    const first = lanes![0]!;
+    const moved = await asUser(ben)
+      .from('pool_lanes')
+      .update({ position: 99 })
+      .eq('id', first.id)
+      .select('id');
+    expect(moved.error).toBeNull();
+    expect(moved.data).toHaveLength(1);
+    const outside = await asUser(cal)
+      .from('pool_lanes')
+      .update({ position: 0 })
+      .eq('id', first.id)
+      .select('id');
+    expect(outside.data).toEqual([]);
+    await asUser(ben).from('pool_lanes').update({ position: first.position }).eq('id', first.id);
+  });
+});
+
 describe('placement', () => {
   it('never creates or modifies a record of mine when history is on', async () => {
     // 0012: joining places existing posts only, and makes none.
