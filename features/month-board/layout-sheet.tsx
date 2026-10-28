@@ -4,6 +4,8 @@ import { X } from 'lucide-react';
 
 import { LayoutControls, type LayoutControlsProps } from './layout-controls';
 import { layoutTitle } from './layout-panel';
+import { LayerSection } from './layer-section';
+import type { LayerControls } from './stacking';
 
 /**
  * More, on a phone (review, 2026-10-27): every slider the desktop panel
@@ -15,10 +17,13 @@ import { layoutTitle } from './layout-panel';
 export function LayoutSheet({
   view,
   onClose,
+  layers = null,
   ...controls
 }: LayoutControlsProps & {
   view: 'calendar' | 'lane' | 'members';
   onClose: () => void;
+  /** The active piece's layer moves, which a phone's toolbar leaves here. */
+  layers?: LayerControls | null;
 }) {
   return (
     <section
@@ -44,6 +49,7 @@ export function LayoutSheet({
         className="no-scrollbar flex min-h-0 flex-col gap-4 overflow-y-auto px-4"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
       >
+        {layers ? <LayerSection layers={layers} /> : null}
         <LayoutControls {...controls} />
       </div>
     </section>

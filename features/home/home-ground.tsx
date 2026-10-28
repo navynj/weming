@@ -432,6 +432,7 @@ export function HomeGround({
           {/* Desktop only (review): the top card's layout, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
           {(boardView || laneView) && wide && topCard ? (
             <LayoutPanel
+              layers={editing.layers}
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}
@@ -447,6 +448,7 @@ export function HomeGround({
           ) : null}
           {sheetOpen && !wide && topCard ? (
             <LayoutSheet
+              layers={editing.layers}
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}

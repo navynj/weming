@@ -41,7 +41,7 @@ import {
   type BoardPart,
   type PartValues,
 } from './handle-math';
-import type { LayerMove } from './stacking';
+import type { LayerControls, LayerMove } from './stacking';
 import type { BoardEditing } from './use-board-editing';
 
 /** Which handles a part has (review): the panel's own fields, no more. */
@@ -613,9 +613,12 @@ export function EditToolbar({
   layers = null,
   parts = [],
   seat = null,
+  phone = false,
   style,
 }: {
   editing: BoardEditing;
+  /** A phone's board (under 600px): two rows, 44px taps, the layer buttons in More. */
+  phone?: boolean;
   /** The piece's parts, as chips that select one (review): shown when there is more than one. */
   parts?: { part: BoardPart; name: string }[];
   /** Placed by its own width, within the board; else `style` places it. */
@@ -623,10 +626,9 @@ export function EditToolbar({
   /** The label's text size as drawn, while the label is selected; else no stepper. */
   fontSize: number | null;
   /** The piece's layer moves (stacking.ts), each possible or not; none for a band along its days. */
-  layers?: { can: Record<LayerMove, boolean>; move: (how: LayerMove) => void } | null;
+  layers?: LayerControls | null;
   style: CSSProperties;
 }) {
-  const button = 'flex h-8 min-w-8 items-center justify-center rounded-full px-1.5';
   // Cmd/Ctrl+] forward, Cmd/Ctrl+[ backward; with Shift, to the front and the back.
   const latest = useRef(layers);
   useEffect(() => {
@@ -668,89 +670,81 @@ export function EditToolbar({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [hasLayers]);
-  return (
-    <div
-      ref={bar}
-      data-edit-toolbar
-      role="toolbar"
-      aria-label="Layout"
-      onClick={(event) => event.stopPropagation()}
-      onPointerDown={(event) => event.stopPropagation()}
-      // A white bar on the ground stays white with ink (0032).
-      // Wraps to a second row on a phone rather than leave the board.
-      className="surface text-ink pointer-events-auto absolute flex w-max flex-wrap items-center gap-0.5 rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md"
-      style={left === undefined ? style : { ...style, left }}
-    >
-      {parts.length > 1 ? (
-        <div data-edit-parts className="flex items-center" role="group" aria-label="Part">
-          {parts.map(({ part, name }) => {
-            const on = samePart(part, editing.part);
-            return (
-              <button
-                key={name}
-                type="button"
-                aria-pressed={on}
-                data-edit-part-chip={name}
-                onClick={() => editing.tap(editing.activeId!, part)}
-                // Selection is ink (H20f); the rest muted.
+  // A phone's taps are a finger's: 44px every one (review).
+  const button = `flex ${phone ? 'h-11 min-w-11' : 'h-8 min-w-8'} items-center justify-center rounded-full px-1.5`;
+  const chips =
+    parts.length > 1 ? (
+      <div
+        data-edit-parts
+        role="group"
+        aria-label="Part"
+        // On a phone a row of its own, scrolling sideways when it does not fit.
+        className={`flex items-center ${phone ? 'no-scrollbar min-w-0 overflow-x-auto' : ''}`}
+      >
+        {parts.map(({ part, name }) => {
+          const on = samePart(part, editing.part);
+          return (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={on}
+              data-edit-part-chip={name}
+              onClick={() => editing.tap(editing.activeId!, part)}
+              className={`flex shrink-0 items-center ${phone ? 'h-11' : 'h-8'}`}
+            >
+              {/* Selection is ink (H20f); the rest muted. */}
+              <span
                 className={`flex h-7 items-center rounded-full px-2 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
               >
                 {name}
-              </button>
-            );
-          })}
-          <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
-        </div>
-      ) : null}
-      {fontSize !== null ? (
-        <div data-edit-text-size className="flex items-center" role="group" aria-label="Text size">
-          <Type aria-hidden size={14} className="mx-1.5" />
-          <span aria-hidden className="bg-ink/20 h-4 w-px" />
-          <button
-            type="button"
-            aria-label="Smaller text"
-            data-edit-text-smaller
-            disabled={fontSize <= LIMITS.fontSize[0]}
-            onClick={() => editing.edit({ label: { fontSize: stepFont(fontSize, -1) } })}
-            className={`${button} disabled:opacity-20`}
-          >
-            −
-          </button>
-          <span data-edit-text-value className="w-5 text-center tabular-nums">
-            {fontSize}
-          </span>
-          <button
-            type="button"
-            aria-label="Larger text"
-            data-edit-text-larger
-            disabled={fontSize >= LIMITS.fontSize[1]}
-            onClick={() => editing.edit({ label: { fontSize: stepFont(fontSize, 1) } })}
-            className={`${button} disabled:opacity-20`}
-          >
-            +
-          </button>
-          <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
-        </div>
-      ) : null}
-      {layers ? (
-        <div data-edit-layers className="flex items-center" role="group" aria-label="Layer">
-          {LAYER_BUTTONS.map(({ how, label, Icon }) => (
-            <button
-              key={how}
-              type="button"
-              aria-label={label}
-              title={label}
-              data-edit-layer={how}
-              disabled={!layers.can[how]}
-              onClick={() => layers.move(how)}
-              className={`${button} disabled:opacity-20`}
-            >
-              <Icon aria-hidden size={16} />
+              </span>
             </button>
-          ))}
-          <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
-        </div>
-      ) : null}
+          );
+        })}
+        {phone ? null : <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />}
+      </div>
+    ) : null;
+  const stepper =
+    fontSize !== null ? (
+      <div data-edit-text-size className="flex items-center" role="group" aria-label="Text size">
+        <Type aria-hidden size={14} className="mx-1.5" />
+        <span aria-hidden className="bg-ink/20 h-4 w-px" />
+        <button
+          type="button"
+          aria-label="Smaller text"
+          data-edit-text-smaller
+          disabled={fontSize <= LIMITS.fontSize[0]}
+          onClick={() => editing.edit({ label: { fontSize: stepFont(fontSize, -1) } })}
+          className={`${button} disabled:opacity-20`}
+        >
+          −
+        </button>
+        <span data-edit-text-value className="w-5 text-center tabular-nums">
+          {fontSize}
+        </span>
+        <button
+          type="button"
+          aria-label="Larger text"
+          data-edit-text-larger
+          disabled={fontSize >= LIMITS.fontSize[1]}
+          onClick={() => editing.edit({ label: { fontSize: stepFont(fontSize, 1) } })}
+          className={`${button} disabled:opacity-20`}
+        >
+          +
+        </button>
+        <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
+      </div>
+    ) : null;
+  // On a phone the layer buttons are More's (review); the shortcuts stay here.
+  const layerGroup =
+    layers && !phone ? (
+      <div data-edit-layers className="flex items-center" role="group" aria-label="Layer">
+        <LayerButtons layers={layers} className={`${button} disabled:opacity-20`} />
+        <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
+      </div>
+    ) : null;
+  const actions = (
+    <>
       <button
         type="button"
         aria-label="Undo"
@@ -784,7 +778,61 @@ export function EditToolbar({
           {editing.status === 'saving' ? 'Saving…' : 'Saved'}
         </span>
       ) : null}
+    </>
+  );
+  return (
+    <div
+      ref={bar}
+      data-edit-toolbar
+      data-phone={phone ? '' : undefined}
+      role="toolbar"
+      aria-label="Layout"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      // A white bar on the ground stays white with ink (0032). On a phone two
+      // rows, the parts over the rest, the board's own width.
+      className={`surface text-ink pointer-events-auto absolute rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md ${phone ? 'flex flex-col' : 'flex w-max flex-wrap items-center gap-0.5'}`}
+      style={left === undefined ? style : { ...style, left }}
+    >
+      {phone ? (
+        <>
+          {chips}
+          <div data-edit-actions className="flex flex-wrap items-center">
+            {stepper}
+            {actions}
+          </div>
+        </>
+      ) : (
+        <>
+          {chips}
+          {stepper}
+          {layerGroup}
+          {actions}
+        </>
+      )}
     </div>
+  );
+}
+
+/** The four layer moves as buttons: the toolbar's on a desktop, More's on a phone. */
+export function LayerButtons({ layers, className }: { layers: LayerControls; className: string }) {
+  return (
+    <>
+      {LAYER_BUTTONS.map(({ how, label, Icon }) => (
+        <button
+          key={how}
+          type="button"
+          aria-label={label}
+          title={label}
+          data-edit-layer={how}
+          disabled={!layers.can[how]}
+          onClick={() => layers.move(how)}
+          className={className}
+        >
+          <Icon aria-hidden size={16} />
+        </button>
+      ))}
+    </>
   );
 }
 

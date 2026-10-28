@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 import { LayoutControls, type LayoutControlsProps } from './layout-controls';
+import { LayerSection } from './layer-section';
+import type { LayerControls } from './stacking';
 
 /**
  * The Layout panel (review, desktop only): under the stack's top card,
@@ -18,8 +20,11 @@ export function LayoutPanel({
   view = 'calendar',
   open: held,
   onOpenChange,
+  layers = null,
   ...controls
 }: LayoutControlsProps & {
+  /** The active piece's layer moves, when a narrow board's toolbar leaves them to More. */
+  layers?: LayerControls | null;
   /** Which view it edits (0045): its title says so, "Layout · Lane". */
   view?: 'calendar' | 'lane' | 'members';
   /** Open or folded, when its owner decides; else its own. */
@@ -54,6 +59,7 @@ export function LayoutPanel({
           // Scrolls within itself when open, so the stack above keeps its height.
           className="no-scrollbar flex max-h-[45vh] flex-col gap-4 overflow-y-auto px-4 pb-4"
         >
+          {layers ? <LayerSection layers={layers} /> : null}
           <LayoutControls {...controls} />
         </div>
       ) : null}

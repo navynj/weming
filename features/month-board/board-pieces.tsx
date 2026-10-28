@@ -24,6 +24,7 @@ import type { SignedMedia } from '@/lib/media';
 
 import {
   captionOf,
+  HALF_WEEK_BELOW_PX,
   type Box,
   type BoardMetrics,
   type BoardPiece,
@@ -57,7 +58,7 @@ import {
   type PartValues,
 } from './handle-math';
 import { learnsAspect } from './photo-aspects';
-import { overAll, zOf, type LayerMove, type Stacking } from './stacking';
+import { overAll, zOf, type LayerControls, type LayerMove, type Stacking } from './stacking';
 import type { BoardEditing } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
@@ -715,6 +716,23 @@ export function BoardPieceView({
           },
         }
       : null;
+  // A phone's toolbar leaves the layer buttons to More (review): offered
+  // there while this piece is active, each move the latest one.
+  const phone = metrics.width < HALF_WEEK_BELOW_PX;
+  const offer = editing?.offerLayers;
+  const layersNow = useRef<LayerControls | null>(layers);
+  useEffect(() => {
+    layersNow.current = layers;
+  });
+  const canKey = layers && phone ? JSON.stringify(layers.can) : null;
+  useEffect(() => {
+    if (canKey === null || !offer) return;
+    offer({
+      can: JSON.parse(canKey) as LayerControls['can'],
+      move: (how) => layersNow.current?.move(how),
+    });
+    return () => offer(null);
+  }, [canKey, offer]);
   const tap = (event: React.MouseEvent): void => {
     if (editing) editing.tap(card.splash.id, partAt(event.target));
     else onPick(card.splash.id);
@@ -1028,8 +1046,15 @@ export function BoardPieceView({
           fontSize={selected?.kind === 'label' ? piece.type.size : null}
           layers={layers}
           parts={parts}
-          seat={toolbar.seat}
-          style={{ top: toolbar.top, zIndex: overAll(total, 3), maxWidth: metrics.width }}
+          phone={phone}
+          // A phone's toolbar takes the board's width, from its left edge.
+          seat={phone ? { ...toolbar.seat, x: toolbar.seat.min, align: 'left' } : toolbar.seat}
+          style={{
+            top: toolbar.top,
+            zIndex: overAll(total, 3),
+            maxWidth: metrics.width,
+            ...(phone ? { width: metrics.width } : {}),
+          }}
         />
       ) : null}
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
@@ -1057,6 +1082,7 @@ export function BoardPieceView({
 export function BoardTapeView({
   tape,
   lanes,
+  metrics,
   onPick,
   ripple,
   editing = null,
@@ -1175,7 +1201,18 @@ export function BoardTapeView({
           editing={editing!}
           fontSize={selected?.kind === 'label' ? size : null}
           parts={parts}
-          style={{ left: tape.x, top: tape.y + tape.h + 10 }}
+          phone={metrics.width < HALF_WEEK_BELOW_PX}
+          // Within the board, as a piece's (its canvas is the band's container).
+          seat={
+            metrics.width < HALF_WEEK_BELOW_PX
+              ? { x: 0, align: 'left', min: 0, max: metrics.width }
+              : { x: tape.x, align: 'left', min: 0, max: metrics.width }
+          }
+          style={{
+            top: tape.y + tape.h + 10,
+            maxWidth: metrics.width,
+            ...(metrics.width < HALF_WEEK_BELOW_PX ? { width: metrics.width } : {}),
+          }}
         />
       ) : null}
     </>

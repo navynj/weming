@@ -13,6 +13,7 @@ import {
   restoring,
   type BoardPart,
 } from './handle-math';
+import type { LayerControls } from './stacking';
 import type { LayoutDrafts, SavedChange, SaveStatus } from './use-layout-drafts';
 
 /** How many changes a piece keeps to undo, per view (review). */
@@ -75,6 +76,10 @@ export type BoardEditing = {
   canUndo: boolean;
   status: SaveStatus;
   more: () => void;
+  /** The active piece's layer moves, on a phone, where More shows them (review). */
+  layers: LayerControls | null;
+  /** The active piece offers them (or takes them back, null). */
+  offerLayers: (layers: LayerControls | null) => void;
 };
 
 const TYPING = 'input, textarea, select, [contenteditable="true"]';
@@ -111,6 +116,8 @@ export function useBoardEditing({
   onMore: () => void;
 }): BoardEditing {
   const [active, setActive] = useState<{ id: string; part: BoardPart } | null>(null);
+  const [layers, setLayers] = useState<LayerControls | null>(null);
+  const offerLayers = useCallback((next: LayerControls | null): void => setLayers(next), []);
   const activeId = active && active.id === topId && canEdit ? active.id : null;
   const part = activeId ? active!.part : LABEL_PART;
   // Let go once the stack turns to another card, or the views change under
@@ -221,5 +228,7 @@ export function useBoardEditing({
     canUndo: last !== null,
     status: activeId ? drafts.status(activeId) : null,
     more: onMore,
+    layers: activeId ? layers : null,
+    offerLayers,
   };
 }

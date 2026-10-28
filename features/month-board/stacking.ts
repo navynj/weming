@@ -31,6 +31,9 @@ export const LAYER_RANGE = [-20, 20] as const;
 
 export type LayerMove = 'forward' | 'backward' | 'front' | 'back';
 
+/** A piece's layer moves as controls: each possible or not, and the move. */
+export type LayerControls = { can: Record<LayerMove, boolean>; move: (how: LayerMove) => void };
+
 export type Stacking = {
   /** Each piece's place, 0 at the bottom. */
   order: ReadonlyMap<string, number>;

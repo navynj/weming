@@ -696,9 +696,10 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     const chips = [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')];
     // Photos carry the icon inline in their caption: no Icon chip.
     expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Photo 1', 'Photo 2', 'Wave']);
-    const chip = (name: string) => q(container, `[data-edit-part-chip="${name}"]`);
+    // The ink is on the chip's pill; the button around it is the 44px tap on a phone.
+    const chip = (name: string) => q(container, `[data-edit-part-chip="${name}"] span`);
     expect(chip('Label').className).toContain('bg-ink');
-    expect(chip('Label').getAttribute('aria-pressed')).toBe('true');
+    expect(q(container, '[data-edit-part-chip="Label"]').getAttribute('aria-pressed')).toBe('true');
     expect(chip('Photo 1').className).not.toContain('bg-ink');
     expect(chip('Photo 1').className).toContain('text-pool-500');
     fireEvent.click(chip('Photo 2'));
@@ -792,5 +793,88 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     } finally {
       document.elementsFromPoint = original;
     }
+  });
+});
+
+describe('the toolbar on a phone (review)', () => {
+  function phoneWidth(): () => void {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 358,
+    });
+    return () => delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+  }
+  const PATH = 'a1/s2-0.webp';
+
+  it('splits into the part chips over the rest, the board wide, with no layer buttons', () => {
+    const restore = phoneWidth();
+    try {
+      const { container } = home([
+        card('s2', 'Lynn Canyon', '2026-10-22', { photos: [{ rippleId: 's2-b', path: PATH }] }),
+        card('s1', 'Grand Austria Hotel', '2026-10-21'),
+      ]);
+      fireEvent.click(label(container, 's2'));
+      const bar = q(container, '[data-edit-toolbar]');
+      expect(bar.hasAttribute('data-phone')).toBe(true);
+      expect(bar.style.width).toBe('358px');
+      const rows = [...bar.children].map((row) =>
+        row.hasAttribute('data-edit-parts')
+          ? 'parts'
+          : row.hasAttribute('data-edit-actions')
+            ? 'actions'
+            : '?',
+      );
+      expect(rows).toEqual(['parts', 'actions']);
+      expect(q(bar, '[data-edit-parts]').className).toContain('overflow-x-auto');
+      const actions = q(bar, '[data-edit-actions]');
+      expect(actions.querySelector('[data-edit-text-size]')).not.toBeNull();
+      expect(actions.querySelector('[data-edit-undo]')).not.toBeNull();
+      expect(actions.querySelector('[data-edit-more]')).not.toBeNull();
+      expect(actions.querySelector('[data-edit-done]')).not.toBeNull();
+      expect(bar.querySelector('[data-edit-layer]')).toBeNull();
+      // A finger's taps, 44px.
+      for (const button of bar.querySelectorAll('button'))
+        expect(button.className).toMatch(/\bh-11\b/);
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps the layer buttons in More, at the top under Layer, and a move there is saved', async () => {
+    const restore = phoneWidth();
+    try {
+      const { container } = home([
+        card('s2', 'Lynn Canyon', '2026-10-22'),
+        card('s1', 'Grand Austria Hotel', '2026-10-21', { layout: { label: { x: 1 } } }),
+      ]);
+      fireEvent.click(label(container, 's2'));
+      fireEvent.click(q(container, '[data-edit-more]'));
+      const sheet = q(container, '[data-layout-sheet]');
+      const body = q(sheet, '[data-layout-body]');
+      expect(body.firstElementChild!.hasAttribute('data-layout-layers')).toBe(true);
+      expect(q(sheet, '[data-layout-layers] h3').textContent).toBe('Layer');
+      const layer = (how: string) => q(sheet, `[data-edit-layer="${how}"]`);
+      expect(sheet.querySelectorAll('[data-edit-layer]')).toHaveLength(4);
+      expect(layer('front').hasAttribute('disabled')).toBe(true);
+      expect(layer('back').className).toContain('h-11');
+      fireEvent.click(layer('back'));
+      expect(layer('back').hasAttribute('disabled')).toBe(true);
+      await act(() => new Promise((resolve) => setTimeout(resolve, LAYOUT_SAVE_MS + 20)));
+      expect(saved[0].patch).toEqual({ piece: { layer: -1 } });
+      // Let go, and More has no layers to offer.
+      fireEvent.click(q(container, '[data-edit-done]'));
+      expect(container.querySelector('[data-layout-layers]')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps the layer buttons in the toolbar on a desktop', () => {
+    media(true);
+    const { container } = home();
+    fireEvent.click(label(container, 's2'));
+    const bar = q(container, '[data-edit-toolbar]');
+    expect(bar.hasAttribute('data-phone')).toBe(false);
+    expect(bar.querySelectorAll('[data-edit-layer]')).toHaveLength(4);
   });
 });

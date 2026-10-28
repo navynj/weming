@@ -420,6 +420,7 @@ export function PoolGround({
           {/* The Calendar, the Lane view and Members, each its own layouts. */}
           {(boardView || laneKind || membersKind) && wide && topCard ? (
             <LayoutPanel
+              layers={editing.layers}
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}
@@ -435,6 +436,7 @@ export function PoolGround({
           ) : null}
           {sheetOpen && !wide && topCard ? (
             <LayoutSheet
+              layers={editing.layers}
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}

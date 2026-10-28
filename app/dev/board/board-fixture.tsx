@@ -9,6 +9,7 @@ import {
   mergeLayout,
   type BoardLayoutJson,
 } from '@/features/month-board/board-layout';
+import { LayoutSheet } from '@/features/month-board/layout-sheet';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { useBoardEditing, useLayoutHistory } from '@/features/month-board/use-board-editing';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
@@ -63,7 +64,7 @@ function fixture(
 }
 
 /** The fixture's scenes: `resize` (the default), `layers`, `captions`, `photos`. */
-export type Scene = 'resize' | 'layers' | 'captions' | 'photos';
+export type Scene = 'resize' | 'layers' | 'captions' | 'photos' | 'toolbar';
 
 /** An opaque image of a given size, so its natural ratio is known (no server signs it). */
 function image(width: number, height: number, fill: string): string {
@@ -151,6 +152,22 @@ function captionCards(saved: Record<string, BoardLayoutJson>): Card[] {
   ];
 }
 
+/**
+ * The phone's toolbar at its fullest (review): one post with three photos
+ * and its wave on — five part chips, Label, Photo 1–3 and Wave — on today.
+ */
+function toolbarCards(saved: Record<string, BoardLayoutJson>): Card[] {
+  return [
+    fixture('full', 'Every part', TODAY, {
+      photos: [TALL, SQUARE, 'fixture/square-2.png'].map((path, at) => ({
+        rippleId: `full-b${at}`,
+        path,
+      })),
+      layout: saved.full ?? { wave: { on: true } },
+    }),
+  ];
+}
+
 /** Three parts to pull: a label, a sticker (Inline off) and a photo, each on its own day. */
 function cards(
   tilt: number,
@@ -161,6 +178,7 @@ function cards(
   if (scene === 'layers') return layerCards(saved, moved);
   if (scene === 'captions') return captionCards(saved);
   if (scene === 'photos') return photoCards();
+  if (scene === 'toolbar') return toolbarCards(saved);
   const turned = tilt ? { tilt } : {};
   const start: Record<string, BoardLayoutJson> = {
     label: { label: turned },
@@ -212,8 +230,12 @@ export function BoardFixture({
     topId: top,
     canEdit: true,
     onPick: setTop,
-    onMore: () => {},
+    // More as a phone's sheet, as Home's (its layer buttons are there on a phone).
+    onMore: () => setSheetOpen(true),
   });
+  const [sheetOpen, setSheetOpen] = useState(false);
+  if (sheetOpen && editing.activeId === null) setSheetOpen(false);
+  const topCard = shown.find((c) => c.splash.id === top) ?? null;
   return (
     <PeopleProvider me="fixture" people={{}}>
       <div data-board-fixture className="water-ground flex h-dvh flex-col">
@@ -229,6 +251,22 @@ export function BoardFixture({
             fixturePhotos={PHOTO_URLS}
           />
         </BoardFrame>
+        {sheetOpen && topCard ? (
+          <LayoutSheet
+            layers={editing.layers}
+            card={topCard}
+            recipe={null}
+            layout={drafts.shown(topCard.splash.id).layout}
+            source={drafts.shown(topCard.splash.id).source}
+            home
+            view="calendar"
+            message={drafts.message}
+            onEdit={(patch, clear) => drafts.edit(topCard.splash.id, patch, clear)}
+            // No pool here to give a layout back to.
+            onRevert={() => {}}
+            onClose={() => setSheetOpen(false)}
+          />
+        ) : null}
       </div>
     </PeopleProvider>
   );
