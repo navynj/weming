@@ -10,7 +10,8 @@ type Client = ReturnType<typeof getClient>;
  *
  * Records are written for oneself (CLAUDE.md): nothing anyone wrote leaves
  * for Sentry. An event keeps the error's type, message and stack, the route,
- * an opaque user id and the release — nothing else. No request bodies, form
+ * an opaque user id (the Supabase id, set in lib/sentry-user.ts) and the
+ * release — nothing else. No request bodies, form
  * data, query strings, cookies or headers; no breadcrumbs; no Session Replay;
  * and any text that looks like a photo's path or a file's name is replaced
  * before it is sent.

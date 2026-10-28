@@ -2,6 +2,7 @@ import { SheetHost } from '@/features/input-sheet/sheet-host';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { ShellDataProvider } from '@/features/home/shell-data';
 import { TimezoneSync } from '@/features/auth/timezone-sync';
+import { SentryUser } from '@/features/auth/sentry-user';
 import { initialsOf } from '@/features/home/grid';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolActivityProvider } from '@/features/pool/activity';
@@ -88,6 +89,7 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
                 <SplashOpeningHost />
                 {context ? <SheetHost context={context} /> : null}
                 {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
+                <SentryUser id={profile?.id ?? null} />
               </ShellDataProvider>
             </InputSheetProvider>
           </NotificationsProvider>
