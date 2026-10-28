@@ -878,3 +878,126 @@ describe('the toolbar on a phone (review)', () => {
     expect(bar.querySelectorAll('[data-edit-layer]')).toHaveLength(4);
   });
 });
+
+describe('More on a phone: Undo and Done in its header, the chips when out of sight (review)', () => {
+  function phoneWidth(): () => void {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 358,
+    });
+    return () => delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+  }
+  const PATH = 'a1/s2-0.webp';
+  const pictured = (): Card[] => [
+    card('s2', 'Lynn Canyon', '2026-10-22', { photos: [{ rippleId: 's2-b', path: PATH }] }),
+    card('s1', 'Grand Austria Hotel', '2026-10-21', { layout: { label: { x: 1 } } }),
+  ];
+  function openMore(cards: Card[] = pictured()) {
+    const view = home(cards);
+    fireEvent.click(label(view.container, 's2'));
+    fireEvent.click(q(view.container, '[data-edit-more]'));
+    return view;
+  }
+
+  it('holds Undo, Done and Close in the header row, each a 44px tap', () => {
+    const restore = phoneWidth();
+    try {
+      const { container } = openMore();
+      const header = q(container, '[data-layout-sheet] header');
+      const names = [...header.querySelectorAll('button')].map(
+        (b) => b.getAttribute('aria-label') ?? b.textContent,
+      );
+      expect(names).toEqual(['Undo', 'Done', 'Close']);
+      for (const button of header.querySelectorAll('button'))
+        expect(button.className).toMatch(/\bh-11\b/);
+    } finally {
+      restore();
+    }
+  });
+
+  it('Close closes the sheet and keeps the piece active; Done ends the editing and the sheet', () => {
+    const restore = phoneWidth();
+    try {
+      const { container } = openMore();
+      fireEvent.click(q(container, '[data-layout-sheet-close]'));
+      expect(container.querySelector('[data-layout-sheet]')).toBeNull();
+      expect(container.querySelector('[data-edit-toolbar]')).not.toBeNull();
+      fireEvent.click(q(container, '[data-edit-more]'));
+      fireEvent.click(q(container, '[data-layout-sheet-done]'));
+      expect(container.querySelector('[data-layout-sheet]')).toBeNull();
+      expect(container.querySelector('[data-edit-toolbar]')).toBeNull();
+      expect(container.querySelector('[data-edit-frame]')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('undoes from the header, as the toolbar does', async () => {
+    const restore = phoneWidth();
+    try {
+      const { container } = openMore([
+        card('s2', 'Lynn Canyon', '2026-10-22'),
+        card('s1', 'Grand Austria Hotel', '2026-10-21', { layout: { label: { x: 1 } } }),
+      ]);
+      const undo = () => q(container, '[data-layout-sheet-undo]');
+      expect(undo().hasAttribute('disabled')).toBe(true);
+      fireEvent.click(q(container, '[data-layout-layers] [data-edit-layer="back"]'));
+      await act(() => new Promise((resolve) => setTimeout(resolve, LAYOUT_SAVE_MS + 20)));
+      expect(saved[0].patch).toEqual({ piece: { layer: -1 } });
+      expect(undo().hasAttribute('disabled')).toBe(false);
+      fireEvent.click(undo());
+      await settle();
+      expect(saved[1]).toMatchObject({ patch: {}, clear: ['piece.layer'] });
+    } finally {
+      restore();
+    }
+  });
+
+  it('adds the chips to its top when the toolbar’s row is not in sight, and a chip there selects', () => {
+    const restore = phoneWidth();
+    try {
+      // jsdom lays nothing out: the toolbar's row has no height, so is not in sight.
+      const { container } = openMore();
+      const body = q(container, '[data-layout-body]');
+      expect(body.firstElementChild!.hasAttribute('data-layout-parts')).toBe(true);
+      const chips = [...body.querySelectorAll('[data-layout-parts] [data-edit-part-chip]')];
+      expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Photo 1']);
+      expect(chips[0].className).toContain('h-11');
+      fireEvent.click(chips[1]);
+      expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
+      expect(q(body, '[data-edit-part-chip="Photo 1"]').getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      restore();
+    }
+  });
+
+  it('leaves the chips to the toolbar when its row shows whole above the sheet', () => {
+    const restore = phoneWidth();
+    const original = Element.prototype.getBoundingClientRect;
+    const at = (top: number, height: number): DOMRect =>
+      ({
+        top,
+        bottom: top + height,
+        height,
+        left: 0,
+        right: 358,
+        width: 358,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if (this.hasAttribute('data-layout-sheet')) return at(420, 420);
+      if (this.hasAttribute('data-edit-parts') && this.closest('[data-edit-toolbar]'))
+        return at(360, 44);
+      return original.call(this);
+    };
+    try {
+      const { container } = openMore();
+      expect(container.querySelector('[data-layout-parts]')).toBeNull();
+    } finally {
+      Element.prototype.getBoundingClientRect = original;
+      restore();
+    }
+  });
+});

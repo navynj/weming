@@ -59,7 +59,7 @@ import {
 } from './handle-math';
 import { learnsAspect } from './photo-aspects';
 import { overAll, zOf, type LayerControls, type LayerMove, type Stacking } from './stacking';
-import type { BoardEditing } from './use-board-editing';
+import type { BoardEditing, PartChip } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
@@ -733,6 +733,7 @@ export function BoardPieceView({
     });
     return () => offer(null);
   }, [canKey, offer]);
+
   const tap = (event: React.MouseEvent): void => {
     if (editing) editing.tap(card.splash.id, partAt(event.target));
     else onPick(card.splash.id);
@@ -773,7 +774,7 @@ export function BoardPieceView({
   ) : null;
   const toolbar = toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line);
   // The toolbar's part chips (review), in the panel's order; the photos newest first.
-  const parts: { part: BoardPart; name: string }[] = active
+  const parts: PartChip[] = active
     ? [
         ...(piece.compact ? [] : [{ part: LABEL_PART, name: 'Label' }]),
         ...(piece.stickerBox && icon ? [{ part: { kind: 'icon' } as const, name: 'Icon' }] : []),
@@ -784,6 +785,8 @@ export function BoardPieceView({
         ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
       ]
     : [];
+  // Its part chips too, for More on a phone when the toolbar's row is out of sight.
+  useOffered(active && phone ? parts : null, editing?.offerParts);
   // The selected part's frame, over every piece: placed and turned exactly as
   // the part, so its outline and handles are never covered, while the part
   // itself keeps its place in the order.
@@ -1127,7 +1130,7 @@ export function BoardTapeView({
       />
     ) : null;
   // A band's part chips (review): not on a range along its days, which takes its text size alone.
-  const parts: { part: BoardPart; name: string }[] =
+  const parts: PartChip[] =
     active && !period
       ? [
           { part: LABEL_PART, name: 'Label' },
@@ -1137,6 +1140,10 @@ export function BoardTapeView({
           ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
         ]
       : [];
+  useOffered(
+    metrics.width < HALF_WEEK_BELOW_PX && parts.length > 0 ? parts : null,
+    editing?.offerParts,
+  );
   return (
     <>
       <div
@@ -1217,6 +1224,16 @@ export function BoardTapeView({
       ) : null}
     </>
   );
+}
+
+/** Offers a value to the board's editing while it is not null (JSON data), taking it back after. */
+function useOffered<T>(value: T | null, offer: ((value: T | null) => void) | undefined): void {
+  const key = value === null ? null : JSON.stringify(value);
+  useEffect(() => {
+    if (key === null || !offer) return;
+    offer(JSON.parse(key) as T);
+    return () => offer(null);
+  }, [key, offer]);
 }
 
 /** Which handles each part has (review): the label moves, turns and widens, its text size the toolbar's. */

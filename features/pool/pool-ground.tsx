@@ -436,7 +436,7 @@ export function PoolGround({
           ) : null}
           {sheetOpen && !wide && topCard ? (
             <LayoutSheet
-              layers={editing.layers}
+              editing={editing}
               card={topCard}
               recipe={recipes[topCard.splash.id] ?? null}
               layout={viewDrafts.shown(topCard.splash.id).layout}

@@ -253,7 +253,7 @@ export function BoardFixture({
         </BoardFrame>
         {sheetOpen && topCard ? (
           <LayoutSheet
-            layers={editing.layers}
+            editing={editing}
             card={topCard}
             recipe={null}
             layout={drafts.shown(topCard.splash.id).layout}

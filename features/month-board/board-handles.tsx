@@ -42,7 +42,7 @@ import {
   type PartValues,
 } from './handle-math';
 import type { LayerControls, LayerMove } from './stacking';
-import type { BoardEditing } from './use-board-editing';
+import type { BoardEditing, PartChip } from './use-board-editing';
 
 /** Which handles a part has (review): the panel's own fields, no more. */
 export type Tools = {
@@ -620,7 +620,7 @@ export function EditToolbar({
   /** A phone's board (under 600px): two rows, 44px taps, the layer buttons in More. */
   phone?: boolean;
   /** The piece's parts, as chips that select one (review): shown when there is more than one. */
-  parts?: { part: BoardPart; name: string }[];
+  parts?: PartChip[];
   /** Placed by its own width, within the board; else `style` places it. */
   seat?: ToolbarSeat | null;
   /** The label's text size as drawn, while the label is selected; else no stepper. */
@@ -681,26 +681,7 @@ export function EditToolbar({
         // On a phone a row of its own, scrolling sideways when it does not fit.
         className={`flex items-center ${phone ? 'no-scrollbar min-w-0 overflow-x-auto' : ''}`}
       >
-        {parts.map(({ part, name }) => {
-          const on = samePart(part, editing.part);
-          return (
-            <button
-              key={name}
-              type="button"
-              aria-pressed={on}
-              data-edit-part-chip={name}
-              onClick={() => editing.tap(editing.activeId!, part)}
-              className={`flex shrink-0 items-center ${phone ? 'h-11' : 'h-8'}`}
-            >
-              {/* Selection is ink (H20f); the rest muted. */}
-              <span
-                className={`flex h-7 items-center rounded-full px-2 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
-              >
-                {name}
-              </span>
-            </button>
-          );
-        })}
+        <PartChips parts={parts} editing={editing} tall={phone} muted="text-pool-500" />
         {phone ? null : <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />}
       </div>
     ) : null;
@@ -811,6 +792,48 @@ export function EditToolbar({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The part chips (review): one per part of the active piece, the selected
+ * one in ink (H20f), a tap selecting its part. The toolbar's, and More's on
+ * a phone when the toolbar's row is out of sight; `tall`, a 44px tap.
+ */
+export function PartChips({
+  parts,
+  editing,
+  tall,
+  muted,
+}: {
+  parts: PartChip[];
+  editing: Pick<BoardEditing, 'part' | 'activeId' | 'tap'>;
+  tall: boolean;
+  /** The unselected chips' text: muted on the white bar, on the water. */
+  muted: string;
+}) {
+  return (
+    <>
+      {parts.map(({ part, name }) => {
+        const on = samePart(part, editing.part);
+        return (
+          <button
+            key={name}
+            type="button"
+            aria-pressed={on}
+            data-edit-part-chip={name}
+            onClick={() => editing.tap(editing.activeId!, part)}
+            className={`flex shrink-0 items-center ${tall ? 'h-11' : 'h-8'}`}
+          >
+            <span
+              className={`flex h-7 items-center rounded-full px-2 ${on ? 'bg-ink text-white' : muted}`}
+            >
+              {name}
+            </span>
+          </button>
+        );
+      })}
+    </>
   );
 }
 

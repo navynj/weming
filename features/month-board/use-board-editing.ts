@@ -54,6 +54,9 @@ export function useLayoutHistory() {
 }
 export type LayoutHistory = ReturnType<typeof useLayoutHistory>;
 
+/** A part of the active piece as the toolbar's chip names it. */
+export type PartChip = { part: BoardPart; name: string };
+
 /** What the board's pieces are told while one of them is being edited by hand. */
 export type BoardEditing = {
   activeId: string | null;
@@ -80,6 +83,9 @@ export type BoardEditing = {
   layers: LayerControls | null;
   /** The active piece offers them (or takes them back, null). */
   offerLayers: (layers: LayerControls | null) => void;
+  /** The active piece's part chips, on a phone, for More when the toolbar's are out of sight. */
+  parts: PartChip[] | null;
+  offerParts: (parts: PartChip[] | null) => void;
 };
 
 const TYPING = 'input, textarea, select, [contenteditable="true"]';
@@ -118,6 +124,8 @@ export function useBoardEditing({
   const [active, setActive] = useState<{ id: string; part: BoardPart } | null>(null);
   const [layers, setLayers] = useState<LayerControls | null>(null);
   const offerLayers = useCallback((next: LayerControls | null): void => setLayers(next), []);
+  const [parts, setParts] = useState<PartChip[] | null>(null);
+  const offerParts = useCallback((next: PartChip[] | null): void => setParts(next), []);
   const activeId = active && active.id === topId && canEdit ? active.id : null;
   const part = activeId ? active!.part : LABEL_PART;
   // Let go once the stack turns to another card, or the views change under
@@ -230,5 +238,7 @@ export function useBoardEditing({
     more: onMore,
     layers: activeId ? layers : null,
     offerLayers,
+    parts: activeId ? parts : null,
+    offerParts,
   };
 }

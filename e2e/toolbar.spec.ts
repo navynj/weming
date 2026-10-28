@@ -45,5 +45,44 @@ test('every toolbar control is on screen, inside the board, 44px tall', async ({
 
   // The layer buttons wait in More, at its top.
   await bar.locator('[data-edit-more]').click();
+  const sheet = page.locator('[data-layout-sheet]');
   await expect(page.locator('[data-layout-layers] [data-edit-layer]')).toHaveCount(4);
+
+  // More covers the toolbar's lower row: Undo, Done and Close sit in its
+  // header, whole on screen, 44px tall.
+  await page.waitForFunction(() =>
+    document
+      .querySelector('[data-layout-sheet]')!
+      .getAnimations()
+      .every((a) => a.playState !== 'running'),
+  );
+  for (const selector of [
+    '[data-layout-sheet-undo]',
+    '[data-layout-sheet-done]',
+    '[data-layout-sheet-close]',
+  ]) {
+    const box = (await sheet.locator(`header ${selector}`).boundingBox())!;
+    expect(box.height, `${selector} height`).toBeGreaterThanOrEqual(44);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  }
+
+  // Here the toolbar's chips row shows whole above the sheet: it stays the
+  // chips' place, uncovered, and the sheet adds none.
+  const sheetTop = (await sheet.boundingBox())!.y;
+  const row = (await bar.locator('[data-edit-parts]').boundingBox())!;
+  expect(row.y + row.height).toBeLessThanOrEqual(sheetTop);
+  expect(await sheet.locator('[data-layout-parts]').count()).toBe(0);
+  await page.locator('[data-edit-toolbar] [data-edit-part-chip="Photo 2"]').click();
+  await expect(page.locator('[data-edit-frame="photo"]')).toBeVisible();
+
+  // Close only closes the sheet; Done ends the editing, and the sheet with it.
+  await sheet.locator('[data-layout-sheet-close]').click();
+  await expect(sheet).toHaveCount(0);
+  await expect(bar).toBeVisible();
+  await bar.locator('[data-edit-more]').click();
+  await sheet.locator('[data-layout-sheet-done]').click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('[data-edit-toolbar]')).toHaveCount(0);
 });
