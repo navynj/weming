@@ -58,9 +58,9 @@ Retired vocabulary (do not reuse): Stream, Deck, Pan, Table, Event, Moment, Log,
 ## 4. Leak model (routing) and category rules
 
 - Records are made in Home ("a dot on my Trail"); pools receive them by **leak**, not by publish.
-- **Explicit mapping is the precondition of any leak.** my_category to pool_lane. No name-match auto flow (identical names in different pools are different contexts).
-- Pool join screen is a **privacy contract**: "these things will flow into this pool." Suggested mappings for matching names come pre-checked, **except residual categories (e.g. Day), which default unchecked.** When a residual category is about to be mapped, nudge toward creating a dedicated category instead.
-- Zero mappings = lurker membership. Fully valid, no warning copy, CTA adapts ("enter without connecting").
+- **A record reaches a pool only when its author turns that pool on, record by record** (Audience, H45). No lane of mine is mapped to a pool's lanes, and nothing shares by default; joining a pool connects nothing.
+- **Where a record that is not in my lanes shows on my Home is mine alone** (Home filing, H45): its pool's column, or a lane of mine I filed it in. Display only; no one else sees it.
+- A record other members wrote in outlives its owner leaving with remove, deleting it, or deleting their account: that pool's thread becomes the pool's joint record (H46).
 - Per-drop override: a small audience chip on the input sheet. One spectrum: everyone, selected lists/pools, only me (lock). Lock is not a separate toggle. **Absent in P1** (H20g): no audience exists solo, so fragments default to Everyone and the lock toggles in the detail sheet; the chip re-enters the sheet at P2.
 - **Lane membership is per-space and derived** (H20h): a Ripple keeps one personal category; pool-side lane assignment lives on the sharing record (the P3 join table carries `pool_lane_id`), never as an array on the fragment. Detach ends the pool-side membership.
 - My category names are mine; pool lane names are the group's. Mapping connects them without forcing shared vocabulary.
@@ -184,7 +184,7 @@ pools(ephemeral, born_from_splash?)       -- reserved flags
 pool_members(pool, user)                  -- independent of links
 pool_lanes(pool, name, icon, order)
 my_categories(user, name, icon, default_mode drop|timed)
-lane_mappings(user, my_category, pool_lane)   -- the plumbing
+home_filing(user, splash, my_lane)        -- where a record not in my lanes shows on my Home (H45)
 ripples(author, category?, note?, media[],    -- a block (H21a); category frozen (H24), dropped in a later release
         occurred_on? date, occurred_time?,    -- occurred_on: its own day, only inside a range post's range (0031);
                                               -- elsewhere, and occurred_time always, frozen metadata (H24, 0029)

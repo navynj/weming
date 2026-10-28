@@ -64,27 +64,28 @@ A pool whose creator's account is gone (`owner_id` null) cannot be deleted for n
 - Splash pool-wide (H20d): the compound pool pill, the joint ripples filter, the sharing record carrying `pool_lane_id`; participants on ripples
 - Swim: FAB entry + lane long-press, live intruding card, focus screen = enlarged lane card + my timer, nothing more. **The dormant live modules (Timer, now band, focus screen, Break, inner ripples) wake here** (H20b)
 
-## Next migration: Sharing model v2 contract (0036) — drop list
+## Next migration: the H45 contract — drop list
 
-Destructive DDL waits for this migration, and each line needs Yoonji's explicit approval there, quoted in the migration and its commit (CLAUDE.md, "Data is real now"). The full list with reasons is `_docs/SHARING-V2.md` §3; these are the ones added since it was drafted.
+The 0036 list landed in 0040. This one waits until the app that stopped reading links and calling conversions (H45) is in production, and the production commit's tests no longer call these (`.github/workflows/migrations-compat.yml`). Destructive DDL: each line needs Yoonji's explicit approval in the session, quoted in the migration and its commit (CLAUDE.md, "Data is real now").
 
-| Drop | From | Why it goes |
+| Drop or change | From | Why |
 | --- | --- | --- |
-| `public.splash_reaction_summary(uuid[])` | 0030 | Fed the board's reactions badge, removed the same day (amends H25); the app no longer calls it |
-| `public.splash_reply_preview(uuid[])` | 0030 | Fed the board's reply lines, removed with the badge; the app no longer calls it |
-| `public.create_joint_splash(…)`, `public.splash_to_joint(uuid, uuid)` | 0011, 0022 (wrappers since 0033) | The old app's calls, kept through the 0033 window to make Everyone on; the new app calls `create_together_splash` and `splash_to_together` |
-| `public.splash_to_pool_record(uuid)` | 0033 | Joint → pool record, retired before it was used: "Make it mine" is on Home only (0034) |
+| table `public.lane_mappings`, its indexes, its policies and the trigger `keep_lane_default` | 0001, 0009, 0010, 0017, 0019, 0033 | Links retired (H45); `home_filing` (0060) carries every Home column they placed |
+| `public._home_lane_for(uuid, uuid)`, `public._set_links(…)`, `public._settle_lane_default(…)`, `public.keep_lane_default()`, `public.set_lane_links(uuid, jsonb)` | 0011, 0033, 0040 | Read or wrote links only |
+| `public.splash_to_together(uuid, uuid, boolean)` | 0033 | Conversion to joint retired (H45); nothing else calls it |
+| `public.splash_to_mine(uuid, uuid, uuid)` | 0035, 0056 | "Make it mine" and "Move to Home…" retired (H45); nothing else calls it |
+| `public._require_only_mine(uuid, uuid)` | 0022 | Called only by the two above |
+| redefine `create_pool` and `join_pool` | 0033 | Same signatures, `p_links` accepted and ignored, so no call breaks |
+| redefine `_detach_thread` and `delete_pool` | 0060 | Read the filing only, not the home link |
 
-Until then each stays in the database, unread by the app.
+The tests that call these (`tests/conversions-db.test.ts`'s fixtures, `tests/pool-record-sharing-db.test.ts`' Move to Home case, any `set_lane_links` setup) are removed or rewritten in the same release.
 
 ## Sharing v2, after the switch
 
-- **"Make it joint…" from Home** (SHARING-V2 §5, Home record edit sheet): pick the pool, a pool lane and Together without opening the pool. Today a Home record becomes joint from its edit sheet opened in the pool it is shared to. Needs each pool's members on Home.
 - **Per-pool invitees on my records (0035)** (SHARING-V2 §7–8, H28): built, rehearsed, awaiting the push.
 - **After 0035, what remains for sharing:**
   - the 0036 contract (drop list above, with quoted approval);
   - H24 release 2 (`ripples.category_id`), its own migration after 0036 is verified;
-  - whether "Make it joint…" on Home is still needed now that the `…` menu offers it in a pool, and on Home for pool records.
 
 ## Queued (Yoonji, 2026-10-26), in this order after 0035
 
@@ -105,6 +106,7 @@ Home Weekly zoom; one year ago today; background auto-collection (timeline autof
 
 - **A Content Security Policy for pages** (Yoonji, 2026-10-27): today only `/sw.js` sends one. Plan it as its own change — report-only first, then enforced — covering Supabase, Sentry, youtube-nocookie.com (the player's frame), i.ytimg.com (thumbnails) and our own assets.
 - **A single photo between the label and the other photos** (H34): photos are drawn as one layer at their top photo's rank in a post's order; place each photo on its own only if people ask.
+- **Audience groups** (H45, 2026-10-28): saved sets of pools to share a record to in one pick. Audience is per record today.
 - **Waves, perhaps as a kind of sticker** (H41, 2026-10-28): the board's wave under a label is gone from drawing, the toolbar, the panel and More. Stored `wave` fields (and a `wave` key in a post's `order`) stay in layouts untouched and ignored, no migration; if waves return, it may be as a sticker.
 
 ## Standing rules
