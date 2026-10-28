@@ -4,12 +4,13 @@ import { asAdmin, asUser } from './as-user';
 
 /**
  * Home filing (0060, H45): where a record that is not in one of my lanes
- * shows on my Home, mine alone. And a pool record's origin, no longer held
- * on: switched off while another pool has it, kept in a lane of mine
- * (keep_in_lane) when it would be in none.
+ * shows on my Home, mine alone. And Move to Home (move_to_home): a pool
+ * record's origin stays locked on (0056) until it moves to a lane of mine,
+ * every placement kept as it is; then its origin turns off like any pool.
  *
- * Ana writes a pool record in Alpha (with Ben) and shares it to Beta (with
- * Cal and Ben); Cal writes on it in Beta. Dee is in neither.
+ * Ana writes a pool record in Alpha (with Ben and Cal) and shares it to
+ * Beta (with Cal and Ben); Ben writes on it in Alpha, Cal in Beta. Dee is
+ * in neither.
  *
  * Needs the local stack; excluded from the CI config like every DB test.
  */
@@ -22,6 +23,8 @@ let alpha: string;
 let beta: string;
 let betaLane: string;
 let calRipple: string;
+let benRipple: string;
+let alphaLane: string;
 const RECORD = crypto.randomUUID();
 const PRIVATE = crypto.randomUUID();
 const people: string[] = [];
@@ -92,8 +95,7 @@ beforeAll(async () => {
   ben = await person('Ben');
   cal = await person('Cal');
   dee = await person('Dee');
-  let alphaLane: string;
-  [alpha, alphaLane] = await openPool('Alpha', [ben]);
+  [alpha, alphaLane] = await openPool('Alpha', [ben, cal]);
   [beta, betaLane] = await openPool('Beta', [ben, cal]);
   const made = await asUser(ana).rpc('create_own_pool_splash', {
     p_id: RECORD,
@@ -120,6 +122,20 @@ beforeAll(async () => {
     .single();
   if (wrote.error) throw wrote.error;
   calRipple = wrote.data.id;
+  const withBen = await asUser(ana).rpc('set_placement_together', {
+    p_splash: RECORD,
+    p_pool: alpha,
+    p_users: [ben],
+    p_everyone: false,
+  });
+  if (withBen.error) throw withBen.error;
+  const benWrote = await asUser(ben)
+    .from('ripples')
+    .insert({ author_id: ben, note: 'Ben in Alpha', splash_id: RECORD, thread_pool_id: alpha })
+    .select('id')
+    .single();
+  if (benWrote.error) throw benWrote.error;
+  benRipple = benWrote.data.id;
   await asUser(dee).from('splashes').insert({ id: PRIVATE, owner_id: dee, title: 'Mine' });
 });
 
@@ -185,8 +201,76 @@ describe('filing a record on my Home', () => {
   });
 });
 
-describe('a pool record’s origin (H45)', () => {
-  it('switches off while another pool still has it', async () => {
+describe('a pool record’s origin, and Move to Home (H45)', () => {
+  const placements = async () =>
+    (
+      await asUser(ana)
+        .from('splash_placements')
+        .select('pool_id, pool_lane_id, shared')
+        .eq('splash_id', RECORD)
+        .order('pool_id')
+    ).data!;
+
+  it('stays locked on by default: its origin cannot be switched off or removed', async () => {
+    const off = await asUser(ana)
+      .from('splash_placements')
+      .update({ shared: false })
+      .eq('splash_id', RECORD)
+      .eq('pool_id', alpha);
+    expect(off.error?.message).toMatch(/always shared to its pool/);
+    const removed = await asUser(ana)
+      .from('splash_placements')
+      .delete()
+      .eq('splash_id', RECORD)
+      .eq('pool_id', alpha);
+    expect(removed.error?.message).toMatch(/always shared to its pool/);
+    expect(await placement(alpha)).toBe(true);
+  });
+
+  it('moves to Home only as Ana’s, into a lane of hers', async () => {
+    const byBen = await asUser(ben).rpc('move_to_home', {
+      p_splash: RECORD,
+      p_my_lane: await laneOf(ben, 'Day'),
+    });
+    expect(byBen.error).not.toBeNull();
+    const intoBens = await asUser(ana).rpc('move_to_home', {
+      p_splash: RECORD,
+      p_my_lane: await laneOf(ben, 'Day'),
+    });
+    expect(intoBens.error).not.toBeNull();
+  });
+
+  it('keeps every placement as it is, the origin’s included, and drops the filing', async () => {
+    await asUser(ana)
+      .from('home_filing')
+      .insert({ user_id: ana, splash_id: RECORD, my_lane_id: await laneOf(ana, 'Day') });
+    const before = await placements();
+    const moved = await asUser(ana).rpc('move_to_home', {
+      p_splash: RECORD,
+      p_my_lane: await laneOf(ana, 'Trips'),
+    });
+    expect(moved.error).toBeNull();
+    expect(await placements()).toEqual(before);
+    expect(before).toContainEqual({ pool_id: alpha, pool_lane_id: alphaLane, shared: true });
+    const row = (
+      await asAdmin()
+        .from('splashes')
+        .select('own_pool_id, declared_lane_id, owner_id')
+        .eq('id', RECORD)
+        .single()
+    ).data!;
+    expect(row).toEqual({
+      own_pool_id: null,
+      declared_lane_id: await laneOf(ana, 'Trips'),
+      owner_id: ana,
+    });
+    expect((await asUser(ana).from('home_filing').select('*')).data).toEqual([]);
+    // Members' sides stay where they were.
+    expect(await sees(cal, benRipple)).toBe(true);
+    expect(await sees(ben, calRipple)).toBe(true);
+  });
+
+  it('unlocks the origin: turned off, members’ ripples there are hidden, never deleted; the record stays on Home', async () => {
     const off = await asUser(ana)
       .from('splash_placements')
       .update({ shared: false })
@@ -194,68 +278,23 @@ describe('a pool record’s origin (H45)', () => {
       .eq('pool_id', alpha);
     expect(off.error).toBeNull();
     expect(await placement(alpha)).toBe(false);
-    // Still a pool record, its origin kept.
-    const row = (await asAdmin().from('splashes').select('own_pool_id').eq('id', RECORD).single())
-      .data!;
-    expect(row.own_pool_id).toBe(alpha);
-  });
-
-  it('refuses switching off the last one: that asks for a lane', async () => {
-    const off = await asUser(ana)
-      .from('splash_placements')
-      .update({ shared: false })
-      .eq('splash_id', RECORD)
-      .eq('pool_id', beta);
-    expect(off.error?.message).toMatch(/Keep it in one of your lanes first/);
-    expect(await placement(beta)).toBe(true);
-  });
-
-  it('keep_in_lane is Ana’s alone, into a lane of hers', async () => {
-    const byBen = await asUser(ben).rpc('keep_in_lane', {
-      p_splash: RECORD,
-      p_my_lane: await laneOf(ben, 'Day'),
-    });
-    expect(byBen.error).not.toBeNull();
-    const intoBens = await asUser(ana).rpc('keep_in_lane', {
-      p_splash: RECORD,
-      p_my_lane: await laneOf(ben, 'Day'),
-    });
-    expect(intoBens.error).not.toBeNull();
-  });
-
-  it('keeps it in Ana’s lane: an ordinary Home record, members’ ripples hidden, never deleted', async () => {
-    await asUser(ana)
-      .from('home_filing')
-      .insert({ user_id: ana, splash_id: RECORD, my_lane_id: await laneOf(ana, 'Day') });
+    expect(await sees(cal, benRipple)).toBe(false);
+    expect((await asAdmin().from('ripples').select('id').eq('id', benRipple)).data).toHaveLength(1);
+    // Beta's side is untouched, and the record is Ana's, in her lane.
     expect(await sees(ben, calRipple)).toBe(true);
-    const kept = await asUser(ana).rpc('keep_in_lane', {
-      p_splash: RECORD,
-      p_my_lane: await laneOf(ana, 'Trips'),
-    });
-    expect(kept.error).toBeNull();
     const row = (
-      await asAdmin()
-        .from('splashes')
-        .select('own_pool_id, declared_lane_id')
-        .eq('id', RECORD)
-        .single()
+      await asAdmin().from('splashes').select('declared_lane_id').eq('id', RECORD).single()
     ).data!;
-    expect(row).toEqual({ own_pool_id: null, declared_lane_id: await laneOf(ana, 'Trips') });
-    expect(await placement(alpha)).toBe(false);
-    expect(await placement(beta)).toBe(false);
-    // A record of her lane needs no filing.
-    expect((await asUser(ana).from('home_filing').select('*')).data).toEqual([]);
-    expect(await sees(ben, calRipple)).toBe(false);
-    expect((await asAdmin().from('ripples').select('id').eq('id', calRipple)).data).toHaveLength(1);
+    expect(row.declared_lane_id).toBe(await laneOf(ana, 'Trips'));
   });
 
-  it('brings Cal’s ripple back when Ana shares it to Beta again', async () => {
+  it('brings Ben’s ripple back when Ana shares it to Alpha again', async () => {
     const on = await asUser(ana)
       .from('splash_placements')
       .update({ shared: true })
       .eq('splash_id', RECORD)
-      .eq('pool_id', beta);
+      .eq('pool_id', alpha);
     expect(on.error).toBeNull();
-    expect(await sees(ben, calRipple)).toBe(true);
+    expect(await sees(cal, benRipple)).toBe(true);
   });
 });

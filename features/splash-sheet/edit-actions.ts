@@ -146,14 +146,11 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
             together: { everyone: p.invite_all, picked: picks[p.pool_id] ?? [] },
           }))
       : [];
-  // Where it sits on Home when not in my lanes (H45): a pool record in the
-  // first pool it is shared to — its origin, unless that is off.
+  // Where it sits on Home when not in my lanes (H45): its pool's column.
   const homePlacement = theirs
     ? (placements ?? []).find((p) => p.pool_id === sidePool)
     : splash.own_pool_id
-      ? ((placements ?? []).find((p) => p.pool_id === splash.own_pool_id && p.shared) ??
-        (placements ?? []).find((p) => p.shared) ??
-        placed)
+      ? placed
       : undefined;
   const homePoolId = joint ? splash.pool_id : (homePlacement?.pool_id ?? ownPool);
   const homeLane = (allLanes ?? []).find(

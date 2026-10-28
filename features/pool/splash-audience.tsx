@@ -1,11 +1,15 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import { useOptimistic, useState, useTransition } from 'react';
+
+import { useToast } from '@/components/ui/toast';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
-import { keepInLane, setPlacement, setPlacementTogether } from './actions';
+import { moveToHome, setPlacement, setPlacementTogether } from './actions';
 import { preselectLane, withPick, withTogether, type AudiencePick } from './audience';
 import { AudienceChip, type AudiencePool } from './audience-sheet';
-import type { KeepIn } from './keep-in-lane';
+import type { MoveHome } from './move-to-home';
 import { lastPicked, rememberPick } from './last-pick';
 
 /**
@@ -13,44 +17,59 @@ import { lastPicked, rememberPick } from './last-pick';
  * shared to, each on a pool lane, switched in place. Each change shows at
  * once and the placement follows behind it; a refusal takes it back and
  * says why. A pick is remembered on this device for my lane and that pool.
- * My pool record's last pool asks for a lane of mine first (H45).
+ * My record written in a pool keeps that pool on (0056) until Move to Home
+ * (H45), which keeps every pool and unlocks it.
  */
 export function SplashAudience({
   splashId,
   myLaneId,
   shared,
   pools,
-  keepIn = null,
-  onKept,
+  locked = null,
+  moveHome = null,
+  onMoved,
 }: {
   splashId: string;
   /** The record's lane: what my last pick is kept by. */
   myLaneId: string | null;
   shared: AudiencePick[];
   pools: AudiencePool[];
-  /** My pool record (H45): my lanes, and where I filed it. */
-  keepIn?: Omit<KeepIn, 'onKeep'> | null;
-  /** Kept in my lane: the record is mine now, so a sheet holding it closes. */
-  onKept?: () => void;
+  /** My record written in a pool (0056): its pool, always on. */
+  locked?: string | null;
+  /** The same record (H45): my lanes, and where I filed it, for Move to Home. */
+  moveHome?: Omit<MoveHome, 'onMove'> | null;
+  /** Moved to Home: the record is a Home record now, so a sheet holding it closes. */
+  onMoved?: () => void;
 }) {
   const audience = useOptimisticAction(shared);
+  const router = useRouter();
+  const toast = useToast();
+  const [message, setMessage] = useState<string | null>(null);
+  // Moved to Home (H45): the origin unlocks at once; every pool stays as it is.
+  const [moved, setMoved] = useOptimistic(false);
+  const [, startMove] = useTransition();
   return (
     <span className="flex flex-col items-end gap-1">
       <AudienceChip
         shared={audience.value}
         pools={pools}
-        keepIn={
-          keepIn
+        locked={moved ? null : locked}
+        moveHome={
+          moveHome && !moved
             ? {
-                ...keepIn,
-                onKeep: (laneId) => {
-                  audience.run(
-                    () => [],
-                    () => keepInLane(splashId, laneId),
-                    'Kept in your lane',
-                  );
-                  onKept?.();
-                },
+                ...moveHome,
+                onMove: (laneId) =>
+                  startMove(async () => {
+                    setMoved(true);
+                    const done = await moveToHome(splashId, laneId);
+                    if (!done.ok) {
+                      setMessage(done.message);
+                      return;
+                    }
+                    toast.show('Moved to Home');
+                    router.refresh();
+                    onMoved?.();
+                  }),
               }
             : null
         }
@@ -76,9 +95,9 @@ export function SplashAudience({
           )
         }
       />
-      {audience.message ? (
+      {audience.message || message ? (
         <span role="alert" className="text-pool-500 text-[10px]">
-          {audience.message}
+          {audience.message ?? message}
         </span>
       ) : null}
     </span>

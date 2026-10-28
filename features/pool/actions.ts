@@ -621,15 +621,15 @@ export async function deletePool(poolId: string): Promise<Done> {
 }
 
 /**
- * "Keep it in which of your lanes?" (H45): my pool record leaves its last
- * pool for a lane of mine (keep_in_lane, 0060). Members' ripples there are
- * hidden, never deleted, and come back if it is shared there again.
+ * Move to Home (H45): my record written in a pool becomes a record of my
+ * lane (move_to_home, 0060). Every placement stays as it is, its origin's
+ * included; from then on that pool's switch is unlocked like any other.
  */
-export async function keepInLane(splashId: string, laneId: string): Promise<Done> {
+export async function moveToHome(splashId: string, laneId: string): Promise<Done> {
   const ids = z.object({ splashId: z.uuid(), laneId: z.uuid() }).safeParse({ splashId, laneId });
   if (!ids.success) return { ok: false, message: 'That didn’t save. Try again.' };
   const supabase = await createClient();
-  const { error } = await supabase.rpc('keep_in_lane', {
+  const { error } = await supabase.rpc('move_to_home', {
     p_splash: splashId,
     p_my_lane: laneId,
   });

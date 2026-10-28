@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Users } from 'lucide-react';
+import { MoreHorizontal, Users } from 'lucide-react';
 
 import { usePeople } from '@/features/people/people-provider';
 import type { PoolFace, PoolLaneChip } from '@/lib/queries/pools';
 
 import { audienceLabel, NOBODY, type AudiencePick, type PickTogether } from './audience';
-import { KeepInLane, type KeepIn } from './keep-in-lane';
+import { MoveToHome, type MoveHome } from './move-to-home';
 import { WithLine } from './with-line';
 import { Switch } from './switch';
 import { PoolSheet, SheetTitle } from './sheet';
@@ -32,7 +32,8 @@ export function AudienceChip({
   preselect,
   onChange,
   onTogether,
-  keepIn = null,
+  locked = null,
+  moveHome = null,
 }: {
   /** Where the record is shared now: a pool lane per pool. */
   shared: AudiencePick[];
@@ -44,11 +45,10 @@ export function AudienceChip({
   onChange: (poolId: string, poolLaneId: string | null) => void;
   /** With, per pool that is on (0035); absent, no With line. */
   onTogether?: (poolId: string, together: PickTogether) => void;
-  /**
-   * My pool record (H45): switching off its last pool asks which of my lanes
-   * keeps it. Absent, a pool turns off without asking.
-   */
-  keepIn?: KeepIn | null;
+  /** My record written in a pool (0056): its pool, always on, its lane still picked. */
+  locked?: string | null;
+  /** The same record (H45): the header's `…` offers Move to Home. */
+  moveHome?: MoveHome | null;
 }) {
   const [open, setOpen] = useState(false);
   const on = shared.filter((pick) => pools.some((p) => p.id === pick.poolId));
@@ -71,7 +71,8 @@ export function AudienceChip({
           preselect={preselect}
           onChange={onChange}
           onTogether={onTogether}
-          keepIn={keepIn}
+          locked={locked}
+          moveHome={moveHome}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -104,7 +105,8 @@ function AudienceSheet({
   preselect,
   onChange,
   onTogether,
-  keepIn,
+  locked,
+  moveHome,
   onClose,
 }: {
   pools: AudiencePool[];
@@ -112,19 +114,71 @@ function AudienceSheet({
   preselect: (poolId: string) => string | null;
   onChange: (poolId: string, poolLaneId: string | null) => void;
   onTogether?: (poolId: string, together: PickTogether) => void;
-  keepIn: KeepIn | null;
+  locked: string | null;
+  moveHome: MoveHome | null;
   onClose: () => void;
 }) {
   const { me } = usePeople();
-  // The pool whose switch asked "Keep it in which of your lanes?" (H45).
-  const [asking, setAsking] = useState<string | null>(null);
+  // The header's `…` (H45): closed, open, or asking which lane.
+  const [menu, setMenu] = useState<'closed' | 'open' | 'moving'>('closed');
   // Turned on with no chip to start on: shown on, shared only once picked.
   const [waiting, setWaiting] = useState<string[]>([]);
   const laneOf = (poolId: string): string | null =>
     shared.find((pick) => pick.poolId === poolId)?.poolLaneId ?? null;
   return (
     <PoolSheet label="Audience" onClose={onClose}>
-      <SheetTitle>Audience</SheetTitle>
+      <div className="relative flex items-start justify-between gap-4">
+        <SheetTitle>Audience</SheetTitle>
+        {moveHome ? (
+          <button
+            type="button"
+            aria-label="More"
+            aria-expanded={menu !== 'closed'}
+            data-audience-more
+            onClick={() => setMenu(menu === 'closed' ? 'open' : 'closed')}
+            className="text-pool-500 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          >
+            <MoreHorizontal aria-hidden size={18} />
+          </button>
+        ) : null}
+        {moveHome && menu === 'open' ? (
+          // In ink, the selection channel, as the card's menu.
+          <ul
+            role="menu"
+            data-audience-menu
+            className="surface bg-ink absolute top-8 right-0 z-20 flex w-64 flex-col rounded-xl py-1 text-sm text-white shadow-lg"
+          >
+            <li>
+              <button
+                type="button"
+                role="menuitem"
+                data-audience-move-home
+                onClick={() => setMenu('moving')}
+                className="flex w-full flex-col gap-0.5 px-4 py-2.5 text-left"
+              >
+                <span>Move to Home</span>
+                <span className="text-xs text-white/70">
+                  Keeps it shared here, and lets you turn this Pool off later.
+                </span>
+              </button>
+            </li>
+          </ul>
+        ) : null}
+      </div>
+      {moveHome && menu === 'moving' ? (
+        <div className="mb-5">
+          <MoveToHome
+            move={{
+              ...moveHome,
+              onMove: (laneId) => {
+                setMenu('closed');
+                moveHome.onMove(laneId);
+              },
+            }}
+            onCancel={() => setMenu('closed')}
+          />
+        </div>
+      ) : null}
       <p className="text-pool-500 -mt-2 mb-5 text-sm">
         Every ripple on this splash follows it. With every switch off, it is yours alone.
       </p>
@@ -143,16 +197,18 @@ function AudienceSheet({
                 <span className="flex items-center justify-between gap-4">
                   <span className="flex min-w-0 flex-col">
                     <span className="text-ink truncate">Shared to {pool.name}</span>
+                    {pool.id === locked ? (
+                      // Written there (0056): it cannot be turned off; its lane can change.
+                      <span data-audience-origin className="text-pool-500 text-xs">
+                        Written here, always shared
+                      </span>
+                    ) : null}
                   </span>
                   <Switch
                     on={on}
+                    disabled={pool.id === locked}
                     label={`Shared to ${pool.name}`}
                     onChange={(next) => {
-                      // Its last pool, for my pool record: asked first (H45).
-                      if (!next && keepIn && shared.length === 1 && shared[0].poolId === pool.id) {
-                        setAsking(pool.id);
-                        return;
-                      }
                       if (!next) {
                         setWaiting((list) => list.filter((id) => id !== pool.id));
                         onChange(pool.id, null);
@@ -209,21 +265,6 @@ function AudienceSheet({
             <li className="text-pool-500 py-3 text-sm">You are in no Pool yet.</li>
           ) : null}
         </ul>
-        {asking && keepIn ? (
-          <div className="mt-4">
-            <KeepInLane
-              keepIn={{
-                ...keepIn,
-                onKeep: (laneId) => {
-                  setAsking(null);
-                  keepIn.onKeep(laneId);
-                  onClose();
-                },
-              }}
-              onCancel={() => setAsking(null)}
-            />
-          </div>
-        ) : null}
       </section>
     </PoolSheet>
   );

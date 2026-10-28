@@ -588,7 +588,7 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     );
   });
 
-  it('from Home: my pool record files on Home, and its Audience has no locked pool (H45)', async () => {
+  it('from Home: my pool record files on Home, and its Audience keeps its pool locked, Move to Home in its … (H45)', async () => {
     const view = await sheet(
       {
         ...MINE_SHARED,
@@ -607,12 +607,18 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     expect(chipOf(view, '[data-filing-pool="p-ours"]').getAttribute('aria-pressed')).toBe('false');
     expect(view.container.querySelector('[data-edit-just-mine]')).toBeNull();
     fireEvent.click(view.container.querySelector('[data-audience-chip]')!);
-    expect(view.container.textContent).not.toContain('Written here');
+    expect(view.container.querySelector('[data-audience-origin]')!.textContent).toBe(
+      'Written here, always shared',
+    );
     const origin = view.getByRole('switch', { name: 'Shared to Our Pool' }) as HTMLButtonElement;
-    expect(origin.disabled).toBe(false);
-    // Its last pool asks for a lane of mine, starting where I filed it.
-    fireEvent.click(origin);
-    expect(view.container.querySelector('[data-keep-in-lane]')).not.toBeNull();
+    expect(origin.disabled).toBe(true);
+    // Move to Home, from the header's …, starts on the lane I filed it in.
+    fireEvent.click(view.container.querySelector('[data-audience-more]')!);
+    fireEvent.click(view.container.querySelector('[data-audience-move-home]')!);
+    const games = [...view.container.querySelectorAll('[data-move-to-home] button')].find((b) =>
+      b.textContent?.includes('Games'),
+    )!;
+    expect(games.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('from Home: someone’s record I wrote on offers only where it shows on my Home (H45)', async () => {

@@ -48,7 +48,7 @@ export function useEditLanes(
   initial: Loaded,
   context: SheetContext,
   pool: PoolScope | null,
-  onKept: () => void,
+  onMoved: () => void,
 ): EditLanes {
   const { categories, pools } = context;
   const { me, people } = usePeople();
@@ -165,8 +165,8 @@ export function useEditLanes(
 
   if (initial.kind !== 'mine') {
     // Not a record of my lanes (H45): where it shows on my Home, filed at
-    // once; and my pool record's Audience, any pool off, its last asking for
-    // a lane of mine.
+    // once; and my pool record's Audience, its own pool locked on (0056)
+    // until Move to Home.
     const own = initial.kind === 'own';
     return {
       conversion: { op: 'none' },
@@ -195,8 +195,9 @@ export function useEditLanes(
                 myLaneId={initial.home?.filed ?? null}
                 shared={initial.ownShared}
                 pools={pools}
-                keepIn={{ lanes: categories, filed: initial.home?.filed ?? null }}
-                onKept={onKept}
+                locked={initial.poolId}
+                moveHome={{ lanes: categories, filed: initial.home?.filed ?? null }}
+                onMoved={onMoved}
               />
             ) : null}
           </div>
