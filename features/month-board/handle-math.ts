@@ -7,11 +7,16 @@ import type { BoardLayoutJson } from './board-layout';
  * handle and a slider always write the same value.
  */
 
-/** A part of a piece that can be selected: its label, its sticker, one photo, its wave. */
+/**
+ * A part of a piece that can be selected: the whole piece (the toolbar's
+ * "All", H41), its label, its sticker, one photo.
+ */
 export type BoardPart =
-  { kind: 'label' } | { kind: 'icon' } | { kind: 'photo'; path: string } | { kind: 'wave' };
+  { kind: 'piece' } | { kind: 'label' } | { kind: 'icon' } | { kind: 'photo'; path: string };
 
 export const LABEL_PART: BoardPart = { kind: 'label' };
+/** The whole piece: what a piece is selected as when it becomes active (H41). */
+export const PIECE_PART: BoardPart = { kind: 'piece' };
 
 export function samePart(a: BoardPart, b: BoardPart): boolean {
   return a.kind === b.kind && (a.kind !== 'photo' || a.path === (b as { path: string }).path);
@@ -24,7 +29,6 @@ export const LIMITS = {
   tilt: [-45, 45],
   iconSize: [0.5, 8],
   photoSize: [0.2, 2],
-  span: [0.2, 4],
   fontSize: [10, 18],
   width: [0.3, 4],
 } as const satisfies Record<string, readonly [number, number]>;
@@ -48,13 +52,14 @@ export type PartValues = {
   y?: number;
   tilt?: number;
   size?: number;
-  span?: number;
   /** A label's width, in column widths (0027, 0050). */
   width?: number;
 };
 
 export function partValues(layout: BoardLayoutJson, part: BoardPart): PartValues {
   switch (part.kind) {
+    case 'piece':
+      return { x: layout.piece?.x, y: layout.piece?.y };
     case 'label':
       return {
         x: layout.label?.x,
@@ -66,13 +71,6 @@ export function partValues(layout: BoardLayoutJson, part: BoardPart): PartValues
       return { ...layout.icon };
     case 'photo':
       return { ...layout.photos?.[part.path] };
-    case 'wave':
-      return {
-        x: layout.wave?.x,
-        y: layout.wave?.y,
-        tilt: layout.wave?.tilt,
-        span: layout.wave?.span,
-      };
   }
 }
 
@@ -83,14 +81,14 @@ export function partPatch(part: BoardPart, values: PartValues): BoardLayoutJson 
       keys.filter((k) => values[k] !== undefined).map((k) => [k, values[k]]),
     ) as Pick<PartValues, K>;
   switch (part.kind) {
+    case 'piece':
+      return { piece: pick(['x', 'y']) };
     case 'label':
       return { label: pick(['x', 'y', 'tilt', 'width']) };
     case 'icon':
       return { icon: pick(['x', 'y', 'tilt', 'size']) };
     case 'photo':
       return { photos: { [part.path]: pick(['x', 'y', 'tilt', 'size']) } };
-    case 'wave':
-      return { wave: pick(['x', 'y', 'tilt', 'span']) };
   }
 }
 
@@ -190,6 +188,29 @@ export function pointOfBox(
 }
 
 /**
+ * The whole piece's outline (H41): the box around every part shown, each
+ * moved and turned about its centre as it is drawn; none when nothing is.
+ */
+export function boundsOf(
+  parts: { box: PartBox; move: Point; tilt: number | undefined }[],
+): PartBox | null {
+  const corners = parts.flatMap(({ box, move, tilt }) =>
+    [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ].map((share) => pointOfBox(box, move, tilt, share)),
+  );
+  if (corners.length === 0) return null;
+  const xs = corners.map((c) => c.x);
+  const ys = corners.map((c) => c.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/**
  * The move that keeps a point of a part where it was while its size
  * changes (review): from the point as it stood when the gesture began, the
  * box the engine lays out at the new size — its own alignment included, a
@@ -230,33 +251,7 @@ export function widened(startPx: number, along: number, column: number): number 
   return clamp(round((startPx + along) / column, 2), LIMITS.width);
 }
 
-/** The wave's right end pulled `along` pixels on its own axis: its length a share of the label. */
-export function spanned(startSpan: number, along: number, labelW: number): number {
-  return clamp(round(startSpan + along / labelW, 2), LIMITS.span);
-}
-
-/**
- * The wave's left end pulled: longer or shorter by as much as the end moved
- * along the wave, its start following, so the right end stays where it was.
- */
-export function spannedFromLeft(
-  start: { x?: number; y?: number; span: number; tilt?: number },
-  along: number,
-  labelW: number,
-  column: number,
-  line: number,
-): { x: number; y: number; span: number } {
-  const span = spanned(start.span, -along, labelW);
-  const travelled = (start.span - span) * labelW;
-  const rad = ((start.tilt ?? 0) * Math.PI) / 180;
-  return {
-    span,
-    x: clamp(round((start.x ?? 0) + (travelled * Math.cos(rad)) / column, 3), LIMITS.x),
-    y: clamp(round((start.y ?? 0) + (travelled * Math.sin(rad)) / line, 2), LIMITS.y),
-  };
-}
-
-/** A pixel delta read along a line turned by `tilt`: how far it travelled down the wave. */
+/** A pixel delta read along a line turned by `tilt`: how far it travelled along the part. */
 export function alongTilt(dx: number, dy: number, tilt: number | undefined): number {
   const rad = ((tilt ?? 0) * Math.PI) / 180;
   return dx * Math.cos(rad) + dy * Math.sin(rad);

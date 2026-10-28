@@ -532,6 +532,8 @@ export const LaneGrid = forwardRef<
         editing.deactivate();
       }}
       className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+      // Room under the last day for a phone's docked toolbar (H41), while it is up.
+      style={{ paddingBottom: 'var(--edit-dock, 0px)' }}
     >
       {/* The avatar: large, centred, scrolling away with the days. */}
       {initials !== null ? (

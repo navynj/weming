@@ -10,6 +10,7 @@ import {
   nudged,
   partPatch,
   partValues,
+  PIECE_PART,
   restoring,
   type BoardPart,
 } from './handle-math';
@@ -145,7 +146,8 @@ export function useBoardEditing({
   const tap = useCallback(
     (id: string, tapped: BoardPart = LABEL_PART): void => {
       if (activeId === id) setActive({ id, part: tapped });
-      else if (id === topId && canEdit) setActive({ id, part: tapped });
+      // Becoming active, the whole piece is selected (H41): All, its layers.
+      else if (id === topId && canEdit) setActive({ id, part: PIECE_PART });
       else {
         setActive(null);
         onPick(id);
@@ -220,7 +222,8 @@ export function useBoardEditing({
       // A band along its days moves nowhere by hand (the panel's own rule).
       if (!card || isPeriod(card.splash)) return;
       const next = nudged(partValues(d.shown(id).layout, selected), event.key, event.shiftKey);
-      if (!next) return;
+      // The whole piece moves, never turns.
+      if (!next || (selected.kind === 'piece' && next.tilt !== undefined)) return;
       event.preventDefault();
       d.edit(id, partPatch(selected, next));
     };

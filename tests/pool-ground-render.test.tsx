@@ -1014,7 +1014,7 @@ describe('a pool drawn with the Calendar’s pieces (review)', () => {
 });
 
 describe('Members layouts (0047)', () => {
-  it('applies a band’s own layout to the band: label across the full width, icon, wave', () => {
+  it('applies a band’s own layout to the band: label across the full width, icon; no wave (H41)', () => {
     setView('members');
     const laidOut: PoolView = {
       ...EVERYONE,
@@ -1036,7 +1036,7 @@ describe('Members layouts (0047)', () => {
     expect(words.style.transform).toContain('rotate(5deg)');
     expect(words.style.fontSize).toBe('14px');
     expect(band.querySelector<HTMLElement>('[data-band-icon]')!.style.fontSize).toBe('34px');
-    expect(band.querySelector('[data-board-wave]')).not.toBeNull();
+    expect(band.querySelector('[data-board-wave]')).toBeNull();
   });
 
   it('draws the Calendar’s and the Lane view’s layouts nowhere in Members', () => {

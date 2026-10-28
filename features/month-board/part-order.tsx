@@ -8,7 +8,7 @@ import { defaultPartOrder, partOrder } from './stacking';
 
 /**
  * Within this post (0055): its parts on the board, front first — the label,
- * the icon's sticker, each photo, the wave — what is hidden not among them.
+ * the icon's sticker, each photo — what is hidden not among them.
  * A part picked here moves up (over the one above it) or down; the whole
  * order is saved as the layout's `order`, back to front.
  */
@@ -28,7 +28,6 @@ export function PartOrder({
   const present = defaultPartOrder({
     label: layout.label?.hidden !== true,
     photos: photos.filter((path) => layout.photos?.[path]?.hidden !== true),
-    wave: layout.wave?.on === true,
     icon: sticker && layout.icon?.hidden !== true,
   });
   const order = partOrder(layout.order, present);
@@ -45,12 +44,10 @@ export function PartOrder({
       ? 'Label'
       : key === 'icon'
         ? 'Icon'
-        : key === 'wave'
-          ? 'Wave'
-          : key.startsWith('photo:yt:')
-            ? // A video its words link to (part 5).
-              `Video ${photos.filter((p) => p.startsWith('yt:')).indexOf(key.slice('photo:'.length)) + 1}`
-            : `Photo ${photos.filter((p) => !p.startsWith('yt:')).indexOf(key.slice('photo:'.length)) + 1}`;
+        : key.startsWith('photo:yt:')
+          ? // A video its words link to (part 5).
+            `Video ${photos.filter((p) => p.startsWith('yt:')).indexOf(key.slice('photo:'.length)) + 1}`
+          : `Photo ${photos.filter((p) => !p.startsWith('yt:')).indexOf(key.slice('photo:'.length)) + 1}`;
 
   // Its own heading, as the panel's groups have: none for a post of one part.
   return (

@@ -153,9 +153,10 @@ function captionCards(saved: Record<string, BoardLayoutJson>): Card[] {
 }
 
 /**
- * The toolbar at its fullest (review): one post with three photos and its
- * wave on — six tabs, Label, Icon, Photo 1–3 and Wave — and one whose icon
- * is a sticker, for Icon inline, both on today.
+ * The toolbar at its fullest (review): one post with three photos — six
+ * tabs, All, Label, Icon, Photo 1–3 — and a wave stored on, which is drawn
+ * nowhere (H41); and one whose icon is a sticker, for Icon inline, both on
+ * today.
  */
 function toolbarCards(saved: Record<string, BoardLayoutJson>): Card[] {
   return [

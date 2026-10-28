@@ -10,7 +10,7 @@ import { photoMove, type BoardPiece, type Box } from './layout';
  * within a day the engine's order, in time. Within a piece its parts take
  * the post's own order (0055, `partRanks`): "Add your side" at the bottom,
  * then by default the label, the photos (the first uploaded on top), the
- * wave, the icon — or as moved in "Within this post".
+ * icon — or as moved in "Within this post".
  *
  * Replaces 0044's lift of every piece moved by hand above all in place,
  * which put a moved photo over the next day's sticker whatever was asked.
@@ -31,14 +31,12 @@ export function zOf(order: number, rank: number): number {
 export function defaultPartOrder(present: {
   label: boolean;
   photos: string[];
-  wave: boolean;
   icon: boolean;
 }): string[] {
   return [
     ...(present.label ? ['label'] : []),
     // Back to front: the last uploaded at the back, the first on top.
     ...[...present.photos].reverse().map((path) => `photo:${path}`),
-    ...(present.wave ? ['wave'] : []),
     ...(present.icon ? ['icon'] : []),
   ];
 }

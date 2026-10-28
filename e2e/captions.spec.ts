@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { activate } from './measure';
+
 /**
  * A photo resized by hand keeps its automatic top-left (review, 2026-10-27),
  * and its caption starts at the photo's left edge: a 100px pull of the
@@ -28,8 +30,8 @@ for (const id of ['photo-left', 'photo-right']) {
     test.skip(info.project.name === 'phone', 'a 100px growth is past a phone photo’s limit');
     await page.goto('/dev/board?scene=captions');
     await page.locator(`[data-board-piece="${id}"]`).waitFor();
-    await page.locator(`[data-board-piece="${id}"] [data-board-label]`).click();
-    await page.locator(`[data-board-piece="${id}"] [data-board-label]`).click();
+    const bar = await activate(page, id);
+    await bar.locator('[data-edit-part-chip="Label"]').click();
     // Near its top: the caption's rotate handle stands over the photo's lower half.
     await page
       .locator(`[data-board-photo-card="fixture/${id}.webp"]`)

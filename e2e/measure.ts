@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * Direct manipulation measured in a real browser (review): a handle dragged
@@ -52,12 +52,28 @@ export async function showPiece(page: Page, id: string): Promise<void> {
   await piece.waitFor();
 }
 
+/**
+ * Makes a piece active: its record to the top, then on — All selected
+ * (H41), whose outline takes the pointer over the piece, so a part is then
+ * chosen by its tab. The toolbar, the board's or a phone's docked one.
+ */
+export async function activate(page: Page, id: string): Promise<Locator> {
+  const label = page.locator(`[data-board-piece="${id}"] [data-board-label]`);
+  await label.waitFor();
+  const whole = page.locator(`[data-board-piece="${id}"] [data-edit-frame="piece"]`);
+  // Forced: another piece's All outline may lie over this one's label.
+  for (let i = 0; i < 2 && (await whole.count()) === 0; i += 1) await label.click({ force: true });
+  await whole.waitFor();
+  const bar = page.locator('[data-edit-toolbar]');
+  await bar.waitFor();
+  return bar;
+}
+
 /** Activates the part: the label's record to the top, then on, then the part itself. */
 export async function select(page: Page, part: Part): Promise<void> {
   const id = pieceOf(part);
-  const label = page.locator(`[data-board-piece="${id}"] [data-board-label]`);
-  await label.click();
-  await label.click();
+  const bar = await activate(page, id);
+  await bar.locator('[data-edit-part-chip="Label"]').click();
   if (part === 'icon')
     await page.locator('[data-board-piece="sticker"] [data-board-sticker]').click();
   if (part === 'photo') await page.locator('[data-board-photo-card="fixture/photo.webp"]').click();

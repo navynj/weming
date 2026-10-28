@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { clearLayout, mergeLayout } from '@/features/month-board/board-layout';
 import {
   alongTilt,
+  boundsOf,
   cornerPulled,
   moveHolding,
   pointOfBox,
@@ -14,8 +15,6 @@ import {
   pathsOf,
   resized,
   restoring,
-  spanned,
-  spannedFromLeft,
   stepFont,
   turned,
 } from '@/features/month-board/handle-math';
@@ -49,13 +48,24 @@ describe('handles, in layout units (review, direct manipulation)', () => {
     expect(resized('photo', 70, 0.1, 140)).toBe(0.2);
   });
 
-  it('lengthens the wave from its right end, or its left end with its start following', () => {
-    expect(spanned(1, 50, 100)).toBe(1.5);
-    expect(spanned(1, -500, 100)).toBe(0.2);
-    // The left end pulled 50px left: half a label longer, its start half a lane (100px) left.
-    expect(spannedFromLeft({ span: 1 }, -50, 100, 100, 13)).toEqual({ x: -0.5, y: 0, span: 1.5 });
-    // Along a wave turned 90°, a drag down is a drag along it.
+  it('reads a drag along a part’s own axis', () => {
+    // Along a part turned 90°, a drag down is a drag along it.
     expect(alongTilt(0, 10, 90)).toBeCloseTo(10);
+  });
+
+  it('outlines the whole piece around every part, each moved and turned (H41)', () => {
+    expect(boundsOf([])).toBeNull();
+    expect(
+      boundsOf([
+        { box: { x: 0, y: 0, w: 10, h: 10 }, move: { x: 0, y: 0 }, tilt: undefined },
+        { box: { x: 20, y: 0, w: 10, h: 10 }, move: { x: 5, y: 30 }, tilt: undefined },
+      ]),
+    ).toEqual({ x: 0, y: 0, w: 35, h: 40 });
+    // A square turned 90° keeps its box; at 45° it grows to its diagonal.
+    const turned = boundsOf([
+      { box: { x: 0, y: 0, w: 10, h: 10 }, move: { x: 0, y: 0 }, tilt: 45 },
+    ])!;
+    expect(turned.w).toBeCloseTo(10 * Math.SQRT2);
   });
 
   it('sizes from a corner by the travel since the finger went down, on the turned diagonal', () => {
@@ -123,7 +133,10 @@ describe('handles, in layout units (review, direct manipulation)', () => {
     expect(partPatch({ kind: 'photo', path: 'a/b.jpg' }, { x: 0.1, size: 0.5 })).toEqual({
       photos: { 'a/b.jpg': { x: 0.1, size: 0.5 } },
     });
-    expect(partPatch({ kind: 'wave' }, { span: 2, size: 9 })).toEqual({ wave: { span: 2 } });
+    // The whole piece: its move alone, never a turn.
+    expect(partPatch({ kind: 'piece' }, { x: 0.5, y: 2, tilt: 9 })).toEqual({
+      piece: { x: 0.5, y: 2 },
+    });
   });
 });
 

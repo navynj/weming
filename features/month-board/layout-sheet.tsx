@@ -14,7 +14,7 @@ const HEAD_BUTTON = 'flex h-11 min-w-11 items-center justify-center rounded-full
 
 /**
  * More, on a phone (review, 2026-10-27): every slider the desktop panel
- * holds — offsets, tilts, sizes, text size, the wave, each photo, Reset all,
+ * holds — offsets, tilts, sizes, text size, each photo, Reset all,
  * Use pool layout — in a low sheet of the water's own colour with no scrim,
  * so the board above stays in view and moves as a slider does, and its
  * handles move the sliders back. It covers the toolbar's lower row, so its

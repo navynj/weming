@@ -112,19 +112,18 @@ describe('one stacking order for a board view (review, 2026-10-27)', () => {
 });
 
 describe('the order within a post (0055)', () => {
-  const present = { label: true, photos: ['first.webp', 'second.webp'], wave: true, icon: true };
+  const present = { label: true, photos: ['first.webp', 'second.webp'], icon: true };
 
-  it('by default: photos above the label, the first uploaded on top, then wave and icon', () => {
+  it('by default: photos above the label, the first uploaded on top, then the icon', () => {
     expect(defaultPartOrder(present)).toEqual([
       'label',
       'photo:second.webp',
       'photo:first.webp',
-      'wave',
       'icon',
     ]);
   });
 
-  it('keeps a saved order, for the parts the post has now', () => {
+  it('keeps a saved order, for the parts the post has now; a stored wave drawn nowhere (H41)', () => {
     const saved = [
       'icon',
       'photo:first.webp',
@@ -138,12 +137,11 @@ describe('the order within a post (0055)', () => {
       'photo:first.webp',
       'label',
       'photo:second.webp',
-      'wave',
     ]);
   });
 
   it('puts a part the saved order lacks where the default would have it', () => {
-    // A third photo uploaded after the order was saved; the wave turned on.
+    // A third photo uploaded after the order was saved.
     const now = { ...present, photos: [...present.photos, 'third.webp'] };
     const saved = ['icon', 'label', 'photo:second.webp', 'photo:first.webp'];
     expect(partOrder(saved, defaultPartOrder(now))).toEqual([
@@ -152,7 +150,6 @@ describe('the order within a post (0055)', () => {
       'photo:third.webp',
       'photo:second.webp',
       'photo:first.webp',
-      'wave',
     ]);
     expect(partRanks(['label', 'icon']).get('icon')).toBe(2);
   });

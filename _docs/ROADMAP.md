@@ -105,6 +105,7 @@ Home Weekly zoom; one year ago today; background auto-collection (timeline autof
 
 - **A Content Security Policy for pages** (Yoonji, 2026-10-27): today only `/sw.js` sends one. Plan it as its own change — report-only first, then enforced — covering Supabase, Sentry, youtube-nocookie.com (the player's frame), i.ytimg.com (thumbnails) and our own assets.
 - **A single photo between the label and the other photos** (H34): photos are drawn as one layer at their top photo's rank in a post's order; place each photo on its own only if people ask.
+- **Waves, perhaps as a kind of sticker** (H41, 2026-10-28): the board's wave under a label is gone from drawing, the toolbar, the panel and More. Stored `wave` fields (and a `wave` key in a post's `order`) stay in layouts untouched and ignored, no migration; if waves return, it may be as a sticker.
 
 ## Standing rules
 

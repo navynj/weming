@@ -454,7 +454,8 @@ export function MonthBoard({
         onTouchEnd={onTouchEnd}
         // Transparent over the ground (review: no depth by row); the cards' radius; no scrollbar; down only.
         className={`no-scrollbar relative min-h-0 flex-1 ${bleed.left + bleed.right > 0 ? 'overflow-x-auto' : 'overflow-x-hidden'} overflow-y-auto overscroll-contain rounded-[24px]`}
-        style={{ touchAction: 'pan-y' }}
+        // Room under the last row for a phone's docked toolbar (H41), while it is up.
+        style={{ touchAction: 'pan-y', paddingBottom: 'var(--edit-dock, 0px)' }}
       >
         <div
           data-board-bleed

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { activate as activatePiece } from './measure';
+
 /**
  * One stacking order for the whole board (review, 2026-10-27), on the
  * /dev/board `layers` scene: Oct 23's photo and caption, and Oct 24's big
@@ -32,20 +34,10 @@ async function onTop(page: Page, a: string, b: string): Promise<'a' | 'b' | null
   );
 }
 
-/**
- * Makes a piece active: its record to the top, then on. On a phone the
- * layer buttons are More's (review): opened, so they are there to press.
- */
+/** Makes a piece active, All selected: its row is the layer buttons on every width (H41). */
 async function activate(page: Page, id: string): Promise<void> {
-  const label = page.locator(`[data-board-piece="${id}"] [data-board-label]`);
-  await label.click({ force: true });
-  await label.click({ force: true });
-  const bar = page.locator(`[data-board-piece="${id}"] [data-edit-toolbar]`);
-  await bar.waitFor();
-  if ((await bar.getAttribute('data-phone')) !== null) {
-    await bar.locator('[data-edit-more]').click();
-    await page.locator('[data-layout-layers]').waitFor();
-  }
+  const bar = await activatePiece(page, id);
+  await bar.locator('[data-edit-part-row] [data-edit-layers]').waitFor();
 }
 
 const layer = (page: Page, how: string) => page.locator(`[data-edit-layer="${how}"]`);

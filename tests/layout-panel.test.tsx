@@ -157,9 +157,11 @@ describe('the Layout panel (review)', () => {
     expect(panel.querySelector('[data-layout-body]')).toBeNull();
     fireEvent.click(panel.querySelector('[data-layout-toggle]')!);
     expect(panel.querySelector('[data-layout-body]')).not.toBeNull();
-    for (const group of ['Icon', 'Label', 'Wave']) {
+    for (const group of ['Icon', 'Label']) {
       expect(panel.querySelector(`[data-layout-group="${group}"]`)).not.toBeNull();
     }
+    // No wave (H41).
+    expect(panel.querySelector('[data-layout-group="Wave"]')).toBeNull();
   });
 
   it('stays open as another label is picked on the calendar', () => {
@@ -447,27 +449,12 @@ function board(cards: Card[]) {
 }
 
 describe('hand-set layouts on the calendar (review)', () => {
-  it('draws no wave by default; one wave path with the chosen weight and length when on', () => {
+  it('draws no wave, even one stored as on (H41)', () => {
     media(false);
-    expect(board(ONE).container.querySelector('[data-board-wave]')).toBeNull();
-    cleanup();
     const wave: BoardLayoutJson = { wave: { on: true, weight: 3, span: 0.5 } };
     const { container } = board([{ ...ONE[0], layout: wave }]);
-    const waves = container.querySelectorAll('[data-board-wave]');
-    expect(waves).toHaveLength(1);
-    const path = waves[0].querySelector('path')!;
-    expect(path.getAttribute('stroke-width')).toBe('3');
-    expect(path.getAttribute('stroke-linecap')).toBe('round');
-    expect(path.getAttribute('stroke-opacity')).toBe('0.8');
-    const label = container.querySelector<HTMLElement>('[data-board-label]')!;
-    expect(Number(waves[0].getAttribute('width'))).toBeCloseTo(
-      parseFloat(label.style.width) * 0.5,
-      1,
-    );
-    cleanup();
-    expect(
-      board([{ ...ONE[0], layout: {} }]).container.querySelector('[data-board-wave]'),
-    ).toBeNull();
+    expect(container.querySelector('[data-board-label]')).not.toBeNull();
+    expect(container.querySelector('[data-board-wave]')).toBeNull();
   });
 
   it('grows the label with its text: at 18px the title fits whole, and the label is taller than at 10', () => {
@@ -652,19 +639,20 @@ describe('hiding the icon or the label, and the order within a post (0055)', () 
   it('moves a part up within the post, the whole order saved back to front', async () => {
     vi.useFakeTimers();
     media(true);
+    // A stored wave is no part of the order (H41).
     const { container } = open([{ ...ONE[0], layout: { wave: { on: true } } }]);
     const items = () =>
       [...container.querySelectorAll('[data-part-order-item]')].map((b) =>
         b.getAttribute('data-part-order-item'),
       );
-    // Front first: its sticker, then the wave over the label, by default.
-    expect(items()).toEqual(['icon', 'wave', 'label']);
+    // Front first: its sticker over the label, by default.
+    expect(items()).toEqual(['icon', 'label']);
     fireEvent.click(container.querySelector('[data-part-order-item="label"]')!);
     fireEvent.click(container.querySelector('[data-part-order-up]')!);
     // Drawn at once, saved when it rests.
-    expect(items()).toEqual(['icon', 'label', 'wave']);
+    expect(items()).toEqual(['label', 'icon']);
     await settle();
-    expect(saved.at(-1)!.patch).toEqual({ order: ['wave', 'label', 'icon'] });
+    expect(saved.at(-1)!.patch).toEqual({ order: ['icon', 'label'] });
     vi.useRealTimers();
   });
 });

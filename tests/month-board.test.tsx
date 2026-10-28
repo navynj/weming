@@ -560,7 +560,7 @@ describe('half weeks on a phone (review)', () => {
     }
   });
 
-  it('keeps a hand-set wave on a compact piece', () => {
+  it('lays out a compact piece with a stored wave, drawing no wave (H41)', () => {
     const waved = WEEK.map((c) =>
       c.splash.id === 'hoppers' ? { ...c, layout: { wave: { on: true } } } : c,
     );
@@ -574,9 +574,8 @@ describe('half weeks on a phone (review)', () => {
     const restore = atWidth(PHONE);
     try {
       const { container } = board(waved);
-      expect(
-        container.querySelector('[data-board-piece="hoppers"] [data-board-wave]'),
-      ).not.toBeNull();
+      expect(container.querySelector('[data-board-piece="hoppers"]')).not.toBeNull();
+      expect(container.querySelector('[data-board-wave]')).toBeNull();
     } finally {
       restore();
     }

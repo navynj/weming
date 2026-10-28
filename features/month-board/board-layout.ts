@@ -54,6 +54,7 @@ export const PartKey = z
   .string()
   .max(520)
   .regex(/^(label|icon|wave|photo:.+|video:[A-Za-z0-9_-]{11})$/);
+/** A wave under the label: still accepted and kept, drawn nowhere (H41). */
 export const WaveLayout = z
   .object({
     on: z.boolean(),
@@ -193,7 +194,6 @@ export function handMoved(layout: BoardLayoutJson | undefined): boolean {
     off(layout.piece) ||
     off(layout.icon) ||
     off(layout.label) ||
-    off(layout.wave) ||
     Object.values(layout.photos ?? {}).some(off)
   );
 }

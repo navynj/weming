@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 
 import type { Card } from '@/features/home/grid';
@@ -9,12 +9,8 @@ import type { BoardLayoutJson, LayoutSource } from './board-layout';
 import { LABEL_STYLES, type Recipe } from './layout';
 import { useLabelStyleNames } from './label-styles';
 import { PartOrder } from './part-order';
-import { WAVE_DEFAULTS } from './board-pieces';
 import { LAYER_RANGE } from './stacking';
 import { useSignedPhotos } from './use-board-photos';
-
-/** The wave's Size slider scales its height and wavelength together: height 2–8px, wavelength 8–32px. */
-const WAVE_SIZE = { min: 1, max: 4, amp: 2, length: 8 } as const;
 
 export type Edit = (patch: BoardLayoutJson, clear?: string[]) => void;
 
@@ -201,7 +197,7 @@ export type LayoutControlsProps = {
 
 /**
  * Every hand-set field of a splash's layout as a slider, switch or choice
- * (review): its icon, its label, each photo, a wave, every one with its own
+ * (review): its icon, its label, each photo, every one with its own
  * reset, and Reset all back to the recipe. The desktop panel and the
  * phone's More sheet both hold these, and the board's handles write the
  * same values, so each follows the other as it moves.
@@ -217,14 +213,12 @@ export function LayoutControls({
   onRevert,
 }: LayoutControlsProps) {
   const styleNames = useLabelStyleNames();
-  const [advanced, setAdvanced] = useState(false);
   // Every photo, so one hidden from the board (0044) can be shown again.
   const photos = card.photos ?? [];
   const signed = useSignedPhotos(photos);
   const piece = layout.piece ?? {};
   const icon = layout.icon ?? {};
   const label = layout.label ?? {};
-  const wave = layout.wave ?? {};
   // As drawn (review): the recipe's sticker reads off, not on, while Inline is unset.
   const inline = icon.inline ?? recipe !== 'B';
   const pooled = home && card.joint === true && card.poolLayout !== undefined;
@@ -236,8 +230,6 @@ export function LayoutControls({
     (label.hidden === true ? 0 : 1);
   const lastOne = shownCount <= 1;
   const KEEP = 'Keep at least one';
-  const waveSize =
-    wave.amp !== undefined ? wave.amp / WAVE_SIZE.amp : (wave.length ?? 0) / WAVE_SIZE.length || 1;
 
   return (
     <>
@@ -548,122 +540,6 @@ export function LayoutControls({
         />
       ) : null}
 
-      {!period ? (
-        <Group title="Wave">
-          <Switch
-            name="Wave"
-            on={wave.on === true}
-            onChange={(on) => (on ? onEdit({ wave: { on: true } }) : onEdit({}, ['wave']))}
-          />
-          {wave.on ? (
-            <>
-              <Slider
-                name="Wave size"
-                value={wave.amp !== undefined || wave.length !== undefined ? waveSize : undefined}
-                fallback={WAVE_DEFAULTS.amp / WAVE_SIZE.amp}
-                min={WAVE_SIZE.min}
-                max={WAVE_SIZE.max}
-                step={0.05}
-                unit={(v) => `${v.toFixed(2)}×`}
-                onChange={(v) =>
-                  onEdit({ wave: { amp: v * WAVE_SIZE.amp, length: v * WAVE_SIZE.length } })
-                }
-                onReset={() => onEdit({}, ['wave.amp', 'wave.length'])}
-              />
-              <button
-                type="button"
-                aria-expanded={advanced}
-                onClick={() => setAdvanced(!advanced)}
-                className="self-start text-[10px] text-white/70 underline"
-              >
-                {advanced ? 'Fewer' : 'Height and wavelength'}
-              </button>
-              {advanced ? (
-                <>
-                  <Slider
-                    name="Wave height"
-                    value={wave.amp}
-                    fallback={WAVE_DEFAULTS.amp}
-                    min={1}
-                    max={8}
-                    step={0.5}
-                    unit={(v) => `${v}px`}
-                    onChange={(v) => onEdit({ wave: { amp: v } })}
-                    onReset={() => onEdit({}, ['wave.amp'])}
-                  />
-                  <Slider
-                    name="Wavelength"
-                    value={wave.length}
-                    fallback={WAVE_DEFAULTS.length}
-                    min={8}
-                    max={32}
-                    step={1}
-                    unit={(v) => `${v}px`}
-                    onChange={(v) => onEdit({ wave: { length: v } })}
-                    onReset={() => onEdit({}, ['wave.length'])}
-                  />
-                </>
-              ) : null}
-              <Slider
-                name="Weight"
-                value={wave.weight}
-                fallback={WAVE_DEFAULTS.weight}
-                min={1}
-                max={4}
-                step={0.5}
-                unit={(v) => `${v}px`}
-                onChange={(v) => onEdit({ wave: { weight: v } })}
-                onReset={() => onEdit({}, ['wave.weight'])}
-              />
-              <Slider
-                name="Length"
-                value={wave.span}
-                fallback={WAVE_DEFAULTS.span}
-                min={0.2}
-                max={4}
-                step={0.05}
-                unit={lanes}
-                onChange={(v) => onEdit({ wave: { span: v } })}
-                onReset={() => onEdit({}, ['wave.span'])}
-              />
-              <Slider
-                name="Wave X"
-                value={wave.x}
-                fallback={0}
-                min={-3}
-                max={3}
-                step={0.01}
-                unit={lanes}
-                onChange={(v) => onEdit({ wave: { x: v } })}
-                onReset={() => onEdit({}, ['wave.x'])}
-              />
-              <Slider
-                name="Wave Y"
-                value={wave.y}
-                fallback={0}
-                min={-20}
-                max={20}
-                step={0.1}
-                unit={lines}
-                onChange={(v) => onEdit({ wave: { y: v } })}
-                onReset={() => onEdit({}, ['wave.y'])}
-              />
-              <Slider
-                name="Wave tilt"
-                value={wave.tilt}
-                fallback={0}
-                min={-45}
-                max={45}
-                step={1}
-                unit={degrees}
-                onChange={(v) => onEdit({ wave: { tilt: v } })}
-                onReset={() => onEdit({}, ['wave.tilt'])}
-              />
-            </>
-          ) : null}
-        </Group>
-      ) : null}
-
       <div className="flex items-center justify-between">
         {message ? (
           <p role="alert" className="text-xs text-white/80">
@@ -675,7 +551,7 @@ export function LayoutControls({
         <button
           type="button"
           data-layout-reset-all
-          onClick={() => onEdit({}, ['icon', 'label', 'photos', 'wave'])}
+          onClick={() => onEdit({}, ['icon', 'label', 'photos'])}
           className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium"
         >
           Reset all

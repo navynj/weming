@@ -9,6 +9,7 @@ import {
   type CSSProperties,
   type Ref,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowDown,
   ArrowUp,
@@ -27,7 +28,6 @@ import { AXIS_LOCK_PX } from '@/components/ui/use-axis-lock';
 import {
   alongTilt,
   angleOf,
-  clamp,
   cornerPulled,
   LIMITS,
   moved,
@@ -35,8 +35,6 @@ import {
   resized,
   samePart,
   shareOf,
-  spanned,
-  spannedFromLeft,
   stepFont,
   turned,
   widened,
@@ -53,7 +51,6 @@ export type Tools = {
   move: boolean;
   rotate: boolean;
   size: boolean;
-  ends: boolean;
   /** A label's right edge: its width, the words rewrapping as it moves. */
   width: boolean;
 };
@@ -61,7 +58,6 @@ export const NO_TOOLS: Tools = {
   move: false,
   rotate: false,
   size: false,
-  ends: false,
   width: false,
 };
 
@@ -77,11 +73,11 @@ export type FrameUnits = {
   sizePx: number;
   /** The part's drawn box, whose diagonal a corner is pulled along; square at `sizePx` when absent. */
   sizeBox?: { w: number; h: number };
-  /** The label's width in pixels: the wave's length is a share of it, and a width pull starts from it. */
+  /** The label's width in pixels: a width pull starts from it. */
   labelW: number;
 };
 
-type Kind = 'move' | 'rotate' | 'size' | 'width' | 'end-left' | 'end-right';
+type Kind = 'move' | 'rotate' | 'size' | 'width';
 type Point = { x: number; y: number };
 type Gesture = {
   kind: Kind;
@@ -131,13 +127,14 @@ type Seat = { side: Side; clear: boolean };
 
 /** Every part a piece or band draws: what a rotate handle keeps off. */
 const PARTS =
-  '[data-board-label], [data-board-sticker], [data-board-photo-card], [data-board-wave], [data-board-band], [data-band-icon]';
+  '[data-board-label], [data-board-sticker], [data-board-photo-card], [data-board-band], [data-band-icon]';
 
 /** The element(s) a part is drawn as. */
 function selectorOf(part: BoardPart): string {
+  // The whole piece is none of its parts: each of them is another.
+  if (part.kind === 'piece') return ':not(*)';
   if (part.kind === 'label') return '[data-board-label], [data-board-band]';
   if (part.kind === 'icon') return '[data-board-sticker], [data-band-icon]';
-  if (part.kind === 'wave') return '[data-board-wave]';
   return `[data-board-photo-card="${part.path.replace(/["\\]/g, '\\$&')}"]`;
 }
 
@@ -208,13 +205,12 @@ function siblingAt(from: Element, part: BoardPart, x: number, y: number): Elemen
 export const ON_PIECE =
   '[data-board-piece], [data-board-tape], [data-edit-toolbar], [data-board-slot]';
 
-/** A tap on a piece names the part it landed on: a photo, the sticker, the wave, else the label. */
+/** A tap on a piece names the part it landed on: a photo, the sticker, else the label. */
 export function partAt(target: EventTarget | null): BoardPart {
   const el = target instanceof Element ? target : null;
   const photo = el?.closest<HTMLElement>('[data-board-photo-card]');
   if (photo) return { kind: 'photo', path: photo.dataset.boardPhotoCard! };
   if (el?.closest('[data-board-sticker], [data-band-icon]')) return { kind: 'icon' };
-  if (el?.closest('[data-board-wave], [data-edit-frame="wave"]')) return { kind: 'wave' };
   return { kind: 'label' };
 }
 
@@ -230,7 +226,7 @@ function scaleAt(el: Element | null): number {
  * The selected part's frame (review): a thin white outline drawn inside the
  * part itself, so it moves and turns exactly as the part does; the body
  * drags it, a round handle above turns it, a corner sizes it, a label's
- * right edge widens it, the wave's ends lengthen it. On a phone two fingers
+ * right edge widens it. On a phone two fingers
  * pinch and twist it, the second landing anywhere. Every pull is read from
  * a snapshot taken as the finger went down; a size change asks the piece to
  * hold the part's top-left (or a pinch's midpoint) where it was. While a
@@ -258,7 +254,7 @@ export function PartFrame({
   units: FrameUnits;
   tools: Tools;
   editing: Pick<BoardEditing, 'hold' | 'commit'>;
-  /** The part's transform origin: its centre, or (a band, a wave) its left edge's middle. */
+  /** The part's transform origin: its centre, or (a band) its left edge's middle. */
   origin?: 'center' | 'left';
   /** The label reaches the board's edge, which clips past it: its width bar sits just inside. */
   widthInside?: boolean;
@@ -341,8 +337,6 @@ export function PartFrame({
       // By the fingers' distance now over at the start, around their first midpoint.
       if (t.size && (p.kind === 'icon' || p.kind === 'photo'))
         next.size = resized(p.kind, u.sizePx, ratio, u.sizeUnit);
-      if (p.kind === 'wave')
-        next.span = clamp(Number(((g.start.span ?? 1) * ratio).toFixed(2)), LIMITS.span);
       g.moved = true;
       send(next);
       return;
@@ -373,20 +367,6 @@ export function PartFrame({
       case 'width':
         send({ width: widened(u.labelW, alongTilt(lx, ly, g.start.tilt), u.column) });
         break;
-      case 'end-right':
-        send({ span: spanned(g.start.span ?? 1, alongTilt(lx, ly, g.start.tilt), u.labelW) });
-        break;
-      case 'end-left':
-        send(
-          spannedFromLeft(
-            { ...g.start, span: g.start.span ?? 1 },
-            alongTilt(lx, ly, g.start.tilt),
-            u.labelW,
-            u.column,
-            u.line,
-          ),
-        );
-        break;
     }
   };
 
@@ -399,7 +379,11 @@ export function PartFrame({
     const release = latest.current.onHold;
     // A tap on the rotate handle (under 8px) where it lies over another part
     // of the piece selects that part; only a drag turns (review).
-    if (g.kind === 'rotate' && !g.moved && root.current) {
+    // So does a tap inside All's outline (H41): the part under it, its tab.
+    const tapped =
+      !g.moved &&
+      (g.kind === 'rotate' || (g.kind === 'move' && latest.current.part.kind === 'piece'));
+    if (tapped && root.current) {
       const under = siblingAt(root.current, latest.current.part, event.clientX, event.clientY);
       if (under) latest.current.onPick?.(partAt(under));
     }
@@ -489,7 +473,9 @@ export function PartFrame({
         .join(' ')}
       onClick={swallow}
       onPointerDown={(event) => (tools.move ? begin('move', event) : swallow(event))}
-      className="pointer-events-none absolute -inset-[3px] block outline outline-1 outline-white"
+      // All's outline takes a drag anywhere inside it (H41); a part's lets
+      // pointers through, its move started from the part itself.
+      className={`${part.kind === 'piece' ? 'pointer-events-auto cursor-move' : 'pointer-events-none'} absolute -inset-[3px] block outline outline-1 outline-white`}
       style={still}
     >
       <span
@@ -572,40 +558,18 @@ export function PartFrame({
           <span className="border-main-900 block h-4 w-1.5 rounded-full border bg-white" />
         </span>
       ) : null}
-      {tools.ends ? (
-        <>
-          <span
-            data-edit-handle="end-left"
-            aria-hidden
-            onClick={swallow}
-            onPointerDown={(event) => begin('end-left', event)}
-            className={`${HANDLE} top-1/2 -left-[22px] -translate-y-1/2 cursor-ew-resize`}
-            style={still}
-          >
-            <span className={DOT} />
-          </span>
-          <span
-            data-edit-handle="end-right"
-            aria-hidden
-            onClick={swallow}
-            onPointerDown={(event) => begin('end-right', event)}
-            className={`${HANDLE} top-1/2 -right-[22px] -translate-y-1/2 cursor-ew-resize`}
-            style={still}
-          >
-            <span className={DOT} />
-          </span>
-        </>
-      ) : null}
     </span>
   );
 }
 
 /**
- * The active piece's toolbar (review): near it, small, white over the
- * water — the text size stepper and the style swatch when the label is
- * selected ("T | − 14 +", 0058), the eye for any part, Undo, More and Done
- * — and what the save is doing: "Saving…", then "Saved"; on a phone a
- * spinner, then a check, so the row keeps every control.
+ * The active piece's toolbar (review; H41): white over the water, three
+ * rows — the parts as tabs with More at the right; the selected part's own
+ * controls (All: the layers; the label: its eye, text size and style; the
+ * icon: its eye and Icon inline; a photo or video: its eye); Undo at the
+ * left, Done at the right with what the save is doing beside it. Near the
+ * piece on a desktop; on a phone docked to the foot of the screen, the
+ * board scrolled so the selected part stays above it.
  */
 
 /** The label's style on the toolbar (0058): as set by hand, or unset (Auto), and as drawn. */
@@ -629,15 +593,18 @@ export function EditToolbar({
   labelStyle = null,
   eye = null,
   iconInline = null,
+  partKind = null,
 }: {
   editing: BoardEditing;
+  /** The selected part's kind, as the piece draws it: where the layer buttons go. */
+  partKind?: BoardPart['kind'] | null;
   /** While the label is selected: its style, for the swatch. */
   labelStyle?: ToolbarStyle | null;
   /** While a part is selected: its eye. */
   eye?: ToolbarEye | null;
   /** While the label or the icon is selected, on a post with an icon to set apart. */
   iconInline?: { on: boolean } | null;
-  /** A phone's board (under 600px): two rows, 44px taps, the layer buttons in More. */
+  /** A phone's board (under 600px): docked, 44px taps, the layer buttons in More but All's. */
   phone?: boolean;
   /** The piece's parts, as chips that select one (review): shown when there is more than one. */
   parts?: PartChip[];
@@ -664,6 +631,7 @@ export function EditToolbar({
     const w = bar.current?.offsetWidth ?? 0;
     if (w !== width) setWidth(w);
   });
+  useDock(phone, bar, editing.activeId, editing.part);
   const left = seat
     ? Math.max(
         seat.min,
@@ -782,38 +750,59 @@ export function EditToolbar({
       Icon inline
     </button>
   ) : null;
-  // The four layer moves, a desktop's; a phone's are More's (review).
-  const layerGroup =
-    layers && !phone ? (
-      <div data-edit-layers className="flex items-center" role="group" aria-label="Layer">
-        <LayerButtons layers={layers} className={`${button} disabled:opacity-20`} />
-        <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
-      </div>
-    ) : null;
-  return (
+  // The four layer moves (H41): All's own row on every width; for another
+  // part a desktop's, after its controls — or, the label's row being full,
+  // in the last row between Undo and Done — and a phone's in More.
+  const whole = partKind === 'piece';
+  const layerGroup = layers ? (
+    <div data-edit-layers className="flex items-center" role="group" aria-label="Layer">
+      <LayerButtons layers={layers} className={`${button} disabled:opacity-20`} />
+    </div>
+  ) : null;
+  const layersInRow = whole || (!phone && partKind !== 'label') ? layerGroup : null;
+  const layersInActions = !whole && !phone && partKind === 'label' ? layerGroup : null;
+  const toolbar = (
     <div
       ref={bar}
       data-edit-toolbar
       data-phone={phone ? '' : undefined}
+      data-docked={phone ? '' : undefined}
       role="toolbar"
       aria-label="Layout"
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
       // A white bar on the ground stays white with ink (0032). Three rows, on
-      // every width: the parts, the selected part's own controls, the actions.
-      className={`surface text-ink pointer-events-auto absolute flex flex-col rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md ${phone ? '' : 'w-max'}`}
-      style={left === undefined ? style : { ...style, left }}
+      // every width: the parts and More, the selected part's own controls,
+      // Undo to Done. On a phone docked to the screen's foot, full width,
+      // clear of the home indicator (H41).
+      className={`surface text-ink pointer-events-auto flex flex-col bg-white px-1 text-xs font-medium whitespace-nowrap ${
+        phone
+          ? 'fixed inset-x-0 bottom-0 z-30 rounded-t-[20px] pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-4px_16px_rgba(0,0,0,0.15)]'
+          : 'absolute w-max rounded-[20px] shadow-md'
+      }`}
+      style={phone ? undefined : left === undefined ? style : { ...style, left }}
     >
-      {tabs}
+      <div data-edit-tab-row className={`${row} min-w-0`}>
+        <div className="flex min-w-0 flex-1 self-stretch">{tabs}</div>
+        <button
+          type="button"
+          aria-label="More"
+          data-edit-more
+          onClick={editing.more}
+          className={`${button} shrink-0`}
+        >
+          <MoreHorizontal aria-hidden size={16} />
+        </button>
+      </div>
       {/* What applies to the selected part, nothing greyed in its place. */}
-      <div data-edit-part-row className={row}>
+      <div data-edit-part-row className={`${row} min-w-0`}>
         {eyeButton}
         {stepper}
         {swatch}
         {inlineToggle}
+        {layersInRow}
       </div>
       <div data-edit-actions className={row}>
-        {layerGroup}
         <button
           type="button"
           aria-label="Undo"
@@ -824,15 +813,17 @@ export function EditToolbar({
         >
           <Undo2 aria-hidden size={16} />
         </button>
-        <button
-          type="button"
-          aria-label="More"
-          data-edit-more
-          onClick={editing.more}
-          className={button}
-        >
-          <MoreHorizontal aria-hidden size={16} />
-        </button>
+        {layersInActions}
+        <span className="flex-1" />
+        {editing.status ? (
+          <span
+            role="status"
+            data-edit-status={editing.status}
+            className="text-pool-500 pr-1 pl-2 text-[10px]"
+          >
+            {editing.status === 'saving' ? 'Saving…' : 'Saved'}
+          </span>
+        ) : null}
         <button
           type="button"
           data-edit-done
@@ -842,18 +833,69 @@ export function EditToolbar({
           <Check aria-hidden size={14} />
           Done
         </button>
-        {editing.status ? (
-          <span
-            role="status"
-            data-edit-status={editing.status}
-            className="text-pool-500 pr-2 pl-1 text-[10px]"
-          >
-            {editing.status === 'saving' ? 'Saving…' : 'Saved'}
-          </span>
-        ) : null}
       </div>
     </div>
   );
+  // Docked, it leaves the board: over every piece, never inside one's stacking.
+  return phone && typeof document !== 'undefined' ? createPortal(toolbar, document.body) : toolbar;
+}
+
+/** What a docked toolbar keeps between itself and the selected part. */
+const DOCK_GAP_PX = 12;
+
+/**
+ * A phone's docked toolbar (H41): its height given to the board as room at
+ * its foot (`--edit-dock`), so the last row can scroll clear of it, and the
+ * board scrolled so the selected part — or the piece, where the part has no
+ * outline of its own — stands above it, each time a piece or a part is
+ * chosen; never while a part is dragged.
+ */
+function useDock(
+  docked: boolean,
+  bar: React.RefObject<HTMLDivElement | null>,
+  activeId: string | null,
+  part: BoardPart,
+): void {
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!docked || !el) return;
+    const root = document.documentElement;
+    const set = (): void => root.style.setProperty('--edit-dock', `${el.offsetHeight}px`);
+    set();
+    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set);
+    watch?.observe(el);
+    return () => {
+      watch?.disconnect();
+      root.style.removeProperty('--edit-dock');
+    };
+  }, [docked, bar]);
+  const partKey = JSON.stringify(part);
+  useEffect(() => {
+    const el = bar.current;
+    if (!docked || !el || !activeId) return;
+    const target =
+      document.querySelector('[data-edit-overlay], [data-edit-ghost]') ??
+      document.querySelector(`[data-board-piece="${activeId}"], [data-board-tape="${activeId}"]`);
+    if (!target) return;
+    let scroller = target.parentElement;
+    while (
+      scroller &&
+      !(
+        /(auto|scroll)/.test(getComputedStyle(scroller).overflowY) &&
+        scroller.scrollHeight > scroller.clientHeight
+      )
+    )
+      scroller = scroller.parentElement;
+    if (!scroller) return;
+    const box = target.getBoundingClientRect();
+    const floor = el.getBoundingClientRect().top - DOCK_GAP_PX;
+    const ceiling = scroller.getBoundingClientRect().top + DOCK_GAP_PX;
+    // Its foot above the bar; a part taller than the room, its top in view.
+    const by = box.height > floor - ceiling ? box.top - ceiling : box.bottom - floor;
+    if (by <= 0 && box.top >= ceiling) return;
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
+    scroller.scrollBy({ top: by, behavior: still ? 'auto' : 'smooth' });
+  }, [docked, bar, activeId, partKey]);
 }
 
 /**
@@ -899,8 +941,10 @@ function StyleSwatch({
           aria-label="Label style"
           data-edit-style-menu
           // Selection is ink (H20f); a white card on the ground stays white (0032).
-          // Centred under the swatch, so it stays within the board at either end of a phone's row.
-          className="surface absolute top-full left-1/2 z-10 mt-1 flex -translate-x-1/2 items-center gap-0.5 rounded-[20px] bg-white p-1 shadow-md"
+          // Centred on the swatch: under it on a desktop, above it on a phone's docked bar.
+          className={`surface absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-[20px] bg-white p-1 shadow-md ${
+            phone ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
         >
           <button
             type="button"

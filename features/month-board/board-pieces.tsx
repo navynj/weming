@@ -53,9 +53,11 @@ import {
   type Tools,
 } from './board-handles';
 import {
+  boundsOf,
   clamp,
   LABEL_PART,
   LIMITS,
+  PIECE_PART,
   samePart,
   moveHolding,
   partPatch,
@@ -126,129 +128,6 @@ function nudge<T extends { x?: number; y?: number }>(
 ): T | undefined {
   if (!shift || (shift.x === undefined && shift.y === undefined)) return set;
   return { ...set, x: (set?.x ?? 0) + (shift.x ?? 0), y: (set?.y ?? 0) + (shift.y ?? 0) } as T;
-}
-
-/** The wave's defaults: a small calm wave, the label's width. */
-export const WAVE_DEFAULTS = { amp: 2, length: 16, weight: 2, span: 1 } as const;
-
-/**
- * The same symmetric wave as the header glyph (review), repeated: half
- * waves as cubics with their controls at a third and two thirds, offset
- * 4/3 of the amplitude, so each crest reaches the amplitude exactly; a
- * whole number of half waves, so both ends sit on the midline.
- */
-export function wavePath(width: number, amp: number, wavelength: number, pad: number): string {
-  const half = wavelength / 2;
-  const count = Math.max(1, Math.round(width / half));
-  const step = width / count;
-  const mid = pad + amp;
-  const k = (amp * 4) / 3;
-  const f = (v: number): string => String(Number(v.toFixed(3)));
-  let d = `M${f(0)} ${f(mid)}`;
-  for (let i = 0; i < count; i += 1) {
-    const x = i * step;
-    const cy = mid + (i % 2 === 0 ? k : -k);
-    d += `C${f(x + step / 3)} ${f(cy)} ${f(x + (2 * step) / 3)} ${f(cy)} ${f(x + step)} ${f(mid)}`;
-  }
-  return d;
-}
-
-/**
- * A wave under the label (review), off unless switched on: white at 80%,
- * round caps, its height, wavelength, weight and length the person's, set
- * from the label's bottom-left and moved and tilted like any part.
- */
-function WaveDecoration({
-  label,
-  wave,
-  column,
-  line,
-  moving = '',
-  z,
-  frameZ,
-  selectable = false,
-  frame = null,
-}: {
-  label: Box;
-  wave: {
-    amp?: number;
-    length?: number;
-    weight?: number;
-    span?: number;
-    x?: number;
-    y?: number;
-    tilt?: number;
-  };
-  column: number;
-  line: number;
-  /** The piece's bob or plunge, played on each part (motionOf). */
-  moving?: string;
-  /** Its place in the view's one stacking order (stacking.ts). */
-  z?: number;
-  /** Its frame's, over every piece. */
-  frameZ?: number;
-  /** Its piece is being edited: a tap on the wave selects it. */
-  selectable?: boolean;
-  /** Its frame while selected, laid over it exactly. */
-  frame?: ReactNode;
-}) {
-  const amp = wave.amp ?? WAVE_DEFAULTS.amp;
-  const wavelength = wave.length ?? WAVE_DEFAULTS.length;
-  const weight = wave.weight ?? WAVE_DEFAULTS.weight;
-  const width = Math.max(4, label.w * (wave.span ?? WAVE_DEFAULTS.span));
-  const pad = weight;
-  const height = amp * 2 + pad * 2;
-  const placedAt: CSSProperties = {
-    left: label.x,
-    top: label.y + label.h - height / 2,
-    transform: moveOf(wave, column, line),
-    transformOrigin: 'left center',
-    ...(z !== undefined ? { zIndex: z } : {}),
-  };
-  const path = wavePath(width, amp, wavelength, pad);
-  return (
-    <>
-      <svg
-        aria-hidden
-        data-board-wave
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        fill="none"
-        className={`absolute overflow-visible ${moving}`}
-        style={placedAt}
-      >
-        {selectable ? (
-          // A finger's width to tap, unseen: the drawn line is two pixels.
-          <path
-            d={path}
-            stroke="transparent"
-            strokeWidth={16}
-            style={{ pointerEvents: 'stroke' }}
-            className="cursor-pointer"
-          />
-        ) : null}
-        <path
-          d={path}
-          // What reads as white on the ground in every mode (0032, 0036).
-          style={{ stroke: 'var(--color-white)' }}
-          strokeOpacity={0.8}
-          strokeWidth={weight}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      {frame ? (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute"
-          style={{ ...placedAt, width, height, zIndex: frameZ }}
-        >
-          {frame}
-        </span>
-      ) : null}
-    </>
-  );
 }
 
 /** The motion a piece plays: a bob for the heading, a plunge for a drop. */
@@ -643,13 +522,12 @@ export function BoardPieceView({
   // A hidden part selected (review): outlined dashed where it would be, no handles.
   const selectedHidden =
     selected !== null &&
+    selected.kind !== 'piece' &&
     (selected.kind === 'label'
       ? labelHidden(saved)
       : selected.kind === 'icon'
         ? iconHidden(saved)
-        : selected.kind === 'photo'
-          ? saved.photos?.[selected.path]?.hidden === true
-          : saved.wave?.on !== true);
+        : saved.photos?.[selected.path]?.hidden === true);
 
   // A part's box as the engine lays it out, before its own move and turn, on
   // the board: the piece's own place counts, as a bigger sticker hanging
@@ -733,7 +611,7 @@ export function BoardPieceView({
   const stillIf = (kind: BoardPart['kind']): CSSProperties | undefined =>
     selected?.kind === kind ? { touchAction: 'none' } : undefined;
   // Its parts' order within it (0055): saved, else label, photos (the first
-  // uploaded on top), wave, icon; what is hidden takes no place.
+  // uploaded on top), icon; what is hidden takes no place.
   const hideIcon = iconHidden(layout);
   const hideLabel = labelHidden(layout) || (piece.compact && piece.captionLines === 0);
   const sticker = !!(piece.stickerBox && icon && !hideIcon);
@@ -743,7 +621,6 @@ export function BoardPieceView({
       defaultPartOrder({
         label: !hideLabel,
         photos: [...piece.fan].reverse().map((p) => p.path),
-        wave: layout.wave?.on === true,
         icon: sticker,
       }),
     ),
@@ -831,9 +708,9 @@ export function BoardPieceView({
   ) : null;
   const toolbar = toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line);
   // The toolbar's tabs (review), in the panel's order: Label, Icon (inline
-  // or a sticker), each photo and video by the order they were added, Wave.
-  // A hidden part keeps its tab under its own name, struck through (0055); a
-  // wave switched off is a hidden one.
+  // or a sticker), each photo and video by the order they were added. A
+  // hidden part keeps its tab under its own name, struck through (0055).
+  // No wave (H41): a stored one is kept and not drawn.
   const media = (card.allPhotos ?? card.photos ?? []).filter(
     (m) => layout.photos?.[m.path]?.hidden === true || piece.fan.some((f) => f.path === m.path),
   );
@@ -841,6 +718,8 @@ export function BoardPieceView({
   let videoAt = 0;
   const parts: PartChip[] = active
     ? [
+        // All first (H41): the whole piece, its move and its layers.
+        { part: PIECE_PART, name: 'All' },
         ...(piece.compact && piece.captionLines === 0 && !labelHidden(layout)
           ? []
           : [{ part: LABEL_PART, name: 'Label', hidden: labelHidden(layout) }]),
@@ -850,7 +729,6 @@ export function BoardPieceView({
           name: m.video ? `Video ${++videoAt}` : `Photo ${++photoAt}`,
           hidden: layout.photos?.[m.path]?.hidden === true,
         })),
-        { part: { kind: 'wave' } as const, name: 'Wave', hidden: layout.wave?.on !== true },
       ]
     : [];
   // Its part chips too, for More on a phone when the toolbar's row is out of sight.
@@ -875,9 +753,7 @@ export function BoardPieceView({
                 w: line,
                 h: line,
               })
-            : selected.kind === 'photo'
-              ? (piece.photoBox ?? whole)
-              : { x: label.x, y: label.y + label.h, w: label.w, h: Math.max(8, line / 2) };
+            : (piece.photoBox ?? whole);
       return (
         <span
           aria-hidden
@@ -891,8 +767,41 @@ export function BoardPieceView({
         />
       );
     }
-    // The wave's frame is its own; an inline icon is outlined in the label, no handles.
-    if (selected.kind === 'wave' || (selected.kind === 'icon' && !piece.stickerBox)) return null;
+    // An inline icon is outlined in the label, no handles.
+    if (selected.kind === 'icon' && !piece.stickerBox) return null;
+    if (selected.kind === 'piece') {
+      // All (H41): around every part shown, as each is moved and turned; a
+      // drag anywhere inside moves them together.
+      const area = piece.photoBox;
+      const turned = (box: Box, set: { x?: number; y?: number; tilt?: number } | undefined) => ({
+        box,
+        move: { x: (set?.x ?? 0) * metrics.column, y: (set?.y ?? 0) * line },
+        tilt: set?.tilt,
+      });
+      const whole = boundsOf([
+        ...(hideLabel || label.h === 0 ? [] : [turned(label, nudge(layout.label, layout.piece))]),
+        ...(sticker ? [turned(piece.stickerBox!, nudge(layout.icon, layout.piece))] : []),
+        ...(area
+          ? piece.fan.map((photo) =>
+              turned(
+                { x: area.x + photo.x, y: area.y + photo.y, w: photo.w, h: photo.h },
+                nudge(photoMove(layout.photos?.[photo.path], photo), layout.piece),
+              ),
+            )
+          : []),
+      ]);
+      if (!whole) return null;
+      return (
+        <span
+          aria-hidden
+          data-edit-overlay="piece"
+          className="pointer-events-none absolute"
+          style={{ ...placed(whole), zIndex: frameZ }}
+        >
+          {frame}
+        </span>
+      );
+    }
     const local =
       selected.kind === 'label'
         ? label
@@ -1004,19 +913,6 @@ export function BoardPieceView({
               />
             ))}
           </span>
-        ) : null}
-        {layout.wave?.on ? (
-          <WaveDecoration
-            label={label}
-            wave={nudge(layout.wave, layout.piece)!}
-            column={metrics.column}
-            line={line}
-            moving={moving}
-            z={zFor(rankOf('wave'), 'wave')}
-            frameZ={frameZ}
-            selectable={active}
-            frame={selected?.kind === 'wave' ? frame : null}
-          />
         ) : null}
         {/* A phone's month (review): no label, no words, no faces — but the
             label's one line when it is all there is to show (0055). Hidden
@@ -1193,15 +1089,11 @@ export function BoardPieceView({
           }
           layers={layers}
           parts={parts}
+          partKind={selected?.kind ?? null}
           phone={phone}
-          // A phone's toolbar takes the board's width, from its left edge.
-          seat={phone ? { ...toolbar.seat, x: toolbar.seat.min, align: 'left' } : toolbar.seat}
-          style={{
-            top: toolbar.top,
-            zIndex: overAll(total, 3),
-            maxWidth: metrics.width,
-            ...(phone ? { width: metrics.width } : {}),
-          }}
+          // A phone's is docked to the screen's foot (H41); a desktop's under the label.
+          seat={toolbar.seat}
+          style={{ top: toolbar.top, zIndex: overAll(total, 3), maxWidth: metrics.width }}
         />
       ) : null}
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
@@ -1237,7 +1129,7 @@ export function BoardTapeView({
   const { card } = tape;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
   const caption = captionOf(card);
-  // Set by hand (0047): label, icon and wave, offsets measured across the
+  // Set by hand (0047): label and icon, offsets measured across the
   // band's full width — X a share of it, Y in lines — the whole piece's
   // offset added, as on any piece.
   const layout = card.layout ?? {};
@@ -1246,7 +1138,7 @@ export function BoardTapeView({
   const label = nudge(layout.label, layout.piece);
   const iconSet = layout.icon;
   // Being edited by hand (review): a range along its days takes its text size
-  // alone; a band across Members its label, icon and wave (0047), as the panel says.
+  // alone; a band across Members its label and icon (0047), as the panel says.
   const active = editing !== null && editing.activeId === tape.id;
   const period = isPeriod(card.splash);
   const selected = active ? tapeSelected(editing.part, layout) : null;
@@ -1254,7 +1146,7 @@ export function BoardTapeView({
     if (editing) editing.tap(card.splash.id, partAt(event.target));
     else onPick(card.splash.id);
   };
-  const frameOf = (kind: 'label' | 'icon' | 'wave'): ReactNode =>
+  const frameOf = (kind: 'label' | 'icon'): ReactNode =>
     selected?.kind === kind ? (
       <PartFrame
         part={selected}
@@ -1281,7 +1173,6 @@ export function BoardTapeView({
           ...(icon && layout.icon?.inline === false
             ? [{ part: { kind: 'icon' } as const, name: 'Icon' }]
             : []),
-          ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
         ]
       : [];
   useOffered(
@@ -1301,16 +1192,6 @@ export function BoardTapeView({
         className={`absolute ${tape.muted ? 'opacity-50' : ''} ${motionOf(ripple, false)}`}
         style={placed(tape)}
       >
-        {layout.wave?.on ? (
-          <WaveDecoration
-            label={{ x: 0, y: 0, w: tape.w, h: tape.h }}
-            wave={nudge(layout.wave, layout.piece)!}
-            column={tape.w}
-            line={line}
-            selectable={active}
-            frame={frameOf('wave')}
-          />
-        ) : null}
         <button
           type="button"
           onClick={tap}
@@ -1352,18 +1233,11 @@ export function BoardTapeView({
           editing={editing!}
           fontSize={selected?.kind === 'label' ? size : null}
           parts={parts}
+          partKind={selected?.kind ?? null}
           phone={metrics.width < HALF_WEEK_BELOW_PX}
-          // Within the board, as a piece's (its canvas is the band's container).
-          seat={
-            metrics.width < HALF_WEEK_BELOW_PX
-              ? { x: 0, align: 'left', min: 0, max: metrics.width }
-              : { x: tape.x, align: 'left', min: 0, max: metrics.width }
-          }
-          style={{
-            top: tape.y + tape.h + 10,
-            maxWidth: metrics.width,
-            ...(metrics.width < HALF_WEEK_BELOW_PX ? { width: metrics.width } : {}),
-          }}
+          // Within the board, as a piece's (its canvas is the band's container); a phone's docked.
+          seat={{ x: tape.x, align: 'left', min: 0, max: metrics.width }}
+          style={{ top: tape.y + tape.h + 10, maxWidth: metrics.width }}
         />
       ) : null}
     </>
@@ -1382,13 +1256,14 @@ function useOffered<T>(value: T | null, offer: ((value: T | null) => void) | und
 
 /** Which handles each part has (review): the label moves, turns and widens, its text size the toolbar's. */
 const TOOLS: Record<BoardPart['kind'], Tools> = {
-  label: { move: true, rotate: true, size: false, ends: false, width: true },
-  icon: { move: true, rotate: true, size: true, ends: false, width: false },
-  photo: { move: true, rotate: true, size: true, ends: false, width: false },
-  wave: { move: true, rotate: false, size: false, ends: true, width: false },
+  // All (H41): moved as one, never turned or sized.
+  piece: { move: true, rotate: false, size: false, width: false },
+  label: { move: true, rotate: true, size: false, width: true },
+  icon: { move: true, rotate: true, size: true, width: false },
+  photo: { move: true, rotate: true, size: true, width: false },
 };
 
-/** The part asked for, when the piece has it as its own: a sticker, a photo shown, a wave on; else its label. */
+/** The part asked for, when the piece has it as its own: a sticker, a photo shown; else its label. */
 function pieceSelected(
   part: BoardPart,
   piece: BoardPiece,
@@ -1396,12 +1271,11 @@ function pieceSelected(
   hasIcon: boolean,
 ): BoardPart {
   const sticker = piece.stickerBox && hasIcon && !iconHidden(layout);
+  if (part.kind === 'piece') return part;
   // A hidden part stays selected (review): its tab, its dashed place, its eye.
   if (part.kind === 'label' && labelHidden(layout)) return part;
   if (part.kind === 'icon' && hasIcon && iconHidden(layout)) return part;
   if (part.kind === 'photo' && layout.photos?.[part.path]?.hidden === true) return part;
-  // A wave, on or switched off (off is hidden).
-  if (part.kind === 'wave') return part;
   // The icon, a sticker or inline in the label (its outline, no handles).
   if (part.kind === 'icon' && (sticker || (hasIcon && piece.inlineIcon))) return part;
   if (part.kind === 'photo' && piece.fan.some((p) => p.path === part.path)) return part;
@@ -1415,7 +1289,7 @@ function pieceSelected(
 /**
  * The selected part's eye (0058): hides it from the board, as its switch in
  * the panel does; the last of photos, icon and label shown keeps it, the
- * eye disabled ("Keep at least one"). A wave is turned off.
+ * eye disabled ("Keep at least one").
  */
 function eyeOf(
   selected: BoardPart | null,
@@ -1426,19 +1300,17 @@ function eyeOf(
   if (!selected) return null;
   const shown = photosShown + (iconHidden(layout) ? 0 : 1) + (labelHidden(layout) ? 0 : 1);
   const last = shown <= 1;
-  const eye = (
-    name: string,
-    hidden: boolean,
-    set: (hidden: boolean) => BoardLayoutJson,
-    keeps = true,
-  ) => ({
+  const eye = (name: string, hidden: boolean, set: (hidden: boolean) => BoardLayoutJson) => ({
     name,
     hidden,
     // Showing is always allowed; hiding the last of photos, icon and label is not.
-    disabled: !hidden && keeps && last,
+    disabled: !hidden && last,
     toggle: () => editing.edit(set(!hidden)),
   });
   switch (selected.kind) {
+    // The whole piece is never hidden (H41): its row is its layers.
+    case 'piece':
+      return null;
     case 'label':
       return eye('Label', labelHidden(layout), (hidden) => ({ label: { hidden } }));
     case 'icon':
@@ -1449,22 +1321,18 @@ function eyeOf(
         layout.photos?.[selected.path]?.hidden === true,
         (hidden) => ({ photos: { [selected.path]: { hidden } } }),
       );
-    case 'wave':
-      // A wave switched off is a hidden one: on and off, the eye.
-      return eye('Wave', layout.wave?.on !== true, (hidden) => ({ wave: { on: !hidden } }), false);
   }
 }
 
-/** A band's: its icon once it is set apart from the words (Inline off), its wave once on; else its label. */
+/** A band's: its icon once it is set apart from the words (Inline off); else its label. */
 function tapeSelected(part: BoardPart, layout: BoardLayoutJson): BoardPart {
   if (part.kind === 'icon' && layout.icon?.inline === false) return part;
-  if (part.kind === 'wave' && layout.wave?.on) return part;
   return LABEL_PART;
 }
 
 /**
  * The toolbar's seat (review): under the label as it is moved — below its
- * own handles and the wave's — towards the board's middle, and never past
+ * own handles — towards the board's middle, and never past
  * the board's edges (a phone's half week put it off the left one).
  */
 function toolbarAt(

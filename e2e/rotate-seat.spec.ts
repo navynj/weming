@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { showPiece } from './measure';
+import { activate, showPiece } from './measure';
 
 /**
  * The rotate handle keeps off the piece's other parts (review): on a
@@ -16,8 +16,8 @@ test('a small photo above its label is a tap away, its centre clear of the handl
   await showPiece(page, 'photo');
   expect(await page.locator('[data-board-header]').count()).toBe(4);
   const label = page.locator('[data-board-piece="photo"] [data-board-label]');
-  await label.click();
-  await label.click();
+  const bar = await activate(page, 'photo');
+  await bar.locator('[data-edit-part-chip="Label"]').click();
   await page.locator('[data-edit-frame="label"]').waitFor();
 
   const photo = page.locator('[data-board-photo-card="fixture/photo.webp"]');

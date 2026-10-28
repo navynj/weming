@@ -175,6 +175,12 @@ const label = (root: ParentNode, id: string): HTMLElement =>
   q(root, `[data-board-piece="${id}"] [data-board-label]`);
 
 /** Lets a save at once (a release, an undo) leave, and its answer land. */
+/** Makes the piece on top active — All selected (H41) — then selects its label. */
+function editLabel(root: HTMLElement, id: string): void {
+  fireEvent.click(label(root, id));
+  fireEvent.click(label(root, id));
+}
+
 async function settle(): Promise<void> {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -253,8 +259,15 @@ describe('direct manipulation: which tap does what (review, 2026-10-27)', () => 
     expect(container.querySelector('[data-edit-frame]')).toBeNull();
     expect(container.querySelector('[data-edit-toolbar]')).toBeNull();
     fireEvent.click(label(container, 's1'));
-    expect(q(container, '[data-board-piece="s1"] [data-edit-frame="label"]')).not.toBeNull();
+    // All, selected as it becomes active (H41): moved as one, never turned or sized.
+    expect(
+      q(container, '[data-board-piece="s1"] [data-edit-frame="piece"]').dataset.editTools,
+    ).toBe('move');
+    expect(q(container, '[data-edit-part-chip="All"]').getAttribute('aria-selected')).toBe('true');
     expect(q(container, '[data-board-piece="s1"] [data-edit-toolbar]')).not.toBeNull();
+    // A tap on a part selects it.
+    fireEvent.click(label(container, 's1'));
+    expect(q(container, '[data-board-piece="s1"] [data-edit-frame="label"]')).not.toBeNull();
     // The label moves, turns and widens; its text size is the toolbar's stepper.
     expect(q(container, '[data-edit-frame="label"]').dataset.editTools).toBe('move rotate width');
     expect(q(container, '[data-edit-text-value]').textContent).toBe('10');
@@ -298,7 +311,7 @@ describe('direct manipulation: which tap does what (review, 2026-10-27)', () => 
 describe('direct manipulation: handles write layout units, once on release', () => {
   it('drags the label: the screen follows the finger, one save on release, in lanes and lines', async () => {
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     await drag(
       q(container, '[data-edit-frame="label"]'),
       [100, 100],
@@ -326,9 +339,31 @@ describe('direct manipulation: handles write layout units, once on release', () 
     expect(q(container, '[data-edit-status]').textContent).toBe('Saved');
   });
 
+  it('drags All: every part moves by the pointer’s distance, piece.x and piece.y saved once (H41)', async () => {
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22', { layout: { icon: { inline: false } } }),
+      card('s1', 'Grand Austria Hotel', '2026-10-21'),
+    ]);
+    fireEvent.click(label(container, 's2'));
+    const frame = q(container, '[data-board-piece="s2"] [data-edit-frame="piece"]');
+    // A drag anywhere inside the outline: it takes the pointer itself.
+    expect(frame.className).toContain('pointer-events-auto');
+    expect(frame.querySelector('[data-edit-handle]')).toBeNull();
+    const sticker = () => q(container, '[data-board-piece="s2"] [data-board-sticker]');
+    const moved = `translate(${COLUMN / 2}px, ${2 * LINE}px)`;
+    await drag(frame, [100, 100], [100 + COLUMN / 2, 100 + 2 * LINE], { release: false });
+    expect(label(container, 's2').style.transform).toBe(moved);
+    expect(sticker().style.transform).toBe(moved);
+    expect(saved).toHaveLength(0);
+    fireEvent.pointerUp(window, { clientX: 170, clientY: 126, pointerId: 1 });
+    await settle();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].patch).toEqual({ piece: { x: 0.5, y: 2 } });
+  });
+
   it('turns the label on the rotate handle, snapping to straight within 3 degrees, clamped to 45', async () => {
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     // jsdom draws nothing: the pivot reads at the origin, so angles are about (0, 0).
     await drag(q(container, '[data-edit-handle="rotate"]'), [0, -50], [50, 0]);
     await settle();
@@ -424,7 +459,7 @@ describe('direct manipulation: handles write layout units, once on release', () 
 
   it('widens a label from its right edge, the words rewrapping as it goes, once on release', async () => {
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     const before = parseFloat(label(container, 's2').style.width);
     await drag(q(container, '[data-edit-handle="width"]'), [0, 0], [70, 0], { release: false });
     const width = Number(((before + 70) / COLUMN).toFixed(2));
@@ -439,11 +474,11 @@ describe('direct manipulation: handles write layout units, once on release', () 
 
   it('tucks the width bar inside a label that reaches the board’s edge, where it would be clipped', () => {
     const edge = render(<Board cards={[card('sat', 'Saturday', '2026-10-24')]} canEdit />);
-    fireEvent.click(label(edge.container, 'sat'));
+    editLabel(edge.container, 'sat');
     expect(q(edge.container, '[data-edit-handle="width"]').hasAttribute('data-inside')).toBe(true);
     edge.unmount();
     const mid = render(<Board cards={[card('wed', 'Wednesday', '2026-10-21')]} canEdit />);
-    fireEvent.click(label(mid.container, 'wed'));
+    editLabel(mid.container, 'wed');
     expect(q(mid.container, '[data-edit-handle="width"]').hasAttribute('data-inside')).toBe(false);
   });
 
@@ -471,7 +506,7 @@ describe('direct manipulation: handles write layout units, once on release', () 
   it('steps the text size from the toolbar, saved after the rest like a slider', async () => {
     vi.useFakeTimers();
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     fireEvent.click(q(container, '[data-edit-text-larger]'));
     fireEvent.click(q(container, '[data-edit-text-larger]'));
     expect(q(container, '[data-edit-text-value]').textContent).toBe('12');
@@ -496,7 +531,7 @@ describe('direct manipulation: handles write layout units, once on release', () 
 describe('direct manipulation: undo', () => {
   it('puts back the previous value and saves it — a field that was Auto is Auto again', async () => {
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     expect(q(container, '[data-edit-undo]').hasAttribute('disabled')).toBe(true);
     await drag(q(container, '[data-edit-frame="label"]'), [100, 100], [170, 126]);
     await settle();
@@ -513,7 +548,7 @@ describe('direct manipulation: undo', () => {
       card('s2', 'Lynn Canyon', '2026-10-22', { layout: { label: { x: 0.2 } } }),
       card('s1', 'Grand Austria Hotel', '2026-10-21'),
     ]);
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     await drag(q(container, '[data-edit-frame="label"]'), [100, 100], [170, 100 + LINE]);
     await settle();
     expect(saved[0].patch).toEqual({ label: { x: 0.7, y: 1 } });
@@ -525,7 +560,7 @@ describe('direct manipulation: undo', () => {
   it('nudges on the arrows and turns on the brackets (desktop keyboard)', async () => {
     vi.useFakeTimers();
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     fireEvent.keyDown(window, { key: 'ArrowRight', shiftKey: true });
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: ']' });
@@ -540,7 +575,7 @@ describe('direct manipulation: undo', () => {
   it('says why in a refusal, and takes the change back', async () => {
     answer = async () => ({ ok: false, message: 'The layout could not be saved.' });
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     await drag(q(container, '[data-edit-frame="label"]'), [100, 100], [170, 100]);
     await settle();
     expect(label(container, 's2').style.transform).toBe('');
@@ -634,7 +669,7 @@ describe('direct manipulation: the page around it', () => {
   it('moves the slider as the handle moves: one value, two controls', async () => {
     media(true);
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     fireEvent.click(q(container, '[data-edit-more]'));
     await drag(q(container, '[data-edit-frame="label"]'), [100, 100], [170, 100], {
       release: false,
@@ -700,25 +735,25 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
       layout: { ...hidden[0].layout, photos: { [P1]: { hidden: true } } },
     };
     const { container } = home(hidden);
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     const names = () =>
       [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')].map(
         (c) => c.textContent,
       );
     // Its own name, in the order it was added; the icon inline in the caption has a tab too.
-    expect(names()).toEqual(['Label', 'Icon', 'Photo 1', 'Photo 2', 'Wave']);
+    expect(names()).toEqual(['All', 'Label', 'Icon', 'Photo 1', 'Photo 2']);
     const tab = q(container, '[data-edit-part-chip="Photo 2"]');
     expect(tab.hasAttribute('data-edit-part-hidden')).toBe(true);
     expect(tab.className).toContain('line-through');
     fireEvent.click(tab);
     expect(tab.getAttribute('aria-selected')).toBe('true');
-    // Where it would be, dashed; no handles; row 2 its eye alone, off.
+    // Where it would be, dashed; no handles; row 2 its eye, off (then a desktop's layers).
     expect(q(container, '[data-edit-ghost="photo"]').className).toContain('outline-dashed');
     expect(container.querySelector('[data-board-piece="s2"] [data-edit-frame]')).toBeNull();
     const row = q(container, '[data-edit-part-row]');
-    expect([...row.querySelectorAll('button')].map((b) => b.getAttribute('data-edit-eye'))).toEqual(
-      ['off'],
-    );
+    expect(row.firstElementChild!.getAttribute('data-edit-eye')).toBe('off');
+    expect(row.querySelectorAll('[data-edit-eye]')).toHaveLength(1);
+    expect(row.querySelector('[data-edit-text-size], [data-edit-style]')).toBeNull();
     fireEvent.click(q(row, '[data-edit-eye]'));
     // Shown at once: no longer struck, outlined as itself.
     expect(
@@ -729,7 +764,7 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
 
   it('tabs each part, the selected one in ink and underlined, and a tab selects its part (review)', () => {
     const { container } = home(busy());
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     const tab = (name: string) => q(container, `[data-edit-part-chip="${name}"]`);
     expect(tab('Label').getAttribute('role')).toBe('tab');
     expect(tab('Label').getAttribute('aria-selected')).toBe('true');
@@ -744,8 +779,8 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
       q(container, `[data-board-photo-card="${P1}"]`).style.width,
     );
     expect(tab('Photo 2').getAttribute('aria-selected')).toBe('true');
-    fireEvent.click(tab('Wave'));
-    expect(q(container, '[data-edit-frame="wave"]')).not.toBeNull();
+    // No wave tab, and no wave drawn (H41).
+    expect(container.querySelector('[data-edit-part-chip="Wave"]')).toBeNull();
     expect(saved).toHaveLength(0);
   });
 
@@ -778,12 +813,16 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     vi.useRealTimers();
   });
 
-  it('keeps a wave that is off as a hidden tab', () => {
-    const { container } = home();
+  it('draws no wave and has no Wave tab, a stored wave kept but ignored (H41)', () => {
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22', { layout: { wave: { on: true, x: 1 } } }),
+      card('s1', 'Grand Austria Hotel', '2026-10-21'),
+    ]);
+    expect(container.querySelector('[data-board-wave]')).toBeNull();
     fireEvent.click(label(container, 's2'));
-    expect(q(container, '[data-edit-part-chip="Wave"]').hasAttribute('data-edit-part-hidden')).toBe(
-      true,
-    );
+    expect(container.querySelector('[data-edit-part-chip="Wave"]')).toBeNull();
+    // A wave moved by hand no longer marks the piece as moved.
+    expect(q(container, '[data-board-piece="s2"]').hasAttribute('data-board-moved')).toBe(false);
   });
 
   it('stands above the part, else right, below, left: the first spot clear of its siblings and its own handles', () => {
@@ -794,7 +833,7 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     });
     try {
       const { container } = home(busy());
-      fireEvent.click(label(container, 's2'));
+      editLabel(container, 's2');
       const seat = q(container, '[data-edit-rotate-seat]');
       expect(seat.dataset.editRotateSeat).toBe('bottom');
       expect(seat.hasAttribute('data-clear')).toBe(true);
@@ -808,7 +847,7 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
 
   it('stands above where it is when nothing is in the way', () => {
     const { container } = home(busy());
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     expect(q(container, '[data-edit-rotate-seat]').dataset.editRotateSeat).toBe('top');
   });
 
@@ -818,7 +857,7 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     );
     try {
       const { container } = home(busy());
-      fireEvent.click(label(container, 's2'));
+      editLabel(container, 's2');
       const seat = q(container, '[data-edit-rotate-seat]');
       expect(seat.dataset.editRotateSeat).toBe('top');
       expect(seat.hasAttribute('data-clear')).toBe(false);
@@ -830,7 +869,7 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
 
   it('a tap on the handle over a sibling selects the sibling; only a drag turns', async () => {
     const { container } = home(busy());
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     const photo = q(container, `[data-board-photo-card="${P0}"]`);
     const handle = q(container, '[data-edit-handle="rotate"]');
     const original = document.elementsFromPoint;
@@ -860,7 +899,7 @@ describe('the toolbar on a phone (review)', () => {
   }
   const PATH = 'a1/s2-0.webp';
 
-  it('is three rows, the board wide: the tabs, the part’s own, the actions; no layer buttons', () => {
+  it('is docked at the foot, three rows: tabs and More, the part’s own, Undo to Done (H41)', () => {
     const restore = phoneWidth();
     try {
       const { container } = home([
@@ -868,31 +907,41 @@ describe('the toolbar on a phone (review)', () => {
         card('s1', 'Grand Austria Hotel', '2026-10-21'),
       ]);
       fireEvent.click(label(container, 's2'));
-      const bar = q(container, '[data-edit-toolbar]');
-      expect(bar.hasAttribute('data-phone')).toBe(true);
-      expect(bar.style.width).toBe('358px');
+      // Out of the board, fixed to the screen's foot at full width.
+      expect(container.querySelector('[data-edit-toolbar]')).toBeNull();
+      const bar = q(document, '[data-edit-toolbar]');
+      expect(bar.parentElement).toBe(document.body);
+      expect(bar.hasAttribute('data-docked')).toBe(true);
+      expect(bar.className).toMatch(/\bfixed\b.*\binset-x-0\b.*\bbottom-0\b/);
+      expect(bar.className).toContain('pb-[env(safe-area-inset-bottom,0px)]');
       const rows = [...bar.children].map((row) =>
-        row.hasAttribute('data-edit-parts')
-          ? 'parts'
+        row.hasAttribute('data-edit-tab-row')
+          ? 'tabs'
           : row.hasAttribute('data-edit-part-row')
             ? 'part'
             : row.hasAttribute('data-edit-actions')
               ? 'actions'
               : '?',
       );
-      expect(rows).toEqual(['parts', 'part', 'actions']);
-      expect(q(bar, '[data-edit-parts]').className).toContain('overflow-x-auto');
+      expect(rows).toEqual(['tabs', 'part', 'actions']);
+      const tabs = q(bar, '[data-edit-tab-row]');
+      expect(q(tabs, '[data-edit-parts]').className).toContain('overflow-x-auto');
+      // More at the right end of the tab row.
+      expect(tabs.lastElementChild!.hasAttribute('data-edit-more')).toBe(true);
+      // All, selected by default: its row is the four layer buttons, on a phone too.
       const part = q(bar, '[data-edit-part-row]');
+      expect(part.querySelectorAll('[data-edit-layer]')).toHaveLength(4);
+      fireEvent.click(label(container, 's2'));
       expect(part.querySelector('[data-edit-eye]')).not.toBeNull();
       expect(part.querySelector('[data-edit-text-size]')).not.toBeNull();
       expect(part.querySelector('[data-edit-style]')).not.toBeNull();
-      const actions = q(bar, '[data-edit-actions]');
-      expect(actions.querySelector('[data-edit-undo]')).not.toBeNull();
-      expect(actions.querySelector('[data-edit-more]')).not.toBeNull();
-      expect(actions.querySelector('[data-edit-done]')).not.toBeNull();
       expect(bar.querySelector('[data-edit-layer]')).toBeNull();
+      // Undo first, Done last.
+      const actions = q(bar, '[data-edit-actions]');
+      expect(actions.firstElementChild!.hasAttribute('data-edit-undo')).toBe(true);
+      expect(actions.lastElementChild!.hasAttribute('data-edit-done')).toBe(true);
       // Every row keeps its height, a finger's 44px.
-      for (const row of [part, actions]) expect(row.className).toMatch(/\bh-11\b/);
+      for (const row of [tabs, part, actions]) expect(row.className).toMatch(/\bh-11\b/);
       for (const button of bar.querySelectorAll('button'))
         expect(button.className).toMatch(/\bh-11\b/);
     } finally {
@@ -907,8 +956,8 @@ describe('the toolbar on a phone (review)', () => {
         card('s2', 'Lynn Canyon', '2026-10-22'),
         card('s1', 'Grand Austria Hotel', '2026-10-21', { layout: { label: { x: 1 } } }),
       ]);
-      fireEvent.click(label(container, 's2'));
-      fireEvent.click(q(container, '[data-edit-more]'));
+      editLabel(container, 's2');
+      fireEvent.click(q(document, '[data-edit-more]'));
       const sheet = q(container, '[data-layout-sheet]');
       const body = q(sheet, '[data-layout-body]');
       // At the top, after the part tabs More shows while the toolbar's row is out of sight.
@@ -924,20 +973,35 @@ describe('the toolbar on a phone (review)', () => {
       await act(() => new Promise((resolve) => setTimeout(resolve, LAYOUT_SAVE_MS + 20)));
       expect(saved[0].patch).toEqual({ piece: { layer: -1 } });
       // Let go, and More has no layers to offer.
-      fireEvent.click(q(container, '[data-edit-done]'));
+      fireEvent.click(q(document, '[data-edit-done]'));
       expect(container.querySelector('[data-layout-layers]')).toBeNull();
     } finally {
       restore();
     }
   });
 
-  it('keeps the layer buttons in the toolbar on a desktop', () => {
+  it('places the layer buttons on a desktop: All’s row, a part’s row after its own, the label’s last row (H41)', () => {
     media(true);
-    const { container } = home();
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22', { layout: { icon: { inline: false } } }),
+      card('s1', 'Grand Austria Hotel', '2026-10-21'),
+    ]);
     fireEvent.click(label(container, 's2'));
     const bar = q(container, '[data-edit-toolbar]');
     expect(bar.hasAttribute('data-phone')).toBe(false);
-    expect(bar.querySelectorAll('[data-edit-layer]')).toHaveLength(4);
+    const layersIn = (row: string) =>
+      q(container, row).querySelectorAll('[data-edit-layer]').length;
+    expect(layersIn('[data-edit-part-row]')).toBe(4);
+    expect(layersIn('[data-edit-actions]')).toBe(0);
+    fireEvent.click(q(container, '[data-edit-part-chip="Icon"]'));
+    expect(layersIn('[data-edit-part-row]')).toBe(4);
+    // After the icon's own controls.
+    const row = q(container, '[data-edit-part-row]');
+    expect(row.firstElementChild!.hasAttribute('data-edit-eye')).toBe(true);
+    expect(row.lastElementChild!.hasAttribute('data-edit-layers')).toBe(true);
+    fireEvent.click(q(container, '[data-edit-part-chip="Label"]'));
+    expect(layersIn('[data-edit-part-row]')).toBe(0);
+    expect(layersIn('[data-edit-actions]')).toBe(4);
   });
 });
 
@@ -956,8 +1020,9 @@ describe('More on a phone: Undo and Done in its header, the chips when out of si
   ];
   function openMore(cards: Card[] = pictured()) {
     const view = home(cards);
-    fireEvent.click(label(view.container, 's2'));
-    fireEvent.click(q(view.container, '[data-edit-more]'));
+    editLabel(view.container, 's2');
+    // Docked on a phone (H41): the toolbar is the page's, not the board's.
+    fireEvent.click(q(document, '[data-edit-more]'));
     return view;
   }
 
@@ -983,11 +1048,11 @@ describe('More on a phone: Undo and Done in its header, the chips when out of si
       const { container } = openMore();
       fireEvent.click(q(container, '[data-layout-sheet-close]'));
       expect(container.querySelector('[data-layout-sheet]')).toBeNull();
-      expect(container.querySelector('[data-edit-toolbar]')).not.toBeNull();
-      fireEvent.click(q(container, '[data-edit-more]'));
+      expect(document.querySelector('[data-edit-toolbar]')).not.toBeNull();
+      fireEvent.click(q(document, '[data-edit-more]'));
       fireEvent.click(q(container, '[data-layout-sheet-done]'));
       expect(container.querySelector('[data-layout-sheet]')).toBeNull();
-      expect(container.querySelector('[data-edit-toolbar]')).toBeNull();
+      expect(document.querySelector('[data-edit-toolbar]')).toBeNull();
       expect(container.querySelector('[data-edit-frame]')).toBeNull();
     } finally {
       restore();
@@ -1023,9 +1088,9 @@ describe('More on a phone: Undo and Done in its header, the chips when out of si
       const body = q(container, '[data-layout-body]');
       expect(body.firstElementChild!.hasAttribute('data-layout-parts')).toBe(true);
       const chips = [...body.querySelectorAll('[data-layout-parts] [data-edit-part-chip]')];
-      expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Icon', 'Photo 1', 'Wave']);
+      expect(chips.map((c) => c.textContent)).toEqual(['All', 'Label', 'Icon', 'Photo 1']);
       expect(chips[0].className).toContain('h-11');
-      fireEvent.click(chips[2]);
+      fireEvent.click(chips[3]);
       expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
       expect(q(body, '[data-edit-part-chip="Photo 1"]').getAttribute('aria-pressed')).toBe('true');
     } finally {
@@ -1065,9 +1130,6 @@ describe('More on a phone: Undo and Done in its header, the chips when out of si
 });
 
 describe('the toolbar’s style swatch and eye (0058)', () => {
-  // Its wave on, so a part besides the label can be picked.
-  const waved = (): Card[] =>
-    TWO.map((c) => (c.splash.id === 's2' ? { ...c, layout: { wave: { on: true } } } : c));
   const rest = async () =>
     act(async () => {
       vi.advanceTimersByTime(LAYOUT_SAVE_MS);
@@ -1077,7 +1139,7 @@ describe('the toolbar’s style swatch and eye (0058)', () => {
   it('picks a style from the swatch, drawn at once and saved after the rest; Auto hands it back', async () => {
     vi.useFakeTimers();
     const { container } = home();
-    fireEvent.click(label(container, 's2'));
+    editLabel(container, 's2');
     const swatch = q(container, '[data-edit-style]');
     expect(swatch.getAttribute('data-edit-style')).toBe('auto');
     fireEvent.click(swatch);
@@ -1094,18 +1156,20 @@ describe('the toolbar’s style swatch and eye (0058)', () => {
     vi.useRealTimers();
   });
 
-  it('offers the swatch only while the label is selected', () => {
-    const { container } = home(waved());
-    fireEvent.click(label(container, 's2'));
+  it('offers the swatch only while the label is selected; All has no eye', () => {
+    const { container } = home();
+    editLabel(container, 's2');
     expect(container.querySelector('[data-edit-style]')).not.toBeNull();
-    fireEvent.click(q(container, '[data-edit-part-chip="Wave"]'));
+    fireEvent.click(q(container, '[data-edit-part-chip="Icon"]'));
     expect(container.querySelector('[data-edit-style]')).toBeNull();
     expect(container.querySelector('[data-edit-eye]')).not.toBeNull();
+    fireEvent.click(q(container, '[data-edit-part-chip="All"]'));
+    expect(container.querySelector('[data-edit-eye]')).toBeNull();
   });
 
   it('hides the selected part with the eye; the last one shown keeps it', () => {
-    const { container } = home(waved());
-    fireEvent.click(label(container, 's2'));
+    const { container } = home();
+    editLabel(container, 's2');
     fireEvent.click(q(container, '[data-edit-eye]'));
     // The label is gone from the board; its chip, crossed out, brings it back.
     expect(container.querySelector('[data-board-piece="s2"] [data-board-label]')).toBeNull();
@@ -1117,7 +1181,7 @@ describe('the toolbar’s style swatch and eye (0058)', () => {
     cleanup();
     const plain = TWO.find((c) => c.splash.id === 's1')!;
     const only = home([{ ...plain, layout: { icon: { hidden: true } } }]);
-    fireEvent.click(label(only.container, 's1'));
+    editLabel(only.container, 's1');
     const eye = q(only.container, '[data-edit-eye]');
     expect(eye.hasAttribute('disabled')).toBe(true);
     expect(eye.getAttribute('title')).toBe('Keep at least one');
