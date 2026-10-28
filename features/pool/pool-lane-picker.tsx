@@ -104,7 +104,7 @@ export function PoolLanePicker({
             </label>
           </span>
           {others.length > 0 ? (
-            <div className="no-scrollbar flex gap-2 overflow-x-auto">
+            <div className="no-scrollbar flex gap-3 overflow-x-auto">
               {others.map((member) => {
                 const on = picked.includes(member.id);
                 const kept = fixedEveryone || fixed.includes(member.id);

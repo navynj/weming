@@ -38,13 +38,14 @@ export function WithFace({
       <Avatar
         id={id}
         initials={initials}
-        className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold ${
+        // 32px on a phone, 36px wide (review).
+        className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold lg:h-9 lg:w-9 lg:text-xs ${
           on ? 'bg-ink ring-ink text-white ring-2 ring-offset-2' : 'bg-pool-100 text-pool-500'
         }`}
       />
       <span
         data-with-name
-        className={`w-full truncate text-center text-[10px] ${on ? 'text-ink font-semibold' : 'text-pool-500'}`}
+        className={`w-full truncate text-center text-[11px] ${on ? 'text-ink font-semibold' : 'text-pool-500'}`}
       >
         {name}
       </span>

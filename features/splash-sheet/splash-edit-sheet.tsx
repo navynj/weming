@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 import { AnnotationControl } from '@/features/input-sheet/annotation-control';
 import { annotationVerdict, type Annotation } from '@/features/input-sheet/draft';
 import { useInputSheet, type PendingEdit } from '@/features/input-sheet/sheet-provider';
@@ -13,7 +12,8 @@ import type { PoolScope } from '@/features/pool/compose-scope';
 import type { Conversion } from './conversion';
 import { loadSplashEdit, saveSplashEdit, type SplashEditState } from './edit-actions';
 import { useEditLanes } from './edit-lanes';
-import { SHEET_MAX_HEIGHT, type SheetContext } from './splash-sheet';
+import { SheetFooter, SheetFrame } from './sheet-frame';
+import type { SheetContext } from './splash-sheet';
 
 type Loaded = Extract<SplashEditState, { ok: true }>;
 
@@ -64,56 +64,44 @@ export function SplashEditSheet({
   }, [splashId]);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col justify-end">
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className="bg-main-900/60 scrim-in absolute inset-0"
-      />
-      <section
-        role="dialog"
-        aria-label="Edit splash"
-        data-edit-sheet
-        className={`sheet-rise relative mx-auto flex w-full ${COLUMN_MAX_WIDTH} ${SHEET_MAX_HEIGHT} flex-col overflow-hidden rounded-t-[32px] bg-white`}
-      >
-        <div
-          className="flex min-h-0 flex-col overflow-y-auto px-7 pt-8"
-          style={{ paddingBottom: 'calc(1.75rem + env(safe-area-inset-bottom, 0px))' }}
-        >
-          {loaded ? (
-            <EditForm
-              initial={loaded}
-              context={context}
-              pool={pool}
-              onCancel={onClose}
-              onSave={(edit) => {
-                // Shown at once everywhere the splash is drawn (CLAUDE.md, the
-                // principle) — a move or a change of kind too (0020, 0022).
-                markEdited(splashId, {
-                  title: edit.title,
-                  icon: edit.icon,
-                  declaredLaneId: edit.kind === 'mine' ? edit.declaredLaneId : undefined,
-                  ...pendingFor(edit.conversion, loaded),
-                });
-                onClose();
-                void saveSplashEdit({ id: splashId, ...edit }).then((done) => {
-                  if (!done.ok) {
-                    clearEdited(splashId);
-                    dropFailed(done.message);
-                    return;
-                  }
-                  router.refresh();
-                  window.setTimeout(() => clearEdited(splashId), SETTLE_MS);
-                });
-              }}
-            />
-          ) : (
-            <p className="text-pool-500 py-6 text-sm">{message ?? 'Opening…'}</p>
-          )}
-        </div>
-      </section>
-    </div>
+    <SheetFrame
+      label="Edit splash"
+      onClose={onClose}
+      data={{ 'data-edit-sheet': '' }}
+      // The form ends in its pinned Cancel and Save; the loading line does not.
+      footer={Boolean(loaded)}
+    >
+      {loaded ? (
+        <EditForm
+          initial={loaded}
+          context={context}
+          pool={pool}
+          onCancel={onClose}
+          onSave={(edit) => {
+            // Shown at once everywhere the splash is drawn (CLAUDE.md, the
+            // principle) — a move or a change of kind too (0020, 0022).
+            markEdited(splashId, {
+              title: edit.title,
+              icon: edit.icon,
+              declaredLaneId: edit.kind === 'mine' ? edit.declaredLaneId : undefined,
+              ...pendingFor(edit.conversion, loaded),
+            });
+            onClose();
+            void saveSplashEdit({ id: splashId, ...edit }).then((done) => {
+              if (!done.ok) {
+                clearEdited(splashId);
+                dropFailed(done.message);
+                return;
+              }
+              router.refresh();
+              window.setTimeout(() => clearEdited(splashId), SETTLE_MS);
+            });
+          }}
+        />
+      ) : (
+        <p className="text-pool-500 py-6 text-sm">{message ?? 'Opening…'}</p>
+      )}
+    </SheetFrame>
   );
 }
 
@@ -236,13 +224,15 @@ function EditForm({
           {initial.title || 'Untitled'}
         </p>
         {lanes.node}
-        <button
-          type="button"
-          onClick={onCancel}
-          className="border-pool-200 text-ink rounded-full border py-2.5 text-base font-medium"
-        >
-          Done
-        </button>
+        <SheetFooter>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="border-pool-200 text-ink w-full rounded-full border py-2.5 text-base font-medium"
+          >
+            Done
+          </button>
+        </SheetFooter>
       </div>
     );
   }
@@ -304,24 +294,26 @@ function EditForm({
 
       {lanes.node}
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="border-pool-200 text-ink flex-1 rounded-full border py-2.5 text-base font-medium"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          data-edit-save
-          disabled={!changed || !rangeOk}
-          onClick={save}
-          className="bg-main-900 flex-1 rounded-full py-2.5 text-base font-semibold text-white disabled:opacity-40"
-        >
-          Save
-        </button>
-      </div>
+      <SheetFooter>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="border-pool-200 text-ink flex-1 rounded-full border py-2.5 text-base font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-edit-save
+            disabled={!changed || !rangeOk}
+            onClick={save}
+            className="bg-main-900 flex-1 rounded-full py-2.5 text-base font-semibold text-white disabled:opacity-40"
+          >
+            Save
+          </button>
+        </div>
+      </SheetFooter>
     </div>
   );
 

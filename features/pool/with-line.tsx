@@ -42,7 +42,7 @@ export function WithLine({
         </label>
       </span>
       {faces.length > 0 ? (
-        <div className="no-scrollbar flex gap-2 overflow-x-auto">
+        <div className="no-scrollbar flex gap-3 overflow-x-auto">
           {faces.map((face) => {
             const on = picked.includes(face.id);
             return (

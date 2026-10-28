@@ -29,6 +29,7 @@ import type { IsoDate } from '@/lib/time';
 import { usePeople } from '@/features/people/people-provider';
 import type { PendingDrop } from '@/features/input-sheet/sheet-provider';
 
+import { SheetFooter } from './sheet-frame';
 import { composeDrop } from './split-title';
 
 export type SheetContext = {
@@ -462,15 +463,18 @@ export function SplashComposer({
         </div>
       )}
 
-      {/* Blue means action: the one filled thing here commits (H20f). */}
-      <button
-        type="button"
-        disabled={!hasContent || !annotationOk || !poolReady}
-        onClick={drop}
-        className="bg-main-900 w-full rounded-full py-2.5 text-xl font-medium text-white disabled:opacity-50"
-      >
-        Drop
-      </button>
+      {/* Blue means action: the one filled thing here commits (H20f).
+          Pinned to the sheet's bottom, in reach above the keyboard. */}
+      <SheetFooter>
+        <button
+          type="button"
+          disabled={!hasContent || !annotationOk || !poolReady}
+          onClick={drop}
+          className="bg-main-900 w-full rounded-full py-2.5 text-xl font-medium text-white disabled:opacity-50"
+        >
+          Drop
+        </button>
+      </SheetFooter>
     </div>
   );
 }
