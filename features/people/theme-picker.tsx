@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 import { DEFAULT_THEME, THEMES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
@@ -68,45 +69,48 @@ export function ThemePicker() {
               </span>
             }
           />
-          {/* The pool's own default (review): a quiet step further, closed each
-              time the sheet opens; its colour shows on the button when set. */}
-          {poolOpen ? (
-            <Colours
-              name="Pool default color"
-              hint="Everyone here sees it, unless they choose their own."
-              value={place.colors.pool}
-              mode={theme.mode}
-              clear="None"
-              data="pool"
-              onPick={(color) => void done(choosePoolColor(color))}
-            />
-          ) : (
+          {/* The pool's own default (review): a row that folds it, closed each
+              time the sheet opens; its colour shows before the chevron when set. */}
+          <div data-theme-pool className="flex flex-col gap-3">
             <button
               type="button"
               data-theme-pool-open
-              onClick={() => setPoolOpen(true)}
-              className="text-main-900 flex items-center gap-2 self-start text-sm font-semibold"
+              aria-expanded={poolOpen}
+              onClick={() => setPoolOpen((open) => !open)}
+              className="text-main-900 flex w-full items-center gap-2 text-left text-sm font-semibold"
             >
+              <span className="min-w-0 flex-1">Set default color for this Pool</span>
               {place.colors.pool ? (
-                <>
-                  Pool default color:
-                  <span
-                    aria-label={THEMES.find((t) => t.key === place.colors.pool)?.name}
-                    data-theme-pool-swatch={place.colors.pool}
-                    className="h-5 w-5 rounded-full"
-                    style={{
-                      backgroundColor:
-                        theme.mode === 'pastel'
-                          ? THEMES.find((t) => t.key === place.colors.pool)?.pastel.fill
-                          : THEMES.find((t) => t.key === place.colors.pool)?.hex,
-                    }}
-                  />
-                </>
+                <span
+                  aria-label={THEMES.find((t) => t.key === place.colors.pool)?.name}
+                  data-theme-pool-swatch={place.colors.pool}
+                  className="h-5 w-5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      theme.mode === 'pastel'
+                        ? THEMES.find((t) => t.key === place.colors.pool)?.pastel.fill
+                        : THEMES.find((t) => t.key === place.colors.pool)?.hex,
+                  }}
+                />
+              ) : null}
+              {poolOpen ? (
+                <ChevronUp aria-hidden size={18} className="text-pool-500 shrink-0" />
               ) : (
-                'Set default color for this Pool'
+                <ChevronDown aria-hidden size={18} className="text-pool-500 shrink-0" />
               )}
             </button>
-          )}
+            {poolOpen ? (
+              <Colours
+                name="Pool default color"
+                hint="Everyone here sees it, unless they choose their own."
+                value={place.colors.pool}
+                mode={theme.mode}
+                clear="None"
+                data="pool"
+                onPick={(color) => void done(choosePoolColor(color))}
+              />
+            ) : null}
+          </div>
         </>
       ) : (
         <>
@@ -188,7 +192,7 @@ export function ThemePicker() {
 
 /**
  * Twelve colours as swatches, the chosen one ringed in ink; `clear` offers
- * none. `heading` false: the swatches stand alone, `name` their label only.
+ * none, as the grid's last swatch: white, outlined, struck through in red. `heading` false: the swatches stand alone, `name` their label only.
  * `muted`: shown faded, none chosen, still a tap to choose; `trailing` sits
  * at the heading's far right.
  */
@@ -250,21 +254,29 @@ function Colours({
             />
           );
         })}
+        {clear ? (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={value === null}
+            aria-label={clear}
+            title={clear}
+            data-theme-clear={data}
+            onClick={() => onPick(null)}
+            className={`border-pool-200 relative h-9 w-9 justify-self-center overflow-hidden rounded-full border ${
+              value === null ? 'ring-ink ring-2 ring-offset-2' : ''
+            }`}
+            // White on any ground, whatever a mode makes of `white` there.
+            style={{ backgroundColor: '#ffffff' }}
+          >
+            {/* No colour: a thin red stroke from corner to corner. */}
+            <span
+              aria-hidden
+              className="absolute top-1/2 left-1/2 h-px w-[130%] -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-red-500"
+            />
+          </button>
+        ) : null}
       </div>
-      {clear ? (
-        <button
-          type="button"
-          role="radio"
-          aria-checked={value === null}
-          data-theme-clear={data}
-          onClick={() => onPick(null)}
-          className={`self-start rounded-full px-3 py-1.5 text-xs font-medium ${
-            value === null ? 'bg-ink text-white' : 'border-pool-200 text-pool-500 border'
-          }`}
-        >
-          {clear}
-        </button>
-      ) : null}
     </div>
   );
 }
