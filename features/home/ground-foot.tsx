@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 
 import { Monogram } from '@/components/ui/monogram';
 import { useAxisLock } from '@/components/ui/use-axis-lock';
@@ -154,7 +154,7 @@ export function GroundFoot({
         onClick={onCompose}
         className="text-main-900 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white"
       >
-        <Plus aria-hidden size={24} />
+        <Pencil aria-hidden size={22} />
       </button>
     </div>
   );
