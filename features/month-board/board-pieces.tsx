@@ -30,6 +30,7 @@ import {
   type BoardTape,
   type LabelStyle,
   type PhotoCard,
+  photoMove,
 } from './layout';
 import { handMoved, isPeriod, mergeLayout, type BoardLayoutJson } from './board-layout';
 import {
@@ -54,6 +55,7 @@ import {
   type PartBox,
   type PartValues,
 } from './handle-math';
+import { learnsAspect } from './photo-aspects';
 import { overAll, zOf, type LayerMove, type Stacking } from './stacking';
 import type { BoardEditing } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -498,21 +500,21 @@ function OpenSlot({
 }
 
 /**
- * One photo card: square, no frame, the image cropped to fill it; standing
- * on the photo area's bottom edge, a card behind peeking above the one in
- * front.
+ * One photo card: no frame, the whole image in its own ratio — never cropped
+ * (review, 2026-10-27) — standing on the photo area's bottom edge, a card
+ * behind peeking above the one in front. Until it loads it holds a 4:3
+ * placeholder; on load its ratio is learned and the layout makes room. Once
+ * drawn there is nothing behind it, so a cutout floats on the water.
  */
 function PhotoCardView({
   photo,
   url,
-  area,
   more,
   moved,
   children,
 }: {
   photo: PhotoCard;
   url: string | null | undefined;
-  area: Box;
   more: number;
   /** Its offset and tilt set by hand, drawn without moving anything else (review). */
   moved: string | undefined;
@@ -525,10 +527,10 @@ function PhotoCardView({
       data-size={photo.size}
       className="pointer-events-auto absolute block cursor-pointer"
       style={{
-        left: 0,
-        top: area.h - photo.dy - photo.size,
-        width: photo.size,
-        height: photo.size,
+        left: photo.x,
+        top: photo.y,
+        width: photo.w,
+        height: photo.h,
         transform: moved,
       }}
     >
@@ -540,7 +542,8 @@ function PhotoCardView({
           alt=""
           draggable={false}
           data-board-photo
-          className="block h-full w-full object-cover"
+          {...learnsAspect(photo.path)}
+          className="block h-full w-full object-contain"
         />
       ) : (
         <span aria-hidden data-board-photo-pending className="block h-full w-full bg-white/20" />
@@ -620,9 +623,7 @@ export function BoardPieceView({
       if (part.kind !== 'photo' || !piece.photoBox) return null;
       const photo = piece.fan.find((p) => p.path === part.path);
       const area = piece.photoBox;
-      return photo
-        ? { x: area.x, y: area.y + area.h - photo.dy - photo.size, w: photo.size, h: photo.size }
-        : null;
+      return photo ? { x: area.x + photo.x, y: area.y + photo.y, w: photo.w, h: photo.h } : null;
     };
     const box = local();
     return box ? { ...box, x: piece.x + box.x, y: piece.y + box.y } : null;
@@ -725,6 +726,12 @@ export function BoardPieceView({
       selected?.kind === 'photo'
         ? (piece.fan.find((p) => p.path === selected.path)?.size ?? 0)
         : (piece.stickerBox?.w ?? 0),
+    // A photo's own box (its ratio, never cropped): its corner runs on that diagonal.
+    sizeBox: (() => {
+      if (selected?.kind !== 'photo') return undefined;
+      const photo = piece.fan.find((p) => p.path === selected.path);
+      return photo ? { w: photo.w, h: photo.h } : undefined;
+    })(),
     labelW: label.w,
   };
   const period = isPeriod(card.splash);
@@ -759,10 +766,10 @@ export function BoardPieceView({
               const area = piece.photoBox;
               return photo && area
                 ? {
-                    x: area.x,
-                    y: area.y + area.h - photo.dy - photo.size,
-                    w: photo.size,
-                    h: photo.size,
+                    x: area.x + photo.x,
+                    y: area.y + photo.y,
+                    w: photo.w,
+                    h: photo.h,
                   }
                 : null;
             })();
@@ -772,7 +779,11 @@ export function BoardPieceView({
         ? layout.label
         : selected.kind === 'icon'
           ? layout.icon
-          : layout.photos?.[selected.path];
+          : (() => {
+              const photo = piece.fan.find((p) => p.path === selected.path);
+              const set = layout.photos?.[selected.path];
+              return photo ? photoMove(set, photo) : set;
+            })();
     return (
       <span
         aria-hidden
@@ -847,10 +858,9 @@ export function BoardPieceView({
                 key={photo.path}
                 photo={photo}
                 url={photos[photo.path]}
-                area={piece.photoBox!}
                 more={at === top ? piece.morePhotos : 0}
                 moved={moveOf(
-                  nudge(layout.photos?.[photo.path], layout.piece),
+                  nudge(photoMove(layout.photos?.[photo.path], photo), layout.piece),
                   metrics.column,
                   line,
                 )}

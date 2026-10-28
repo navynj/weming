@@ -42,10 +42,17 @@ export async function downscale(picked: File): Promise<File> {
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
+  // A format that can carry transparency stays one (review, 2026-10-27): a
+  // cutout flattened to JPEG would arrive on black. A browser that cannot
+  // encode WebP hands back a PNG, which keeps it too.
+  const alpha = /^image\/(png|webp|gif)$/.test(file.type);
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', QUALITY),
+    canvas.toBlob(resolve, alpha ? 'image/webp' : 'image/jpeg', QUALITY),
   );
   if (!blob) return file;
 
-  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+  const ext = blob.type === 'image/webp' ? '.webp' : blob.type === 'image/png' ? '.png' : '.jpg';
+  return new File([blob], file.name.replace(/\.[^.]+$/, '') + ext, {
+    type: blob.type || 'image/jpeg',
+  });
 }

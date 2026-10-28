@@ -457,7 +457,7 @@ export function LayoutControls({
                   <img
                     src={signed[photo.path]!}
                     alt={`Photo ${at + 1}`}
-                    className="h-10 w-10 shrink-0 object-cover"
+                    className="h-10 w-10 shrink-0 object-contain"
                   />
                 ) : (
                   <span aria-hidden className="h-10 w-10 shrink-0 bg-white/20" />

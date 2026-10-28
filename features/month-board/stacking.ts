@@ -1,5 +1,5 @@
 import type { BoardLayoutJson } from './board-layout';
-import type { BoardPiece, Box } from './layout';
+import { photoMove, type BoardPiece, type Box } from './layout';
 
 /**
  * One stacking order for a whole board view (review, 2026-10-27): every
@@ -69,12 +69,12 @@ export function extentOf(piece: BoardPiece, column: number): Box[] {
   if (area) {
     for (const photo of piece.fan) {
       const card = {
-        x: area.x,
-        y: area.y + area.h - photo.dy - photo.size,
-        w: photo.size,
-        h: photo.size,
+        x: area.x + photo.x,
+        y: area.y + photo.y,
+        w: photo.w,
+        h: photo.h,
       };
-      boxes.push(on(card, layout.photos?.[photo.path]));
+      boxes.push(on(card, photoMove(layout.photos?.[photo.path], photo)));
     }
   }
   return boxes;

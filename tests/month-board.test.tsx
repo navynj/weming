@@ -673,9 +673,16 @@ describe('three recipes, always readable (review)', () => {
     const cs = layout.pieces.filter((p) => p.recipe === 'C');
     expect(cs.length).toBeGreaterThan(0);
     for (const piece of cs) {
-      expect(piece.photoBox!.w).toBeGreaterThanOrEqual(Math.round(column * 0.55));
-      expect(piece.photoBox!.w).toBeLessThanOrEqual(Math.round(column * 0.7));
-      expect([0, Math.floor(column - piece.photoBox!.w)]).toContain(piece.photoBox!.x);
+      // The front photo — the newest, drawn last — at the recipe's width.
+      const front = piece.fan[piece.fan.length - 1];
+      expect(front.w).toBeLessThanOrEqual(Math.round(column * 0.7));
+      if (piece.fan.length === 1) {
+        expect(front.w).toBeGreaterThanOrEqual(Math.round(column * 0.55));
+        expect([0, Math.floor(column - piece.photoBox!.w)]).toContain(piece.photoBox!.x);
+      } else {
+        // A pile grows right from the lane's left line.
+        expect(piece.photoBox!.x).toBe(0);
+      }
       expect(piece.labelBox.x).toBe(piece.photoBox!.x);
       expect(piece.labelBox.y).toBe(piece.photoBox!.h);
       expect(piece.center).toBe(true);
@@ -780,12 +787,15 @@ describe('labels, photos and bands, drawn', () => {
     }
   });
 
-  it('draws a photo card square, no frame, the caption under it with a small icon and no sticker', () => {
+  it('draws a photo card in its own ratio — 4:3 until it loads — no frame, the caption under it with a small icon and no sticker', () => {
     const { container } = board();
     const one = container.querySelector<HTMLElement>(
       '[data-board-piece="soup"] [data-board-photo-card]',
     )!;
-    expect(one.style.width).toBe(one.style.height);
+    expect(parseFloat(one.style.height)).toBe(Math.round((parseFloat(one.style.width) * 3) / 4));
+    expect(one.querySelector('[data-board-photo]')?.className ?? 'object-contain').toMatch(
+      /object-contain/,
+    );
     expect(one.className).not.toMatch(/rounded|bg-white|shadow/);
     expect(container.querySelector('[data-board-piece="soup"]')!.getAttribute('data-recipe')).toBe(
       'C',

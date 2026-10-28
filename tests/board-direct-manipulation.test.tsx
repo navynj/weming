@@ -385,8 +385,9 @@ describe('direct manipulation: handles write layout units, once on release', () 
     fireEvent.click(photo());
     expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
     const before = drawnTopLeft(photo());
-    // The finger takes the corner 20px out each way.
-    await drag(q(container, '[data-edit-handle="size"]'), [100, 100], [120, 120], {
+    // The finger takes the corner 20px out along the photo's own diagonal —
+    // a 4:3 placeholder until its image loads, so 20px right and 15px down.
+    await drag(q(container, '[data-edit-handle="size"]'), [100, 100], [120, 115], {
       release: false,
     });
     const drawn = parseFloat(photo().style.width);
@@ -394,7 +395,7 @@ describe('direct manipulation: handles write layout units, once on release', () 
     const during = drawnTopLeft(photo());
     expect(during.x).toBeCloseTo(before.x, 0);
     expect(during.y).toBeCloseTo(before.y, 0);
-    fireEvent.pointerUp(window, { clientX: 120, clientY: 120, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 120, clientY: 115, pointerId: 1 });
     await frames(2);
     await settle();
     expect(saved).toHaveLength(1);

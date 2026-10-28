@@ -70,6 +70,13 @@ describe('handles, in layout units (review, direct manipulation)', () => {
     expect(cornerPulled(100, 40, 40, 0, 2)).toBeCloseTo(120);
   });
 
+  it('pulls a photo’s corner along its own diagonal, keeping its ratio (review, 2026-10-27)', () => {
+    // A 2:1 box: the corner 20px right and 10px down is 20% further out.
+    expect(cornerPulled(100, 20, 10, 0, 1, { w: 100, h: 50 })).toBeCloseTo(120);
+    // A tall one scaled down to twice its width: its own box, not its layout width.
+    expect(cornerPulled(100, 5, 15, 0, 1, { w: 50, h: 150 })).toBeCloseTo(110);
+  });
+
   it('holds a point of a part still as its box changes, turned about its centre', () => {
     const box = { x: 10, y: 20, w: 100, h: 40 };
     // Unturned, the top-left is the box's own corner plus its move.

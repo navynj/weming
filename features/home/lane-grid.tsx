@@ -29,6 +29,7 @@ import {
   type Recipe,
 } from '@/features/month-board/layout';
 import { useBoardPhotos } from '@/features/month-board/use-board-photos';
+import { usePhotoAspects, withAspects } from '@/features/month-board/photo-aspects';
 
 import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { CommitRing } from '@/components/ui/waves';
@@ -335,6 +336,8 @@ export const LaneGrid = forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps -- banded reads bands and drawPieces
   }, [drawPieces, namedKey, byDay, bands]);
   const [measured, setMeasured] = useState<Measured>({});
+  // Each photo's own ratio, once it has loaded: photos are never cropped.
+  const aspects = usePhotoAspects();
   const laneBoard = useMemo(() => {
     if (!drawPieces) return null;
     const pieceRows: { key: string; day: IsoDate }[] = [];
@@ -352,11 +355,11 @@ export const LaneGrid = forwardRef<
     );
     return layoutLaneBoard(drawn, pieceRows, columnIds, {
       width: columnPx * Math.max(columns, 1),
-      measured,
+      measured: withAspects(measured, aspects),
       columnOf: (card) => (isOrphanCard(card, categories) ? '' : cardColumn(card)),
       rowOf: (card) => rowOfId.get(card.splash.id) ?? null,
     });
-  }, [drawPieces, segmentsOf, cards, columnIds, columnPx, columns, measured, categories]);
+  }, [drawPieces, segmentsOf, cards, columnIds, columnPx, columns, measured, aspects, categories]);
   // One stacking order across every day's pieces (stacking.ts).
   const laneStacking = useMemo(
     () => (laneBoard ? stackingOf(laneBoard.pieces, laneBoard.metrics.column) : null),

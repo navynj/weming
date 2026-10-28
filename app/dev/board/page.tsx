@@ -8,8 +8,8 @@ export const metadata = { title: 'Board · fixture' };
  * The Calendar on fixture records, for measuring direct manipulation in a
  * real browser (e2e/board-resize.spec.ts). Dev-only, like /dev/waves: it
  * reads and writes nothing, and a tab must never appear for it (D3).
- * `?tilt=20` turns every part by that many degrees; `?scene=layers` or
- * `?scene=captions` sets other records out, and `?moved=1` moves one by hand.
+ * `?tilt=20` turns every part by that many degrees; `?scene=layers`,
+ * `?scene=captions` or `?scene=photos` sets other records out, and `?moved=1` moves one by hand.
  */
 export default async function BoardFixturePage({
   searchParams,
@@ -23,7 +23,8 @@ export default async function BoardFixturePage({
     return Array.isArray(v) ? v[0] : v;
   };
   const degrees = Number(one('tilt') ?? 0) || 0;
+  const asked = one('scene');
   const scene: Scene =
-    one('scene') === 'layers' ? 'layers' : one('scene') === 'captions' ? 'captions' : 'resize';
+    asked === 'layers' || asked === 'captions' || asked === 'photos' ? asked : 'resize';
   return <BoardFixture tilt={degrees} scene={scene} moved={one('moved') === '1'} />;
 }

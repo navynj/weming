@@ -78,7 +78,7 @@ export function BlockView({
       {photos.map((url, index) =>
         url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={url} src={url} alt="" data-photo className="w-full rounded-xl object-cover" />
+          <img key={url} src={url} alt="" data-photo className="w-full rounded-xl object-contain" />
         ) : (
           <span
             key={index}

@@ -3,6 +3,7 @@ import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
 import { seedOf } from './layout-seed';
+import { spreadPhotos } from './photo-spread';
 
 export { seedOf };
 
@@ -256,10 +257,15 @@ export type BoardPiece = {
 export type PhotoCard = {
   path: string;
   rippleId: string;
-  /** Its side: the recipe's, or a share of the lane set by hand (review). */
+  /** Its width as laid out: the recipe's, or a share of the lane set by hand (review). */
   size: number;
-  /** Upward from the area's bottom: a card behind peeks above the one in front. */
-  dy: number;
+  /** Its box before its tilt, within the photo area: its own ratio, never cropped (photo-spread.ts). */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** The pile's own tilt, in degrees, unless one is set by hand. */
+  tilt: number;
 };
 
 /** A ranged post: one band per week row it touches, at the top of the row. */
@@ -496,6 +502,29 @@ function planDay(cards: Card[]): Plan[] {
 
 /** The words' measured lines, by piece, the room they had and the first line's indent: the browser's own wrapping. */
 export type Measured = Record<string, number>;
+
+/**
+ * Photos are never cropped (review, 2026-10-27): each keeps its own ratio,
+ * width over height, learned in the browser (photo-aspects.ts) and kept
+ * among the measurements under this key; 4:3 until it is known.
+ */
+export const PLACEHOLDER_ASPECT = 4 / 3;
+
+/** Taller than this (height over width) and the whole image scales down to fit. */
+export const MAX_TALL = 2;
+
+/** A photo's move as drawn: set by hand, the pile's own tilt where none is set (photo-spread.ts). */
+export function photoMove<T extends { tilt?: number }>(
+  set: T | undefined,
+  photo: Pick<PhotoCard, 'tilt'>,
+): T | undefined {
+  if (!photo.tilt || set?.tilt !== undefined) return set;
+  return { ...set, tilt: photo.tilt } as T;
+}
+
+export function aspectKey(path: string): string {
+  return `aspect:${path}`;
+}
 
 /** The key a measured line count is kept under. */
 export function measureKey(id: string, textW: number, indent: number, size = 10): string {
@@ -852,7 +881,8 @@ function shapeB(card: Card, plan: Plan, ctx: Context): Shape {
 }
 
 /**
- * C (Beef Short Rib): up to three square cards 55–70% of the lane, left or
+ * C (Beef Short Rib): up to three photo cards 55–70% of the lane wide, each
+ * its own ratio tall (never cropped), left or
  * right, the caption directly under with its icon inline — centred under
  * the card, or on a phone reaching across empty lanes; tucked up into the
  * item above's bottom padding, as far as that padding goes (10px at most).
@@ -868,21 +898,52 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     const set = card.layout?.photos?.[path]?.size;
     return set ? Math.round(m.column * set) : auto;
   };
-  const size = Math.max(...shown.map((p) => sizeOf(p.path)));
   // Its place is the recipe's: left, or right against the line, for the
   // recipe's own size (review, 2026-10-27). A size set by hand grows it right
   // and down from that corner, so a resize never pulls the photo, or the
   // caption that starts at its left edge, to the left.
-  const x = draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - auto);
-  let dy = 0;
-  const fan: PhotoCard[] = [];
-  // Back to front: the last shown — the newest — is drawn last, on top.
-  for (let at = shown.length - 1; at >= 0; at -= 1) {
-    fan.push({ ...shown[at], size: sizeOf(shown[at].path), dy });
-    dy += m.fanMin + draw(id, `fan:${at}`, m.fanMax - m.fanMin + 1);
+  // A pile (photo-spread.ts) grows right from the lane's left line.
+  const x = shown.length > 1 || draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - auto);
+  // The newest first, on top; a following photo's size only when set by hand.
+  const pile = (scale: number) =>
+    spreadPhotos(
+      shown.map((p, at) => ({
+        path: p.path,
+        size:
+          at === 0 || card.layout?.photos?.[p.path]?.size
+            ? Math.round(sizeOf(p.path) * scale)
+            : null,
+        ratio: ctx.measured[aspectKey(p.path)] ?? PLACEHOLDER_ASPECT,
+      })),
+      Math.round(sizeOf(shown[0].path) * scale),
+      (salt) => unit(id, salt),
+    );
+  let spread = pile(1);
+  // Past the lane, it overhangs into empty lanes as a label does; with none
+  // empty, the whole pile shrinks to the lane, in the same proportions.
+  if (
+    x + spread.w > m.column &&
+    !ctx.room({ x: m.column, y: 0, w: x + spread.w - m.column, h: spread.h })
+  ) {
+    spread = pile((m.column - x) / spread.w);
   }
-  const spread = fan.length > 0 ? fan[fan.length - 1].dy : 0;
-  const photoBox = { x, y: 0, w: size, h: size + spread };
+  const byPath = new Map(shown.map((p) => [p.path, p]));
+  // Back to front: the first — the newest — is drawn last, on top.
+  const fan: PhotoCard[] = spread.cards
+    .map((c) => ({
+      ...byPath.get(c.path)!,
+      size: c.size,
+      x: c.x,
+      y: c.y,
+      w: c.w,
+      h: c.h,
+      tilt: c.tilt,
+    }))
+    .reverse();
+  // The pile's box is the photo area; the caption sits under its lowest edge.
+  const area = { x, y: 0, w: spread.w, h: spread.h };
+  // The caption keeps to the front photo's width, as it did to the one photo.
+  const size = spread.cards[0].w;
   const side = Math.min(m.pad.side, Math.floor(size / 8));
   const v = padY(plan.label, m);
   // Against the line, the caption keeps the right padding the next lane's sticker hangs on.
@@ -897,11 +958,11 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
   if (m.narrow && !set) {
     const wide = spanLabel(x, pad, fitFor, {
       ...ctx,
-      room: (band) => ctx.room({ ...band, y: band.y + photoBox.h }),
+      room: (band) => ctx.room({ ...band, y: band.y + area.h }),
     });
     if (wide.span > 0) fit = wide;
   }
-  const labelBox = { x, y: photoBox.h, w: fit.w, h: fit.h };
+  const labelBox = { x, y: area.h, w: fit.w, h: fit.h };
   return {
     ...base(card),
     recipe: 'C',
@@ -912,11 +973,11 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     stickerAt: null,
     indent: 0,
     tuck: above ? Math.min(C_TUCK_PX, above.pad.bottom) : 0,
-    fan: fan.reverse(),
+    fan,
     morePhotos: photos.length - shown.length,
     labelBox,
     textBoxes: textOf(labelBox, pad, 0, fit.lines, m),
-    photoBox,
+    photoBox: area,
     stickerBox: null,
     pad,
     center: fit.span === 0,

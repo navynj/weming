@@ -62,6 +62,8 @@ export type FrameUnits = {
   sizeUnit: number;
   /** The part's size in pixels, a corner's pull starts from (read once, as the finger goes down). */
   sizePx: number;
+  /** The part's drawn box, whose diagonal a corner is pulled along; square at `sizePx` when absent. */
+  sizeBox?: { w: number; h: number };
   /** The label's width in pixels: the wave's length is a share of it, and a width pull starts from it. */
   labelW: number;
 };
@@ -238,7 +240,7 @@ export function PartFrame({
       case 'size':
         // The pulled corner under the finger, no smoothing; the piece holds the top-left.
         if (p.kind === 'icon' || p.kind === 'photo') {
-          const px = cornerPulled(u.sizePx, lx, ly, g.start.tilt);
+          const px = cornerPulled(u.sizePx, lx, ly, g.start.tilt, 1, u.sizeBox);
           send({ size: resized(p.kind, px, 1, u.sizeUnit) });
         }
         break;

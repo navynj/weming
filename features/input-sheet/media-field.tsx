@@ -175,7 +175,7 @@ export function MediaPreviews({
             >
               {previews[path] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={previews[path]} alt="" className="h-full w-full object-cover" />
+                <img src={previews[path]} alt="" className="h-full w-full object-contain" />
               ) : (
                 <span className="text-pool-500 block truncate px-1 pt-5 text-center text-[10px]">
                   {path.split('/').pop()}

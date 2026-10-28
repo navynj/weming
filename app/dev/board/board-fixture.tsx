@@ -62,8 +62,54 @@ function fixture(
   return { ...placeCard(splash, '', TZ), ...over };
 }
 
-/** The fixture's scenes: `resize` (the default), `layers`, `captions`. */
-export type Scene = 'resize' | 'layers' | 'captions';
+/** The fixture's scenes: `resize` (the default), `layers`, `captions`, `photos`. */
+export type Scene = 'resize' | 'layers' | 'captions' | 'photos';
+
+/** An opaque image of a given size, so its natural ratio is known (no server signs it). */
+function image(width: number, height: number, fill: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}'><rect width='${width}' height='${height}' fill='${fill}'/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const WIDE = 'fixture/wide.png';
+const TALL = 'fixture/tall.png';
+const SQUARE = 'fixture/square.png';
+const PHOTO_URLS = {
+  [WIDE]: image(600, 200, '#e8a33d'),
+  [TALL]: image(200, 600, '#3d8be8'),
+  [SQUARE]: image(400, 400, '#5fbf6a'),
+  'fixture/wide-2.png': image(600, 200, '#c0587a'),
+  'fixture/tall-2.png': image(200, 600, '#7a58c0'),
+  'fixture/square-2.png': image(400, 400, '#58c0b4'),
+  // The other scenes' photos: square, as the resize and caption specs measure them.
+  'fixture/photo.webp': image(400, 400, '#d98c5f'),
+  'fixture/photo-left.webp': image(400, 400, '#d98c5f'),
+  'fixture/photo-right.webp': image(400, 400, '#5f9dd9'),
+  'fixture/oct23.webp': image(400, 400, '#a3d95f'),
+};
+
+/**
+ * Photos never cropped (review, 2026-10-27): a 3:1 and a 1:3 alone, and
+ * piles of two and three with wide, tall and square mixed — all in the week
+ * the board opens on, two piles with an empty day to their right.
+ */
+function photoCards(): Card[] {
+  const of = (id: string, paths: string[]): Pick<Card, 'photos'> => ({
+    photos: paths.map((path, at) => ({ rippleId: `${id}-b${at}`, path })),
+  });
+  return [
+    fixture('ratio-wide', 'Beach', '2026-10-18', of('ratio-wide', ['fixture/wide-2.png'])),
+    fixture('ratio-tall', 'Tower', '2026-10-19', of('ratio-tall', ['fixture/tall-2.png'])),
+    fixture('pile-two', 'Two prints', '2026-10-20', of('pile-two', [WIDE, TALL])),
+    fixture(
+      'pile-three',
+      'Three prints',
+      '2026-10-22',
+      of('pile-three', [TALL, SQUARE, 'fixture/square-2.png']),
+    ),
+    fixture('pile-mixed', 'Mixed prints', '2026-10-24', of('pile-mixed', [SQUARE, WIDE, TALL])),
+  ];
+}
 
 const photo = (id: string): Pick<Card, 'photos'> => ({
   photos: [{ rippleId: `${id}-b`, path: `fixture/${id}.webp` }],
@@ -114,6 +160,7 @@ function cards(
 ): Card[] {
   if (scene === 'layers') return layerCards(saved, moved);
   if (scene === 'captions') return captionCards(saved);
+  if (scene === 'photos') return photoCards();
   const turned = tilt ? { tilt } : {};
   const start: Record<string, BoardLayoutJson> = {
     label: { label: turned },
@@ -179,6 +226,7 @@ export function BoardFixture({
             onPick={setTop}
             lanes={LANES}
             editing={editing}
+            fixturePhotos={PHOTO_URLS}
           />
         </BoardFrame>
       </div>

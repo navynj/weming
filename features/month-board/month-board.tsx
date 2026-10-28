@@ -18,6 +18,7 @@ import type { Card, GridColumn } from '@/features/home/grid';
 import type { Ring } from '@/features/home/lane-grid';
 import { WaveGlyph } from '@/components/ui/waves';
 import { monthKey } from '@/features/splash/summary';
+import type { SignedMedia } from '@/lib/media';
 import type { IsoDate } from '@/lib/time';
 
 import { ON_PIECE } from './board-handles';
@@ -42,6 +43,7 @@ import {
 } from './layout';
 import type { BoardEditing } from './use-board-editing';
 import { useBoardPhotos } from './use-board-photos';
+import { usePhotoAspects, withAspects } from './photo-aspects';
 
 /** A sideways swipe this long turns the page, once its axis is decided (the first 8px). */
 const SWIPE_PX = 48;
@@ -108,6 +110,7 @@ export function MonthBoard({
   lanes,
   onDrawn,
   editing = null,
+  fixturePhotos,
 }: {
   cards: Card[];
   /** `YYYY-MM`: the month shown, when Month is; the week shown is the board's own. */
@@ -126,6 +129,8 @@ export function MonthBoard({
   onDrawn?: (recipes: Record<string, Recipe>) => void;
   /** Direct manipulation (review): taps go through it, and the piece on top may be active. */
   editing?: BoardEditing | null;
+  /** The dev fixture's own images by path (/dev/board), which no server signs. */
+  fixturePhotos?: SignedMedia;
 }) {
   const [span, setSpan] = useBoardSpan();
   // The week shown: this one on open (review), unless the ground was opened on another month.
@@ -143,6 +148,8 @@ export function MonthBoard({
   const [tall, setTall] = useState<number | null>(null);
   // The words' lines as the browser wrapped them, fed back so every label hugs them (review).
   const [measured, setMeasured] = useState<Measured>({});
+  // Each photo's own ratio, once it has loaded: photos are never cropped.
+  const aspects = usePhotoAspects();
   // A photo hidden from the board (0044) is not on it: with every one hidden,
   // the post is drawn as one with no photos (the sticker's recipe).
   const drawn = useMemo(
@@ -156,13 +163,16 @@ export function MonthBoard({
   const layout = useMemo(
     () =>
       span === 'week'
-        ? layoutWeekBoard(drawn, week, { width: room ?? 980, measured })
+        ? layoutWeekBoard(drawn, week, {
+            width: room ?? 980,
+            measured: withAspects(measured, aspects),
+          })
         : layoutMonthBoard(drawn, month, {
             width: room ?? 980,
             fill: tall ?? undefined,
-            measured,
+            measured: withAspects(measured, aspects),
           }),
-    [drawn, span, week, month, room, tall, measured],
+    [drawn, span, week, month, room, tall, measured, aspects],
   );
   const { metrics } = layout;
   // One stacking order for the whole view: every piece's parts compete in it (stacking.ts).
@@ -213,7 +223,11 @@ export function MonthBoard({
     const frame = requestAnimationFrame(() => setMeasured((current) => ({ ...current, ...found })));
     return () => cancelAnimationFrame(frame);
   }, [layout, measured]);
-  const photos = useBoardPhotos(layout.pieces);
+  const signed = useBoardPhotos(layout.pieces);
+  const photos = useMemo(
+    () => (fixturePhotos ? { ...signed, ...fixturePhotos } : signed),
+    [signed, fixturePhotos],
+  );
   const scroller = useRef<HTMLDivElement>(null);
 
   // A part pushed by hand past the board's edge (0044) stays on it: the board

@@ -66,10 +66,11 @@ export async function dragHandle(
   const dir =
     part === 'width'
       ? { x: Math.cos(c0.tilt), y: Math.sin(c0.tilt) }
-      : {
-          x: Math.cos(c0.tilt + Math.PI / 4),
-          y: Math.sin(c0.tilt + Math.PI / 4),
-        };
+      : (() => {
+          // Along the part's own diagonal: a photo keeps its ratio, so it is rarely square.
+          const d = Math.hypot(c0.br.x - c0.tl.x, c0.br.y - c0.tl.y);
+          return { x: (c0.br.x - c0.tl.x) / d, y: (c0.br.y - c0.tl.y) / d };
+        })();
   const dragged = (c: typeof c0): Pt =>
     part === 'width' ? { x: (c.tr.x + c.br.x) / 2, y: (c.tr.y + c.br.y) / 2 } : c.br;
   const p0 = dragged(c0);

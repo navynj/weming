@@ -150,7 +150,9 @@ type Point = { x: number; y: number };
  * it went down, read on the part's turned diagonal and over the board's CSS
  * scale, added to the size it had then — never to the size as drawn now,
  * which compounds every frame. With the top-left held, the corner then
- * follows the finger one to one.
+ * follows the finger one to one. The diagonal is the box's own: a photo
+ * keeps its ratio (review, 2026-10-27), so its box is rarely square; `box`
+ * is its drawn size, square at `startPx` when not given.
  */
 export function cornerPulled(
   startPx: number,
@@ -158,10 +160,14 @@ export function cornerPulled(
   dy: number,
   tilt: number | undefined,
   scale = 1,
+  box: { w: number; h: number } = { w: startPx, h: startPx },
 ): number {
-  const diagonal = ((tilt ?? 0) * Math.PI) / 180 + Math.PI / 4;
+  const corner = Math.atan2(box.h, box.w);
+  const diagonal = ((tilt ?? 0) * Math.PI) / 180 + corner;
   const along = (dx * Math.cos(diagonal) + dy * Math.sin(diagonal)) / (scale || 1);
-  return Math.max(0, startPx + along / Math.SQRT2);
+  const length = Math.hypot(box.w, box.h);
+  // The size grows as the diagonal does: the corner travels `along` on it.
+  return Math.max(0, startPx * (1 + (length > 0 ? along / length : 0)));
 }
 
 /** A part's box as laid out, before its own move and turn. */
