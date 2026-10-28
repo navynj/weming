@@ -35,15 +35,36 @@ async function corners(page: Page): Promise<{ tl: Pt; br: Pt; tr: Pt; tilt: numb
   });
 }
 
+/** The fixture piece each part is measured on. */
+export function pieceOf(part: Part): string {
+  return part === 'width' ? 'label' : part === 'icon' ? 'sticker' : 'photo';
+}
+
+/**
+ * Waits for a fixture piece on the week. A phone shows half a week at a
+ * time, opening on today's (Wed–Sat in the fixture): a piece earlier in
+ * the week is half a week back.
+ */
+export async function showPiece(page: Page, id: string): Promise<void> {
+  const piece = page.locator(`[data-board-piece="${id}"]`);
+  await page.locator('[data-board-piece]').first().waitFor();
+  if ((await piece.count()) === 0) await page.locator('[data-board-prev]').click();
+  await piece.waitFor();
+}
+
 /** Activates the part: the label's record to the top, then on, then the part itself. */
 export async function select(page: Page, part: Part): Promise<void> {
-  const id = part === 'width' ? 'label' : part === 'icon' ? 'sticker' : 'photo';
+  const id = pieceOf(part);
   const label = page.locator(`[data-board-piece="${id}"] [data-board-label]`);
   await label.click();
   await label.click();
   if (part === 'icon')
     await page.locator('[data-board-piece="sticker"] [data-board-sticker]').click();
-  if (part === 'photo') await page.locator('[data-board-photo-card="fixture/photo.webp"]').click();
+  // Dispatched: the label's rotate handle (a 44px target) stands centred
+  // above the label, and on a phone's half week covers most of this small
+  // photo. What is measured is the drag that follows, not this tap.
+  if (part === 'photo')
+    await page.locator('[data-board-photo-card="fixture/photo.webp"]').dispatchEvent('click');
   await page.locator(`[data-edit-frame="${part === 'width' ? 'label' : part}"]`).waitFor();
 }
 

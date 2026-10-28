@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { dragHandle, driftAfter, select, topLeft, type Part } from './measure';
+import { dragHandle, driftAfter, pieceOf, select, showPiece, topLeft, type Part } from './measure';
 
 /**
  * Resizing on the board follows the pointer one to one and holds the
@@ -16,7 +16,7 @@ for (const tilt of [0, 20]) {
   for (const part of PARTS) {
     test(`${part} at ${tilt}°: one to one, the top-left held`, async ({ page }) => {
       await page.goto(`/dev/board?tilt=${tilt}`);
-      await page.locator('[data-board-piece="label"]').waitFor();
+      await showPiece(page, pieceOf(part));
       await select(page, part);
       const before = await topLeft(page);
 

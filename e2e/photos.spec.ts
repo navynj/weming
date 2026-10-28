@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { showPiece } from './measure';
+
 /**
  * Photos are never cropped (review, 2026-10-27), on /dev/board?scene=photos:
  * a 3:1 and a 1:3 photo alone draw in boxes of their own ratio; piles of two
@@ -7,9 +9,9 @@ import { expect, test, type Page } from '@playwright/test';
  * photo, crop none, and keep the caption clear of every photo.
  */
 
-async function open(page: Page): Promise<void> {
+async function open(page: Page, id: string): Promise<void> {
   await page.goto('/dev/board?scene=photos');
-  await page.locator('[data-board-piece="pile-three"]').waitFor();
+  await showPiece(page, id);
   // Every image loaded, and the layout re-run with what each taught it.
   await page.waitForFunction(() =>
     [...document.querySelectorAll<HTMLImageElement>('[data-board-photo]')].every(
@@ -42,7 +44,7 @@ for (const [id, ratio] of [
   ['ratio-tall', 1 / 3],
 ] as const) {
   test(`${id}: the photo's box is its own ratio, nothing cropped`, async ({ page }) => {
-    await open(page);
+    await open(page, id);
     const box = (await page
       .locator(`[data-board-piece="${id}"] [data-board-photo-card]`)
       .boundingBox())!;
@@ -59,7 +61,7 @@ for (const id of ['pile-two', 'pile-three', 'pile-mixed']) {
   test(`${id}: every photo at least half seen, none cropped, the caption clear`, async ({
     page,
   }) => {
-    await open(page);
+    await open(page, id);
     for (const photo of await ratios(page, id)) {
       expect(Math.abs(photo.h - photo.w / photo.natural)).toBeLessThanOrEqual(1);
       expect(photo.fit).toBe('contain');
