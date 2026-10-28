@@ -18,12 +18,12 @@ vi.mock('@/features/people/actions', () => ({
     saved.push(input);
     return Promise.resolve(outcome.next);
   },
-  setPoolTheme: (poolId: string, color: unknown) => {
-    saved.push({ pool: poolId, color });
+  setPoolTheme: (poolId: string, color: unknown, mode: unknown) => {
+    saved.push({ pool: poolId, color, mode });
     return Promise.resolve(outcome.next);
   },
-  setMyPoolTheme: (poolId: string, color: unknown) => {
-    saved.push({ mine: poolId, color });
+  setMyPoolTheme: (poolId: string, color: unknown, mode: unknown) => {
+    saved.push({ mine: poolId, color, mode });
     return Promise.resolve(outcome.next);
   },
 }));
@@ -31,13 +31,14 @@ vi.mock('@/features/people/actions', () => ({
 import { ToastProvider } from '@/components/ui/toast';
 import { ThemePicker } from '@/features/people/theme-picker';
 import { PlaceTheme, ThemeProvider } from '@/features/people/theme-provider';
-import { asTheme, PASTEL_INK, THEMES, type ThemeColor } from '@/lib/theme';
+import { asTheme, PASTEL_INK, THEMES, type PoolColors } from '@/lib/theme';
 
 afterEach(() => {
   cleanup();
   saved.length = 0;
   outcome.next = { ok: true };
   delete document.documentElement.dataset.theme;
+  delete document.documentElement.dataset.mode;
   delete document.documentElement.dataset.mode;
 });
 
@@ -84,7 +85,7 @@ describe('the twelve colours', () => {
   });
 });
 
-function picker(pool: { pool: ThemeColor | null; mine: ThemeColor | null } | null = null) {
+function picker(pool: PoolColors | null = null) {
   saved.length = 0;
   return render(
     <ThemeProvider initial={{ home: 'blue', mode: 'dark', everywhere: false }}>
@@ -197,9 +198,9 @@ describe('the Theme tab in a pool (0059)', () => {
     fireEvent.click(use());
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('mint'));
     expect(saved).toEqual([
-      { pool: 'p-a', color: 'mint' },
-      { mine: 'p-a', color: 'pink' },
-      { mine: 'p-a', color: null },
+      { pool: 'p-a', color: 'mint', mode: null },
+      { mine: 'p-a', color: 'pink', mode: 'dark' },
+      { mine: 'p-a', color: null, mode: null },
     ]);
   });
 
@@ -224,7 +225,7 @@ describe('the Theme tab in a pool (0059)', () => {
     // On with none chosen: my Home colour.
     fireEvent.click(use);
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('blue'));
-    expect(saved).toEqual([{ mine: 'p-a', color: 'blue' }]);
+    expect(saved).toEqual([{ mine: 'p-a', color: 'blue', mode: 'dark' }]);
     expect(use.getAttribute('aria-checked')).toBe('true');
     expect(swatches.hasAttribute('data-muted')).toBe(false);
     expect(swatches.querySelector('[data-theme-swatch="blue"]')!.getAttribute('aria-checked')).toBe(
@@ -244,10 +245,10 @@ describe('the Theme tab in a pool (0059)', () => {
         .querySelector('[data-theme-use-mine] [role="switch"]')!
         .getAttribute('aria-checked'),
     ).toBe('true');
-    expect(saved).toEqual([{ mine: 'p-a', color: 'pink' }]);
+    expect(saved).toEqual([{ mine: 'p-a', color: 'pink', mode: 'dark' }]);
   });
 
-  it('shows a set pool default on its folded row, before the chevron; Mode stays at the bottom', async () => {
+  it('shows a set pool default on its folded row, before the chevron; Mode right under my color here (0062)', async () => {
     const { container } = picker({ pool: 'mint', mine: null });
     await waitFor(() =>
       expect(container.querySelector('[data-theme-pool-swatch="mint"]')).not.toBeNull(),
@@ -258,12 +259,84 @@ describe('the Theme tab in a pool (0059)', () => {
       'svg',
     );
     expect(container.querySelector('[data-theme-colors="pool"]')).toBeNull();
-    const parts = [
-      ...container.querySelectorAll(
-        '[data-theme-colors], [data-theme-pool-open], [role="radiogroup"][aria-label="Mode"]',
-      ),
-    ];
-    expect(parts.at(-1)!.getAttribute('aria-label')).toBe('Mode');
+    // Colour and mode are one choice: mine here, its mode, then the default.
+    const order = () =>
+      [
+        ...container.querySelectorAll(
+          '[data-theme-colors], [data-theme-modes], [data-theme-pool-open]',
+        ),
+      ].map(
+        (el) =>
+          (el.hasAttribute('data-theme-colors') &&
+            `colors:${el.getAttribute('data-theme-colors')}`) ||
+          (el.hasAttribute('data-theme-modes') && `modes:${el.getAttribute('data-theme-modes')}`) ||
+          'open',
+      );
+    expect(order()).toEqual(['colors:mine', 'modes:mine', 'open']);
+    // Unfolded, the default has a mode of its own under its swatches.
+    fireEvent.click(row);
+    expect(order()).toEqual(['colors:mine', 'modes:mine', 'open', 'colors:pool', 'modes:pool']);
+  });
+
+  it('wears the mode chosen with my colour here, and only here (0062)', async () => {
+    const { container } = picker({ pool: 'mint', mine: 'pink', mineMode: null });
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('pink'));
+    const modes = container.querySelector('[data-theme-modes="mine"]')!;
+    // No mode of its own yet: my Home mode, chosen.
+    expect(modes.querySelector('[aria-checked="true"]')!.getAttribute('data-theme-mode')).toBe(
+      'dark',
+    );
+    fireEvent.click(modes.querySelector('[data-theme-mode="light"]')!);
+    await waitFor(() => expect(document.documentElement.dataset.mode).toBe('light'));
+    expect(document.documentElement.dataset.theme).toBe('pink');
+    expect(saved).toEqual([{ mine: 'p-a', color: 'pink', mode: 'light' }]);
+    // A colour picked after keeps the mode it goes with.
+    fireEvent.click(
+      container.querySelector('[data-theme-colors="mine"] [data-theme-swatch="sky"]')!,
+    );
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('sky'));
+    expect(document.documentElement.dataset.mode).toBe('light');
+    expect(saved.at(-1)).toEqual({ mine: 'p-a', color: 'sky', mode: 'light' });
+    // No Home mode control in a pool: the mode here is the one.
+    expect(container.querySelector('[data-theme-modes="home"]')).toBeNull();
+  });
+
+  it('turns my colour here on with the colour worn now when a mode is tapped while off (0062)', async () => {
+    const { container } = picker({ pool: 'mint', mine: null });
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('mint'));
+    const modes = container.querySelector('[data-theme-modes="mine"]')!;
+    expect(modes.hasAttribute('data-muted')).toBe(true);
+    expect(modes.querySelector('[aria-checked="true"]')).toBeNull();
+    fireEvent.click(modes.querySelector('[data-theme-mode="pastel"]')!);
+    await waitFor(() => expect(document.documentElement.dataset.mode).toBe('pastel'));
+    expect(saved).toEqual([{ mine: 'p-a', color: 'mint', mode: 'pastel' }]);
+    expect(
+      container
+        .querySelector('[data-theme-use-mine] [role="switch"]')!
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+  });
+
+  it('gives the pool’s default a mode of its own, worn by whoever uses no colour here (0062)', async () => {
+    const { container } = picker({ pool: 'mint', mine: null, poolMode: null });
+    await waitFor(() => expect(container.querySelector('[data-theme-pool-open]')).not.toBeNull());
+    fireEvent.click(container.querySelector('[data-theme-pool-open]')!);
+    const modes = container.querySelector('[data-theme-modes="pool"]')!;
+    // None chosen: each member's own.
+    expect(modes.querySelector('[aria-checked="true"]')).toBeNull();
+    fireEvent.click(modes.querySelector('[data-theme-mode="light"]')!);
+    await waitFor(() => expect(document.documentElement.dataset.mode).toBe('light'));
+    expect(document.documentElement.dataset.theme).toBe('mint');
+    expect(saved).toEqual([{ pool: 'p-a', color: 'mint', mode: 'light' }]);
+    // Cleared, the colour takes its mode with it; nothing left to choose a mode for.
+    fireEvent.click(container.querySelector('[data-theme-clear="pool"]')!);
+    await waitFor(() => expect(document.documentElement.dataset.mode).toBe('dark'));
+    expect(saved.at(-1)).toEqual({ pool: 'p-a', color: null, mode: null });
+    const after = container.querySelector('[data-theme-modes="pool"]')!;
+    expect(after.querySelector('[aria-checked="true"]')).toBeNull();
+    expect(after.querySelector<HTMLButtonElement>('[data-theme-mode="light"]')!.disabled).toBe(
+      true,
+    );
   });
 
   it('folds the pool default again from the same row', async () => {
@@ -290,6 +363,6 @@ describe('the Theme tab in a pool (0059)', () => {
     fireEvent.click(none);
     await waitFor(() => expect(none.getAttribute('aria-checked')).toBe('true'));
     expect(none.className).toContain('ring-ink');
-    expect(saved).toEqual([{ pool: 'p-a', color: null }]);
+    expect(saved).toEqual([{ pool: 'p-a', color: null, mode: null }]);
   });
 });

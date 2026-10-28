@@ -392,16 +392,19 @@ export type Database = {
         Row: {
           pool_id: string
           theme: string | null
+          theme_mode: string | null
           user_id: string
         }
         Insert: {
           pool_id: string
           theme?: string | null
+          theme_mode?: string | null
           user_id: string
         }
         Update: {
           pool_id?: string
           theme?: string | null
+          theme_mode?: string | null
           user_id?: string
         }
         Relationships: [
@@ -773,6 +776,7 @@ export type Database = {
           photo_path: string | null
           photo_version: number | null
           theme: string | null
+          theme_mode: string | null
           visibility: Database["public"]["Enums"]["pool_visibility"]
         }
         Insert: {
@@ -788,6 +792,7 @@ export type Database = {
           photo_path?: string | null
           photo_version?: number | null
           theme?: string | null
+          theme_mode?: string | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Update: {
@@ -803,6 +808,7 @@ export type Database = {
           photo_path?: string | null
           photo_version?: number | null
           theme?: string | null
+          theme_mode?: string | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Relationships: [
@@ -1783,10 +1789,12 @@ export type Database = {
         Args: { p_on: boolean; p_pool: string }
         Returns: undefined
       }
-      set_pool_theme: {
-        Args: { p_pool: string; p_theme: string }
-        Returns: undefined
-      }
+      set_pool_theme:
+        | { Args: { p_pool: string; p_theme: string }; Returns: undefined }
+        | {
+            Args: { p_mode: string; p_pool: string; p_theme: string }
+            Returns: undefined
+          }
       set_splash_lane: {
         Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
         Returns: undefined

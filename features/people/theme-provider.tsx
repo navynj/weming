@@ -4,7 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -37,8 +37,9 @@ type ThemeApi = {
   /** Each applies at once, saves behind it, and takes it back with a reason when refused. */
   chooseHome: (color: ThemeColor, everywhere: boolean) => Promise<string | null>;
   chooseMode: (mode: ThemeMode) => Promise<string | null>;
-  choosePoolColor: (color: ThemeColor | null) => Promise<string | null>;
-  chooseMyPoolColor: (color: ThemeColor | null) => Promise<string | null>;
+  /** A colour and its mode, one choice (0062); a cleared colour takes its mode with it. */
+  choosePoolColor: (color: ThemeColor | null, mode: ThemeMode | null) => Promise<string | null>;
+  chooseMyPoolColor: (color: ThemeColor | null, mode: ThemeMode | null) => Promise<string | null>;
   /** A pool's screen, arriving and leaving: its colours worn while there. */
   enter: (poolId: string, colors: PoolColors) => void;
   leave: (poolId: string) => void;
@@ -60,7 +61,11 @@ const ThemeContext = createContext<ThemeApi>({
   leave: () => {},
 });
 
-/** Where the theme is worn: on <html>, so pages, sheets and portals all read it. */
+/**
+ * Where the theme is worn: on <html> alone, so pages, sheets and portals all
+ * read it, and nothing below can hold an older colour (a pool's screen once
+ * kept the colour it was drawn with, and light and pastel read it there).
+ */
 function wear(theme: Theme): void {
   document.documentElement.dataset.theme = theme.color;
   document.documentElement.dataset.mode = theme.mode;
@@ -76,8 +81,9 @@ export function ThemeProvider({ initial, children }: { initial: MyTheme; childre
   const [mine, setMine] = useState(initial);
   const [place, setPlace] = useState<Place>(null);
   const theme = resolveTheme(mine, place?.colors ?? null);
+  // Before the paint: arriving in a pool never shows Home's colour first.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => wear(theme), [theme.color, theme.mode]);
+  useLayoutEffect(() => wear(theme), [theme.color, theme.mode]);
 
   const saveMine = useCallback(
     async (next: MyTheme): Promise<string | null> => {
@@ -92,17 +98,23 @@ export function ThemeProvider({ initial, children }: { initial: MyTheme; childre
   );
   const savePlace = useCallback(
     async (
-      key: keyof PoolColors,
+      key: 'pool' | 'mine',
       color: ThemeColor | null,
+      mode: ThemeMode | null,
       action: (
         poolId: string,
         color: ThemeColor | null,
+        mode: ThemeMode | null,
       ) => Promise<{ ok: boolean; message?: string }>,
     ): Promise<string | null> => {
       if (!place) return null;
       const before = place;
-      setPlace({ ...place, colors: { ...place.colors, [key]: color } });
-      const saved = await action(place.poolId, color);
+      const kept = color ? mode : null;
+      setPlace({
+        ...place,
+        colors: { ...place.colors, [key]: color, [`${key}Mode`]: kept },
+      });
+      const saved = await action(place.poolId, color, kept);
       if (saved.ok) return null;
       setPlace(before);
       return saved.message ?? 'That colour could not be saved.';
@@ -118,8 +130,8 @@ export function ThemeProvider({ initial, children }: { initial: MyTheme; childre
       place,
       chooseHome: (home, everywhere) => saveMine({ ...mine, home, everywhere }),
       chooseMode: (mode) => saveMine({ ...mine, mode }),
-      choosePoolColor: (color) => savePlace('pool', color, setPoolTheme),
-      chooseMyPoolColor: (color) => savePlace('mine', color, setMyPoolTheme),
+      choosePoolColor: (color, mode) => savePlace('pool', color, mode, setPoolTheme),
+      chooseMyPoolColor: (color, mode) => savePlace('mine', color, mode, setMyPoolTheme),
       enter: (poolId, colors) => setPlace({ poolId, colors }),
       leave: (poolId) => setPlace((now) => (now?.poolId === poolId ? null : now)),
     }),
@@ -134,15 +146,16 @@ export function useTheme(): ThemeApi {
 
 /**
  * In a pool (0059): wears its colours while its screen is shown, and hands
- * the theme back to Home's on leaving. The server drew the pool's own
- * colour on its screen already, so the first paint is right.
+ * the theme back to Home's on leaving. Entered before the paint, so a
+ * visit from inside the app never shows Home's colour first; a page loaded
+ * here is worn by the server's own line on <html> (`wornHere`).
  */
 export function PlaceTheme({ poolId, colors }: { poolId: string; colors: PoolColors }) {
   const { enter, leave } = useTheme();
-  useEffect(() => {
+  useLayoutEffect(() => {
     enter(poolId, colors);
     return () => leave(poolId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolId, colors.pool, colors.mine]);
+  }, [poolId, colors.pool, colors.mine, colors.poolMode, colors.mineMode]);
   return null;
 }

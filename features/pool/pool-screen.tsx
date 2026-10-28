@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
 import { PlaceTheme } from '@/features/people/theme-provider';
 import { getMyTheme, getPoolColors } from '@/lib/queries/theme';
-import { resolveTheme } from '@/lib/theme';
+import { resolveTheme, wornHere } from '@/lib/theme';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { poolViewParam } from '@/features/pool/pool-views';
 import { getMyProfile } from '@/lib/queries/profile';
@@ -64,7 +64,11 @@ export async function PoolScreen({
   const worn = resolveTheme(mine, colors);
 
   return (
-    <main data-theme={worn.color} className="water-ground flex h-dvh min-h-0 flex-col">
+    // The colour is worn on <html> alone (theme-provider): a colour held
+    // here kept what the server drew, and light and pastel read it.
+    <main className="water-ground flex h-dvh min-h-0 flex-col">
+      {/* Loaded here directly: the pool's colour and mode before the first paint. */}
+      <script dangerouslySetInnerHTML={{ __html: wornHere(worn) }} />
       <PlaceTheme poolId={view.pool.id} colors={colors} />
       {/* Editing from here edits with this pool's lanes (0022). */}
       <PoolEditScope scope={poolScopeOf(view)}>

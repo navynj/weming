@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
 import { createClient } from '@/lib/supabase/server';
-import { THEME_COLORS, type ThemeColor } from '@/lib/theme';
+import { THEME_COLORS, THEME_MODES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
 import { displayName } from './name';
 
@@ -93,18 +93,22 @@ export async function saveTheme(raw: z.input<typeof themeInput>): Promise<Profil
 }
 
 const poolColor = z.enum(THEME_COLORS as [ThemeColor, ...ThemeColor[]]).nullable();
+const poolMode = z.enum(THEME_MODES as [ThemeMode, ...ThemeMode[]]).nullable();
+const poolTheme = z.object({ poolId: z.uuid(), color: poolColor, mode: poolMode });
 
-/** A pool's colour (0059): any current member sets or clears it. */
+/** A pool's colour and its mode (0059, 0062): any current member sets or clears them. */
 export async function setPoolTheme(
   poolId: string,
   color: ThemeColor | null,
+  mode: ThemeMode | null,
 ): Promise<ProfileSaved> {
-  const parsed = z.object({ poolId: z.uuid(), color: poolColor }).safeParse({ poolId, color });
+  const parsed = poolTheme.safeParse({ poolId, color, mode });
   if (!parsed.success) return { ok: false, message: 'That colour is not one of the twelve.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_pool_theme', {
     p_pool: parsed.data.poolId,
     p_theme: parsed.data.color as string,
+    p_mode: parsed.data.mode as string,
   });
   if (error) {
     return {
@@ -117,21 +121,26 @@ export async function setPoolTheme(
   return { ok: true };
 }
 
-/** My colour in one pool (0059), over every other for me there; null uses the pool's. */
+/** My colour in one pool and its mode (0059, 0062), over every other for me there; null uses the pool's. */
 export async function setMyPoolTheme(
   poolId: string,
   color: ThemeColor | null,
+  mode: ThemeMode | null,
 ): Promise<ProfileSaved> {
-  const parsed = z.object({ poolId: z.uuid(), color: poolColor }).safeParse({ poolId, color });
+  const parsed = poolTheme.safeParse({ poolId, color, mode });
   if (!parsed.success) return { ok: false, message: 'That colour is not one of the twelve.' };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: 'Sign in again to save your colour.' };
-  const { error } = await supabase
-    .from('member_pool_settings')
-    .upsert({ pool_id: parsed.data.poolId, user_id: user.id, theme: parsed.data.color });
+  const { error } = await supabase.from('member_pool_settings').upsert({
+    pool_id: parsed.data.poolId,
+    user_id: user.id,
+    theme: parsed.data.color,
+    // Cleared, the colour takes its mode with it.
+    theme_mode: parsed.data.color ? parsed.data.mode : null,
+  });
   if (error) return { ok: false, message: error.message };
   return { ok: true };
 }

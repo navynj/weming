@@ -76,6 +76,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
       lang="en"
       data-theme={theme.color}
       data-mode={theme.mode}
+      // A pool's page re-wears both before hydrating (lib/theme.ts, wornHere).
+      suppressHydrationWarning
       className={`${poppins.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">

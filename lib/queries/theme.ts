@@ -1,6 +1,13 @@
 import { cache } from 'react';
 
-import { asTheme, asThemeColor, DEFAULT_THEME, type MyTheme, type PoolColors } from '@/lib/theme';
+import {
+  asTheme,
+  asThemeColor,
+  asThemeMode,
+  DEFAULT_THEME,
+  type MyTheme,
+  type PoolColors,
+} from '@/lib/theme';
 import { getAuthUser, getMyProfile, type DuringClient } from '@/lib/queries/profile';
 
 /**
@@ -25,20 +32,25 @@ export const getMyTheme = cache(async (supabase: DuringClient): Promise<MyTheme>
   return { home: theme.color, mode: theme.mode, everywhere: false };
 });
 
-/** A pool's colour and mine there (0059). */
+/** A pool's colour and mine there (0059), each with its mode (0062). */
 export async function getPoolColors(
   supabase: DuringClient,
   poolId: string,
   me: string,
 ): Promise<PoolColors> {
   const [pool, mine] = await Promise.all([
-    supabase.from('pools').select('theme').eq('id', poolId).maybeSingle(),
+    supabase.from('pools').select('theme, theme_mode').eq('id', poolId).maybeSingle(),
     supabase
       .from('member_pool_settings')
-      .select('theme')
+      .select('theme, theme_mode')
       .eq('pool_id', poolId)
       .eq('user_id', me)
       .maybeSingle(),
   ]);
-  return { pool: asThemeColor(pool.data?.theme), mine: asThemeColor(mine.data?.theme) };
+  return {
+    pool: asThemeColor(pool.data?.theme),
+    mine: asThemeColor(mine.data?.theme),
+    poolMode: asThemeMode(pool.data?.theme_mode),
+    mineMode: asThemeMode(mine.data?.theme_mode),
+  };
 }

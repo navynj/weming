@@ -196,29 +196,50 @@ export function asTheme(color: unknown, mode: unknown): Theme {
 /** What I set for my theme (0059): my Home colour, my mode, and whether my colour applies in every pool. */
 export type MyTheme = { home: ThemeColor; mode: ThemeMode; everywhere: boolean };
 
-/** A pool's two sources (0059): its members' colour, and mine there. */
-export type PoolColors = { pool: ThemeColor | null; mine: ThemeColor | null };
+/**
+ * A pool's two sources (0059): its members' colour, and mine there; each
+ * with the mode chosen with it (0062), absent or null for my Home mode.
+ */
+export type PoolColors = {
+  pool: ThemeColor | null;
+  mine: ThemeColor | null;
+  poolMode?: ThemeMode | null;
+  mineMode?: ThemeMode | null;
+};
 
 /**
- * The colour a place wears (0059, Yoonji, in the session). In a pool: my
- * colour here ?? my Home colour if I apply it everywhere ?? the pool's ??
- * my Home colour ?? the app's. On Home (no pool): my Home colour ?? the
- * app's. The mode is always mine.
+ * What a place wears (0059, Yoonji, in the session). In a pool: my colour
+ * here ?? my Home colour if I apply it everywhere ?? the pool's ?? my Home
+ * colour ?? the app's. On Home (no pool): my Home colour ?? the app's. A
+ * colour and its mode are one choice (0062): the mode comes from the source
+ * the colour came from — mine here or the pool's when chosen with it — and
+ * is otherwise my Home mode.
  */
 export function resolveTheme(mine: Partial<MyTheme> | null, place: PoolColors | null): Theme {
   const home = mine?.home ?? null;
-  const mode = mine?.mode ?? DEFAULT_THEME.mode;
-  const color = place
-    ? (place.mine ??
-      (mine?.everywhere && home ? home : null) ??
-      place.pool ??
-      home ??
-      DEFAULT_THEME.color)
-    : (home ?? DEFAULT_THEME.color);
-  return { color, mode };
+  const homeMode = mine?.mode ?? DEFAULT_THEME.mode;
+  if (place?.mine) return { color: place.mine, mode: place.mineMode ?? homeMode };
+  if (place && mine?.everywhere && home) return { color: home, mode: homeMode };
+  if (place?.pool) return { color: place.pool, mode: place.poolMode ?? homeMode };
+  return { color: home ?? DEFAULT_THEME.color, mode: homeMode };
 }
 
 /** A stored colour read safely: anything unknown is none. */
 export function asThemeColor(value: unknown): ThemeColor | null {
   return THEME_COLORS.includes(value as ThemeColor) ? (value as ThemeColor) : null;
+}
+
+/** A stored mode read safely: anything unknown is none. */
+export function asThemeMode(value: unknown): ThemeMode | null {
+  return THEME_MODES.includes(value as ThemeMode) ? (value as ThemeMode) : null;
+}
+
+/**
+ * The first paint of a pool loaded directly (a reload, a link): <html> is
+ * the root layout's, Home's, so a line run as the page is read puts the
+ * pool's colour and mode on it before anything shows. Both values are the
+ * fixed keys of lib/theme.ts, never anyone's text.
+ */
+export function wornHere(theme: Theme): string {
+  return `document.documentElement.dataset.theme=${JSON.stringify(theme.color)};document.documentElement.dataset.mode=${JSON.stringify(theme.mode)};`;
 }

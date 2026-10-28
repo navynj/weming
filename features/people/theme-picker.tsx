@@ -24,7 +24,11 @@ const MODES: { mode: ThemeMode; label: string }[] = [
  * everything for me, behind "Use my color" (H43): off, the pool's colour
  * (or the usual fallback) and the swatches muted with none chosen; a
  * swatch turns it on; on with none chosen, my Home colour; off clears mine
- * here. The mode — Dark, Light or Pastel — is always mine, with no label.
+ * here. A colour and its mode are one choice (0062): in a pool the mode —
+ * Dark, Light or Pastel, with no label — sits under my colour here and is
+ * mine here (a tap turns my colour here on, with the colour worn now), and
+ * the pool's default, unfolded, has a mode of its own (none chosen: each
+ * member's own). On Home it is my Home mode, at the bottom.
  * Every choice shows at once and saves behind it (CLAUDE.md, the
  * principle); a refusal takes it back and says why. Chosen wears ink
  * (H20f). Every colour keeps 3:1 against its ground (tests/theme.test.tsx).
@@ -32,6 +36,9 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 export function ThemePicker() {
   const { mine, place, theme, chooseHome, chooseMode, choosePoolColor, chooseMyPoolColor } =
     useTheme();
+  // The mode a colour here is chosen with: mine here when I use my colour,
+  // else the one worn now.
+  const hereMode = place?.colors.mine ? (place.colors.mineMode ?? mine.mode) : theme.mode;
   const [message, setMessage] = useState<string | null>(null);
   // A Home colour picked, waiting on where it applies.
   const [asking, setAsking] = useState<ThemeColor | null>(null);
@@ -56,18 +63,27 @@ export function ThemePicker() {
             muted={place.colors.mine === null}
             mode={theme.mode}
             data="mine"
-            onPick={(color) => void done(chooseMyPoolColor(color))}
+            onPick={(color) => void done(chooseMyPoolColor(color, hereMode))}
             trailing={
               <span data-theme-use-mine>
                 <Switch
                   on={place.colors.mine !== null}
                   label="Use my color"
                   onChange={(on) =>
-                    void done(chooseMyPoolColor(on ? (mine.home ?? DEFAULT_THEME.color) : null))
+                    void done(
+                      chooseMyPoolColor(on ? (mine.home ?? DEFAULT_THEME.color) : null, hereMode),
+                    )
                   }
                 />
               </span>
             }
+          />
+          {/* Its mode, the same choice as the colour above (0062). */}
+          <Modes
+            value={place.colors.mine ? hereMode : null}
+            muted={place.colors.mine === null}
+            data="mine"
+            onPick={(mode) => void done(chooseMyPoolColor(place.colors.mine ?? theme.color, mode))}
           />
           {/* The pool's own default (review): a row that folds it, closed each
               time the sheet opens; its colour shows before the chevron when set. */}
@@ -87,7 +103,7 @@ export function ThemePicker() {
                   className="h-5 w-5 shrink-0 rounded-full"
                   style={{
                     backgroundColor:
-                      theme.mode === 'pastel'
+                      (place.colors.poolMode ?? theme.mode) === 'pastel'
                         ? THEMES.find((t) => t.key === place.colors.pool)?.pastel.fill
                         : THEMES.find((t) => t.key === place.colors.pool)?.hex,
                   }}
@@ -100,15 +116,27 @@ export function ThemePicker() {
               )}
             </button>
             {poolOpen ? (
-              <Colours
-                name="Pool default color"
-                hint="Everyone here sees it, unless they choose their own."
-                value={place.colors.pool}
-                mode={theme.mode}
-                clear="None"
-                data="pool"
-                onPick={(color) => void done(choosePoolColor(color))}
-              />
+              <>
+                <Colours
+                  name="Pool default color"
+                  hint="Everyone here sees it, unless they choose their own."
+                  value={place.colors.pool}
+                  mode={place.colors.poolMode ?? theme.mode}
+                  clear="None"
+                  data="pool"
+                  onPick={(color) =>
+                    void done(choosePoolColor(color, place.colors.poolMode ?? null))
+                  }
+                />
+                {/* The default's own mode (0062); with no colour, nothing to wear it with. */}
+                <Modes
+                  value={place.colors.pool ? (place.colors.poolMode ?? null) : null}
+                  muted={place.colors.pool === null}
+                  disabled={place.colors.pool === null}
+                  data="pool"
+                  onPick={(mode) => void done(choosePoolColor(place.colors.pool, mode))}
+                />
+              </>
             ) : null}
           </div>
         </>
@@ -159,34 +187,63 @@ export function ThemePicker() {
         </>
       )}
 
-      <div
-        role="radiogroup"
-        aria-label="Mode"
-        className="bg-pool-100 flex w-full rounded-full p-1 text-sm font-medium"
-      >
-        {MODES.map(({ mode, label }) => {
-          const on = mode === mine.mode;
-          return (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              data-theme-mode={mode}
-              onClick={() => void done(chooseMode(mode))}
-              className={`flex-1 rounded-full py-1.5 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {/* My Home mode, on Home; in a pool each colour carries its own above. */}
+      {place ? null : (
+        <Modes value={mine.mode} data="home" onPick={(mode) => void done(chooseMode(mode))} />
+      )}
       {message ? (
         <p role="alert" className="text-ink text-sm">
           {message}
         </p>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Dark · Light · Pastel, the chosen one in ink (H20f), no label. `value`
+ * null: none chosen (in a pool, the colour it goes with is not set);
+ * `muted` shows it faded, still a tap to choose; `disabled`, not a tap.
+ */
+function Modes({
+  value,
+  muted = false,
+  disabled = false,
+  data,
+  onPick,
+}: {
+  value: ThemeMode | null;
+  muted?: boolean;
+  disabled?: boolean;
+  data: string;
+  onPick: (mode: ThemeMode) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Mode"
+      data-theme-modes={data}
+      data-muted={muted ? '' : undefined}
+      className={`bg-pool-100 flex w-full rounded-full p-1 text-sm font-medium ${muted ? 'opacity-40' : ''}`}
+    >
+      {MODES.map(({ mode, label }) => {
+        const on = mode === value;
+        return (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            disabled={disabled}
+            data-theme-mode={mode}
+            onClick={() => onPick(mode)}
+            className={`flex-1 rounded-full py-1.5 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

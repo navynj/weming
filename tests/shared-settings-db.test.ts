@@ -81,6 +81,69 @@ describe('a pool’s colour (0059)', () => {
   });
 });
 
+describe('a pool’s colour with its mode (0062)', () => {
+  const read = async () =>
+    (await asUser(ana).from('pools').select('theme, theme_mode').eq('id', pool).single()).data!;
+
+  it('sets both as any current member; not someone outside it; no unknown mode', async () => {
+    expect(
+      (await asUser(ben).rpc('set_pool_theme', { p_pool: pool, p_theme: 'sky', p_mode: 'pastel' }))
+        .error,
+    ).toBeNull();
+    expect(await read()).toEqual({ theme: 'sky', theme_mode: 'pastel' });
+    expect(
+      (await asUser(cal).rpc('set_pool_theme', { p_pool: pool, p_theme: 'red', p_mode: 'light' }))
+        .error?.code,
+    ).toBe('42501');
+    expect(
+      (await asUser(ana).rpc('set_pool_theme', { p_pool: pool, p_theme: 'sky', p_mode: 'dim' }))
+        .error?.code,
+    ).toBe('22023');
+    expect(await read()).toEqual({ theme: 'sky', theme_mode: 'pastel' });
+  });
+
+  it('clears the mode with the colour', async () => {
+    expect(
+      (
+        await asUser(ana).rpc('set_pool_theme', {
+          p_pool: pool,
+          p_theme: null as unknown as string,
+          p_mode: 'light',
+        })
+      ).error,
+    ).toBeNull();
+    expect(await read()).toEqual({ theme: null, theme_mode: null });
+  });
+
+  it('keeps 0059’s two-argument call, as the app in production makes it, the mode untouched', async () => {
+    await asUser(ana).rpc('set_pool_theme', { p_pool: pool, p_theme: 'sky', p_mode: 'light' });
+    expect(
+      (await asUser(ben).rpc('set_pool_theme', { p_pool: pool, p_theme: 'mint' })).error,
+    ).toBeNull();
+    expect(await read()).toEqual({ theme: 'mint', theme_mode: 'light' });
+  });
+
+  it('keeps my mode here mine alone, and refuses an unknown one', async () => {
+    expect(
+      (
+        await asUser(ben)
+          .from('member_pool_settings')
+          .upsert({ pool_id: pool, user_id: ben, theme: 'pink', theme_mode: 'light' })
+      ).error,
+    ).toBeNull();
+    expect(
+      (await asUser(ana).from('member_pool_settings').select('*').eq('user_id', ben)).data,
+    ).toEqual([]);
+    expect(
+      (
+        await asUser(ben)
+          .from('member_pool_settings')
+          .upsert({ pool_id: pool, user_id: ben, theme: 'pink', theme_mode: 'dim' })
+      ).error?.code,
+    ).toBe('23514');
+  });
+});
+
 describe('my colour in a pool, and my theme (0059)', () => {
   it('are mine alone: a companion reads neither', async () => {
     const mine = await asUser(ben)
