@@ -124,8 +124,6 @@ type Edit = {
   jointTogether: { everyone: boolean; picked: string[] } | null;
   /** A joint record: members added in Together (0033), and Everyone turned on. */
   invite: string[];
-  /** The description when it changed (0037); empty takes it off. */
-  description?: string;
   inviteEveryone: boolean;
   poolId: string | null;
   /** Only when it moved: a pool's own splash's new pool lane (0020). */
@@ -182,10 +180,6 @@ function EditForm({
   const lanes = useEditLanes(initial, context, pool, onCancel);
   const [title, setTitle] = useState(initial.title);
   const [icon, setIcon] = useState(initial.icon ?? '');
-  // Its description (0037): a field once asked for, or once it has one.
-  const [description, setDescription] = useState(initial.description ?? '');
-  const [describing, setDescribing] = useState(Boolean(initial.description));
-  const describedChange = description.trim() !== (initial.description ?? '');
   // The composer's own date control (review), prefilled with the splash's
   // days: its ripples take them (H24).
   const [annotation, setAnnotation] = useState<Annotation | null>(initial.annotation);
@@ -198,7 +192,6 @@ function EditForm({
   const changed =
     title.trim() !== initial.title ||
     (icon || null) !== initial.icon ||
-    describedChange ||
     (!joint && !sameAnnotation(annotation, initial.annotation)) ||
     lanes.changed;
   const rangeOk = !annotation || annotationVerdict(annotation) === 'ok';
@@ -252,28 +245,7 @@ function EditForm({
         />
       </div>
 
-      {/* The description (0037): optional, so asked for first. */}
-      {describing ? (
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          rows={2}
-          maxLength={2000}
-          aria-label="Description"
-          data-edit-description
-          placeholder="Describe this splash"
-          className="text-ink placeholder:text-ink bg-pool-100 w-full resize-none rounded-xl px-3 py-2.5 text-sm/relaxed outline-none placeholder:opacity-30"
-        />
-      ) : (
-        <button
-          type="button"
-          data-edit-description-add
-          onClick={() => setDescribing(true)}
-          className="text-pool-500 self-start text-sm"
-        >
-          + Add description
-        </button>
-      )}
+      {/* No description here (H48): it is written on the splash's page, from its `…`. */}
 
       {joint ? (
         <p className="text-pool-500 text-xs">
@@ -322,7 +294,6 @@ function EditForm({
     onSave({
       kind: initial.kind,
       title: title.trim(),
-      ...(describedChange ? { description: description.trim() } : {}),
       icon: icon || null,
       ...dates(),
       declaredLaneId: mine ? laneId : null,

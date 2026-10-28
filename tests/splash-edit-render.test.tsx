@@ -204,6 +204,24 @@ const save = async (view: ReturnType<typeof render>) => {
   });
 };
 
+describe('no description in the edit sheet (H48)', () => {
+  it('has no description field or "+ Add description", even on one that has words', async () => {
+    const view = await open({
+      kind: 'mine',
+      title: 'Coffee',
+      description: 'Kept on the page',
+      declaredStart: '2026-10-20',
+      annotation: { date: '2026-10-20', time: null, endDate: null, endTime: null },
+    });
+    expect(view.queryByLabelText('Description')).toBeNull();
+    expect(view.container.textContent).not.toContain('Add description');
+    // Saving a title sends nothing about it, so the page's stays as it is.
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Coffee, again' } });
+    await save(view);
+    expect(saved[0]).not.toHaveProperty('description');
+  });
+});
+
 describe('a splash’s date in the edit sheet (review)', () => {
   it('edits the post’s own days, with no clock: never a ripple’s date (H24)', async () => {
     const view = await open({
