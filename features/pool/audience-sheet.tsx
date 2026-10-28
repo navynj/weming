@@ -7,8 +7,9 @@ import { usePeople } from '@/features/people/people-provider';
 import type { PoolFace, PoolLaneChip } from '@/lib/queries/pools';
 
 import { audienceLabel, NOBODY, type AudiencePick, type PickTogether } from './audience';
+import { KeepInLane, type KeepIn } from './keep-in-lane';
 import { WithLine } from './with-line';
-import { Switch } from './lane-match';
+import { Switch } from './switch';
 import { PoolSheet, SheetTitle } from './sheet';
 
 /** A pool I am in, with its lanes and members: one row in Audience. */
@@ -31,7 +32,7 @@ export function AudienceChip({
   preselect,
   onChange,
   onTogether,
-  locked = null,
+  keepIn = null,
 }: {
   /** Where the record is shared now: a pool lane per pool. */
   shared: AudiencePick[];
@@ -43,8 +44,11 @@ export function AudienceChip({
   onChange: (poolId: string, poolLaneId: string | null) => void;
   /** With, per pool that is on (0035); absent, no With line. */
   onTogether?: (poolId: string, together: PickTogether) => void;
-  /** A pool record's own pool (0056): always on, its lane still picked. */
-  locked?: string | null;
+  /**
+   * My pool record (H45): switching off its last pool asks which of my lanes
+   * keeps it. Absent, a pool turns off without asking.
+   */
+  keepIn?: KeepIn | null;
 }) {
   const [open, setOpen] = useState(false);
   const on = shared.filter((pick) => pools.some((p) => p.id === pick.poolId));
@@ -67,7 +71,7 @@ export function AudienceChip({
           preselect={preselect}
           onChange={onChange}
           onTogether={onTogether}
-          locked={locked}
+          keepIn={keepIn}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -100,7 +104,7 @@ function AudienceSheet({
   preselect,
   onChange,
   onTogether,
-  locked,
+  keepIn,
   onClose,
 }: {
   pools: AudiencePool[];
@@ -108,10 +112,12 @@ function AudienceSheet({
   preselect: (poolId: string) => string | null;
   onChange: (poolId: string, poolLaneId: string | null) => void;
   onTogether?: (poolId: string, together: PickTogether) => void;
-  locked: string | null;
+  keepIn: KeepIn | null;
   onClose: () => void;
 }) {
   const { me } = usePeople();
+  // The pool whose switch asked "Keep it in which of your lanes?" (H45).
+  const [asking, setAsking] = useState<string | null>(null);
   // Turned on with no chip to start on: shown on, shared only once picked.
   const [waiting, setWaiting] = useState<string[]>([]);
   const laneOf = (poolId: string): string | null =>
@@ -137,18 +143,16 @@ function AudienceSheet({
                 <span className="flex items-center justify-between gap-4">
                   <span className="flex min-w-0 flex-col">
                     <span className="text-ink truncate">Shared to {pool.name}</span>
-                    {pool.id === locked ? (
-                      // Written there (0056): it cannot be turned off; its lane can change.
-                      <span data-audience-origin className="text-pool-500 text-xs">
-                        Written here, always shared
-                      </span>
-                    ) : null}
                   </span>
                   <Switch
                     on={on}
-                    disabled={pool.id === locked}
                     label={`Shared to ${pool.name}`}
                     onChange={(next) => {
+                      // Its last pool, for my pool record: asked first (H45).
+                      if (!next && keepIn && shared.length === 1 && shared[0].poolId === pool.id) {
+                        setAsking(pool.id);
+                        return;
+                      }
                       if (!next) {
                         setWaiting((list) => list.filter((id) => id !== pool.id));
                         onChange(pool.id, null);
@@ -205,6 +209,21 @@ function AudienceSheet({
             <li className="text-pool-500 py-3 text-sm">You are in no Pool yet.</li>
           ) : null}
         </ul>
+        {asking && keepIn ? (
+          <div className="mt-4">
+            <KeepInLane
+              keepIn={{
+                ...keepIn,
+                onKeep: (laneId) => {
+                  setAsking(null);
+                  keepIn.onKeep(laneId);
+                  onClose();
+                },
+              }}
+              onCancel={() => setAsking(null)}
+            />
+          </div>
+        ) : null}
       </section>
     </PoolSheet>
   );

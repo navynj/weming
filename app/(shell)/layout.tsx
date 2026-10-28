@@ -8,7 +8,7 @@ import { PoolActivityProvider } from '@/features/pool/activity';
 import { NotificationsProvider } from '@/features/notifications/notifications-provider';
 import { getPeople } from '@/lib/queries/people';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { getMyLinks, getMyPoolNames, getPoolActivity } from '@/lib/queries/pools';
+import { getMyPoolNames, getPoolActivity } from '@/lib/queries/pools';
 import { getUnreadCount } from '@/lib/queries/notifications';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -29,24 +29,21 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
   // A page without a profile redirects to sign-in on its own, so the shell
   // just renders around it. Everything needing only the profile is read in
   // one wave, and what needs the pools in the next (review: round trips).
-  const [categories, links, pools, people, unread] = profile
+  const [categories, pools, people, unread] = profile
     ? await Promise.all([
         getMyCategories(supabase),
-        // The Audience chip's defaults and rows (H23).
-        getMyLinks(supabase, profile.id),
         getMyPoolNames(supabase, profile.id),
         // Every face the shell draws, signed once here (0018).
         getPeople(supabase),
         // The bell's dot (H32); a failed count is no dot, never a broken shell.
         getUnreadCount(supabase).catch(() => 0),
       ])
-    : [[], [], [], {}, 0];
+    : [[], [], {}, 0];
   const context = profile
     ? {
         categories,
         timeZone: profile.timezone,
         today: todayIn(profile.timezone),
-        links,
         pools,
         initials: initialsOf(profile.display_name),
       }

@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { DEFAULT_THEME, THEMES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
 import { useToast } from '@/components/ui/toast';
-import { Switch } from '@/features/pool/lane-match';
+import { Switch } from '@/features/pool/switch';
 
 import { useTheme } from './theme-provider';
 

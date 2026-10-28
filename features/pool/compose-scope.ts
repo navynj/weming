@@ -1,10 +1,7 @@
-import { homeLaneFor, type MarkedLink } from './links';
-
 /**
  * Composing from a pool (H23, 0033): the pool, its lanes, and its current
- * members for Together. A pool lane carries my home lane for it, when I
- * marked one: where a record written there shows on my Home. Nothing here
- * asks for a lane of mine.
+ * members for Together. Nothing here asks for a lane of mine: a record
+ * written there shows in the pool's column on my Home until I file it (H45).
  */
 export type PoolScope = {
   poolId: string;
@@ -13,8 +10,6 @@ export type PoolScope = {
     id: string;
     name: string;
     icon: string | null;
-    /** My lane marked as this pool lane's home lane (0033), else null: the pool's column. */
-    homeLaneId: string | null;
   }[];
   /** Current members, me among them: the faces Together offers. */
   members: { id: string; name: string; initials: string }[];
@@ -22,11 +17,10 @@ export type PoolScope = {
   inviteAllByDefault?: boolean;
 };
 
-/** A pool as the composer takes it: its lanes with my home lanes, and its members. */
+/** A pool as the composer takes it: its lanes and its members. */
 export function poolScopeOf(view: {
   pool: { id: string; name: string; inviteAllByDefault?: boolean };
   lanes: { id: string; name: string; icon: string | null }[];
-  myLinks: MarkedLink[];
   members?: { userId: string; name: string; initials: string; former: boolean }[];
 }): PoolScope {
   return {
@@ -36,7 +30,6 @@ export function poolScopeOf(view: {
       id: lane.id,
       name: lane.name,
       icon: lane.icon,
-      homeLaneId: homeLaneFor(lane.id, view.myLinks),
     })),
     inviteAllByDefault: view.pool.inviteAllByDefault ?? false,
     members: (view.members ?? [])

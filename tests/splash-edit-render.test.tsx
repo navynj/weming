@@ -43,6 +43,13 @@ const loaded = vi.hoisted(() => ({ state: null as unknown }));
 const outcome = vi.hoisted(() => ({
   next: null as Promise<{ ok: true } | { ok: false; message: string }> | null,
 }));
+const filed = vi.hoisted(() => [] as unknown[][]);
+vi.mock('@/features/home/filing-actions', () => ({
+  fileOnHome: (...args: unknown[]) => {
+    filed.push(args);
+    return Promise.resolve({ ok: true });
+  },
+}));
 vi.mock('@/features/splash-sheet/edit-actions', () => ({
   loadSplashEdit: () => Promise.resolve(loaded.state ?? JOINT),
   saveSplashEdit: (input: Record<string, unknown>) => {
@@ -64,6 +71,9 @@ afterEach(() => {
   loaded.state = null;
   outcome.next = null;
   saved.length = 0;
+  filed.length = 0;
+  // The last Audience pick on this device (0033): kept apart between tests.
+  window.localStorage.clear();
 });
 
 const SUMMARY = {
@@ -128,7 +138,6 @@ describe('editing a joint record (review)', () => {
             categories: [],
             timeZone: 'UTC',
             today: '2026-10-23',
-            links: [],
             pools: [{ id: 'p-ours', name: 'Our Pool', lanes: OUR_LANES }],
             initials: 'YL',
           }}
@@ -164,17 +173,26 @@ const CONTEXT = {
   categories: [],
   timeZone: 'America/Vancouver',
   today: '2026-10-23',
-  links: [],
   pools: [{ id: 'p-ours', name: 'Our Pool', lanes: OUR_LANES }],
   initials: 'YL',
 };
 
-async function open(state: Record<string, unknown>) {
+/** Our Pool, as its screen opens the sheet: a joint record moves among its lanes there. */
+const OURS: PoolScope = {
+  poolId: 'p-ours',
+  poolName: 'Our Pool',
+  lanes: OUR_LANES,
+  members: [{ id: 'me', name: 'Yoonji', initials: 'YL' }],
+};
+
+async function open(state: Record<string, unknown>, pool: PoolScope | null = null) {
   loaded.state = { ...JOINT, ...state };
   const view = render(
-    <InputSheetProvider>
-      <SplashEditSheet splashId="s-1" context={CONTEXT} onClose={() => {}} />
-    </InputSheetProvider>,
+    <PeopleProvider me="me" people={{}}>
+      <InputSheetProvider>
+        <SplashEditSheet splashId="s-1" context={CONTEXT} pool={pool} onClose={() => {}} />
+      </InputSheetProvider>
+    </PeopleProvider>,
   );
   await waitFor(() => expect(view.container.querySelector('[data-edit-form]')).not.toBeNull());
   return view;
@@ -226,13 +244,13 @@ describe('a splash’s date in the edit sheet (review)', () => {
   });
 });
 
-describe('a joint record’s pool lane in the edit sheet (0020)', () => {
+describe('a joint record’s pool lane in the edit sheet, from its pool (0020)', () => {
   it('offers only its pool’s lanes, and saves a move', async () => {
-    const view = await open({});
+    const view = await open({}, OURS);
     const lanes = view.container.querySelector('[data-edit-pool-lanes]')!;
     expect(lanes.textContent).toContain('Games');
     expect(lanes.textContent).toContain('Media');
-    fireEvent.click(view.getByText('Media'));
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="l-media"]')!);
     await save(view);
     expect(saved[0]).toMatchObject({
       kind: 'joint',
@@ -241,7 +259,7 @@ describe('a joint record’s pool lane in the edit sheet (0020)', () => {
   });
 
   it('sends no move when the lane is unchanged', async () => {
-    const view = await open({});
+    const view = await open({}, OURS);
     fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Renamed' } });
     await save(view);
     expect(saved[0]).toMatchObject({ conversion: { op: 'none' } });
@@ -259,13 +277,15 @@ describe('a pool-lane move from the edit sheet (review)', () => {
     outcome.next = new Promise((resolve) => (settle = resolve));
     loaded.state = { ...JOINT };
     const view = render(
-      <InputSheetProvider>
-        <SplashEditSheet splashId="s-joint" context={CONTEXT} onClose={() => {}} />
-        <Probe />
-      </InputSheetProvider>,
+      <PeopleProvider me="me" people={{}}>
+        <InputSheetProvider>
+          <SplashEditSheet splashId="s-joint" context={CONTEXT} pool={OURS} onClose={() => {}} />
+          <Probe />
+        </InputSheetProvider>
+      </PeopleProvider>,
     );
     await waitFor(() => expect(view.container.querySelector('[data-edit-form]')).not.toBeNull());
-    fireEvent.click(view.getByText('Media'));
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="l-media"]')!);
     await act(async () => {
       fireEvent.click(view.container.querySelector('[data-edit-save]')!);
     });
@@ -298,8 +318,8 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     poolId: 'p-ours',
     poolName: 'Our Pool',
     lanes: [
-      { id: 'l-games', name: 'Games', icon: '🎲', homeLaneId: 'c-games' },
-      { id: 'l-media', name: 'Media', icon: '🎬', homeLaneId: null },
+      { id: 'l-games', name: 'Games', icon: '🎲' },
+      { id: 'l-media', name: 'Media', icon: '🎬' },
     ],
     members: [
       { id: 'me', name: 'Yoonji', initials: 'YL' },
@@ -339,18 +359,6 @@ describe('converting from the edit sheet (0022, 0033)', () => {
         members: [{ id: 'u-mina', name: 'Mina', initials: 'MI' }],
       },
       { id: 'p-other', name: 'Other Pool', lanes: [{ id: 'o-play', name: 'Play', icon: '🃏' }] },
-    ],
-    links: [
-      // Games is linked to Our Pool's Games, as its default, sharing nothing by default.
-      {
-        myCategoryId: 'c-games',
-        poolId: 'p-ours',
-        poolName: 'Our Pool',
-        poolLaneId: 'l-games',
-        isDefault: true,
-        shareByDefault: false,
-        isHome: true,
-      },
     ],
   } as unknown as typeof CONTEXT;
 
@@ -500,6 +508,9 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     fireEvent.click(view.container.querySelector('[data-audience-chip]')!);
     expect(view.container.querySelector('[data-audience-with]')).toBeNull();
     fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
+    // No default lane (H45): With shows once one is picked.
+    expect(view.container.querySelector('[data-audience-with="p-ours"]')).toBeNull();
+    fireEvent.click(view.container.querySelector('[data-audience-lane="l-games"]')!);
     const line = view.container.querySelector('[data-audience-with="p-ours"]')!;
     expect(line.textContent).toContain('With');
     expect(line.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
@@ -517,21 +528,15 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     });
   });
 
-  it('from Home: turning a pool on in Audience starts on the link’s default pool lane', async () => {
+  it('from Home: turning a pool on in Audience starts on no lane: one is picked (H45)', async () => {
     const view = await sheet({ ...MINE_SHARED, shared: [], sharedIn: [] }, null);
     const chip = view.container.querySelector('[data-audience-chip]') as HTMLButtonElement;
-    expect(chip.textContent).toBe('Only me');
     fireEvent.click(chip);
     fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
     expect(
       view.container.querySelector('[data-audience-lane="l-games"]')!.getAttribute('aria-pressed'),
-    ).toBe('true');
-    expect(chip.textContent).toBe('Our Pool · 🎲 Games');
-    await save(view);
-    expect(saved[0]).toMatchObject({
-      conversion: { op: 'none' },
-      share: [{ poolId: 'p-ours', on: true, poolLaneId: 'l-games' }],
-    });
+    ).toBe('false');
+    expect(chip.textContent).toBe('Only me');
   });
 
   it('from Home: turning a pool off in Audience saves it off', async () => {
@@ -547,62 +552,75 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     });
   });
 
-  it('from Home: Make it mine sets a lane and a fresh Audience for a joint record only I wrote in', async () => {
-    const view = await sheet({ othersWrote: false }, null);
+  const chipOf = (view: ReturnType<typeof render>, sel: string) =>
+    view.container.querySelector(sel) as HTMLButtonElement;
+  const HOME = {
+    pool: { id: 'p-ours', name: 'Our Pool', photo: null },
+    poolLane: { name: 'Games', icon: '🎲' },
+    filed: null,
+  };
+
+  it('from Home: a joint record shows its pool’s chip, then my lanes, and files at once (H45)', async () => {
+    const view = await sheet({ othersWrote: false, home: HOME, id: 's-1' }, null);
+    expect(view.container.querySelector('[data-edit-my-lanes]')).toBeNull();
     expect(view.container.querySelector('[data-edit-pool-lanes]')).toBeNull();
-    // Before a lane is picked it is still the pool's: no Audience.
-    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
-    fireEvent.click(view.getByText('Games'));
-    expect(warnings(view)).toEqual([
-      'This is a joint splash in Our Pool. Moving it to your lane makes it yours alone; members can no longer add to it.',
-      'It leaves Our Pool unless you share it there in Audience.',
-    ]);
-    // Its Audience starts anew, as a new record's: Only me.
-    const chip = view.container.querySelector('[data-audience-chip]') as HTMLButtonElement;
-    expect(chip.textContent).toBe('Only me');
-    fireEvent.click(chip);
-    fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
-    fireEvent.click(view.container.querySelector('[data-audience-lane="l-media"]')!);
-    expect(chip.textContent).toBe('Our Pool · 🎬 Media');
-    await save(view);
-    expect(saved[0]).toMatchObject({
-      conversion: { op: 'to_mine', myLaneId: 'c-games', placeOn: null },
-      share: [{ poolId: 'p-ours', on: true, poolLaneId: 'l-media' }],
+    const pool = chipOf(view, '[data-filing-pool="p-ours"]');
+    expect(pool.textContent).toContain('Our Pool');
+    expect(pool.getAttribute('aria-pressed')).toBe('true');
+    expect(view.container.textContent).not.toMatch(/Make it mine|Move to Home/);
+    fireEvent.click(view.getByText('Day'));
+    await waitFor(() => expect(filed).toEqual([['s-1', 'c-day']]));
+    expect(pool.getAttribute('aria-pressed')).toBe('false');
+    // On Home its mark moves at once; nothing to save.
+    const pending = JSON.parse(view.container.querySelector('[data-pending]')!.textContent!);
+    expect(pending['s-1'].homeColumn).toEqual({
+      column: 'c-day',
+      lane: { icon: '🖋', name: 'Day' },
     });
+    expect(saved).toEqual([]);
+    // The pool's chip takes it back.
+    fireEvent.click(pool);
+    await waitFor(() =>
+      expect(filed).toEqual([
+        ['s-1', 'c-day'],
+        ['s-1', null],
+      ]),
+    );
   });
 
-  it('from Home: my pool record moves to the lane I pick, keeping every pool it is in (0056)', async () => {
+  it('from Home: my pool record files on Home, and its Audience has no locked pool (H45)', async () => {
     const view = await sheet(
       {
         ...MINE_SHARED,
         kind: 'own',
+        id: 's-1',
         poolId: 'p-ours',
         poolLaneId: 'l-media',
-        // Always in its own pool.
-        sharedIn: [{ poolId: 'p-ours', poolLaneId: 'l-media' }],
+        sharedIn: [],
+        ownShared: [
+          { poolId: 'p-ours', poolLaneId: 'l-media', together: { everyone: false, picked: [] } },
+        ],
+        home: { ...HOME, filed: 'c-games' },
       },
       null,
     );
-    expect(view.container.querySelector('[data-edit-just-mine]')!.textContent).toBe(
-      'Yours · in Our Pool. Pick a lane to move it to Home.',
-    );
-    fireEvent.click(view.getByText('Day'));
-    expect(warnings(view)).toEqual(['It stays in Our Pool and every Pool it is shared to.']);
-    expect(view.container.querySelector('[data-audience-chip]')!.textContent).toContain('Our Pool');
-    await save(view);
-    // Nothing switched off: it stays where it was.
-    expect(saved[0]).toMatchObject({
-      kind: 'own',
-      conversion: { op: 'to_mine', myLaneId: 'c-day', placeOn: null },
-      share: [],
-    });
+    expect(chipOf(view, '[data-filing-pool="p-ours"]').getAttribute('aria-pressed')).toBe('false');
+    expect(view.container.querySelector('[data-edit-just-mine]')).toBeNull();
+    fireEvent.click(view.container.querySelector('[data-audience-chip]')!);
+    expect(view.container.textContent).not.toContain('Written here');
+    const origin = view.getByRole('switch', { name: 'Shared to Our Pool' }) as HTMLButtonElement;
+    expect(origin.disabled).toBe(false);
+    // Its last pool asks for a lane of mine, starting where I filed it.
+    fireEvent.click(origin);
+    expect(view.container.querySelector('[data-keep-in-lane]')).not.toBeNull();
   });
 
-  it('from Home: a joint record someone else wrote in shows only its pool’s lanes and says why', async () => {
-    const view = await sheet({ othersWrote: true }, null);
-    expect(view.container.querySelector('[data-edit-my-lanes]')).toBeNull();
-    expect(view.container.querySelector('[data-edit-pool-lanes]')!.textContent).toContain(
-      'Others have written here, so it stays in Our Pool.',
-    );
+  it('from Home: someone’s record I wrote on offers only where it shows on my Home (H45)', async () => {
+    const view = await sheet({ kind: 'theirs', id: 's-1', home: HOME }, null);
+    expect(view.container.querySelector('[data-edit-title]')).toBeNull();
+    expect(view.container.querySelector('[data-edit-save]')).toBeNull();
+    expect(view.container.querySelector('[data-filing-chips]')).not.toBeNull();
+    fireEvent.click(view.getByText('Games'));
+    await waitFor(() => expect(filed).toEqual([['s-1', 'c-games']]));
   });
 });

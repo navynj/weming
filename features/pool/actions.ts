@@ -14,18 +14,6 @@ export type Made = { ok: true; id: string } | { ok: false; message: string };
 
 const ICON = z.string().trim().max(16).nullable();
 const DESCRIPTION = z.string().trim().max(80).nullable();
-/** An advanced link and its defaults (0033); absent markers are off. */
-const LINKS = z
-  .array(
-    z.object({
-      poolLaneId: z.uuid(),
-      myCategoryId: z.uuid().nullable(),
-      isDefault: z.boolean().optional(),
-      shareByDefault: z.boolean().optional(),
-      isHome: z.boolean().optional(),
-    }),
-  )
-  .max(24);
 
 /** Every surface a pool touches re-reads. */
 function revalidatePool(poolId: string | null = null): void {
@@ -44,9 +32,6 @@ function said(error: { message: string; code?: string } | null): string {
   if (error.code === '42501' && /no longer valid/.test(error.message)) return DEAD_LINK;
   if (error.code === '42501' && /ripples? by other members/.test(error.message)) {
     return error.message;
-  }
-  if (error.code === '23505' && /lane_mappings_one_default/.test(error.message)) {
-    return 'Each of your lanes has one default here.';
   }
   if (error.code === '42501' && /together here/.test(error.message)) return error.message;
   if (error.code === '42501') return 'You’re not in this Pool anymore.';
@@ -69,8 +54,7 @@ const NewPool = z.object({
 
 /**
  * "Open a new Pool" (0011 `create_pool`): the pool, its lanes and my
- * membership as one act. No lane of mine is connected: links are advanced
- * only, in its settings (0033).
+ * membership as one act. No lane of mine is connected (H45).
  */
 export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> {
   const parsed = NewPool.safeParse(input);
@@ -119,27 +103,6 @@ async function joinPoolWork(input: z.infer<typeof Join>): Promise<Made> {
   if (error || !data) return { ok: false, message: said(error) };
   revalidatePool(data);
   return { ok: true, id: data };
-}
-
-/** Pool settings → Advanced: my links here and their defaults, the whole set. */
-export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>): Promise<Done> {
-  const parsed = z.object({ poolId: z.uuid(), links: LINKS }).safeParse({ poolId, links });
-  if (!parsed.success)
-    return { ok: false, message: 'Those lane connections didn’t save. Try again.' };
-  const supabase = await createClient();
-  const { error } = await supabase.rpc('set_lane_links', {
-    p_pool: poolId,
-    p_links: parsed.data.links.map((l) => ({
-      pool_lane_id: l.poolLaneId,
-      my_category_id: l.myCategoryId,
-      is_default: l.isDefault ?? false,
-      share_by_default: l.shareByDefault ?? false,
-      is_home: l.isHome ?? false,
-    })),
-  });
-  if (error) return { ok: false, message: said(error) };
-  revalidatePool(poolId);
-  return { ok: true };
 }
 
 /** Pool settings: "Invite everyone to new posts by default" (0033), any current member. */
@@ -640,8 +603,8 @@ async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Ma
  * Delete a pool for everyone (0015), the creator only — the database checks
  * that and refuses a pool whose creator's account is gone. Nobody's words go
  * with it: pool records move into a new lane of their author's, each
- * author's joint ripples become one post of theirs (in their home lane when
- * marked), shared records stay.
+ * author's joint ripples become one post of theirs (in the lane they filed
+ * it in, 0060), shared records stay.
  */
 export async function deletePool(poolId: string): Promise<Done> {
   if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
@@ -654,5 +617,24 @@ export async function deletePool(poolId: string): Promise<Done> {
     };
   }
   revalidatePool(poolId);
+  return { ok: true };
+}
+
+/**
+ * "Keep it in which of your lanes?" (H45): my pool record leaves its last
+ * pool for a lane of mine (keep_in_lane, 0060). Members' ripples there are
+ * hidden, never deleted, and come back if it is shared there again.
+ */
+export async function keepInLane(splashId: string, laneId: string): Promise<Done> {
+  const ids = z.object({ splashId: z.uuid(), laneId: z.uuid() }).safeParse({ splashId, laneId });
+  if (!ids.success) return { ok: false, message: 'That didn’t save. Try again.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('keep_in_lane', {
+    p_splash: splashId,
+    p_my_lane: laneId,
+  });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool();
+  revalidatePath(`/splash/${splashId}`);
   return { ok: true };
 }

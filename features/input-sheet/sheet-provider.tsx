@@ -30,6 +30,11 @@ export type PendingEdit = {
   poolLane?: { id: string; icon: string | null; name: string };
   /** Converted (0022): what it is now — my own, Just mine, or the pool's. */
   kind?: 'mine' | 'own' | 'joint';
+  /**
+   * Filed on Home (H45): the column its mark moves to — a lane of mine, or
+   * back to its pool's — and the lane it names there (none: my lane's own).
+   */
+  homeColumn?: { column: string; lane: { icon: string | null; name: string } | null };
 };
 
 /**

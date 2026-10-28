@@ -112,10 +112,16 @@ export function PoolGround({
   const landed = dropHere !== null && cards.some((c) => c.splash.id === dropHere.splash.id);
   const shown = useMemo(() => {
     // An edit made a moment ago shows at once (review).
-    const kept = withPoolMoves(withEdits(cards, pendingEdits), pendingEdits, kind, view.pool.name, {
-      id: me,
-      initials: view.members.find((m) => m.userId === me)?.initials ?? '',
-    }).filter((c) => !pendingDeletes.includes(c.splash.id));
+    const kept = withPoolMoves(
+      withEdits(cards, pendingEdits, { home: false }),
+      pendingEdits,
+      kind,
+      view.pool.name,
+      {
+        id: me,
+        initials: view.members.find((m) => m.userId === me)?.initials ?? '',
+      },
+    ).filter((c) => !pendingDeletes.includes(c.splash.id));
     if (!dropHere || landed) return kept;
     // In Members my drop sits in my column, and a joint splash's first ripple branches into it.
     const seated: Card =

@@ -3,11 +3,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { asAdmin, asUser } from './as-user';
 
 /**
- * Converting records (0022, 0033) through the edit sheet's save, against the
- * real schema with throwaway users. Ana opens Sarang (Word, Free) and Study
- * (Play); Ben joins Sarang. Links are advanced only and move nothing, so
- * none are made here. No conversion deletes a ripple or changes its author;
- * none takes a record out of a pool that could read it, except into joint.
+ * A record's lane through the edit sheet's save (0033), against the real
+ * schema with throwaway users. Ana opens Sarang (Word, Free) and Study
+ * (Play); Ben joins Sarang. Nothing converts a record's kind any more
+ * (H45): a lane change moves no placement.
  *
  * Needs the local stack; excluded from the CI config like every DB test.
  */
@@ -139,8 +138,6 @@ afterAll(async () => {
 
 const row = async (id: string) =>
   (await asAdmin().from('splashes').select('*').eq('id', id).single()).data!;
-const ripplesOf = async (id: string) =>
-  (await asAdmin().from('ripples').select('author_id').eq('splash_id', id)).data!;
 const placementsOf = async (id: string) =>
   (
     await asAdmin()
@@ -148,192 +145,6 @@ const placementsOf = async (id: string) =>
       .select('pool_id, pool_lane_id, shared')
       .eq('splash_id', id)
   ).data!;
-
-describe('Together in a pool: my record becomes joint', () => {
-  it('keeps my authorship and leaves every other pool; my ripple keeps no lane of its own (H24)', async () => {
-    as.user = ana;
-    const id = await anas(
-      [
-        [sarang, lane.Word],
-        [study, lane.Play],
-      ],
-      true,
-    );
-    const done = await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'mine',
-      declaredLaneId: CHURCH,
-      poolId: null,
-      conversion: { op: 'to_joint', poolLaneId: lane.Word, invitees: [ben], everyone: false },
-    });
-    expect(done).toEqual({ ok: true });
-    const s = await row(id);
-    expect(s).toMatchObject({
-      owner_id: null,
-      pool_id: sarang,
-      pool_lane_id: lane.Word,
-      created_by: ana,
-      pinned_at: null,
-    });
-    // The ripple itself carries no lane; Home places it by the home lane.
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana }]);
-    expect(await placementsOf(id)).toEqual([]);
-    // Together: Ana, who made it, and Ben, picked; not Everyone.
-    const invited = (await asAdmin().from('joint_invitees').select('user_id').eq('splash_id', id))
-      .data!.map((i) => i.user_id)
-      .sort();
-    expect(invited).toEqual([ana, ben].sort());
-    expect(s.joint_invite_all).toBe(false);
-  });
-
-  it('from Home, into a pool it was never shared to, with Everyone (0033)', async () => {
-    as.user = ana;
-    const id = await anas([]);
-    const done = await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'mine',
-      declaredLaneId: CHURCH,
-      poolId: null,
-      conversion: { op: 'to_joint', poolLaneId: lane.Free, invitees: [], everyone: true },
-    });
-    expect(done).toEqual({ ok: true });
-    expect(await row(id)).toMatchObject({
-      owner_id: null,
-      pool_id: sarang,
-      joint_invite_all: true,
-      description: null,
-    });
-  });
-
-  it('on an unlinked pool lane too, my ripple carries no lane', async () => {
-    as.user = ana;
-    const id = await anas([[sarang, lane.Word]]);
-    await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'mine',
-      declaredLaneId: CHURCH,
-      poolId: null,
-      conversion: { op: 'to_joint', poolLaneId: lane.Free, invitees: [], everyone: false },
-    });
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana }]);
-  });
-
-  it('keeps a locked ripple locked: a member still cannot read it', async () => {
-    as.user = ana;
-    const id = await anas([[sarang, lane.Word]]);
-    const locked = (await asUser(ana).from('ripples').select('id').eq('splash_id', id).single())
-      .data!.id;
-    await asUser(ana).from('ripple_audience').insert({ ripple_id: locked, target_type: 'lock' });
-    await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'mine',
-      declaredLaneId: CHURCH,
-      poolId: null,
-      conversion: { op: 'to_joint', poolLaneId: lane.Word, invitees: [], everyone: false },
-    });
-    expect((await asUser(ben).from('splashes').select('id').eq('id', id)).data).toHaveLength(1);
-    expect((await asUser(ben).from('ripples').select('id').eq('id', locked)).data).toEqual([]);
-  });
-});
-
-describe('a joint splash back to mine', () => {
-  async function jointOfAnas(): Promise<string> {
-    as.user = ana;
-    const id = await anas([[sarang, lane.Word]], false);
-    await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'mine',
-      declaredLaneId: CHURCH,
-      poolId: null,
-      conversion: { op: 'to_joint', poolLaneId: lane.Word, invitees: [], everyone: false },
-    });
-    return id;
-  }
-
-  it('is refused while another member has a ripple on it', async () => {
-    const id = await jointOfAnas();
-    await asUser(ben).from('ripples').insert({ author_id: ben, note: 'Ben wrote', splash_id: id });
-    as.user = ana;
-    const done = await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'joint',
-      poolId: sarang,
-      conversion: { op: 'to_mine', myLaneId: CHURCH, placeOn: null },
-    });
-    expect(done).toEqual({ ok: false, message: 'Others have written here.' });
-    expect((await row(id)).owner_id).toBeNull();
-  });
-
-  it('from Home, with only my ripples, becomes mine in my lane, shared only where its new Audience says', async () => {
-    const id = await jointOfAnas();
-    await asAdmin().from('splashes').update({ pinned_at: new Date().toISOString() }).eq('id', id);
-    as.user = ana;
-    const done = await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'joint',
-      poolId: sarang,
-      conversion: { op: 'to_mine', myLaneId: CHURCH, placeOn: null },
-      // Its Audience, set anew: Study's Play.
-      share: [{ poolId: study, on: true, poolLaneId: lane.Play }],
-    });
-    expect(done).toEqual({ ok: true });
-    expect(await row(id)).toMatchObject({
-      owner_id: ana,
-      pool_id: null,
-      declared_lane_id: CHURCH,
-      pinned_at: null,
-      joint_invite_all: false,
-      description: null,
-    });
-    // The splash takes the lane; the ripple inherits it and carries none (H24).
-    expect(await ripplesOf(id)).toEqual([{ author_id: ana }]);
-    // Sarang lets go of it; Study has it, as its Audience said.
-    expect(await placementsOf(id)).toEqual([
-      { pool_id: study, pool_lane_id: lane.Play, shared: true },
-    ]);
-    expect((await asAdmin().from('joint_invitees').select('*').eq('splash_id', id)).data).toEqual(
-      [],
-    );
-  });
-});
-
-describe('my pool record moved to Home (0033, 0056)', () => {
-  it('takes my lane and keeps its pool placement (0056)', async () => {
-    as.user = ana;
-    const id = crypto.randomUUID();
-    const made = await asUser(ana).rpc('create_own_pool_splash', {
-      p_id: id,
-      p_pool: sarang,
-      p_pool_lane: lane.Word,
-      p_title: 'in the pool',
-    });
-    expect(made.error).toBeNull();
-    const done = await saveSplashEdit({
-      ...base,
-      id,
-      kind: 'own',
-      poolId: sarang,
-      conversion: { op: 'to_mine', myLaneId: DAY, placeOn: null },
-    });
-    expect(done).toEqual({ ok: true });
-    expect(await row(id)).toMatchObject({
-      owner_id: ana,
-      own_pool_id: null,
-      declared_lane_id: DAY,
-    });
-    // It keeps every placement (0056): still in Sarang, where it was written.
-    expect(await placementsOf(id)).toEqual([
-      { pool_id: sarang, pool_lane_id: lane.Word, shared: true },
-    ]);
-  });
-});
 
 describe('my shared record changes lane from Home', () => {
   it('moves no placement: every pool keeps it where it was (0033)', async () => {

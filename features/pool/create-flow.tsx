@@ -15,8 +15,8 @@ import { PrimaryButton, StepPage } from './step-page';
  * "Open a new Pool" (1c): one screen — its photo and name, its visibility
  * and its lanes — and one button, which opens the pool, its lanes and my
  * membership as one act (`create_pool`), then goes to the pool. No lane of
- * mine is connected here: links are advanced only, in the pool's settings
- * (0033).
+ * mine is connected: a record written there shows in the pool's column on
+ * my Home until I file it (H45).
  *
  * The pool's id comes from the database, so this one add waits on its round
  * trip: the button says so while it does.

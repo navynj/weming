@@ -10,7 +10,7 @@ import { summarizeSplash } from '@/features/splash/summary';
 import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import {
-  getMyLinks,
+  getMyFilings,
   getMyPlacements,
   getMyPoolNames,
   getPlacementPicks,
@@ -45,12 +45,12 @@ export async function PoolSplash({
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
 
-  const [view, categories, links, pools, placements, ripples] = await Promise.all([
+  const [view, categories, pools, placements, filings, ripples] = await Promise.all([
     getPoolView(supabase, id, profile.id),
     getMyCategories(supabase),
-    getMyLinks(supabase, profile.id),
     getMyPoolNames(supabase, profile.id),
     getMyPlacements(supabase, profile.id),
+    getMyFilings(supabase),
     // Every ripple on it I may read, with my own lanes where they are mine.
     supabase
       .from('ripples')
@@ -121,7 +121,8 @@ export async function PoolSplash({
           board,
           summary,
           me: profile.id,
-          links,
+          categories,
+          filed: filings[sid] ?? null,
           pools,
           placements,
           picks: board.owner_id === profile.id ? await getPlacementPicks(supabase, sid) : {},

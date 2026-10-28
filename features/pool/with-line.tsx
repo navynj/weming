@@ -2,7 +2,7 @@
 
 import type { PoolFace } from '@/lib/queries/pools';
 
-import { Switch } from './lane-match';
+import { Switch } from './switch';
 import { WithFace } from './with-face';
 import { toggleEveryone, toggleFace, type Together } from './pool-pick';
 

@@ -121,15 +121,6 @@ const A: PoolView = {
     },
   ],
   lanes: [LANE('l-food', 'p-a', 'Food', '🍽️', 0), LANE('l-media', 'p-a', 'Media', '🎬', 1)],
-  myLinks: [
-    {
-      poolLaneId: 'l-food',
-      myCategoryId: 'my-lane',
-      isDefault: true,
-      shareByDefault: false,
-      isHome: true,
-    },
-  ],
   placements: [
     { splashId: 's-mine', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: ME },
     { splashId: 's-mina', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: MINA },
@@ -177,7 +168,6 @@ const B: PoolView = {
     },
   ],
   lanes: [LANE('l-notes', 'p-b', 'Notes', '📓', 0)],
-  myLinks: [],
   placements: [
     { splashId: 's-study', poolId: 'p-b', poolLaneId: 'l-notes', shared: true, ownerId: ME },
   ],

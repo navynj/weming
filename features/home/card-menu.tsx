@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { MoreHorizontal, Pencil } from 'lucide-react';
 
@@ -9,23 +8,14 @@ import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 
 import { splashHref } from '@/features/home/scope';
 import { usePoolEditScope } from '@/features/pool/edit-scope';
-import {
-  makeJointRecord,
-  previewMakeJoint,
-  type MakeJointPreview,
-} from '@/features/splash-sheet/edit-actions';
 
 import type { Card } from './grid';
-
-/** How long a conversion stays applied over the server's rows before the re-read has surely landed. */
-const SETTLE_MS = 2500;
 
 /**
  * The top card's quiet menu (review): the `…` at its top right, the same
  * three things the post's page offers from its header — open the page,
- * pin or unpin, delete behind a small confirm — and, for my record in a
- * pool, "Make it a joint record of <Pool>…" behind its confirm: the only way
- * my record becomes joint (Yoonji, in the session). In ink, the selection
+ * pin or unpin, delete behind a small confirm. No conversions (H45): a
+ * record opens to others through its Audience. In ink, the selection
  * channel. A sibling of the card's link, never inside it.
  */
 export function CardMenu({
@@ -39,60 +29,19 @@ export function CardMenu({
   onPin: (pinned: boolean) => void;
   onDelete: () => void;
 }) {
-  const [menu, setMenu] = useState<'closed' | 'open' | 'delete' | 'joint'>('closed');
-  const [joint, setJoint] = useState<MakeJointPreview | null>(null);
+  const [menu, setMenu] = useState<'closed' | 'open' | 'delete'>('closed');
   const { count } = card.splash;
-  const { openEdit, markEdited, clearEdited, dropFailed } = useInputSheet();
-  const router = useRouter();
+  const { openEdit } = useInputSheet();
   const pool = usePoolEditScope();
-  // My record, in a pool: the one this screen is, or on Home my pool record's own.
-  const jointTarget =
-    card.editable && !card.joint && !card.splash.orphan
-      ? pool
-        ? { id: pool.poolId, name: pool.poolName }
-        : card.splash.ownPoolId
-          ? { id: card.splash.ownPoolId, name: card.lane?.name ?? 'its Pool' }
-          : null
-      : null;
-
-  function askJoint(): void {
-    if (!jointTarget) return;
-    setMenu('joint');
-    setJoint(null);
-    previewMakeJoint(card.splash.id, jointTarget.id)
-      .then(setJoint)
-      .catch(() => setJoint({ ok: false, message: 'That did not open. Try again.' }));
-  }
-
-  function makeJoint(): void {
-    if (!jointTarget) return;
-    setMenu('closed');
-    const id = card.splash.id;
-    // Shown at once (CLAUDE.md, the principle); a refusal takes it back.
-    markEdited(id, { title: card.splash.title, icon: card.splash.icon, kind: 'joint' });
-    makeJointRecord(id, jointTarget.id)
-      .then((done) => {
-        if (!done.ok) {
-          clearEdited(id);
-          dropFailed(done.message);
-          return;
-        }
-        router.refresh();
-        window.setTimeout(() => clearEdited(id), SETTLE_MS);
-      })
-      .catch(() => {
-        clearEdited(id);
-        dropFailed('That did not go through. Try again.');
-      });
-  }
 
   return (
     <div
       className="absolute top-3 right-3 z-20 flex items-center"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {card.editable ? (
-        // Edit, beside the menu (review): the compose sheet in edit mode.
+      {card.editable || (card.fileable && !pool) ? (
+        // Edit, beside the menu (review): the compose sheet in edit mode —
+        // for someone's record on my Home, only where it shows there (H45).
         <button
           type="button"
           aria-label="Edit"
@@ -151,19 +100,6 @@ export function CardMenu({
                 </button>
               </li>
             )}
-            {jointTarget ? (
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  data-card-make-joint
-                  onClick={askJoint}
-                  className="w-full px-4 py-2.5 text-left"
-                >
-                  Make it a joint record of {jointTarget.name}…
-                </button>
-              </li>
-            ) : null}
             {card.menu?.delete === false ? null : (
               <li>
                 <button
@@ -178,47 +114,6 @@ export function CardMenu({
             )}
           </ul>
         </>
-      ) : null}
-
-      {menu === 'joint' && jointTarget ? (
-        <div
-          role="alertdialog"
-          data-joint-confirm
-          className="bg-ink absolute top-full right-0 z-20 flex w-64 flex-col gap-2 rounded-xl px-3 py-2 text-sm text-white shadow-lg"
-        >
-          {joint === null ? (
-            <p className="text-white/70">Opening…</p>
-          ) : joint.ok ? (
-            <>
-              <p className="text-white/70">
-                Make this a joint splash in {joint.poolName}? Everyone in {joint.poolName} can add
-                to it and edit its title. You keep your ripples.
-              </p>
-              {joint.removed.length > 0 ? (
-                <p data-joint-removed className="text-white/70">
-                  It will be removed from {joint.removed.join(', ')}.
-                </p>
-              ) : null}
-              <span className="flex gap-3">
-                <button
-                  type="button"
-                  data-joint-confirm-go
-                  onClick={makeJoint}
-                  className="font-medium"
-                >
-                  Make it joint
-                </button>
-                <button type="button" onClick={() => setMenu('closed')} className="text-white/70">
-                  Keep
-                </button>
-              </span>
-            </>
-          ) : (
-            <p role="alert" className="text-white/70">
-              {joint.message}
-            </p>
-          )}
-        </div>
       ) : null}
 
       {menu === 'delete' ? (

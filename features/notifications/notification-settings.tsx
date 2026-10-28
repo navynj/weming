@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Switch } from '@/features/pool/lane-match';
+import { Switch } from '@/features/pool/switch';
 import type { NotificationSettings as Settings } from '@/lib/queries/notifications';
 
 import { loadNotificationSettings, setNotificationSettings } from './actions';

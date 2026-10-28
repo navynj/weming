@@ -95,7 +95,7 @@ export function HomeGround({
   topParam?: string | null;
   /**
    * After my lanes, one column per pool holding my pool records and joint
-   * records with no home lane (0014, 0033), headed by the pool's monogram and name.
+   * records I have not filed (0014, H45), headed by the pool's monogram and name.
    */
   poolColumns?: GridColumn[];
   board?: Board;

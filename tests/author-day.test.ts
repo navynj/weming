@@ -102,7 +102,6 @@ describe('the author’s local day', () => {
         },
       ],
       lanes: [{ id: 'l', pool_id: 'p', name: 'Food', icon: '🍽️', description: null, position: 0 }],
-      myLinks: [],
       placements: [
         { splashId: 'late', poolId: 'p', poolLaneId: 'l', shared: true, ownerId: 'u-van' },
       ],

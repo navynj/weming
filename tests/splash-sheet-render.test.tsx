@@ -46,7 +46,6 @@ vi.mock('@/lib/supabase/client', () => ({
 import { ownPoolColumn } from '@/features/home/grid';
 import { InputSheetProvider, type PendingDrop } from '@/features/input-sheet/sheet-provider';
 import { PeopleProvider } from '@/features/people/people-provider';
-import type { AudienceLink } from '@/features/pool/audience';
 import type { AudiencePool } from '@/features/pool/audience-sheet';
 import type { PoolScope } from '@/features/pool/compose-scope';
 import {
@@ -96,40 +95,6 @@ const POOLS: AudiencePool[] = [
     ],
   },
 ];
-/**
- * Advanced links (0033): Place shares to Our Pool's Trips by default, and
- * has Crew's Outings as its default pool lane without sharing by default.
- * Mood is linked to Notes with no default. Day is linked nowhere.
- */
-const marks = (isDefault: boolean, shareByDefault: boolean) => ({
-  isDefault,
-  shareByDefault,
-  isHome: false,
-});
-const LINKS: AudienceLink[] = [
-  {
-    myCategoryId: 'c-place',
-    poolId: 'p-ours',
-    poolName: 'Our Pool',
-    poolLaneId: 'pl-trips',
-    ...marks(true, true),
-  },
-  {
-    myCategoryId: 'c-place',
-    poolId: 'p-crew',
-    poolName: 'Crew',
-    poolLaneId: 'cr-out',
-    ...marks(true, false),
-  },
-  {
-    myCategoryId: 'c-mood',
-    poolId: 'p-ours',
-    poolName: 'Our Pool',
-    poolLaneId: 'pl-notes',
-    ...marks(false, false),
-  },
-];
-
 /** The last Audience picks on this device (0033), kept clean between tests. */
 const LAST_PICK = 'weming.audience.lastPick';
 const store = (picks: Record<string, string>) =>
@@ -164,7 +129,6 @@ function sheet() {
         categories: LANES,
         timeZone: TZ,
         today: TODAY,
-        links: LINKS,
         pools: POOLS,
         initials: 'YL',
       }}
@@ -435,20 +399,16 @@ describe('the Audience chip (H23, 0033)', () => {
   const laneChip = (view: ReturnType<typeof sheet>, id: string) =>
     view.container.querySelector(`[data-audience-lane="${id}"]`) as HTMLButtonElement | null;
 
-  it('is Only me for every lane but one whose default link shares by default', () => {
+  it('is Only me for every lane: Audience is per record (H45)', () => {
     const view = sheet();
     expect(chip(view).textContent).toBe('Only me');
-    // Place shares to Our Pool's Trips by default; its Crew link does not.
-    fireEvent.click(view.getByText('Place'));
-    expect(chip(view).textContent).toBe('Our Pool · 🏕 Trips');
-    // Mood is linked, but not as a default: still Only me.
-    fireEvent.click(view.getByText('Mood'));
-    expect(chip(view).textContent).toBe('Only me');
-    fireEvent.click(view.getByText('Day'));
-    expect(chip(view).textContent).toBe('Only me');
+    for (const lane of ['Place', 'Mood', 'Day']) {
+      fireEvent.click(view.getAllByText(lane)[0]);
+      expect(chip(view).textContent).toBe('Only me');
+    }
   });
 
-  it('never turns a pool on by itself: a default pool lane without share by default stays off', () => {
+  it('never turns a pool on by itself, a last pick included', () => {
     store({ 'c-place:p-crew': 'cr-chat' });
     const view = sheet();
     fireEvent.click(view.getByText('Place'));
@@ -457,21 +417,10 @@ describe('the Audience chip (H23, 0033)', () => {
     expect(view.container.querySelector('[data-audience-lanes="p-crew"]')).toBeNull();
     expect(
       view.getByRole('switch', { name: 'Shared to Our Pool' }).getAttribute('aria-checked'),
-    ).toBe('true');
+    ).toBe('false');
   });
 
-  it('turns a pool on at the link’s default pool lane, ahead of the last pick', () => {
-    store({ 'c-place:p-crew': 'cr-chat' });
-    const view = sheet();
-    fireEvent.click(view.getByText('Place'));
-    fireEvent.click(chip(view));
-    fireEvent.click(crewSwitch(view));
-    expect(laneChip(view, 'cr-out')!.getAttribute('aria-pressed')).toBe('true');
-    expect(laneChip(view, 'cr-chat')!.getAttribute('aria-pressed')).toBe('false');
-    expect(chip(view).textContent).toBe('2 pools');
-  });
-
-  it('with no link default, turns a pool on at the pool lane last picked for that lane and pool', () => {
+  it('turns a pool on at the pool lane last picked for that lane and pool', () => {
     store({ 'c-day:p-crew': 'cr-chat', 'c-mood:p-crew': 'cr-out' });
     const view = sheet();
     fireEvent.click(view.getByText('Day'));
@@ -505,18 +454,20 @@ describe('the Audience chip (H23, 0033)', () => {
     fireEvent.click(view.getByText('Place'));
     fireEvent.click(chip(view));
     fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
+    fireEvent.click(laneChip(view, 'pl-trips')!);
     // The sheet stays open over the composer; the chip already reads the edit.
-    expect(chip(view).textContent).toBe('Only me');
+    expect(chip(view).textContent).toBe('Our Pool · 🏕 Trips');
     fireEvent.click(view.getAllByText('Day')[0]);
-    expect(chip(view).textContent).toBe('Only me');
-    fireEvent.click(view.getAllByText('Place')[0]);
-    expect(chip(view).textContent).toBe('Only me');
+    expect(chip(view).textContent).toBe('Our Pool · 🏕 Trips');
   });
 
   it('places the dropped record where the chip says, on its pool lane', async () => {
     const view = sheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
     fireEvent.click(view.getByText('Place'));
+    fireEvent.click(chip(view));
+    fireEvent.click(view.getByRole('switch', { name: 'Shared to Our Pool' }));
+    fireEvent.click(laneChip(view, 'pl-trips')!);
     fireEvent.click(view.drop());
     await waitFor(() => expect(placed).toHaveLength(1));
     expect(placed[0].picks).toEqual([{ poolId: 'p-ours', poolLaneId: 'pl-trips' }]);
@@ -533,13 +484,12 @@ describe('the Audience chip (H23, 0033)', () => {
 });
 
 describe('compose from a pool (H23, 0033)', () => {
-  // Our Pool's lanes: Trips has my Place as its home lane, Notes has none.
   const SCOPE: PoolScope = {
     poolId: 'p-ours',
     poolName: 'Our Pool',
     lanes: [
-      { id: 'pl-trips', name: 'Trips', icon: '🏕', homeLaneId: 'c-place' },
-      { id: 'pl-notes', name: 'Notes', icon: '📓', homeLaneId: null },
+      { id: 'pl-trips', name: 'Trips', icon: '🏕' },
+      { id: 'pl-notes', name: 'Notes', icon: '📓' },
     ],
     members: [
       { id: 'a1', name: 'Yoonji', initials: 'YL' },
@@ -565,7 +515,6 @@ describe('compose from a pool (H23, 0033)', () => {
               categories: LANES,
               timeZone: TZ,
               today: TODAY,
-              links: LINKS,
               pools: POOLS,
               initials: 'YL',
             }}
@@ -744,20 +693,22 @@ describe('compose from a pool (H23, 0033)', () => {
     expect(hint(view)).toBe('Yours · in Our Pool');
   });
 
-  it('seats a record on a pool lane with a home lane in that lane’s column on Home', async () => {
+  it('seats a joint record in the pool’s column on Home: nothing is filed yet (H45)', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
     pickLane(view, 'pl-trips');
     fireEvent.click(face(view, 'u-mina')!);
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    expect(poolDrops[0].home?.card).toMatchObject({ column: 'c-place', joint: true });
-    // My lane's column already exists on Home: no pool column to add.
-    expect(poolDrops[0].home?.column).toBeUndefined();
+    expect(poolDrops[0].home?.card).toMatchObject({
+      column: ownPoolColumn('p-ours'),
+      joint: true,
+    });
+    expect(poolDrops[0].home?.column).toMatchObject({ id: ownPoolColumn('p-ours') });
     expect(poolDrops[0].pool).toMatchObject({ poolId: 'p-ours', card: { column: 'pl-trips' } });
   });
 
-  it('seats a record on a pool lane with no home lane in the pool’s column, with the lane’s emoji', async () => {
+  it('seats my pool record in the pool’s column, with the lane’s emoji', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Chapter 3' } });
     pickLane(view, 'pl-notes');

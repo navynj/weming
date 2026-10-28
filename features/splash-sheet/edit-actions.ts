@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import type { HomeFiling } from '@/features/home/filing-chips';
 import type { Annotation } from '@/features/input-sheet/draft';
+import { signPoolPhotos } from '@/lib/avatars';
 import { setPlacement, setPlacementTogether } from '@/features/pool/actions';
 import { getJointInvitees, getPlacementPicks } from '@/lib/queries/pools';
 import { updateSplashHeader } from '@/features/splash/actions';
@@ -15,8 +17,13 @@ import { pushAfter } from '@/lib/notifications/after';
 export type SplashEditState =
   | {
       ok: true;
-      /** mine: everything; own: my pool record (title, icon, dates; its pool fixed); joint: title and icon. */
-      kind: 'mine' | 'own' | 'joint';
+      id: string;
+      /**
+       * mine: everything; own: my pool record (title, icon, dates; its pool
+       * fixed); joint: title and icon; theirs: someone's record I wrote on in
+       * a pool, only where it shows on my Home (H45).
+       */
+      kind: 'mine' | 'own' | 'joint' | 'theirs';
       title: string;
       icon: string | null;
       /** Its description (0037), or null. */
@@ -41,6 +48,12 @@ export type SplashEditState =
       }[];
       /** My pool record: who it is with in its pool (0035). */
       ownTogether: { everyone: boolean; picked: string[] } | null;
+      /** My pool record: every pool it is shared to now, for its Audience (H45). */
+      ownShared: {
+        poolId: string;
+        poolLaneId: string;
+        together: { everyone: boolean; picked: string[] };
+      }[];
       /** Someone else has a ripple here I can see: it cannot become mine (0022). */
       othersWrote: boolean;
       /** A joint record: who it is together with, picked one by one (0033). */
@@ -53,6 +66,8 @@ export type SplashEditState =
       writerIds: string[];
       /** Every pool lane of my pools, for the sheet's warnings: "It will move to <lane>". */
       laneNames: Record<string, { name: string; icon: string | null; poolId: string }>;
+      /** Not in my lanes (own, joint, theirs): its pool, and where I filed it on Home (H45). */
+      home: HomeFiling | null;
     }
   | { ok: false; message: string };
 
@@ -74,6 +89,8 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     invited,
     { data: allLanes },
     picks,
+    { data: filing },
+    { data: myThread },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
@@ -92,15 +109,27 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     // RLS: the lanes of pools I am a current member of.
     supabase.from('pool_lanes').select('id, name, icon, pool_id, position').order('position'),
     getPlacementPicks(supabase, id),
+    supabase.from('home_filing').select('my_lane_id').eq('splash_id', id).maybeSingle(),
+    // Someone's record: the pool I wrote my side in, as my Home places it.
+    supabase
+      .from('ripples')
+      .select('thread_pool_id, author_id')
+      .eq('splash_id', id)
+      .not('thread_pool_id', 'is', null)
+      .order('created_at'),
   ]);
   if (!user) return { ok: false, message: 'Sign in again to edit this.' };
   if (!splash) return { ok: false, message: 'That splash is gone.' };
 
   const joint = splash.owner_id === null;
-  if (!joint && splash.owner_id !== user.id) {
+  const theirs = !joint && splash.owner_id !== user.id;
+  const sidePool = theirs
+    ? ((myThread ?? []).find((r) => r.author_id === user.id)?.thread_pool_id ?? null)
+    : null;
+  if (theirs && !sidePool) {
     return { ok: false, message: 'Only its author edits this splash.' };
   }
-  const ownPool = splash.pool_id ?? splash.own_pool_id;
+  const ownPool = splash.pool_id ?? splash.own_pool_id ?? sidePool;
   const placed = (placements ?? []).find((p) => p.pool_id === splash.own_pool_id);
   // The splash's own days (H24): its ripples take them and carry none.
   const annotation: Annotation | null = splash.declared_start
@@ -117,9 +146,26 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
             together: { everyone: p.invite_all, picked: picks[p.pool_id] ?? [] },
           }))
       : [];
+  // Where it sits on Home when not in my lanes (H45): a pool record in the
+  // first pool it is shared to — its origin, unless that is off.
+  const homePlacement = theirs
+    ? (placements ?? []).find((p) => p.pool_id === sidePool)
+    : splash.own_pool_id
+      ? ((placements ?? []).find((p) => p.pool_id === splash.own_pool_id && p.shared) ??
+        (placements ?? []).find((p) => p.shared) ??
+        placed)
+      : undefined;
+  const homePoolId = joint ? splash.pool_id : (homePlacement?.pool_id ?? ownPool);
+  const homeLane = (allLanes ?? []).find(
+    (l) => l.id === (joint ? splash.pool_lane_id : homePlacement?.pool_lane_id),
+  );
+  const home = homePoolId
+    ? await homeFiling(supabase, homePoolId, homeLane ?? null, filing?.my_lane_id ?? null)
+    : null;
   return {
     ok: true,
-    kind: joint ? 'joint' : splash.own_pool_id ? 'own' : 'mine',
+    id,
+    kind: theirs ? 'theirs' : joint ? 'joint' : splash.own_pool_id ? 'own' : 'mine',
     title: splash.title,
     icon: splash.icon,
     description: splash.description,
@@ -138,6 +184,15 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
       splash.own_pool_id && placed
         ? { everyone: placed.invite_all, picked: picks[splash.own_pool_id] ?? [] }
         : null,
+    ownShared: splash.own_pool_id
+      ? (placements ?? [])
+          .filter((p) => p.shared)
+          .map((p) => ({
+            poolId: p.pool_id,
+            poolLaneId: p.pool_lane_id,
+            together: { everyone: p.invite_all, picked: picks[p.pool_id] ?? [] },
+          }))
+      : [],
     othersWrote: (writers ?? []).some((w) => w.author_id !== user.id),
     invitees: joint ? (invited[id] ?? []) : [],
     inviteAll: splash.joint_invite_all,
@@ -146,6 +201,29 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     laneNames: Object.fromEntries(
       (allLanes ?? []).map((l) => [l.id, { name: l.name, icon: l.icon, poolId: l.pool_id }]),
     ),
+    home: joint || theirs || splash.own_pool_id ? home : null,
+  };
+}
+
+/** The filing row's pool chip: the pool's name and photo, and its lane there. */
+async function homeFiling(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  poolId: string,
+  lane: { name: string; icon: string | null } | null,
+  filed: string | null,
+): Promise<HomeFiling> {
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('id, name, photo_version')
+    .eq('id', poolId)
+    .maybeSingle();
+  const photos = pool
+    ? await signPoolPhotos(supabase, [{ id: pool.id, version: pool.photo_version }])
+    : {};
+  return {
+    pool: { id: poolId, name: pool?.name ?? 'A pool you left', photo: photos[poolId] ?? null },
+    poolLane: lane ? { name: lane.name, icon: lane.icon } : null,
+    filed,
   };
 }
 
@@ -153,57 +231,29 @@ const CONVERSION = z.discriminatedUnion('op', [
   z.object({ op: z.literal('none') }),
   z.object({ op: z.literal('move_pool'), poolLaneId: z.uuid() }),
   z.object({
-    op: z.literal('to_joint'),
-    poolLaneId: z.uuid(),
-    invitees: z.array(z.uuid()).max(64),
-    everyone: z.boolean(),
-  }),
-  z.object({ op: z.literal('to_mine'), myLaneId: z.uuid(), placeOn: z.uuid().nullable() }),
-  z.object({
     op: z.literal('set_lane'),
     myLaneId: z.uuid().nullable(),
     placeOn: z.uuid().nullable(),
   }),
 ]);
 
-/** One conversion act (0022, 0033), or a move within the pool (0020); null when done. */
+/** A move within the pool (0020) or a lane change (0033); null when done. */
 async function convert(
   supabase: Awaited<ReturnType<typeof createClient>>,
   id: string,
   plan: z.infer<typeof CONVERSION>,
 ): Promise<{ ok: false; message: string } | null> {
-  if (plan.op === 'to_joint') {
-    // Everyone said explicitly (0033): splash_to_joint is the old app's.
-    const { error } = await supabase.rpc('splash_to_together', {
-      p_splash: id,
-      p_pool_lane: plan.poolLaneId,
-      p_invite_all: plan.everyone,
-    });
-    if (error) return refused(error);
-    if (plan.invitees.length === 0) return null;
-    const { error: inviteError } = await supabase.rpc('add_joint_invitees', {
-      p_splash: id,
-      p_users: plan.invitees,
-    });
-    return inviteError ? refused(inviteError) : null;
-  }
   const { error } =
     plan.op === 'none'
       ? { error: null }
       : plan.op === 'move_pool'
         ? await supabase.rpc('move_pool_splash', { p_splash: id, p_pool_lane: plan.poolLaneId })
-        : plan.op === 'to_mine'
-          ? await supabase.rpc('splash_to_mine', {
-              p_splash: id,
-              p_my_lane: plan.myLaneId,
-              ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
-            })
-          : await supabase.rpc('set_splash_lane', {
-              p_splash: id,
-              // Null keeps no lane; the generated type reads the argument as required.
-              p_my_lane: plan.myLaneId as string,
-              ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
-            });
+        : await supabase.rpc('set_splash_lane', {
+            p_splash: id,
+            // Null keeps no lane; the generated type reads the argument as required.
+            p_my_lane: plan.myLaneId as string,
+            ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
+          });
   return error ? refused(error) : null;
 }
 
@@ -314,11 +364,6 @@ async function saveSplashEditWork(
       ? await convert(supabase, edit.id, edit.conversion)
       : await movePoolSplash(supabase, edit.id, edit.poolLaneId);
     if (moved) return moved;
-    // Made mine from Home: shared where its new Audience says.
-    if (edit.conversion?.op === 'to_mine') {
-      const shared = await applyShare(edit.id, edit.share);
-      if (shared) return shared;
-    }
     revalidatePath('/');
     if (edit.poolId) {
       revalidatePath(`/pool/${edit.poolId}`);
@@ -351,7 +396,7 @@ async function saveSplashEditWork(
     const moved = await movePoolSplash(supabase, edit.id, edit.poolLaneId);
     if (moved) return moved;
   }
-  if (edit.kind === 'own' && edit.ownTogether && edit.poolId && edit.conversion?.op !== 'to_mine') {
+  if (edit.kind === 'own' && edit.ownTogether && edit.poolId) {
     const withDone = await setPlacementTogether(
       edit.id,
       edit.poolId,
@@ -363,14 +408,8 @@ async function saveSplashEditWork(
   revalidatePath('/');
   revalidatePath(`/splash/${edit.id}`);
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
-  // Hand-made sharing applies to a record that is mine after the save — one
-  // made mine from Home too, its Audience set anew; a conversion to joint
-  // has already let go of every pool.
-  const mineAfter =
-    edit.kind === 'mine'
-      ? !edit.conversion || ['none', 'set_lane'].includes(edit.conversion.op)
-      : edit.conversion?.op === 'to_mine';
-  if (mineAfter) {
+  // Hand-made sharing applies to my Home record.
+  if (edit.kind === 'mine') {
     const shared = await applyShare(edit.id, edit.share);
     if (shared) return shared;
   }
@@ -411,87 +450,4 @@ async function movePoolSplash(
     p_pool_lane: poolLaneId,
   });
   return error ? { ok: false, message: error.message } : null;
-}
-
-export type MakeJointPreview =
-  | { ok: true; poolName: string; poolLaneId: string; removed: string[] }
-  | { ok: false; message: string };
-
-/**
- * "Make it a joint record of <Pool>…" (the `…` menu, the only way my record
- * becomes joint; Yoonji, in the session): what the confirm says first —
- * the pool, the pool lane it lands on (where it sits there now), and the
- * other pools it leaves.
- */
-export async function previewMakeJoint(
-  splashId: string,
-  poolId: string,
-): Promise<MakeJointPreview> {
-  const ids = z.object({ splashId: z.uuid(), poolId: z.uuid() }).safeParse({ splashId, poolId });
-  if (!ids.success) return { ok: false, message: 'No such splash.' };
-  const supabase = await createClient();
-  const [
-    {
-      data: { user },
-    },
-    { data: splash },
-    { data: placements },
-    { data: pools },
-  ] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.from('splashes').select('owner_id, own_pool_id').eq('id', splashId).maybeSingle(),
-    supabase
-      .from('splash_placements')
-      .select('pool_id, pool_lane_id, shared')
-      .eq('splash_id', splashId),
-    supabase.from('pools').select('id, name'),
-  ]);
-  if (!user || !splash || splash.owner_id !== user.id) {
-    return { ok: false, message: 'Only its author makes it joint.' };
-  }
-  const here = (placements ?? []).find((p) => p.pool_id === poolId && p.shared);
-  if (!here) return { ok: false, message: 'It is not in that Pool.' };
-  const nameOf = (id: string) => pools?.find((p) => p.id === id)?.name ?? 'A pool you left';
-  return {
-    ok: true,
-    poolName: nameOf(poolId),
-    poolLaneId: here.pool_lane_id,
-    removed: (placements ?? [])
-      .filter((p) => p.shared && p.pool_id !== poolId)
-      .map((p) => nameOf(p.pool_id)),
-  };
-}
-
-/**
- * Makes my record the pool's joint record on the pool lane it sits on there.
- * Everyone starts as composing does: on where the pool invites everyone by
- * default, and in a pool of one.
- */
-export async function makeJointRecord(
-  splashId: string,
-  poolId: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  pushAfter();
-  const preview = await previewMakeJoint(splashId, poolId);
-  if (!preview.ok) return preview;
-  const supabase = await createClient();
-  const [{ data: pool }, { count: members }] = await Promise.all([
-    supabase.from('pools').select('invite_all_by_default').eq('id', poolId).maybeSingle(),
-    supabase
-      .from('pool_members')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('pool_id', poolId)
-      .is('left_at', null),
-  ]);
-  const { error } = await supabase.rpc('splash_to_together', {
-    p_splash: splashId,
-    p_pool_lane: preview.poolLaneId,
-    p_invite_all: Boolean(pool?.invite_all_by_default) || (members ?? 0) <= 1,
-  });
-  if (error) return refused(error);
-  revalidatePath('/');
-  revalidatePath(`/splash/${splashId}`);
-  revalidatePath(`/pool/${poolId}`);
-  revalidatePath(`/pool/${poolId}/splash/${splashId}`);
-  return { ok: true };
 }

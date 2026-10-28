@@ -3,7 +3,7 @@
 import { usePeople } from '@/features/people/people-provider';
 
 import type { PoolScope } from './compose-scope';
-import { Switch } from './lane-match';
+import { Switch } from './switch';
 import {
   landingHint,
   resolvePick,
@@ -49,7 +49,7 @@ export function PoolLanePicker({
   togetherLocked?: string | null;
   /**
    * Editing my own record: no With at all — it never converts my record
-   * (Yoonji, in the session); "Make it a joint record of…" is in the menu.
+   * (Yoonji, in the session; H45 retires conversion).
    */
   withTogether?: boolean;
 }) {
