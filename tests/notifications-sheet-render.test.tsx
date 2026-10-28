@@ -19,6 +19,19 @@ vi.mock('@/features/notifications/actions', () => ({
 const offered: number[] = [];
 vi.mock('@/features/install/install-state', () => ({
   offerInstall: () => offered.push(1),
+  subscribeInstall: () => () => {},
+  canPromptInstall: () => false,
+  promptInstall: () => Promise.resolve(false),
+}));
+const device = vi.hoisted(() => ({ state: 'on' }));
+vi.mock('@/features/notifications/push-client', () => ({
+  isStandalone: () => false,
+  pushState: () => Promise.resolve(device.state),
+  enablePush: () => Promise.resolve(null),
+  disablePush: () => {
+    device.state = 'off';
+    return Promise.resolve(null);
+  },
 }));
 
 import { NotificationsSheet } from '@/features/notifications/notifications-sheet';
@@ -109,5 +122,34 @@ describe('the notifications sheet (H32)', () => {
     fireEvent.click(all);
     expect(container.querySelectorAll('[data-unread]')).toHaveLength(0);
     await waitFor(() => expect(marked).toEqual([null]));
+  });
+});
+
+describe('the bell’s sheet offers to turn notifications on (review)', () => {
+  it('shows Turn on notifications to someone who has not turned them on', async () => {
+    device.state = 'off';
+    rows = [];
+    const { container } = render(<NotificationsSheet onClose={() => {}} />);
+    await waitFor(() =>
+      expect(container.querySelector('[data-turn-on-notifications]')).not.toBeNull(),
+    );
+    device.state = 'on';
+  });
+
+  it('once they are on, turns them off from the same place', async () => {
+    device.state = 'on';
+    rows = [];
+    const { container } = render(<NotificationsSheet onClose={() => {}} />);
+    const off = await waitFor(() => {
+      const found = container.querySelector<HTMLButtonElement>('[data-turn-off-notifications]');
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    expect(container.querySelector('[data-turn-on-notifications]')).toBeNull();
+    fireEvent.click(off);
+    await waitFor(() =>
+      expect(container.querySelector('[data-turn-on-notifications]')).not.toBeNull(),
+    );
+    device.state = 'on';
   });
 });

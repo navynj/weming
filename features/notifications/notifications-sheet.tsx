@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { initialsOf } from '@/features/home/grid';
 import { offerInstall } from '@/features/install/install-state';
 import { Avatar } from '@/features/people/avatar';
+import { TurnOnNotifications } from '@/features/install/turn-on';
 import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
 import { EMPTY } from '@/lib/empty-states';
 import { notificationPath, notificationText } from '@/lib/notifications/model';
@@ -85,6 +86,9 @@ export function NotificationsSheet({ onClose }: { onClose: () => void }) {
           {message}
         </p>
       ) : null}
+      {/* This device's notifications, on or off, here where they are read
+          (review): the onboarding card's button, and Turn off once on. */}
+      <TurnOnNotifications inSheet />
       {items === null ? (
         <p className="text-pool-500 py-6 text-sm">Loading…</p>
       ) : items.length === 0 ? (
