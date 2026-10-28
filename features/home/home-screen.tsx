@@ -13,6 +13,7 @@ import {
   type GridColumn,
 } from '@/features/home/grid';
 import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
+import { NotifyCard } from '@/features/notifications/notify-card';
 import { HomeGround } from '@/features/home/home-ground';
 import { homeViewParam, scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -60,12 +61,15 @@ export async function HomeScreen({
   top,
   manage,
   view,
+  welcome = false,
 }: {
   m?: string;
   top?: string;
   manage?: string;
   /** `?view=`: the view to open on, from a lane page's tabs (review); else the Calendar. */
   view?: string;
+  /** `?welcome`: a first sign-in, so the notifications card while I am in no pool (review). */
+  welcome?: boolean;
 }) {
   const supabase = await createClient();
   const profile = await getMyProfile(supabase);
@@ -491,6 +495,7 @@ export async function HomeScreen({
       {/* A server render runs once per request: the stamp is when this copy was read. */}
       {/* eslint-disable-next-line react-hooks/purity */}
       <FreshOnArrival renderedAt={Date.now()} />
+      {welcome && pools.length === 0 ? <NotifyCard /> : null}
     </main>
   );
 }

@@ -60,7 +60,7 @@ describe('joining a pool asks nothing about lanes (hotfix)', () => {
       target: { value: 'Yoonji' },
     });
     fireEvent.click(view.getByText('Join'));
-    await waitFor(() => expect(replaced).toEqual(['/pool/p-ours']));
+    await waitFor(() => expect(replaced).toEqual(['/pool/p-ours?welcome=1']));
     expect(saved).toEqual([{ name: 'Yoonji', photo: 'keep' }]);
     // Just the invite: no links, no earlier records — links are advanced only.
     expect(joined).toEqual([{ token: 't-invite' }]);
@@ -69,7 +69,7 @@ describe('joining a pool asks nothing about lanes (hotfix)', () => {
   it('keeps a name that is already there, and needs one to join', async () => {
     const view = invite('Mina');
     fireEvent.click(view.getByText('Join'));
-    await waitFor(() => expect(replaced).toEqual(['/pool/p-ours']));
+    await waitFor(() => expect(replaced).toEqual(['/pool/p-ours?welcome=1']));
     expect(saved).toEqual([]);
     cleanup();
     const empty = invite('');

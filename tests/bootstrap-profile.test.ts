@@ -31,12 +31,15 @@ describe('profile bootstrap', () => {
     const userId = await newAccount();
     const supabase = asUser(userId);
 
-    await bootstrapProfile(supabase, {
-      userId,
-      displayName: 'Newcomer',
-      avatarUrl: null,
-      timezone: 'Asia/Seoul',
-    });
+    // True: this was the first sign-in, which the callback greets (review).
+    await expect(
+      bootstrapProfile(supabase, {
+        userId,
+        displayName: 'Newcomer',
+        avatarUrl: null,
+        timezone: 'Asia/Seoul',
+      }),
+    ).resolves.toBe(true);
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -65,7 +68,7 @@ describe('profile bootstrap', () => {
     };
 
     await bootstrapProfile(supabase, input);
-    await expect(bootstrapProfile(supabase, input)).resolves.toBeUndefined();
+    await expect(bootstrapProfile(supabase, input)).resolves.toBe(false);
 
     const { count } = await supabase
       .from('my_categories')

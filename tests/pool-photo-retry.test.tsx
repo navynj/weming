@@ -100,7 +100,7 @@ async function createWithFailingPhoto() {
     fireEvent.click(root.querySelector('[data-create-step="1"] [data-primary]')!);
   });
   // The pool was made and opened all the same; the row never named a photo.
-  await waitFor(() => expect(calls.replaced).toEqual(['/pool/p-new']));
+  await waitFor(() => expect(calls.replaced).toEqual(['/pool/p-new?welcome=1']));
   expect(calls.uploads).toHaveLength(1);
   expect(calls.set).toEqual([]);
   flow.unmount();

@@ -11,6 +11,7 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
       top={one(params.top)}
       manage={one(params.manage)}
       view={one(params.view)}
+      welcome={params.welcome !== undefined}
     />
   );
 }

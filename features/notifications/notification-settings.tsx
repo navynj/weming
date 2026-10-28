@@ -15,6 +15,17 @@ import { loadNotificationSettings, setNotificationSettings } from './actions';
  * shows at once and saves behind it; a refusal puts it back and says why.
  */
 export function NotificationSettings() {
+  return (
+    <section data-notification-settings className="flex w-full flex-col gap-4">
+      <h2 className="text-ink font-semibold">Notifications</h2>
+      <GlobalNotificationSwitches />
+      <PushSetup />
+    </section>
+  );
+}
+
+/** The two switches that hold across every pool, loaded and saved on their own. */
+export function GlobalNotificationSwitches() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -40,8 +51,7 @@ export function NotificationSettings() {
   }
 
   return (
-    <section data-notification-settings className="flex w-full flex-col gap-4">
-      <h2 className="text-ink font-semibold">Notifications</h2>
+    <>
       <label className="flex items-center justify-between gap-4">
         <span className="flex flex-col gap-0.5">
           <span className="text-ink text-sm font-medium">Pause all notifications</span>
@@ -73,7 +83,6 @@ export function NotificationSettings() {
           {message}
         </p>
       ) : null}
-      <PushSetup />
-    </section>
+    </>
   );
 }

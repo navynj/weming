@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Monogram } from '@/components/ui/monogram';
 import { saveProfile } from '@/features/people/actions';
 import { NAME_MAX } from '@/features/people/name';
+import { welcomePool } from '@/features/notifications/welcome';
 
 import { joinPool } from './actions';
 import { PrimaryButton, StepPage } from './step-page';
@@ -57,7 +58,8 @@ export function JoinFlow({
       setBusy(false);
       return;
     }
-    router.replace(`/pool/${joined.id}`);
+    // The pool's first screen greets me with its notifications (review).
+    router.replace(welcomePool(joined.id));
   }
 
   return (

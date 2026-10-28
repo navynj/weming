@@ -135,7 +135,7 @@ function without(values: ValuesByType, type: NotificationType): ValuesByType {
   return next;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+export function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div role="group" aria-label={label} className="flex flex-col gap-2">
       <span className="text-pool-500 text-xs">{label}</span>
@@ -145,7 +145,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 /** Selection is ink (H20f), never blue. */
-function Chip({
+export function Chip({
   on,
   data,
   onClick,

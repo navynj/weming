@@ -32,6 +32,24 @@ export function usePushState(): [PushState | null, (next: PushState | null) => v
   return [state, setState];
 }
 
+/** iOS Safari in a tab (H32): push needs Weming on the Home Screen first. */
+export function IosInstallGuide() {
+  return (
+    <div data-ios-install-guide className="text-ink flex flex-col gap-2 text-sm">
+      <p>To get notifications on iPhone, add Weming to your Home Screen:</p>
+      <ol className="flex list-decimal flex-col gap-1 pl-5">
+        <li>
+          Tap <span className="font-semibold">Share</span> in Safari’s toolbar.
+        </li>
+        <li>
+          Choose <span className="font-semibold">Add to Home Screen</span>.
+        </li>
+        <li>Open Weming from your Home Screen and turn notifications on here.</li>
+      </ol>
+    </div>
+  );
+}
+
 /** Whether the offer has anything to do on this device. */
 export function hasOffer(state: PushState | null, canPrompt: boolean): boolean {
   return (canPrompt && !isStandalone()) || state === 'needs-install' || state === 'off';
@@ -80,20 +98,7 @@ export function PushSetup() {
         </button>
       ) : null}
 
-      {state === 'needs-install' ? (
-        <div data-ios-install-guide className="text-ink flex flex-col gap-2 text-sm">
-          <p>To get notifications on iPhone, add Weming to your Home Screen:</p>
-          <ol className="flex list-decimal flex-col gap-1 pl-5">
-            <li>
-              Tap <span className="font-semibold">Share</span> in Safari’s toolbar.
-            </li>
-            <li>
-              Choose <span className="font-semibold">Add to Home Screen</span>.
-            </li>
-            <li>Open Weming from your Home Screen and turn notifications on here.</li>
-          </ol>
-        </div>
-      ) : null}
+      {state === 'needs-install' ? <IosInstallGuide /> : null}
 
       {state === 'off' ? (
         <button

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { welcomePool } from '@/features/notifications/welcome';
+
 import { createPool } from './actions';
 import { LaneEditor, type DraftLane } from './lane-editor';
 import { holdFailedPhoto } from './photo-retry';
@@ -51,7 +53,8 @@ export function CreateFlow() {
       console.error(`[during] pool photo not saved: ${photoFailed}`);
       holdFailedPhoto(made.id, photo);
     }
-    router.replace(`/pool/${made.id}`);
+    // The pool's first screen greets me with its notifications (review).
+    router.replace(welcomePool(made.id));
   };
 
   return (

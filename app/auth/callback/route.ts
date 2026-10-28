@@ -6,6 +6,7 @@ import { safeNext } from '@/lib/next-path';
 import { isTimeZone } from '@/lib/time';
 import { NEXT_COOKIE, siteUrl, TIMEZONE_COOKIE } from '@/lib/site';
 import { createClient } from '@/lib/supabase/server';
+import { WELCOME_HOME } from '@/features/notifications/welcome';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = request.nextUrl.searchParams.get('code');
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { user } = data;
   // Idempotent: an account can reach here with a session but no profile if an
   // earlier attempt died after the exchange, and this is where it recovers.
-  await bootstrapProfile(supabase, {
+  const first = await bootstrapProfile(supabase, {
     userId: user.id,
     displayName:
       user.user_metadata.full_name ?? user.user_metadata.name ?? user.email?.split('@')[0] ?? 'You',
@@ -48,9 +49,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .eq('id', user.id);
   }
 
-  const response = NextResponse.redirect(
-    `${home}${safeNext(next ? decodeURIComponent(next) : null)}`,
-  );
+  const to = safeNext(next ? decodeURIComponent(next) : null);
+  // A first sign-in that lands on Home is greeted with the notifications
+  // card once (review); one that came through an invite gets the pool's.
+  const response = NextResponse.redirect(`${home}${first && to === '/' ? WELCOME_HOME : to}`);
   response.cookies.delete(TIMEZONE_COOKIE);
   response.cookies.delete(NEXT_COOKIE);
   return response;

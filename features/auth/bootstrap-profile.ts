@@ -3,6 +3,7 @@ import { PRESET_CATEGORIES } from '@/features/auth/preset-categories';
 
 /**
  * First sign-in: create the profile row and seed the preset categories.
+ * True when it made them now, so the callback can greet a first sign-in.
  *
  * Runs as the signed-in user, so RLS is doing the work — the insert policies
  * are what guarantee a profile can only ever be created for oneself. Both
@@ -11,7 +12,7 @@ import { PRESET_CATEGORIES } from '@/features/auth/preset-categories';
 export async function bootstrapProfile(
   supabase: DuringClient,
   input: { userId: string; displayName: string; avatarUrl: string | null; timezone: string },
-): Promise<void> {
+): Promise<boolean> {
   const { data: existing, error: lookupError } = await supabase
     .from('profiles')
     .select('id')
@@ -19,7 +20,7 @@ export async function bootstrapProfile(
     .maybeSingle();
 
   if (lookupError) throw lookupError;
-  if (existing) return;
+  if (existing) return false;
 
   const { error: profileError } = await supabase.from('profiles').insert({
     id: input.userId,
@@ -41,4 +42,5 @@ export async function bootstrapProfile(
   );
 
   if (categoryError) throw categoryError;
+  return true;
 }
