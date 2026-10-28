@@ -97,6 +97,24 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** A wide screen, where the top card reads in full (H42f: a phone's is compact). */
+function wideScreen(): void {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: query.includes('min-width'),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 function lane(id: string, name: string, icon: string, position: number): MyCategory {
   return {
     id,
@@ -536,7 +554,8 @@ describe('the diving board, a staircase', () => {
     expect(pile(container)).toEqual([]);
   });
 
-  it('reads the top card: the title at the detail title size, then the date, the chip, the initials and the body', () => {
+  it('reads the top card on a wide screen: the title at the detail title size, then the date, the chip, the initials and the body', () => {
+    wideScreen();
     const { container } = ground();
     const card = topCard(container);
     expect(card.querySelector('[data-card-title]')!.className).toContain(DETAIL_TITLE_CLASS);
@@ -548,6 +567,26 @@ describe('the diving board, a staircase', () => {
     expect(card.querySelector('[data-card-link]')!.getAttribute('href')).toBe('/splash/late');
     const behind = container.querySelector('[data-stack-card="mid"] [data-card-title]')!;
     expect(behind.className).not.toContain('text-3xl');
+  });
+
+  it('reads the top card on a phone as the title and the first lines, under the fade (H42f)', () => {
+    const { container } = ground();
+    const card = topCard(container);
+    expect(card.querySelector('[data-card-compact]')).not.toBeNull();
+    expect(card.querySelector('[data-card-title]')!.textContent).toContain('Toy Story 5');
+    // The post's words, as the fixture's block carries them.
+    expect(card.querySelector('[data-card-preview-text]')!.textContent).toBe('late 0');
+    // Nothing else between them: no date, chip, thread or replies.
+    expect(card.querySelector('[data-card-date], [data-ripple-thread]')).toBeNull();
+    const body = card.querySelector('[data-card-body]')!;
+    expect(body.className).toContain('flex-1');
+    expect(body.className).toContain('overflow-hidden');
+    expect(body.querySelector('[data-card-fade]')).not.toBeNull();
+    expect(card.querySelector('[data-card-link]')!.getAttribute('href')).toBe('/splash/late');
+    // The peeking cards keep their one title line.
+    const behind = container.querySelector('[data-stack-card="mid"]')!;
+    expect(behind.querySelector('[data-card-title]')).not.toBeNull();
+    expect(behind.querySelector('[data-card-preview], [data-card-compact]')).toBeNull();
   });
 
   it('flips forward from a tap on the first lower card: the top goes up one step, the ring moves', async () => {
@@ -1089,6 +1128,7 @@ describe('coming back from a post\u2019s page', () => {
 
 describe('the top card\u2019s ripples as a thread (round 3)', () => {
   it('gives each ripple its own avatar and draws one line fewer than ripples', () => {
+    wideScreen();
     const { container } = ground();
     fireEvent.click(container.querySelector('[data-board-pick=\"early\"]')!);
     return settled(container).then(() => {
@@ -1099,6 +1139,7 @@ describe('the top card\u2019s ripples as a thread (round 3)', () => {
   });
 
   it('draws an avatar and no line for a single ripple', () => {
+    wideScreen();
     const { container } = ground();
     const thread = topCard(container).querySelector('[data-ripple-thread]')!;
     expect(thread.querySelectorAll('[data-thread-avatar]')).toHaveLength(1);

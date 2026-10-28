@@ -65,11 +65,12 @@ beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   Element.prototype.scrollTo = function scrollTo() {} as Element['scrollTo'];
+  // A wide screen: the top card in full (a phone's is compact, H42f).
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     configurable: true,
     value: (query: string) => ({
-      matches: false,
+      matches: query.includes('min-width'),
       media: query,
       addEventListener: () => {},
       removeEventListener: () => {},

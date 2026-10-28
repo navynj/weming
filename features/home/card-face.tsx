@@ -15,6 +15,7 @@ import { isUnseen, useSeen } from '@/features/responses/seen';
 import { useRippleResponses } from '@/features/responses/use-ripple-responses';
 
 import { CardPhotos } from './card-photos';
+import { CardPreview } from './card-preview';
 import { cardDate, postIcon, type Card, type CardLane, type CardPhoto } from './grid';
 import { LinkedText } from '@/components/ui/linked-text';
 
@@ -68,6 +69,7 @@ export function CardFace({
   ink = 'blue',
   href,
   onClickCapture,
+  compact = false,
 }: {
   card: Card;
   lane: CardLane | null;
@@ -79,6 +81,8 @@ export function CardFace({
   /** Where the full card opens: the post's page, coming back to Home by default. */
   href?: string;
   onClickCapture?: (event: React.MouseEvent) => void;
+  /** The phone's top card (H42f): the title and the first lines of the post, nothing else. */
+  compact?: boolean;
 }) {
   const { me } = usePeople();
   const seen = useSeen();
@@ -147,6 +151,44 @@ export function CardFace({
   }
   const target = href ?? card.href ?? splashHref(card.splash.id);
   const respond = card.responded;
+  const fade = (
+    <span
+      aria-hidden
+      data-card-fade
+      className="pointer-events-none absolute inset-x-0 bottom-0"
+      style={{
+        height: CARD_FADE_PX,
+        background: 'linear-gradient(to bottom, transparent, var(--face, #fff))',
+      }}
+    />
+  );
+  if (compact) {
+    // The phone's top card (H42f): its title, then as much of the post as
+    // its height holds, down to the fade; the rest lives in the sheet.
+    return (
+      <span className="relative flex h-full flex-col">
+        <Link
+          href={target}
+          data-card-link={card.splash.id}
+          aria-label={title}
+          onClickCapture={onClickCapture}
+          draggable={false}
+          className="absolute inset-0"
+        />
+        <span
+          data-card-compact
+          className="pointer-events-none relative flex h-full flex-col gap-1.5 px-5"
+          style={{ paddingTop: CARD_PAD_PX, paddingBottom: CARD_PAD_PX }}
+        >
+          {titleLine}
+          <span data-card-body className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+            <CardPreview card={card} signed={signed} />
+            {fade}
+          </span>
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="relative flex h-full flex-col">
       {/* The whole card opens the post. Beneath the content, so the chips and
@@ -256,15 +298,7 @@ export function CardFace({
               ),
             }))}
           />
-          <span
-            aria-hidden
-            data-card-fade
-            className="pointer-events-none absolute inset-x-0 bottom-0"
-            style={{
-              height: CARD_FADE_PX,
-              background: 'linear-gradient(to bottom, transparent, var(--face, #fff))',
-            }}
-          />
+          {fade}
         </span>
       </span>
     </span>

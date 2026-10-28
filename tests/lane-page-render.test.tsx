@@ -43,13 +43,19 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { written } from './written-on';
 
-afterEach(cleanup);
+/** Whether the screen reads wide; a phone unless a test says so. */
+const screen = { wide: false };
+
+afterEach(() => {
+  cleanup();
+  screen.wide = false;
+});
 beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     configurable: true,
     value: (query: string) => ({
-      matches: false,
+      matches: screen.wide && query.includes('min-width'),
       media: query,
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -350,6 +356,8 @@ describe('a post moved to another pool lane (0020, review)', () => {
 
 describe('the top card on a lane’s page reads responses, as Home does (H25, review)', () => {
   it('shows each ripple’s reaction chips and its first two replies, then "+n"', () => {
+    // On a wide screen: a phone's top card is the title and first lines (H42f).
+    screen.wide = true;
     const shared: Card = {
       ...CARDS[0],
       ripples: [{ id: 'noodles-b', note: 'noodles', createdAt: '2026-10-12T16:00:00.000Z' }],

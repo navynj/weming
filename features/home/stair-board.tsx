@@ -478,6 +478,8 @@ function Step({
   const edgeSide = moving ? side : stairSide === 'up' ? 'up' : 'down';
   const frosted = frostFill && stairSide === 'up';
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
+  // A phone's top card reads the title and the post's first lines (H42f).
+  const wide = useWide();
   const edge = horizontal
     ? edgeSide === 'up'
       ? 'left'
@@ -536,6 +538,7 @@ function Step({
               edge="full"
               href={href}
               onClickCapture={guard}
+              compact={!wide}
             />
             {onTop && !moving ? (
               <CardMenu card={card} pinned={pinned} onPin={onPin} onDelete={onDelete} />
