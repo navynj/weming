@@ -226,3 +226,60 @@ export function boardPhotos<P extends { path: string }>(
 export function photoLayout(layout: BoardLayoutJson | undefined, path: string) {
   return layout?.photos?.[path];
 }
+
+/** A video among a post's photos, as the board draws and edits it (part 5). */
+const AS_PHOTO = 'yt:';
+
+/**
+ * As the board reads a stored layout (part 5): a video's layout, kept by
+ * its id under `videos`, drawn and edited as a photo's under `yt:<id>`, its
+ * order key `video:<id>` as `photo:yt:<id>`, so every photo control works
+ * on it unchanged.
+ */
+export function drawnLayout(layout: BoardLayoutJson): BoardLayoutJson {
+  if (!layout.videos && !layout.order?.some((k) => k.startsWith('video:'))) return layout;
+  const out: BoardLayoutJson = { ...layout };
+  if (layout.videos) {
+    out.photos = { ...layout.photos };
+    for (const [id, set] of Object.entries(layout.videos)) out.photos[`${AS_PHOTO}${id}`] = set;
+    delete out.videos;
+  }
+  if (layout.order) {
+    out.order = layout.order.map((k) =>
+      k.startsWith('video:') ? `photo:${AS_PHOTO}${k.slice('video:'.length)}` : k,
+    );
+  }
+  return out;
+}
+
+/** Back the way it is stored: `yt:<id>` photos as `videos`, their order keys as `video:<id>`. */
+export function storedLayout(layout: BoardLayoutJson): BoardLayoutJson {
+  const videoKeys = Object.keys(layout.photos ?? {}).filter((k) => k.startsWith(AS_PHOTO));
+  if (videoKeys.length === 0 && !layout.order?.some((k) => k.startsWith(`photo:${AS_PHOTO}`)))
+    return layout;
+  const out: BoardLayoutJson = { ...layout };
+  if (videoKeys.length > 0) {
+    const photos = { ...layout.photos };
+    const videos = { ...layout.videos };
+    for (const key of videoKeys) {
+      videos[key.slice(AS_PHOTO.length)] = photos[key];
+      delete photos[key];
+    }
+    out.videos = videos;
+    if (Object.keys(photos).length > 0) out.photos = photos;
+    else delete out.photos;
+  }
+  if (layout.order) {
+    out.order = layout.order.map((k) =>
+      k.startsWith(`photo:${AS_PHOTO}`) ? `video:${k.slice(`photo:${AS_PHOTO}`.length)}` : k,
+    );
+  }
+  return out;
+}
+
+/** A cleared path, the way it is stored: `photos.yt:<id>…` as `videos.<id>…`. */
+export function storedClear(path: string): string {
+  return path.startsWith(`photos.${AS_PHOTO}`)
+    ? `videos.${path.slice(`photos.${AS_PHOTO}`.length)}`
+    : path;
+}

@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 
+import { rippleMedia } from '@/lib/ripple-media';
 import {
   byNewest,
   cardLane,
@@ -96,10 +97,7 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     if (list) list.push(entry);
     else threads.set(key, [entry]);
     if (ripple.media.length > 0) {
-      photos.set(key, [
-        ...(photos.get(key) ?? []),
-        ...ripple.media.map((path) => ({ rippleId: ripple.id, path })),
-      ]);
+      photos.set(key, [...(photos.get(key) ?? []), ...rippleMedia(ripple)]);
     }
   }
   const cards = summarizeSplashes([...mine, ...joints], ripples, profile.timezone, new Date())

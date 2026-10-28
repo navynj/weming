@@ -1,4 +1,8 @@
-import { BoardLayout, type BoardLayoutJson } from '@/features/month-board/board-layout';
+import {
+  BoardLayout,
+  drawnLayout,
+  type BoardLayoutJson,
+} from '@/features/month-board/board-layout';
 import type { DuringClient } from '@/lib/queries/profile';
 
 /** Which view a layout is for (0045): each keeps its own values. */
@@ -7,7 +11,8 @@ export type BoardView = 'calendar' | 'lane' | 'members';
 /** A row's layout, read through the shape the database holds it to; anything else is no layout. */
 function parsed(raw: unknown): BoardLayoutJson | null {
   const result = BoardLayout.safeParse(raw);
-  return result.success ? result.data : null;
+  // Videos drawn as photos (part 5).
+  return result.success ? drawnLayout(result.data) : null;
 }
 
 /**

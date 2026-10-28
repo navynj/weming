@@ -1,4 +1,5 @@
 import { byNewest, placeCard, type Card, type GridColumn } from '@/features/home/grid';
+import { rippleMedia } from '@/lib/ripple-media';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { PoolRipple, PoolView } from '@/lib/queries/pools';
 
@@ -89,7 +90,8 @@ export function poolCards(
       }));
     const href = poolSplashHref(view.pool.id, splash.id);
     // Its photos, for the Board view: every image across its ripples, oldest first.
-    const pictured = blocks.flatMap((r) => r.media.map((path) => ({ rippleId: r.id, path })));
+    // And each YouTube video its words link to (part 5).
+    const pictured = blocks.flatMap((r) => rippleMedia(r));
     const photo = pictured.length > 0 ? { photos: pictured } : {};
     if (splash.owner_id === null) {
       // A joint splash: the pool's, so its pin is shared (any member) and it

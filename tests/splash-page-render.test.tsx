@@ -73,6 +73,7 @@ function block(over: Partial<RippleWithSplash> & { id: string }): RippleWithSpla
   return written({
     author_id: 'a1',
     thread_pool_id: null,
+    video_previews: true,
     note: 'fixture',
     media: [],
     occurred_on: null,

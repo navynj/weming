@@ -3,6 +3,7 @@
 import { MAX_TALL, PLACEHOLDER_ASPECT } from '@/features/month-board/layout';
 import { learnsAspect, usePhotoAspects } from '@/features/month-board/photo-aspects';
 import type { SignedMedia } from '@/lib/media';
+import { VideoPlayer } from '@/components/ui/video-media';
 
 import type { CardPhoto } from './grid';
 
@@ -17,12 +18,21 @@ export const PHOTOS_SHOWN = 3;
  * tall, the whole image scaled down beyond that. Until it loads it holds a
  * 4:3 placeholder; once drawn nothing is behind it, so a cutout floats.
  */
-export function CardPhotos({ photos, signed }: { photos: CardPhoto[]; signed: SignedMedia }) {
+export function CardPhotos({
+  photos: media,
+  signed,
+}: {
+  photos: CardPhoto[];
+  signed: SignedMedia;
+}) {
   const aspects = usePhotoAspects();
-  if (photos.length === 0) return null;
+  // Its videos (part 5) play in place under the photos, each the card's width.
+  const photos = media.filter((m) => !m.video);
+  const videos = media.flatMap((m) => (m.video ? [m.video] : []));
+  if (media.length === 0) return null;
   const shown = photos.slice(0, PHOTOS_SHOWN);
   const more = photos.length - shown.length;
-  return (
+  const grid = (
     <span data-card-photos className="grid grid-cols-3 items-start gap-1 pt-1.5">
       {shown.map((photo, index) => {
         const url = signed[photo.path];
@@ -56,5 +66,15 @@ export function CardPhotos({ photos, signed }: { photos: CardPhoto[]; signed: Si
         );
       })}
     </span>
+  );
+  return (
+    <>
+      {photos.length > 0 ? grid : null}
+      {videos.map((video) => (
+        <span key={video.id} data-card-video={video.id} className="block pt-1.5">
+          <VideoPlayer video={video} />
+        </span>
+      ))}
+    </>
   );
 }

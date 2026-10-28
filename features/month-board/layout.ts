@@ -2,6 +2,8 @@ import type { Card } from '@/features/home/grid';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
+import { videoAspect, type YouTubeVideo } from '@/lib/youtube';
+
 import { iconHidden, labelHidden } from './board-layout';
 import { seedOf } from './layout-seed';
 import { spreadPhotos } from './photo-spread';
@@ -270,6 +272,8 @@ export type BoardPiece = {
 export type PhotoCard = {
   path: string;
   rippleId: string;
+  /** A YouTube video its ripple links to (part 5): drawn as its thumbnail, in its own shape. */
+  video?: YouTubeVideo;
   /** Its width as laid out: the recipe's, or a share of the lane set by hand (review). */
   size: number;
   /** Its box before its tilt, within the photo area: its own ratio, never cropped (photo-spread.ts). */
@@ -959,7 +963,10 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
           at === 0 || card.layout?.photos?.[p.path]?.size
             ? Math.round(sizeOf(p.path) * scale)
             : null,
-        ratio: ctx.measured[aspectKey(p.path)] ?? PLACEHOLDER_ASPECT,
+        // A video's shape is its own (part 5): 16:9, a Short 9:16; never its thumbnail's.
+        ratio: p.video
+          ? videoAspect(p.video)
+          : (ctx.measured[aspectKey(p.path)] ?? PLACEHOLDER_ASPECT),
       })),
       Math.round(sizeOf(shown[0].path) * scale),
       (salt) => unit(id, salt),
@@ -1092,7 +1099,9 @@ function shapeCompact(card: Card, ctx: Context): Shape {
     };
   }
   if (photo) {
-    const ratio = ctx.measured[aspectKey(photo.path)] ?? PLACEHOLDER_ASPECT;
+    const ratio = photo.video
+      ? videoAspect(photo.video)
+      : (ctx.measured[aspectKey(photo.path)] ?? PLACEHOLDER_ASPECT);
     const w = room;
     const h = Math.round(Math.min(w * MAX_TALL, w / ratio));
     const x = Math.round((m.column - w) / 2);

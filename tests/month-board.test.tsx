@@ -1701,3 +1701,24 @@ describe('hiding the icon or the label on the board (0055)', () => {
     expect(piece.stickerBox).toBeNull();
   });
 });
+
+describe('a YouTube video on the board (part 5)', () => {
+  const VIDEO = { id: 'dQw4w9WgXcQ', start: null, short: false };
+  const withVideo = {
+    ...card('v1', 'Song for the walk', '2026-10-21'),
+    photos: [{ rippleId: 'v1-b', path: `yt:${VIDEO.id}`, video: VIDEO }],
+  } as Card;
+
+  it('stands in its own shape, 16:9, not its thumbnail file’s', () => {
+    const piece = layoutMonthBoard([withVideo], '2026-10', { width: 728 }).pieces[0];
+    const front = piece.fan[piece.fan.length - 1];
+    expect(front.w / front.h).toBeCloseTo(16 / 9, 1);
+  });
+
+  it('draws its thumbnail with a play mark and no player', () => {
+    const { container } = board([withVideo]);
+    const drawn = container.querySelector(`[data-board-photo-card="yt:${VIDEO.id}"]`)!;
+    expect(drawn.querySelector('[data-video-thumb]')).not.toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+});

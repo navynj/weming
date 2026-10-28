@@ -47,7 +47,10 @@ export function PartOrder({
         ? 'Icon'
         : key === 'wave'
           ? 'Wave'
-          : `Photo ${photos.indexOf(key.slice('photo:'.length)) + 1}`;
+          : key.startsWith('photo:yt:')
+            ? // A video its words link to (part 5).
+              `Video ${photos.filter((p) => p.startsWith('yt:')).indexOf(key.slice('photo:'.length)) + 1}`
+            : `Photo ${photos.filter((p) => !p.startsWith('yt:')).indexOf(key.slice('photo:'.length)) + 1}`;
 
   // Its own heading, as the panel's groups have: none for a post of one part.
   return (

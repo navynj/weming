@@ -19,6 +19,8 @@ const Block = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  /** Its YouTube links drawn as videos (part 5); absent, left as it is. */
+  videoPreviews: z.boolean().optional(),
 });
 
 /** The database's refusals, said plainly. */
@@ -61,6 +63,7 @@ export async function addBlock(input: z.input<typeof NewBlock>): Promise<CommitR
     splash_id: block.splashId,
     ...(block.threadPoolId ? { thread_pool_id: block.threadPoolId } : {}),
     ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
+    ...(block.videoPreviews !== undefined ? { video_previews: block.videoPreviews } : {}),
   });
   if (error) return { ok: false, reason: 'error', message: said(error.message) };
 
@@ -86,6 +89,7 @@ export async function editBlock(input: z.infer<typeof Block>): Promise<CommitRes
       note: block.note.length > 0 ? block.note : null,
       media: block.media,
       ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
+      ...(block.videoPreviews !== undefined ? { video_previews: block.videoPreviews } : {}),
     })
     .eq('id', block.id)
     .select('splash_id')

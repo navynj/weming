@@ -257,6 +257,7 @@ export function SplashPage({
       note: draft.note.trim().length > 0 ? draft.note : null,
       media: draft.media,
       ...(draft.occurredOn ? { occurred_on: draft.occurredOn } : {}),
+      ...(draft.videoPreviews !== undefined ? { video_previews: draft.videoPreviews } : {}),
     };
   }
 
@@ -276,6 +277,7 @@ export function SplashPage({
               note: draft.note,
               media: draft.media,
               ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
+              ...(draft.videoPreviews !== undefined ? { videoPreviews: draft.videoPreviews } : {}),
             }),
           ),
       );
@@ -298,6 +300,7 @@ export function SplashPage({
         written_on: today,
         parent_ripple_id: null,
         thread_pool_id: sidePool,
+        video_previews: true,
         splash_id: target.splashId,
         splash: {
           declared_start: page.splash.declaredRange?.start ?? null,
@@ -321,6 +324,7 @@ export function SplashPage({
             splashId: target.splashId,
             ...(sidePool ? { threadPoolId: sidePool } : {}),
             ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
+            ...(draft.videoPreviews !== undefined ? { videoPreviews: draft.videoPreviews } : {}),
           }),
         ),
     );

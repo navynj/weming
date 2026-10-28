@@ -1003,6 +1003,7 @@ export type Database = {
           splash_id: string | null
           started_at: string | null
           thread_pool_id: string | null
+          video_previews: boolean
           written_on: string
         }
         Insert: {
@@ -1020,6 +1021,7 @@ export type Database = {
           splash_id?: string | null
           started_at?: string | null
           thread_pool_id?: string | null
+          video_previews?: boolean
           written_on?: string
         }
         Update: {
@@ -1037,6 +1039,7 @@ export type Database = {
           splash_id?: string | null
           started_at?: string | null
           thread_pool_id?: string | null
+          video_previews?: boolean
           written_on?: string
         }
         Relationships: [

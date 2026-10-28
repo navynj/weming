@@ -45,6 +45,7 @@ import type { Splash } from '@/features/splash/summary';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 import { signPoolPhotos } from '@/lib/avatars';
+import { rippleMedia } from '@/lib/ripple-media';
 
 /**
  * Home (SPEC 5, H22): the water ground — the lane grid or the date list
@@ -359,10 +360,11 @@ export async function HomeScreen({
   // A card's photos, for the Board view: every image across its ripples, oldest first.
   const photos = new Map<string, CardPhoto[]>();
   for (const ripple of [...[...ripples].reverse(), ...othersOldest]) {
-    if (ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
     const list = photos.get(key) ?? [];
-    list.push(...ripple.media.map((path) => ({ rippleId: ripple.id, path })));
+    const media = rippleMedia(ripple);
+    if (media.length === 0) continue;
+    list.push(...media);
     photos.set(key, list);
   }
   // A pool switched off my Home (0039): what I wrote there stays off it —

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { VideoThumb } from '@/components/ui/video-media';
 import {
   postIcon,
   laneOfCard,
@@ -554,7 +555,10 @@ function PhotoCardView({
         transform: moved,
       }}
     >
-      {url ? (
+      {photo.video ? (
+        // A video (part 5): its thumbnail in its own shape; a tap brings the post up, as ever.
+        <VideoThumb url={url} />
+      ) : url ? (
         // A signed URL for a few minutes: next/image would cache it past its life.
         // eslint-disable-next-line @next/next/no-img-element
         <img

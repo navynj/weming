@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Lock, Unlock } from 'lucide-react';
 
+import { videosIn } from '@/lib/youtube';
 import {
   AddImageAffordance,
   MediaPreviews,
@@ -25,6 +26,8 @@ export type BlockDraft = {
   media: string[];
   /** Its own day, on a range splash only (0031); absent elsewhere. */
   occurredOn?: IsoDate;
+  /** Its YouTube links drawn as videos (part 5); absent when it links none. */
+  videoPreviews?: boolean;
 };
 
 /**
@@ -67,6 +70,9 @@ export function BlockEditor({
       : null,
   );
   const [locked, setLocked] = useState(target.kind === 'edit' ? target.locked : false);
+  // Show video previews (part 5): on unless its author turned them off.
+  const [previews, setPreviews] = useState(editing?.video_previews !== false);
+  const linksVideos = videosIn(note).length > 0;
   const [confirming, setConfirming] = useState(false);
   const attach = useMediaAttach(media, setMedia);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -87,6 +93,7 @@ export function BlockEditor({
       note,
       media,
       ...(day ? { occurredOn: day } : {}),
+      ...(linksVideos ? { videoPreviews: previews } : {}),
     });
   }
 
@@ -115,6 +122,25 @@ export function BlockEditor({
         failed={attach.failed}
         onChange={setMedia}
       />
+
+      {linksVideos ? (
+        // Its links as players, or left as links (part 5); saved with Save.
+        <button
+          type="button"
+          role="switch"
+          aria-checked={previews}
+          data-video-previews
+          onClick={() => setPreviews((on) => !on)}
+          className="text-pool-500 flex items-center gap-2 self-start text-sm"
+        >
+          <span
+            className={`flex h-4 w-7 items-center rounded-full p-0.5 ${previews ? 'bg-ink justify-end' : 'bg-pool-200 justify-start'}`}
+          >
+            <span className="h-3 w-3 rounded-full bg-white" />
+          </span>
+          Show video previews
+        </button>
+      ) : null}
 
       <div className="flex items-center gap-3 text-sm">
         {editing ? (

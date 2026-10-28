@@ -6,7 +6,13 @@ import { z } from 'zod';
 import type { BoardView } from '@/lib/queries/layouts';
 import { createClient } from '@/lib/supabase/server';
 
-import { BoardLayout, type BoardLayoutJson } from './board-layout';
+import {
+  BoardLayout,
+  drawnLayout,
+  storedClear,
+  storedLayout,
+  type BoardLayoutJson,
+} from './board-layout';
 
 export type LayoutResult = { ok: true; layout: BoardLayoutJson } | { ok: false; message: string };
 
@@ -52,8 +58,9 @@ export async function setBoardLayout(input: z.input<typeof Write>): Promise<Layo
   const { data, error } = await supabase.rpc('set_board_layout', {
     p_splash: splashId,
     p_pool: poolId as string,
-    p_patch: patch as never,
-    p_clear: clear,
+    // Videos stored by their id (part 5), drawn as photos.
+    p_patch: storedLayout(patch) as never,
+    p_clear: clear.map(storedClear),
     p_view: view,
   });
   if (error) {
@@ -69,7 +76,7 @@ export async function setBoardLayout(input: z.input<typeof Write>): Promise<Layo
   }
   revalidate(poolId);
   const layout = BoardLayout.safeParse(data);
-  return { ok: true, layout: layout.success ? layout.data : {} };
+  return { ok: true, layout: layout.success ? drawnLayout(layout.data) : {} };
 }
 
 /** "Use pool layout": my Home layout for the splash is gone, so my Home draws the pool's again. */

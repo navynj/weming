@@ -1,5 +1,7 @@
 'use client';
 
+import { VideoPlayer } from '@/components/ui/video-media';
+import { videosIn } from '@/lib/youtube';
 import { DurationChip } from '@/components/ui/chips/duration-chip';
 import { annotationLabel, draftFrom } from '@/features/input-sheet/draft';
 import { dayOf } from '@/lib/flow-key';
@@ -90,22 +92,32 @@ export function BlockView({
       )}
     </>
   );
+  // Its YouTube links as players (part 5), after its photos; outside the
+  // edit tap, so play never opens the editor. Off when its author said so.
+  const videos =
+    block.video_previews === false
+      ? []
+      : videosIn(block.note).map((video) => <VideoPlayer key={video.id} video={video} />);
   if (!onEdit) {
     return (
       <div data-block={block.id} data-read-only className="flex w-full flex-col items-start gap-2">
         {body}
+        {videos}
       </div>
     );
   }
   return (
-    <button
-      type="button"
-      data-block={block.id}
-      onClick={onEdit}
-      aria-label="Edit this block"
-      className="flex w-full flex-col items-start gap-2 text-left"
-    >
-      {body}
-    </button>
+    <div className="flex w-full flex-col items-start gap-2">
+      <button
+        type="button"
+        data-block={block.id}
+        onClick={onEdit}
+        aria-label="Edit this block"
+        className="flex w-full flex-col items-start gap-2 text-left"
+      >
+        {body}
+      </button>
+      {videos}
+    </div>
   );
 }

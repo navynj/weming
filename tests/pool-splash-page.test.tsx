@@ -71,6 +71,7 @@ function ripple(id: string, author: string, note: string): RippleWithSplash {
     id,
     author_id: author,
     thread_pool_id: null,
+    video_previews: true,
     note,
     media: [],
     occurred_on: null,

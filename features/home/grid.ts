@@ -1,6 +1,7 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
 import type { BoardLayoutJson, LayoutSource } from '@/features/month-board/board-layout';
 import type { RippleResponsesValue, ThreadLabels } from '@/features/responses/model';
+import type { RippleMediaItem } from '@/lib/ripple-media';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -133,7 +134,8 @@ export type Card = {
 export type CardFace = { authorId: string; initials: string };
 
 /** One image of a post's, and the ripple it hangs on (whose visibility signs it). */
-export type CardPhoto = { rippleId: string; path: string };
+/** A photo, or a YouTube video its ripple links to (part 5: path `yt:<id>`). */
+export type CardPhoto = RippleMediaItem;
 
 /** A ripple as a card reads it: its words, when it was written, and in a pool whose it is. */
 export type CardRipple = {

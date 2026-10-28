@@ -26,6 +26,7 @@ function ripple(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
     id: 'r1',
     author_id: 'a1',
     thread_pool_id: null,
+    video_previews: true,
     note: 'kitsilano beach',
     media: [],
     occurred_on: null,
