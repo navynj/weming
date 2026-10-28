@@ -79,6 +79,7 @@ import {
   type Stacking,
 } from './stacking';
 import type { BoardEditing, PartChip } from './use-board-editing';
+import type { ToolbarEye } from './board-handles';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
 type Lanes = Pick<GridColumn, 'id' | 'icon' | 'name'>[];
@@ -270,6 +271,8 @@ const LABEL_CLASS: Record<LabelStyle, string> = {
   ink: 'label-ink bg-ink text-white',
   // A period band's fill (review): my side on someone else's record.
   pale: 'bg-white/20 text-white',
+  // Glass (0058): a band's fill, its edge a hairline of white drawn inside.
+  glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
 };
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {
@@ -277,6 +280,7 @@ const FACE_RING: Record<LabelStyle, string> = {
   white: 'ring-white',
   ink: 'ring-ink',
   pale: 'ring-transparent',
+  glass: 'ring-transparent',
 };
 /**
  * A face's size on the calendar: a little past the words' line (review: "a
@@ -1128,6 +1132,10 @@ export function BoardPieceView({
         <EditToolbar
           editing={editing!}
           fontSize={selected?.kind === 'label' ? piece.type.size : null}
+          labelStyle={
+            selected?.kind === 'label' ? { set: layout.label?.style, drawn: piece.label } : null
+          }
+          eye={eyeOf(selected, layout, card.photos?.length ?? 0, editing!)}
           layers={layers}
           parts={parts}
           phone={phone}
@@ -1332,10 +1340,49 @@ function pieceSelected(
   layout: BoardLayoutJson,
   hasIcon: boolean,
 ): BoardPart {
-  if (part.kind === 'icon' && piece.stickerBox && hasIcon) return part;
+  const sticker = piece.stickerBox && hasIcon && !iconHidden(layout);
+  if (part.kind === 'icon' && sticker) return part;
   if (part.kind === 'photo' && piece.fan.some((p) => p.path === part.path)) return part;
   if (part.kind === 'wave' && layout.wave?.on) return part;
-  return LABEL_PART;
+  // What is hidden is never selected (0055): the label, else the icon, else the top photo.
+  if (!labelHidden(layout) && !(piece.compact && piece.captionLines === 0)) return LABEL_PART;
+  if (sticker) return { kind: 'icon' };
+  const front = piece.fan[piece.fan.length - 1];
+  return front ? { kind: 'photo', path: front.path } : LABEL_PART;
+}
+
+/**
+ * The selected part's eye (0058): hides it from the board, as its switch in
+ * the panel does; the last of photos, icon and label shown keeps it, the
+ * eye disabled ("Keep at least one"). A wave is turned off.
+ */
+function eyeOf(
+  selected: BoardPart | null,
+  layout: BoardLayoutJson,
+  photosShown: number,
+  editing: BoardEditing,
+): ToolbarEye | null {
+  if (!selected) return null;
+  const shown = photosShown + (iconHidden(layout) ? 0 : 1) + (labelHidden(layout) ? 0 : 1);
+  const last = shown <= 1;
+  switch (selected.kind) {
+    case 'label':
+      return {
+        name: 'Label',
+        disabled: last,
+        hide: () => editing.edit({ label: { hidden: true } }),
+      };
+    case 'icon':
+      return { name: 'Icon', disabled: last, hide: () => editing.edit({ icon: { hidden: true } }) };
+    case 'photo':
+      return {
+        name: selected.path.startsWith('yt:') ? 'Video' : 'Photo',
+        disabled: last,
+        hide: () => editing.edit({ photos: { [selected.path]: { hidden: true } } }),
+      };
+    case 'wave':
+      return { name: 'Wave', disabled: false, hide: () => editing.edit({ wave: { on: false } }) };
+  }
 }
 
 /** A band's: its icon once it is set apart from the words (Inline off), its wave once on; else its label. */

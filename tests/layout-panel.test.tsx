@@ -315,12 +315,11 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(label().className).toContain(auto === 'ink' ? 'bg-ink' : 'bg-white');
   });
 
-  it('offers no Style on my side of someone else’s record: its pale is not mine to set (review)', () => {
+  it('offers Style on my side of someone else’s record too, as on any record (0058)', () => {
     media(true);
     const { container } = home([{ ...ONE[0], side: true, pools: ['Our Pool'] }]);
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
-    expect(container.querySelector('[data-layout-group="Label"]')).not.toBeNull();
-    expect(container.querySelector('[data-layout-control="Style"]')).toBeNull();
+    expect(container.querySelector('[data-layout-control="Style"]')).not.toBeNull();
   });
 
   it('offers Style, White or Black, on my own record once someone is invited on it (0035)', () => {
@@ -352,22 +351,20 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Pale');
   });
 
-  it('offers no Style for a label with no fill, a joint record with nobody invited included', () => {
+  it('offers Style on any record, with the four styles and Auto (0058)', () => {
     media(true);
-    const plain = home(ONE);
-    fireEvent.click(plain.container.querySelector('[data-layout-toggle]')!);
-    expect(plain.container.querySelector('[data-layout-control="Style"]')).toBeNull();
-    plain.unmount();
-    const alone = home([{ ...ONE[0], joint: true, together: false }]);
-    fireEvent.click(alone.container.querySelector('[data-layout-toggle]')!);
-    expect(alone.container.querySelector('[data-layout-control="Style"]')).toBeNull();
-  });
-
-  it('offers no Style for a label with no fill (plain)', () => {
-    media(true);
-    const { container } = home(ONE);
-    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
-    expect(container.querySelector('[data-layout-control="Style"]')).toBeNull();
+    for (const cards of [ONE, [{ ...ONE[0], joint: true, together: false }]]) {
+      const view = home(cards);
+      fireEvent.click(view.container.querySelector('[data-layout-toggle]')!);
+      const style = view.container.querySelector('[data-layout-control="Style"]')!;
+      expect(
+        [...style.querySelectorAll('[data-layout-choice]')].map((b) =>
+          b.getAttribute('data-layout-choice'),
+        ),
+      ).toEqual(['none', 'white', 'ink', 'glass']);
+      expect(style.querySelector('button')!.textContent).toBe('Auto');
+      view.unmount();
+    }
   });
 
   it('turns the icon by Icon tilt, inline or a sticker', () => {
@@ -569,13 +566,36 @@ describe('hand-set layouts on the calendar (review)', () => {
     expect(saved.at(-1)!.patch).toEqual({ piece: { layer: -1 } });
   });
 
-  it('draws a joint label’s hand-set fill; a label with no fill stays so', () => {
-    for (const style of ['white', 'ink'] as const) {
+  it('draws every style set by hand on joint and other records alike; unset, the rule (0058)', () => {
+    for (const style of ['none', 'white', 'ink', 'glass'] as const) {
       const joint = { ...ONE[0], joint: true, together: true, layout: { label: { style } } };
+      const plain = { ...ONE[0], layout: { label: { style } } };
       expect(layoutWeekBoard([joint], TODAY, { width: 980 }).pieces[0].label).toBe(style);
+      expect(layoutWeekBoard([plain], TODAY, { width: 980 }).pieces[0].label).toBe(style);
     }
-    const plain = { ...ONE[0], layout: { label: { style: 'ink' as const } } };
-    expect(layoutWeekBoard([plain], TODAY, { width: 980 }).pieces[0].label).toBe('none');
+    // Auto: a plain record has no fill; a joint one white or ink by the rule.
+    expect(layoutWeekBoard([ONE[0]], TODAY, { width: 980 }).pieces[0].label).toBe('none');
+    const joint = { ...ONE[0], joint: true, together: true };
+    expect(['white', 'ink']).toContain(
+      layoutWeekBoard([joint], TODAY, { width: 980 }).pieces[0].label,
+    );
+  });
+
+  it('keeps a joint record’s faces whatever its style (0058)', () => {
+    media(true);
+    const joint = {
+      ...ONE[0],
+      joint: true,
+      together: true,
+      writers: [{ authorId: 'u-mina', initials: 'MK' }],
+      layout: { label: { style: 'none' as const } },
+    };
+    const { container } = home([joint]);
+    const piece = container.querySelector('[data-board-piece="s1"]')!;
+    expect(piece.getAttribute('data-label')).toBe('none');
+    expect(
+      piece.querySelector('[data-board-label] [data-faces], [data-board-label] .bg-joint-face'),
+    ).not.toBeNull();
   });
 
   it('lets Inline pick the recipe and a hand-set size fix the sticker', () => {

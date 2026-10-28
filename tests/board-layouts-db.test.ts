@@ -211,7 +211,6 @@ describe('a pool layout', () => {
       { label: { width: 0.2 } },
       { label: { width: 4.5 } },
       { label: { style: 'blue' } },
-      { label: { style: 'none' } },
       { label: { style: 1 } },
       { icon: { width: 1 } },
       { icon: { tilt: -46 } },
@@ -429,5 +428,16 @@ describe('hidden icon and label, the order within a post, videos (0055)', () => 
       (await set(ana, { order: ['label', 'photo:gone/elsewhere.webp', `photo:${PHOTO_A}`] })).error,
     ).toBeNull();
     expect((await pooled()).order).toEqual(['label', `photo:${PHOTO_A}`]);
+  });
+});
+
+describe('a label’s style, any record’s to choose (0058)', () => {
+  it('takes none, white, ink and glass, and refuses anything else', async () => {
+    for (const style of ['none', 'white', 'ink', 'glass']) {
+      expect((await set(ana, { label: { style } })).error).toBeNull();
+      expect(((await read(ana, 'pool'))[0].layout.label as { style?: string }).style).toBe(style);
+    }
+    expect((await set(ana, { label: { style: 'pale' } })).error).not.toBeNull();
+    await set(ana, {}, { clear: ['label.style'] });
   });
 });

@@ -33,8 +33,8 @@ export const LabelLayout = z
     fontSize: z.number().int().min(10).max(18),
     // A share of the lane, like X: narrower than it, or across up to four (0027, 0050).
     width: z.number().min(0.3).max(4),
-    // A filled label's fill (0027): white or ink. No fill is another kind of label, never a choice.
-    style: z.enum(['white', 'ink']),
+    // Its style, any record's to choose (0058): none, white, ink or glass; unset, the rule's.
+    style: z.enum(['none', 'white', 'ink', 'glass']),
     hidden: z.boolean(),
   })
   .partial()

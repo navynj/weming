@@ -1632,13 +1632,16 @@ describe('a set layout holds when a ripple is added (review)', () => {
 });
 
 describe('my side on someone else’s record, on Home (review)', () => {
+  it('takes a style set by hand, as any record does (0058); unset, it is pale', () => {
+    const set = { ...side, layout: { label: { style: 'ink' as const } } };
+    expect(layoutWeekBoard([set], TODAY, { width: 980 }).pieces[0].label).toBe('ink');
+  });
+
   const side: Card = {
     ...card('theirs', 'Their trip', '2026-10-21'),
     side: true,
     pools: ['Our Pool'],
     poolPhoto: null,
-    // A fill set by hand elsewhere is not this record's: it stays pale.
-    layout: { label: { style: 'ink' } },
   };
 
   it('is drawn with a period band’s pale fill and its pool’s monogram', () => {

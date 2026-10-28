@@ -14,6 +14,8 @@ import {
   ArrowUp,
   BringToFront,
   Check,
+  Eye,
+  Loader2,
   MoreHorizontal,
   SendToBack,
   Type,
@@ -41,6 +43,8 @@ import {
   type BoardPart,
   type PartValues,
 } from './handle-math';
+import { LabelSwatch, useLabelStyleNames, type LabelChoice } from './label-styles';
+import { LABEL_STYLES, type LabelStyle } from './layout';
 import type { LayerControls, LayerMove } from './stacking';
 import type { BoardEditing, PartChip } from './use-board-editing';
 
@@ -598,9 +602,16 @@ export function PartFrame({
 
 /**
  * The active piece's toolbar (review): near it, small, white over the
- * water — the text size stepper when the label is selected ("T | − 14 +"),
- * Undo, More and Done — and what the save is doing: "Saving…", then "Saved".
+ * water — the text size stepper and the style swatch when the label is
+ * selected ("T | − 14 +", 0058), the eye for any part, Undo, More and Done
+ * — and what the save is doing: "Saving…", then "Saved"; on a phone a
+ * spinner, then a check, so the row keeps every control.
  */
+
+/** The label's style on the toolbar (0058): as set by hand, or unset (Auto), and as drawn. */
+export type ToolbarStyle = { set: LabelChoice | undefined; drawn: LabelStyle };
+/** The selected part's eye (0055, 0058): hide it, unless it is the last one shown. */
+export type ToolbarEye = { name: string; disabled: boolean; hide: () => void };
 /**
  * Where a toolbar starts or ends (`x`, by `align`) in its container's
  * pixels, kept between `min` and `max`: the board's edges there.
@@ -615,8 +626,14 @@ export function EditToolbar({
   seat = null,
   phone = false,
   style,
+  labelStyle = null,
+  eye = null,
 }: {
   editing: BoardEditing;
+  /** While the label is selected: its style, for the swatch. */
+  labelStyle?: ToolbarStyle | null;
+  /** While a part is selected: its eye. */
+  eye?: ToolbarEye | null;
   /** A phone's board (under 600px): two rows, 44px taps, the layer buttons in More. */
   phone?: boolean;
   /** The piece's parts, as chips that select one (review): shown when there is more than one. */
@@ -688,7 +705,7 @@ export function EditToolbar({
   const stepper =
     fontSize !== null ? (
       <div data-edit-text-size className="flex items-center" role="group" aria-label="Text size">
-        <Type aria-hidden size={14} className="mx-1.5" />
+        <Type aria-hidden size={14} className={phone ? 'mx-1' : 'mx-1.5'} />
         <span aria-hidden className="bg-ink/20 h-4 w-px" />
         <button
           type="button"
@@ -713,9 +730,28 @@ export function EditToolbar({
         >
           +
         </button>
-        <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
+        {/* A phone's row is full (0058): the swatch follows with no rule between. */}
+        {phone ? null : <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />}
       </div>
     ) : null;
+  const swatch = labelStyle ? (
+    <StyleSwatch labelStyle={labelStyle} editing={editing} button={button} phone={phone} />
+  ) : null;
+  const eyeButton = eye ? (
+    <button
+      type="button"
+      aria-label={
+        eye.disabled ? `${eye.name}: keep at least one` : `Hide ${eye.name.toLowerCase()}`
+      }
+      title={eye.disabled ? 'Keep at least one' : `Hide ${eye.name.toLowerCase()}`}
+      data-edit-eye
+      disabled={eye.disabled}
+      onClick={eye.hide}
+      className={`${button} disabled:opacity-20`}
+    >
+      <Eye aria-hidden size={16} />
+    </button>
+  ) : null;
   // On a phone the layer buttons are More's (review); the shortcuts stay here.
   const layerGroup =
     layers && !phone ? (
@@ -749,12 +785,32 @@ export function EditToolbar({
         type="button"
         data-edit-done
         onClick={editing.deactivate}
-        className={`${button} text-main-900 gap-1 px-2.5 font-semibold`}
+        className={`${button} text-main-900 relative gap-1 px-2.5 font-semibold`}
       >
-        <Check aria-hidden size={14} />
+        {/* The word alone on a phone, so its row keeps every control (0058). */}
+        {phone ? null : <Check aria-hidden size={14} />}
         Done
+        {phone && editing.status ? (
+          // A phone's status (0058): an icon on Done's corner, taking no room in the row.
+          <span
+            aria-hidden
+            data-edit-status={editing.status}
+            className="text-pool-500 absolute top-1 right-0.5 flex"
+          >
+            {editing.status === 'saving' ? (
+              <Loader2 aria-hidden size={10} className="animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Check aria-hidden size={10} />
+            )}
+          </span>
+        ) : null}
       </button>
-      {editing.status ? (
+      {phone && editing.status ? (
+        <span role="status" className="sr-only">
+          {editing.status === 'saving' ? 'Saving' : 'Saved'}
+        </span>
+      ) : null}
+      {editing.status && !phone ? (
         <span data-edit-status={editing.status} className="text-pool-500 pr-2 pl-1 text-[10px]">
           {editing.status === 'saving' ? 'Saving…' : 'Saved'}
         </span>
@@ -778,8 +834,10 @@ export function EditToolbar({
       {phone ? (
         <>
           {chips}
-          <div data-edit-actions className="flex flex-wrap items-center">
+          <div data-edit-actions className="flex items-center">
             {stepper}
+            {swatch}
+            {eyeButton}
             {actions}
           </div>
         </>
@@ -787,11 +845,90 @@ export function EditToolbar({
         <>
           {chips}
           {stepper}
+          {swatch}
+          {eyeButton}
           {layerGroup}
           {actions}
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The label's style (0058): a swatch of the style as drawn; a tap opens the
+ * four and Auto. A pick is drawn at once and saved after the rest, undoable,
+ * as the stepper's is; Auto hands it back to the rule.
+ */
+function StyleSwatch({
+  labelStyle,
+  editing,
+  button,
+  phone,
+}: {
+  labelStyle: ToolbarStyle;
+  editing: BoardEditing;
+  button: string;
+  phone: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const names = useLabelStyleNames();
+  const pick = (style: LabelChoice | undefined): void => {
+    setOpen(false);
+    if (style === undefined) editing.edit({}, ['label.style']);
+    else editing.edit({ label: { style } });
+  };
+  const choice = (on: boolean) =>
+    `flex ${phone ? 'h-11 min-w-11' : 'h-8 min-w-8'} items-center justify-center gap-1 rounded-full px-1.5 ${on ? 'bg-ink text-white' : ''}`;
+  return (
+    <span className="relative flex">
+      <button
+        type="button"
+        aria-label={`Label style: ${labelStyle.set ? names[labelStyle.set] : 'Auto'}`}
+        aria-expanded={open}
+        data-edit-style={labelStyle.set ?? 'auto'}
+        onClick={() => setOpen((was) => !was)}
+        className={button}
+      >
+        <LabelSwatch style={labelStyle.drawn} px={20} />
+      </button>
+      {open ? (
+        <span
+          role="menu"
+          aria-label="Label style"
+          data-edit-style-menu
+          // Selection is ink (H20f); a white card on the ground stays white (0032).
+          // Centred under the swatch, so it stays within the board at either end of a phone's row.
+          className="surface absolute top-full left-1/2 z-10 mt-1 flex -translate-x-1/2 items-center gap-0.5 rounded-[20px] bg-white p-1 shadow-md"
+        >
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={labelStyle.set === undefined}
+            data-edit-style-choice="auto"
+            onClick={() => pick(undefined)}
+            className={`${choice(labelStyle.set === undefined)} px-2.5`}
+          >
+            Auto
+          </button>
+          {LABEL_STYLES.map((style) => (
+            <button
+              key={style}
+              type="button"
+              role="menuitemradio"
+              aria-checked={labelStyle.set === style}
+              aria-label={names[style]}
+              title={names[style]}
+              data-edit-style-choice={style}
+              onClick={() => pick(style)}
+              className={choice(labelStyle.set === style)}
+            >
+              <LabelSwatch style={style} px={20} />
+            </button>
+          ))}
+        </span>
+      ) : null}
+    </span>
   );
 }
 

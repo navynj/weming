@@ -4,11 +4,10 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 
 import type { Card } from '@/features/home/grid';
-import { useTheme } from '@/features/people/theme-provider';
-import { THEMES } from '@/lib/theme';
 
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
-import type { Recipe } from './layout';
+import { LABEL_STYLES, type Recipe } from './layout';
+import { useLabelStyleNames } from './label-styles';
 import { PartOrder } from './part-order';
 import { WAVE_DEFAULTS } from './board-pieces';
 import { LAYER_RANGE } from './stacking';
@@ -174,20 +173,6 @@ function Choice<T extends string>({
   );
 }
 
-/**
- * The fill's two choices as they look (Yoonji, in the session): `white` is
- * white on the dark ground, but in light mode the ground's white is my theme
- * colour, so it is named after it ("Pink"), as in pastel mode, where it is
- * the colour's pastel; `ink` is said "Black", and in pastel mode, where it is
- * nearly white with a pastel edge, "Pale".
- */
-function labelStyleChoices(firstName: string, secondName: string) {
-  return [
-    { value: 'white', label: firstName },
-    { value: 'ink', label: secondName },
-  ] as const;
-}
-
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section data-layout-group={title} className="flex flex-col gap-1.5">
@@ -231,7 +216,7 @@ export function LayoutControls({
   onEdit,
   onRevert,
 }: LayoutControlsProps) {
-  const { theme } = useTheme();
+  const styleNames = useLabelStyleNames();
   const [advanced, setAdvanced] = useState(false);
   // Every photo, so one hidden from the board (0044) can be shown again.
   const photos = card.photos ?? [];
@@ -398,24 +383,15 @@ export function LayoutControls({
         ) : null}
         {!period ? (
           <>
-            {/* Only a filled label has a fill to choose: one with someone
-              invited on it, mine or the pool's (0033, 0035). */}
-            {card.together ? (
-              <Choice
-                name="Style"
-                value={label.style}
-                options={labelStyleChoices(
-                  // In light mode it shows as the colour; in pastel, as its pastel (0036).
-                  theme.mode === 'dark'
-                    ? 'White'
-                    : (THEMES.find((t) => t.key === theme.color)?.name ?? 'White'),
-                  // In pastel mode the second is nearly white (0036).
-                  theme.mode === 'pastel' ? 'Pale' : 'Black',
-                )}
-                onChange={(v) => onEdit({ label: { style: v } })}
-                onReset={() => onEdit({}, ['label.style'])}
-              />
-            ) : null}
+            {/* Any record's to choose (0058), joint or not; Auto is the rule's.
+                The toolbar's swatch says the same four. */}
+            <Choice
+              name="Style"
+              value={label.style}
+              options={LABEL_STYLES.map((value) => ({ value, label: styleNames[value] }))}
+              onChange={(v) => onEdit({ label: { style: v } })}
+              onReset={() => onEdit({}, ['label.style'])}
+            />
             <Slider
               name="Width"
               value={label.width}

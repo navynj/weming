@@ -1022,3 +1022,63 @@ describe('More on a phone: Undo and Done in its header, the chips when out of si
     }
   });
 });
+
+describe('the toolbar’s style swatch and eye (0058)', () => {
+  // Its wave on, so a part besides the label can be picked.
+  const waved = (): Card[] =>
+    TWO.map((c) => (c.splash.id === 's2' ? { ...c, layout: { wave: { on: true } } } : c));
+  const rest = async () =>
+    act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+
+  it('picks a style from the swatch, drawn at once and saved after the rest; Auto hands it back', async () => {
+    vi.useFakeTimers();
+    const { container } = home();
+    fireEvent.click(label(container, 's2'));
+    const swatch = q(container, '[data-edit-style]');
+    expect(swatch.getAttribute('data-edit-style')).toBe('auto');
+    fireEvent.click(swatch);
+    fireEvent.click(q(container, '[data-edit-style-choice="glass"]'));
+    expect(label(container, 's2').className).toContain('ring-white/30');
+    expect(container.querySelector('[data-edit-style-menu]')).toBeNull();
+    await rest();
+    expect(saved.at(-1)!.patch).toEqual({ label: { style: 'glass' } });
+    fireEvent.click(q(container, '[data-edit-style]'));
+    fireEvent.click(q(container, '[data-edit-style-choice="auto"]'));
+    expect(label(container, 's2').className).not.toContain('ring-white/30');
+    await rest();
+    expect(saved.at(-1)!.clear).toContain('label.style');
+    vi.useRealTimers();
+  });
+
+  it('offers the swatch only while the label is selected', () => {
+    const { container } = home(waved());
+    fireEvent.click(label(container, 's2'));
+    expect(container.querySelector('[data-edit-style]')).not.toBeNull();
+    fireEvent.click(q(container, '[data-edit-part-chip="Wave"]'));
+    expect(container.querySelector('[data-edit-style]')).toBeNull();
+    expect(container.querySelector('[data-edit-eye]')).not.toBeNull();
+  });
+
+  it('hides the selected part with the eye; the last one shown keeps it', () => {
+    const { container } = home(waved());
+    fireEvent.click(label(container, 's2'));
+    fireEvent.click(q(container, '[data-edit-eye]'));
+    // The label is gone from the board; its chip, crossed out, brings it back.
+    expect(container.querySelector('[data-board-piece="s2"] [data-board-label]')).toBeNull();
+    expect(
+      q(container, '[data-edit-part-chip="Label"]').hasAttribute('data-edit-part-hidden'),
+    ).toBe(true);
+
+    // A post with its label alone shown: its eye stays, disabled.
+    cleanup();
+    const plain = TWO.find((c) => c.splash.id === 's1')!;
+    const only = home([{ ...plain, layout: { icon: { hidden: true } } }]);
+    fireEvent.click(label(only.container, 's1'));
+    const eye = q(only.container, '[data-edit-eye]');
+    expect(eye.hasAttribute('disabled')).toBe(true);
+    expect(eye.getAttribute('title')).toBe('Keep at least one');
+  });
+});

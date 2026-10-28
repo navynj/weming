@@ -1,0 +1,57 @@
+'use client';
+
+import { useTheme } from '@/features/people/theme-provider';
+import { THEMES } from '@/lib/theme';
+
+import { LABEL_STYLES, type LabelStyle } from './layout';
+
+/** A style a person can choose for any label (0058). */
+export type LabelChoice = (typeof LABEL_STYLES)[number];
+
+/** A label drawn in each style, as the board draws it (board-pieces' LABEL_CLASS). */
+const SAMPLE: Record<LabelStyle, string> = {
+  none: 'text-white',
+  white: 'label-fill bg-white text-main-900',
+  ink: 'label-ink bg-ink text-white',
+  pale: 'bg-white/20 text-white',
+  glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
+};
+
+/**
+ * The styles as they look (Yoonji, in the session): `white` is white on the
+ * dark ground, but in light mode the ground's white is my theme colour, so
+ * it is named after it ("Pink"), as in pastel mode, its pastel; `ink` is
+ * "Black", and in pastel mode, nearly white, "Pale". The toolbar's swatch,
+ * the panel and More all say them so.
+ */
+export function useLabelStyleNames(): Record<LabelChoice, string> {
+  const { theme } = useTheme();
+  return {
+    none: 'None',
+    white:
+      theme.mode === 'dark'
+        ? 'White'
+        : (THEMES.find((t) => t.key === theme.color)?.name ?? 'White'),
+    ink: theme.mode === 'pastel' ? 'Pale' : 'Black',
+    glass: 'Glass',
+  };
+}
+
+/**
+ * A style shown as it looks: "Aa" in it, on a square of the water, so a
+ * white label, glass and no fill all read on the white toolbar.
+ */
+export function LabelSwatch({ style, px = 24 }: { style: LabelStyle; px?: number }) {
+  return (
+    <span
+      aria-hidden
+      data-label-swatch={style}
+      className="water-ground flex shrink-0 items-center justify-center rounded-md"
+      style={{ width: px, height: px }}
+    >
+      <span className={`rounded-sm px-0.5 text-[10px] leading-4 font-semibold ${SAMPLE[style]}`}>
+        Aa
+      </span>
+    </span>
+  );
+}

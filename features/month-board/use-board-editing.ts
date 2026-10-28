@@ -77,8 +77,8 @@ export type BoardEditing = {
    * handle's run of edits as it stands, held while held, saved with the release.
    */
   adjust: (patch: BoardLayoutJson) => void;
-  /** The text size stepper: saved after the rest, as a slider is. */
-  edit: (patch: BoardLayoutJson) => void;
+  /** The text size stepper, the style swatch, the eye: saved after the rest, as a slider is; `clear` hands fields back (Auto). */
+  edit: (patch: BoardLayoutJson, clear?: string[]) => void;
   undo: () => void;
   canUndo: boolean;
   status: SaveStatus;
@@ -170,8 +170,8 @@ export function useBoardEditing({
     if (id) drafts.commit(id);
   }, [activeId, drafts]);
   const edit = useCallback(
-    (patch: BoardLayoutJson): void => {
-      if (activeId) drafts.edit(activeId, patch);
+    (patch: BoardLayoutJson, clear: string[] = []): void => {
+      if (activeId) drafts.edit(activeId, patch, clear);
     },
     [activeId, drafts],
   );

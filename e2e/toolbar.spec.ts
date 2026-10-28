@@ -24,24 +24,58 @@ test('every toolbar control is on screen, inside the board, 44px tall', async ({
   ]);
   expect(await bar.locator('[data-edit-layer]').count()).toBe(0);
 
+  // Row 2 (0058): the text size, the style swatch, the eye, Undo, More, Done.
+  const row2 = await bar
+    .locator('[data-edit-actions] button')
+    .evaluateAll((buttons) =>
+      buttons.map(
+        (b) =>
+          [
+            'data-edit-text-smaller',
+            'data-edit-text-larger',
+            'data-edit-style',
+            'data-edit-eye',
+            'data-edit-undo',
+            'data-edit-more',
+            'data-edit-done',
+          ].find((a) => b.hasAttribute(a)) ?? b.getAttribute('aria-label'),
+      ),
+    );
+  expect(row2).toEqual([
+    'data-edit-text-smaller',
+    'data-edit-text-larger',
+    'data-edit-style',
+    'data-edit-eye',
+    'data-edit-undo',
+    'data-edit-more',
+    'data-edit-done',
+  ]);
+
   const viewport = page.viewportSize()!;
   const board = (await page.locator('[data-board-scroller]').boundingBox())!;
-  const controls = bar.locator('button');
-  const count = await controls.count();
-  expect(count).toBeGreaterThanOrEqual(10);
-  for (let i = 0; i < count; i += 1) {
-    const control = controls.nth(i);
-    const name =
-      (await control.getAttribute('aria-label')) ?? (await control.textContent()) ?? `#${i}`;
-    const box = (await control.boundingBox())!;
-    expect(box.height, `${name} height`).toBeGreaterThanOrEqual(44);
-    expect(box.x, `${name} left`).toBeGreaterThanOrEqual(Math.max(0, board.x) - 0.5);
-    expect(box.x + box.width, `${name} right`).toBeLessThanOrEqual(
-      Math.min(viewport.width, board.x + board.width) + 0.5,
-    );
-    expect(box.y, `${name} top`).toBeGreaterThanOrEqual(0);
-    expect(box.y + box.height, `${name} bottom`).toBeLessThanOrEqual(viewport.height);
-  }
+  const everyControlFits = async (when: string): Promise<void> => {
+    const controls = bar.locator('button');
+    const count = await controls.count();
+    expect(count).toBeGreaterThanOrEqual(12);
+    for (let i = 0; i < count; i += 1) {
+      const control = controls.nth(i);
+      const name =
+        (await control.getAttribute('aria-label')) ?? (await control.textContent()) ?? `#${i}`;
+      const box = (await control.boundingBox())!;
+      expect(box.height, `${when}: ${name} height`).toBeGreaterThanOrEqual(44);
+      expect(box.x, `${when}: ${name} left`).toBeGreaterThanOrEqual(Math.max(0, board.x) - 0.5);
+      expect(box.x + box.width, `${when}: ${name} right`).toBeLessThanOrEqual(
+        Math.min(viewport.width, board.x + board.width) + 0.5,
+      );
+      expect(box.y, `${when}: ${name} top`).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height, `${when}: ${name} bottom`).toBeLessThanOrEqual(viewport.height);
+    }
+  };
+  await everyControlFits('at rest');
+  // While saving, the status takes its place in the row as an icon: still all on screen.
+  await bar.locator('[data-edit-text-larger]').click();
+  await expect(bar.locator('[data-edit-status]')).toHaveCount(1);
+  await everyControlFits('saving');
 
   // The layer buttons wait in More, at its top.
   await bar.locator('[data-edit-more]').click();

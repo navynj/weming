@@ -119,8 +119,9 @@ const FACES_CHARS = 4;
  * ink, alternating within a day, wherever it is drawn.
  */
 /** `pale`: my side on someone else's record (review), a period band's fill; never chosen. */
-export type LabelStyle = 'none' | 'white' | 'ink' | 'pale';
-export const LABEL_STYLES: readonly LabelStyle[] = ['none', 'white', 'ink'];
+export type LabelStyle = 'none' | 'white' | 'ink' | 'pale' | 'glass';
+/** The styles a person can choose (0058); `pale` is a side's, never chosen. */
+export const LABEL_STYLES = ['none', 'white', 'ink', 'glass'] as const;
 
 /** The sizes that follow the board's width. */
 export type BoardMetrics = {
@@ -525,16 +526,24 @@ function planDay(cards: Card[]): Plan[] {
   let bigUsed = false;
   return cards.map((card, at) => {
     let label: LabelStyle = 'none';
-    // My side on someone's record (review): pale, as a period band; not mine to colour.
+    const set = card.layout?.label?.style;
+    // My side on someone's record (review): pale, as a period band.
     if (card.side) label = 'pale';
     else if (card.together) {
       const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'ink';
       // A fill set by hand (0027) is drawn as set; the next joint one alternates from it.
       fill =
-        card.layout?.label?.style ??
-        (drawnFill === fill ? (fill === 'white' ? 'ink' : 'white') : drawnFill);
+        set === 'white' || set === 'ink'
+          ? set
+          : drawnFill === fill
+            ? fill === 'white'
+              ? 'ink'
+              : 'white'
+            : drawnFill;
       label = fill;
     }
+    // Any record's style set by hand (0058) is drawn as set; unset, the rule's above.
+    if (set) label = set;
     let size: StickerSize | null = null;
     if (recipes[at] === 'B') {
       const sizes = (['small', 'medium', 'big'] as const).filter(
