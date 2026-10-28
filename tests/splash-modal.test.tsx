@@ -16,6 +16,7 @@ vi.mock('next/navigation', () => ({
 
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { SplashModal, useCloseSplash } from '@/features/splash/splash-modal';
+import { SHEET_MAX_HEIGHT } from '@/features/splash-sheet/sheet-frame';
 
 /**
  * The splash detail as a bottom sheet (review): the screen it opened over
@@ -134,15 +135,18 @@ describe('the splash sheet (review)', () => {
     expect(document.documentElement.style.overflow).toBe('');
   });
 
-  it('fits its content up to 92dvh on a phone and 88dvh wide, min(1040px, 90vw) across, header pinned', () => {
+  it('fits its content on a phone under the 56px band, stands at 90vh wide, min(1040px, 90vw) across, header pinned', () => {
     const { container } = sheet(null);
     const panel = container.querySelector('[data-splash-sheet]')!;
-    expect(panel.className).toContain('max-h-[min(92dvh,var(--sheet-room))]');
-    expect(panel.className).toContain('lg:max-h-[min(88dvh,var(--sheet-room))]');
+    expect(panel.className).toContain(SHEET_MAX_HEIGHT);
+    expect(SHEET_MAX_HEIGHT).toMatch(/56px/);
+    // On a phone a fixed height would make short content a tall sheet.
+    expect(panel.className.split(' ').some((c) => c.startsWith('h-['))).toBe(false);
+    // Wide (the board 600px and up): 90vh whatever the length (review).
+    expect(panel.className).toContain('lg:h-[90vh]');
+    expect(panel.className).toContain('lg:max-h-[90vh]');
     expect(panel.className).toContain('lg:w-[min(1040px,90vw)]');
     expect(panel.className).toContain('rounded-t-[32px]');
-    // A fixed height would make short content a tall sheet.
-    expect(panel.className.split(' ').some((c) => c.startsWith('h-['))).toBe(false);
     const body = container.querySelector('[data-sheet-body]')!;
     expect(body.className).toContain('overflow-y-auto');
     expect(body.className).toContain('[&_[data-splash-side]]:sticky');

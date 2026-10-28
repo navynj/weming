@@ -236,6 +236,23 @@ for (const from of ['Home', 'the pool'] as const) {
   });
 }
 
+/** The open sheet's top and height, against the window's. */
+async function sheetBox(page: Page) {
+  // After the rise.
+  await page.waitForTimeout(600);
+  return page.evaluate(() => {
+    const box = document.querySelector('[data-splash-modal] [data-splash-sheet]')!;
+    const r = box.getBoundingClientRect();
+    return { top: r.top, height: r.height, window: window.innerHeight, wide: innerWidth >= 1024 };
+  });
+}
+
+/** Wide, 90vh whatever the length; on a phone, never above the 56px band (review). */
+function expectSheetHeight(box: Awaited<ReturnType<typeof sheetBox>>): void {
+  if (box.wide) expect(Math.abs(box.height - box.window * 0.9)).toBeLessThanOrEqual(1);
+  else expect(box.top).toBeGreaterThanOrEqual(56);
+}
+
 test('a notification opens its sheet at once, and its page lands in place at the reply', async ({
   page,
   baseURL,
@@ -298,6 +315,8 @@ test('a notification opens its sheet at once, and its page lands in place at the
   expect(header - tap, 'the header and skeleton within 100ms of the tap').toBeLessThan(100);
   // The page is still on its way: the skeleton holds, no other sheet.
   await expect(page.locator('[data-splash-page]')).toHaveCount(0);
+  const before = await sheetBox(page);
+  expectSheetHeight(before);
 
   const landed = page.locator('[data-splash-page]:visible');
   await expect(landed).toBeVisible({ timeout: 60_000 });
@@ -309,6 +328,10 @@ test('a notification opens its sheet at once, and its page lands in place at the
     const w = window as unknown as { __adopted: string; __ghosts: number };
     return { adopted: w.__adopted, ghosts: w.__ghosts };
   });
+  // The same height before and after on a wide screen: nothing jumps.
+  const after = await sheetBox(page);
+  expectSheetHeight(after);
+  if (after.wide) expect(after.height).toBeCloseTo(before.height, 0);
   // Taken over where it stood: no second rise, no exit played.
   expect(['none', 'matrix(1, 0, 0, 1, 0, 0)']).toContain(adopted);
   expect(ghosts).toBe(0);

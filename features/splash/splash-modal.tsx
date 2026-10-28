@@ -16,6 +16,7 @@ import { MotionConfig, animate, motion, useDragControls, type PanInfo } from 'mo
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import { FLIP_SPRING } from '@/features/home/use-flip';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { SHEET_MAX_HEIGHT } from '@/features/splash-sheet/sheet-frame';
 
 import { useSplashOpening } from './opening-context';
 
@@ -57,8 +58,11 @@ const FOCUSABLE =
  * works; `closeTo` is where a direct visit goes when closed (its context),
  * and null means back, the screen it was opened over.
  *
- * It fits its content up to 92dvh on a phone and 88dvh on a wide screen,
- * where it is min(1040px, 90vw) wide and keeps the detail's two halves. The
+ * On a phone it fits its content, up to the visible viewport less the 56px
+ * band every bottom sheet leaves (sheet-frame). On a wide screen — the
+ * board 600px and up, which is `lg` — it is min(1040px, 90vw) wide, keeps
+ * the detail's two halves, and stands at 90vh whatever the record's length,
+ * a short one leaving white below (review); `fit` keeps it content-fit there. The
  * header stays pinned while the body scrolls. Dismissed by dragging down the
  * handle or the header, or the body once scrolled to its top; by the dimmed
  * screen; by Escape; by back. It opens and closes on the board's spring, a
@@ -70,6 +74,7 @@ export function SplashModal({
   closeTo,
   onLeave,
   silentExit,
+  fit = false,
   children,
 }: {
   closeTo: string | null;
@@ -77,6 +82,8 @@ export function SplashModal({
   onLeave?: () => void;
   /** Asked as it unmounts: true when another sheet took its place, so no exit plays. */
   silentExit?: () => boolean;
+  /** Content-fit on a wide screen too, not 90vh: a sheet that is not a record (settings). */
+  fit?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -298,10 +305,12 @@ export function SplashModal({
             onAnimationComplete={() => {
               if (leaving) leave();
             }}
-            className="surface relative flex max-h-[min(92dvh,var(--sheet-room))] w-full flex-col overflow-hidden rounded-t-[32px] bg-white shadow-xl outline-none lg:max-h-[min(88dvh,var(--sheet-room))] lg:w-[min(1040px,90vw)]"
+            className={`surface relative flex ${SHEET_MAX_HEIGHT} w-full flex-col overflow-hidden rounded-t-[32px] bg-white shadow-xl outline-none lg:w-[min(1040px,90vw)] ${
+              fit ? 'lg:max-h-[min(88dvh,var(--sheet-room))]' : 'lg:h-[90vh] lg:max-h-[90vh]'
+            }`}
             style={
               {
-                '--sheet-room': viewport ? `${viewport.height - 16}px` : '100dvh',
+                '--sheet-room': viewport ? `${viewport.height}px` : '100dvh',
               } as React.CSSProperties
             }
           >

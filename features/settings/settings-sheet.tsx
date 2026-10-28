@@ -20,7 +20,7 @@ export function SettingsSheet({ title, tabs }: { title: string; tabs: SettingsTa
   if (!tab) return null;
   const current = tabs.find((t) => t.key === tab) ?? tabs[0];
   return (
-    <SplashModal closeTo={null} onLeave={close}>
+    <SplashModal closeTo={null} onLeave={close} fit>
       <div
         data-splash-side
         data-settings-sheet={current.key}
