@@ -11,6 +11,7 @@ vi.mock('next/navigation', () => ({
     push: (to: string) => pushed.push(to),
     replace: (to: string) => replaced.push(to),
     refresh: () => {},
+    prefetch: () => {},
   }),
 }));
 vi.mock('@/features/splash/actions', () => ({

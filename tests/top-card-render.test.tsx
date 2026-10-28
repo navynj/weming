@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),
 }));
 vi.mock('@/lib/media', () => ({
   signBoardPhotos: (photos: { path: string }[]) =>

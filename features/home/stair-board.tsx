@@ -35,8 +35,10 @@ export const SIDEWAYS = false;
 /** Collapsed while a piece is edited on a phone (review): the top card's title strip alone. */
 export const COLLAPSED_PX = 44;
 /** Low (the Board view on a phone): a shorter top card and one step, so the board above gets the height (review). */
-const LOW_CARD_PX = 128;
+export const LOW_CARD_PX = 128;
 const LOW_DOWN = 1;
+/** The low board's box on a phone, which Home and a pool open on. */
+export const LOW_STACK_PX = LOW_CARD_PX + LOW_DOWN * STEP_PX;
 /** The board's box on a phone: the top card and the lower stair; the upper stair rises above it, into the water. */
 export const STACK_PX = CARD_PX + DOWN * STEP_PX;
 /** Sideways, the top card is never narrower than this; fewer cards fan to the right before it would be. */

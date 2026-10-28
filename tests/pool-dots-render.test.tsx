@@ -2,16 +2,26 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const prefetched = vi.hoisted(() => [] as { href: string; kind?: string }[]);
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
+  useRouter: () => ({
+    push: () => {},
+    replace: () => {},
+    refresh: () => {},
+    prefetch: (href: string, options?: { kind?: string }) =>
+      prefetched.push({ href, kind: options?.kind }),
+  }),
 }));
 
 import { GroundFoot } from '@/features/home/ground-foot';
 import { PoolActivityProvider } from '@/features/pool/activity';
 import { rememberVisit } from '@/features/pool/remembered';
 
-beforeEach(() => window.localStorage.clear());
+beforeEach(() => {
+  window.localStorage.clear();
+  prefetched.length = 0;
+});
 afterEach(cleanup);
 
 const ACTIVITY = { 'p-a': '2026-10-23T10:00:00.000Z', 'p-b': null };
@@ -71,5 +81,15 @@ describe('a pool’s photo on the strip (0024)', () => {
     const b = container.querySelector('[data-home-foot="phone"] [data-strip-pool="p-b"]')!;
     expect(b.querySelector('img')).toBeNull();
     expect(b.textContent).toBe('ST');
+  });
+});
+
+describe('switching places (review)', () => {
+  it('prefetches every place in full as soon as the strip is drawn', () => {
+    foot();
+    expect(new Set(prefetched.map((p) => p.href))).toEqual(
+      new Set(['/', '/pool/p-a', '/pool/p-b']),
+    );
+    expect(prefetched.every((p) => p.kind === 'full')).toBe(true);
   });
 });

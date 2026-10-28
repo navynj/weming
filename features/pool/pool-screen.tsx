@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 
+import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { poolViewParam } from '@/features/pool/pool-views';
 import { getMyProfile } from '@/lib/queries/profile';
@@ -65,6 +66,9 @@ export async function PoolScreen({
       </PoolEditScope>
       {/* A new pool's photo that did not upload, offered again (review). */}
       <PhotoRetryToast poolId={view.pool.id} />
+      {/* A server render runs once per request: the stamp is when this copy was read. */}
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <FreshOnArrival renderedAt={Date.now()} />
     </main>
   );
 }

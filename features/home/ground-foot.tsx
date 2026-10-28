@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, type ReactNode, useState } from 'react';
+import { useEffect, useRef, type ReactNode, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Plus, Settings } from 'lucide-react';
 
 import { Monogram } from '@/components/ui/monogram';
@@ -11,6 +12,12 @@ import { Avatar } from '@/features/people/avatar';
 import { ProfileSheet } from '@/features/people/profile-sheet';
 import { usePeople } from '@/features/people/people-provider';
 import { UnseenDot, useStripPools } from '@/features/pool/activity';
+
+import { PendingPlace } from './ground-skeleton';
+
+type PrefetchKind = NonNullable<Parameters<ReturnType<typeof useRouter>['prefetch']>[1]>['kind'];
+/** `PrefetchKind.FULL`: a dynamic page with its data, not just down to its loading boundary. Next exports the enum only as a type. */
+const FULL = 'full' as PrefetchKind;
 
 /**
  * The ground's foot (review): the places I go, as a strip — my face first
@@ -58,6 +65,23 @@ export function GroundFoot({
   const myName = me ? (people[me]?.name ?? '') : '';
   const atHome = here === 'home';
   const [settings, setSettings] = useState(false);
+  // Every place in full as soon as the strip is drawn (review), not only
+  // those in view: a switch then draws from the router's cache, and
+  // FreshOnArrival reads it again behind. One slot is enough; the other is
+  // the same places.
+  const router = useRouter();
+  const hrefs = ['/', ...pools.map((pool) => `/pool/${pool.id}`)].join(' ');
+  useEffect(() => {
+    if (wide) return;
+    let live = true;
+    const warm = (href: string): void => {
+      if (live) router.prefetch(href, { kind: FULL, onInvalidate: () => warm(href) });
+    };
+    hrefs.split(' ').forEach(warm);
+    return () => {
+      live = false;
+    };
+  }, [hrefs, router, wide]);
 
   return (
     <div
@@ -94,6 +118,7 @@ export function GroundFoot({
           label={atHome ? homeLabel : 'Home'}
           href="/"
           onTap={atHome ? onHome : undefined}
+          pending={<PendingPlace here="home" />}
           shape="circle"
           data={{ 'data-home-tab': '', 'data-strip-home': '' }}
         >
@@ -113,6 +138,7 @@ export function GroundFoot({
               href={`/pool/${pool.id}`}
               onTap={current ? onPool : undefined}
               dot={pool.fresh && !current}
+              pending={<PendingPlace here="pool" poolId={pool.id} />}
               shape="square"
               data={{
                 'data-strip-pool': pool.id,
@@ -154,6 +180,7 @@ function Place({
   href,
   onTap,
   dot = false,
+  pending,
   shape,
   data,
   children,
@@ -163,6 +190,8 @@ function Place({
   href: string;
   onTap?: () => void;
   dot?: boolean;
+  /** Drawn inside the link, so it can read whether a tap on it is waiting. */
+  pending?: ReactNode;
   /** A person is a circle, a pool a rounded square (review). */
   shape: 'circle' | 'square';
   data: Record<string, string>;
@@ -196,8 +225,10 @@ function Place({
     );
   }
   return (
-    <Link href={href} aria-label={label} className={className} {...data}>
+    // In full, not just to the loading boundary (review): the place's data comes with it.
+    <Link href={href} prefetch aria-label={label} className={className} {...data}>
       {body}
+      {pending}
     </Link>
   );
 }

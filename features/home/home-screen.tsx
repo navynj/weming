@@ -12,6 +12,7 @@ import {
   ownPoolColumn,
   type GridColumn,
 } from '@/features/home/grid';
+import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
 import { HomeGround } from '@/features/home/home-ground';
 import { homeViewParam, scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -487,6 +488,9 @@ export async function HomeScreen({
         initialView={homeViewParam(view)}
         poolColumns={poolColumns}
       />
+      {/* A server render runs once per request: the stamp is when this copy was read. */}
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <FreshOnArrival renderedAt={Date.now()} />
     </main>
   );
 }
