@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { UnderlineTabs } from '@/components/ui/underline-tabs';
 import { usePushState } from '@/features/install/push-setup';
 import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
 import type { PoolNotificationPrefs } from '@/lib/queries/notifications';
@@ -23,7 +24,8 @@ type Loaded =
  * that hold everywhere — Pause all, Show titles — then, in a pool, mine
  * there and the defaults for its members (its creator's to set, read-only
  * for the rest); on Home, mine in each pool, one group each. What is not
- * yet read shows as rows to come, never a blank sheet.
+ * yet read shows as rows to come, never a blank sheet. On Home the pools
+ * are underline tabs, one shown at a time (H42h).
  */
 export function NotificationSettingsSheet({
   place,
@@ -71,20 +73,47 @@ export function NotificationSettingsSheet({
         loaded.pools.length === 0 ? (
           <p className="text-pool-500 mt-6 text-sm">You are in no Pool yet.</p>
         ) : (
-          loaded.pools.map((pool) => (
-            <PoolNotifications
-              key={pool.poolId}
-              poolId={pool.poolId}
-              isCreator={false}
-              prefs={pool.prefs}
-              title={pool.name}
-              mineOnly
-            />
-          ))
+          <HomePools pools={loaded.pools} />
         )
       ) : null}
       <DeviceOff />
     </PoolSheet>
+  );
+}
+
+/**
+ * Home's pools (H42h): one underline tab per pool, the first chosen, and my
+ * notifications in the one chosen. Every pool's group stays mounted, the
+ * others hidden, so what was just set in one is still there coming back.
+ */
+function HomePools({
+  pools,
+}: {
+  pools: { poolId: string; name: string; prefs: PoolNotificationPrefs }[];
+}) {
+  const [picked, setPicked] = useState(pools[0]!.poolId);
+  const current = pools.some((p) => p.poolId === picked) ? picked : pools[0]!.poolId;
+  return (
+    <section data-notification-pools className="mt-8">
+      <UnderlineTabs
+        tabs={pools.map((pool) => ({ key: pool.poolId, label: pool.name }))}
+        current={current}
+        onSelect={setPicked}
+        label="Pools"
+        data="notification-pool"
+      />
+      {pools.map((pool) => (
+        <div key={pool.poolId} hidden={pool.poolId !== current}>
+          <PoolNotifications
+            poolId={pool.poolId}
+            isCreator={false}
+            prefs={pool.prefs}
+            title={null}
+            mineOnly
+          />
+        </div>
+      ))}
+    </section>
   );
 }
 

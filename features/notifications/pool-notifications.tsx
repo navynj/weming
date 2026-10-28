@@ -33,8 +33,8 @@ export function PoolNotifications({
   poolId: string;
   isCreator: boolean;
   prefs: PoolNotificationPrefs;
-  /** The group's heading: a pool's name on Home's list (0059). */
-  title?: string;
+  /** The group's heading; none where a tab already names the pool (H42h). */
+  title?: string | null;
   /** Home's list (0059): my notifications per pool, without the members' defaults. */
   mineOnly?: boolean;
 }) {
@@ -45,8 +45,8 @@ export function PoolNotifications({
     defaults.value[type] ?? APP_DEFAULTS[type];
 
   return (
-    <section data-settings-notifications={poolId} className="mt-8">
-      <h2 className="text-ink mb-1 font-semibold">{title}</h2>
+    <section data-settings-notifications={poolId} className={title === null ? 'mt-4' : 'mt-8'}>
+      {title === null ? null : <h2 className="text-ink mb-1 font-semibold">{title}</h2>}
 
       {/* Mine and the members' defaults, one at a time (review); Home's list has mine alone. */}
       {mineOnly ? (

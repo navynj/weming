@@ -42,10 +42,11 @@ vi.mock('@/features/lanes/actions', () => ({ saveLane: () => Promise.resolve({ o
 const prefs: [string, unknown][] = [];
 const poolPrefs = vi.hoisted(() => ({
   next: { poolDefaults: {}, mine: {}, paused: false } as Record<string, unknown>,
+  home: [] as unknown[],
 }));
 vi.mock('@/features/notifications/actions', () => ({
   loadPoolNotificationPrefs: () => Promise.resolve(poolPrefs.next),
-  loadMyPoolsNotificationPrefs: () => Promise.resolve([]),
+  loadMyPoolsNotificationPrefs: () => Promise.resolve(poolPrefs.home),
   loadNotificationSettings: () => Promise.resolve({ paused: false, showTitles: false }),
   setNotificationSettings: () => Promise.resolve({ ok: true }),
   setMyNotificationPref: (input: unknown) => {
@@ -362,5 +363,39 @@ describe('the pool’s lanes are Home’s lane rows (H42b)', () => {
         ['reorder', 'p-a', ['l-a', 'l-b', 'l-new']],
       ]),
     );
+  });
+});
+
+describe('notification settings, from the bell on Home (H42h)', () => {
+  const prefs = (mine: Record<string, string>) => ({ poolDefaults: {}, mine, paused: false });
+
+  it('picks a pool by underline tabs, the first chosen, one pool’s notifications shown at a time', async () => {
+    poolPrefs.home = [
+      { poolId: 'p-a', name: 'Our Pool', prefs: prefs({ reply: 'off' }) },
+      { poolId: 'p-b', name: 'Study Crew', prefs: prefs({}) },
+    ];
+    const { container } = render(<NotificationSettingsSheet place={null} onClose={() => {}} />);
+    await waitFor(() =>
+      expect(container.querySelector('[data-notification-pools]')).not.toBeNull(),
+    );
+    const tab = (id: string) =>
+      container.querySelector<HTMLButtonElement>(`[data-notification-pool="${id}"]`)!;
+    expect(tab('p-a').getAttribute('role')).toBe('tab');
+    expect(tab('p-a').textContent).toBe('Our Pool');
+    expect(tab('p-a').getAttribute('aria-selected')).toBe('true');
+    expect(tab('p-b').getAttribute('aria-selected')).toBe('false');
+    const group = (id: string) =>
+      container.querySelector(`[data-settings-notifications="${id}"]`)!.parentElement!;
+    expect(group('p-a').hidden).toBe(false);
+    expect(group('p-b').hidden).toBe(true);
+    // The tab names the pool: no heading of its own, and no members' defaults.
+    expect(group('p-a').querySelector('h2')).toBeNull();
+    expect(container.querySelector('[data-notification-group]')).toBeNull();
+
+    fireEvent.click(tab('p-b'));
+    expect(tab('p-b').getAttribute('aria-selected')).toBe('true');
+    expect(group('p-a').hidden).toBe(true);
+    expect(group('p-b').hidden).toBe(false);
+    poolPrefs.home = [];
   });
 });
