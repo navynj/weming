@@ -138,20 +138,14 @@ describe('the bell’s sheet offers to turn notifications on (review)', () => {
     device.state = 'on';
   });
 
-  it('once they are on, turns them off from the same place', async () => {
+  it('shows nothing of it once they are on: turning off is in Notification settings (review)', async () => {
     device.state = 'on';
     rows = [];
     const { container } = render(<NotificationsSheet onClose={() => {}} />);
-    const off = await waitFor(() => {
-      const found = container.querySelector<HTMLButtonElement>('[data-turn-off-notifications]');
-      expect(found).not.toBeNull();
-      return found!;
-    });
-    expect(container.querySelector('[data-turn-on-notifications]')).toBeNull();
-    fireEvent.click(off);
     await waitFor(() =>
-      expect(container.querySelector('[data-turn-on-notifications]')).not.toBeNull(),
+      expect(container.querySelector('[data-notifications-empty]')).not.toBeNull(),
     );
-    device.state = 'on';
+    expect(container.querySelector('[data-turn-on]')).toBeNull();
+    expect(container.querySelector('[data-turn-off-notifications]')).toBeNull();
   });
 });

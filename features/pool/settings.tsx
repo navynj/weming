@@ -46,10 +46,13 @@ function PoolTab({ view }: { view: PoolView }) {
   // The name shows at once; a refusal takes it back and says why.
   const name = useOptimisticAction(view.pool.name);
   const photo = useOptimisticAction<string | null>(view.pool.photo ?? null);
-  const inviteAll = useOptimisticAction(view.pool.inviteAllByDefault ?? false);
-  const onHome = useOptimisticAction(view.pool.myOnHome ?? true);
+  // On a desktop two columns (review): the photo and name narrow at the
+  // left, the lanes wide at the right; a phone's one column.
   return (
-    <>
+    <div
+      data-settings-pool
+      className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-12"
+    >
       <PoolName
         name={name.value}
         photo={photo.value}
@@ -76,13 +79,55 @@ function PoolTab({ view }: { view: PoolView }) {
         }}
       />
 
-      <section data-settings-lanes className="mt-10">
+      <section data-settings-lanes className="mt-10 lg:mt-0 lg:min-w-0">
         <h2 className="text-ink mb-3 font-semibold">Lanes</h2>
         <PoolLanesSheet poolId={poolId} lanes={view.lanes} onClose={() => {}} inline />
       </section>
+    </div>
+  );
+}
 
+function AdvancedTab({ view, me }: { view: PoolView; me: string }) {
+  const router = useRouter();
+  const { categories } = useShellData();
+  const poolId = view.pool.id;
+  const initial: Links = Object.fromEntries(
+    view.lanes.map((lane) => [
+      lane.id,
+      view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
+    ]),
+  );
+  const [links, setLinks] = useState<Links>(initial);
+  const keys = view.lanes.map((lane) => lane.id);
+  const initialMarkers: Markers = settleMarkers(
+    keys,
+    initial,
+    Object.fromEntries(
+      view.myLinks.map((l) => [
+        l.poolLaneId,
+        { isDefault: l.isDefault, shareByDefault: l.shareByDefault, isHome: l.isHome },
+      ]),
+    ),
+  );
+  const [markers, setMarkers] = useState<Markers>(initialMarkers);
+  const [connecting, setConnecting] = useState(false);
+  const [mine, setMine] = useState(() =>
+    categories.map(({ id, name, icon }) => ({ id, name, icon })),
+  );
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const inviteAll = useOptimisticAction(view.pool.inviteAllByDefault ?? false);
+  const onHome = useOptimisticAction(view.pool.myOnHome ?? true);
+  const changed =
+    JSON.stringify(links) !== JSON.stringify(initial) ||
+    JSON.stringify(settleMarkers(keys, links, markers)) !== JSON.stringify(initialMarkers);
+
+  return (
+    <>
+      {/* Mine, and the Pool's, above the lane links (review). */}
       {/* Mine alone (0039): what I wrote here, on my Home or not. Nothing moves. */}
-      <section data-settings-on-home className="mt-10">
+      <section data-settings-on-home>
         <label className="flex items-center justify-between gap-4">
           <span className="flex flex-col gap-0.5">
             <span className="text-ink text-sm font-medium">Show on my Home</span>
@@ -137,47 +182,7 @@ function PoolTab({ view }: { view: PoolView }) {
           </p>
         ) : null}
       </section>
-    </>
-  );
-}
-
-function AdvancedTab({ view, me }: { view: PoolView; me: string }) {
-  const router = useRouter();
-  const { categories } = useShellData();
-  const poolId = view.pool.id;
-  const initial: Links = Object.fromEntries(
-    view.lanes.map((lane) => [
-      lane.id,
-      view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
-    ]),
-  );
-  const [links, setLinks] = useState<Links>(initial);
-  const keys = view.lanes.map((lane) => lane.id);
-  const initialMarkers: Markers = settleMarkers(
-    keys,
-    initial,
-    Object.fromEntries(
-      view.myLinks.map((l) => [
-        l.poolLaneId,
-        { isDefault: l.isDefault, shareByDefault: l.shareByDefault, isHome: l.isHome },
-      ]),
-    ),
-  );
-  const [markers, setMarkers] = useState<Markers>(initialMarkers);
-  const [connecting, setConnecting] = useState(false);
-  const [mine, setMine] = useState(() =>
-    categories.map(({ id, name, icon }) => ({ id, name, icon })),
-  );
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState(false);
-  const changed =
-    JSON.stringify(links) !== JSON.stringify(initial) ||
-    JSON.stringify(settleMarkers(keys, links, markers)) !== JSON.stringify(initialMarkers);
-
-  return (
-    <>
-      <section data-settings-advanced className="flex flex-col">
+      <section data-settings-advanced className="mt-10 flex flex-col">
         <button
           type="button"
           data-settings-advanced-toggle

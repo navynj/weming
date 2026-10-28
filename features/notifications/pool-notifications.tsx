@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import {
   APP_DEFAULTS,
   NOTIFICATION_TYPES,
@@ -10,6 +12,7 @@ import {
   type NotificationValue,
 } from '@/lib/notifications/model';
 import type { PoolNotificationPrefs, ValuesByType } from '@/lib/queries/notifications';
+import { UnderlineTabs } from '@/components/ui/underline-tabs';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { setMyNotificationPref, setPoolNotificationDefault } from './actions';
@@ -36,6 +39,7 @@ export function PoolNotifications({
   mineOnly?: boolean;
 }) {
   const defaults = useOptimisticAction<ValuesByType>(prefs.poolDefaults);
+  const [group, setGroup] = useState<'mine' | 'defaults'>('mine');
   const mine = useOptimisticAction<ValuesByType>(prefs.mine);
   const poolValue = (type: NotificationType): NotificationValue =>
     defaults.value[type] ?? APP_DEFAULTS[type];
@@ -44,57 +48,73 @@ export function PoolNotifications({
     <section data-settings-notifications={poolId} className="mt-8">
       <h2 className="text-ink mb-1 font-semibold">{title}</h2>
 
-      <h3 className="text-ink mt-5 text-sm font-medium">Your notifications</h3>
-      {prefs.paused ? (
-        <p data-notifications-paused className="text-pool-500 mt-1 text-xs">
-          Paused in your settings: nothing arrives until you turn it back on.
-        </p>
-      ) : null}
-      <div className="mt-2 flex flex-col gap-4">
-        {NOTIFICATION_TYPES.map((type) => (
-          <Row key={type} label={TYPE_LABELS[type]}>
-            <Chip
-              on={mine.value[type] === undefined}
-              data={`mine-${type}-default`}
-              onClick={() =>
-                mine.run(
-                  (current) => without(current, type),
-                  () => setMyNotificationPref({ poolId, type, value: null }),
-                  'Saved',
-                )
-              }
-            >
-              Pool default ({VALUE_LABELS[poolValue(type)]})
-            </Chip>
-            {VALUES[type].map((value) => (
-              <Chip
-                key={value}
-                on={mine.value[type] === value}
-                data={`mine-${type}-${value}`}
-                onClick={() =>
-                  mine.run(
-                    (current) => ({ ...current, [type]: value }),
-                    () => setMyNotificationPref({ poolId, type, value }),
-                    'Saved',
-                  )
-                }
-              >
-                {VALUE_LABELS[value]}
-              </Chip>
+      {/* Mine and the members' defaults, one at a time (review); Home's list has mine alone. */}
+      {mineOnly ? (
+        <h3 className="text-ink mt-5 text-sm font-medium">Your notifications</h3>
+      ) : (
+        <div className="mt-3">
+          <UnderlineTabs
+            tabs={GROUPS}
+            current={group}
+            onSelect={setGroup}
+            label="Notifications"
+            data="notification-group"
+          />
+        </div>
+      )}
+      {mineOnly || group === 'mine' ? (
+        <>
+          {prefs.paused ? (
+            <p data-notifications-paused className="text-pool-500 mt-1 text-xs">
+              Paused in your settings: nothing arrives until you turn it back on.
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-col gap-4">
+            {NOTIFICATION_TYPES.map((type) => (
+              <Row key={type} label={TYPE_LABELS[type]}>
+                <Chip
+                  on={mine.value[type] === undefined}
+                  data={`mine-${type}-default`}
+                  onClick={() =>
+                    mine.run(
+                      (current) => without(current, type),
+                      () => setMyNotificationPref({ poolId, type, value: null }),
+                      'Saved',
+                    )
+                  }
+                >
+                  Pool default ({VALUE_LABELS[poolValue(type)]})
+                </Chip>
+                {VALUES[type].map((value) => (
+                  <Chip
+                    key={value}
+                    on={mine.value[type] === value}
+                    data={`mine-${type}-${value}`}
+                    onClick={() =>
+                      mine.run(
+                        (current) => ({ ...current, [type]: value }),
+                        () => setMyNotificationPref({ poolId, type, value }),
+                        'Saved',
+                      )
+                    }
+                  >
+                    {VALUE_LABELS[value]}
+                  </Chip>
+                ))}
+              </Row>
             ))}
-          </Row>
-        ))}
-      </div>
-      {mine.message ? (
-        <p role="alert" className="text-pool-500 mt-2 text-xs">
-          {mine.message}
-        </p>
+          </div>
+          {mine.message ? (
+            <p role="alert" className="text-pool-500 mt-2 text-xs">
+              {mine.message}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
-      {mineOnly ? null : (
+      {mineOnly || group !== 'defaults' ? null : (
         <>
-          <h3 className="text-ink mt-8 text-sm font-medium">Defaults for members</h3>
-          <p className="text-pool-500 mt-1 text-xs">
+          <p className="text-pool-500 mt-3 text-xs">
             {isCreator
               ? 'What everyone here gets until they choose their own.'
               : 'Set by the Pool’s creator; what you get until you choose your own.'}
@@ -138,6 +158,11 @@ export function PoolNotifications({
     </section>
   );
 }
+
+const GROUPS = [
+  { key: 'mine', label: 'Your notifications' },
+  { key: 'defaults', label: 'Defaults for members' },
+] as const;
 
 function without(values: ValuesByType, type: NotificationType): ValuesByType {
   const next = { ...values };

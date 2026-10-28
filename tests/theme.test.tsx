@@ -155,9 +155,18 @@ describe('the Theme tab on Home (0059)', () => {
 describe('the Theme tab in a pool (0059)', () => {
   it('sets the pool’s colour for everyone, and mine over it, worn at once', async () => {
     const { container } = picker({ pool: null, mine: null });
+    // My colour here first; the pool's default folded under its button (review).
     await waitFor(() =>
-      expect(container.querySelector('[data-theme-colors="pool"]')).not.toBeNull(),
+      expect(container.querySelector('[data-theme-colors="mine"]')).not.toBeNull(),
     );
+    expect(container.querySelector('[data-theme-colors]')!.getAttribute('data-theme-colors')).toBe(
+      'mine',
+    );
+    expect(container.querySelector('[data-theme-colors="pool"]')).toBeNull();
+    expect(container.querySelector('[data-theme-pool-open]')!.textContent).toBe(
+      'Set default color for this Pool',
+    );
+    fireEvent.click(container.querySelector('[data-theme-pool-open]')!);
     fireEvent.click(
       container.querySelector('[data-theme-colors="pool"] [data-theme-swatch="mint"]')!,
     );
@@ -174,5 +183,22 @@ describe('the Theme tab in a pool (0059)', () => {
       { mine: 'p-a', color: 'pink' },
       { mine: 'p-a', color: null },
     ]);
+  });
+
+  it('shows a set pool default on its folded button; Mode stays at the bottom', async () => {
+    const { container } = picker({ pool: 'mint', mine: null });
+    await waitFor(() =>
+      expect(container.querySelector('[data-theme-pool-swatch="mint"]')).not.toBeNull(),
+    );
+    expect(container.querySelector('[data-theme-pool-open]')!.textContent).toContain(
+      'Pool default color:',
+    );
+    expect(container.querySelector('[data-theme-colors="pool"]')).toBeNull();
+    const parts = [
+      ...container.querySelectorAll(
+        '[data-theme-colors], [data-theme-pool-open], [role="radiogroup"][aria-label="Mode"]',
+      ),
+    ];
+    expect(parts.at(-1)!.getAttribute('aria-label')).toBe('Mode');
   });
 });

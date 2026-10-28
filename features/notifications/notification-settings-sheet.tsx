@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 
+import { usePushState } from '@/features/install/push-setup';
 import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
 import type { PoolNotificationPrefs } from '@/lib/queries/notifications';
 
 import { loadMyPoolsNotificationPrefs, loadPoolNotificationPrefs } from './actions';
+import { disablePush, pushState } from './push-client';
 import { GlobalNotificationSwitches } from './notification-settings';
 import { PoolNotifications } from './pool-notifications';
 
@@ -81,7 +83,48 @@ export function NotificationSettingsSheet({
           ))
         )
       ) : null}
+      <DeviceOff />
     </PoolSheet>
+  );
+}
+
+/**
+ * At the very bottom, after a rule (review): this device's notifications
+ * turned off — its subscription gone — only while they are on. Leave
+ * Pool's quiet words: a step away, not an action to reach for.
+ */
+function DeviceOff() {
+  const [state, setState] = usePushState();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  if (state !== 'on') return null;
+  return (
+    <section className="border-pool-100 mt-12 flex flex-col border-t pt-6">
+      <button
+        type="button"
+        data-device-notifications-off
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            setMessage(await disablePush());
+            setState(await pushState());
+          } catch (error) {
+            setMessage(error instanceof Error ? error.message : 'That didn’t work. Try again.');
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="text-pool-500 self-start py-2 text-sm disabled:opacity-40"
+      >
+        Turn off notifications on this device
+      </button>
+      {message ? (
+        <p role="alert" className="text-pool-500 text-xs">
+          {message}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

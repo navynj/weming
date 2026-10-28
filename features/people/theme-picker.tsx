@@ -30,6 +30,8 @@ export function ThemePicker() {
   const [message, setMessage] = useState<string | null>(null);
   // A Home colour picked, waiting on where it applies.
   const [asking, setAsking] = useState<ThemeColor | null>(null);
+  // The pool's default, folded until asked for (review).
+  const [poolOpen, setPoolOpen] = useState(false);
   const toast = useToast();
 
   async function done(work: Promise<string | null>): Promise<void> {
@@ -43,15 +45,6 @@ export function ThemePicker() {
       {place ? (
         <>
           <Colours
-            name="Pool color"
-            hint="Everyone here sees it, unless they choose their own."
-            value={place.colors.pool}
-            mode={theme.mode}
-            clear="None"
-            data="pool"
-            onPick={(color) => void done(choosePoolColor(color))}
-          />
-          <Colours
             name="My color here"
             hint="Only you see it, over every other colour here."
             value={place.colors.mine}
@@ -60,6 +53,45 @@ export function ThemePicker() {
             data="mine"
             onPick={(color) => void done(chooseMyPoolColor(color))}
           />
+          {/* The pool's own default (review): a quiet step further, closed each
+              time the sheet opens; its colour shows on the button when set. */}
+          {poolOpen ? (
+            <Colours
+              name="Pool default color"
+              hint="Everyone here sees it, unless they choose their own."
+              value={place.colors.pool}
+              mode={theme.mode}
+              clear="None"
+              data="pool"
+              onPick={(color) => void done(choosePoolColor(color))}
+            />
+          ) : (
+            <button
+              type="button"
+              data-theme-pool-open
+              onClick={() => setPoolOpen(true)}
+              className="text-main-900 flex items-center gap-2 self-start text-sm font-semibold"
+            >
+              {place.colors.pool ? (
+                <>
+                  Pool default color:
+                  <span
+                    aria-label={THEMES.find((t) => t.key === place.colors.pool)?.name}
+                    data-theme-pool-swatch={place.colors.pool}
+                    className="h-5 w-5 rounded-full"
+                    style={{
+                      backgroundColor:
+                        theme.mode === 'pastel'
+                          ? THEMES.find((t) => t.key === place.colors.pool)?.pastel.fill
+                          : THEMES.find((t) => t.key === place.colors.pool)?.hex,
+                    }}
+                  />
+                </>
+              ) : (
+                'Set default color for this Pool'
+              )}
+            </button>
+          )}
         </>
       ) : (
         <>

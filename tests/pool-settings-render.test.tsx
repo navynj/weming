@@ -54,7 +54,6 @@ import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { NotificationSettingsSheet } from '@/features/notifications/notification-settings-sheet';
 import { PoolSettingsSheet } from '@/features/pool/settings';
 import type { PoolView } from '@/lib/queries/pools';
-import type { PoolNotificationPrefs } from '@/lib/queries/notifications';
 
 // The sheet asks whether motion is reduced.
 window.matchMedia ??= ((query: string) => ({
@@ -134,7 +133,7 @@ describe('inviting everyone to new posts by default (0033)', () => {
     root.querySelector('[data-settings-invite-all] [role="switch"]') as HTMLButtonElement;
 
   it('starts as the pool has it, and saves a flip at once', async () => {
-    const { container } = settings(view('u-other'), 'pool');
+    const { container } = settings(view('u-other'), 'advanced');
     expect(container.textContent).toContain('Invite everyone to new posts by default');
     expect(toggle(container).getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle(container));
@@ -143,7 +142,7 @@ describe('inviting everyone to new posts by default (0033)', () => {
   });
 
   it('turns off a pool that has it on', async () => {
-    const { container } = settings(view('u-me', true), 'pool');
+    const { container } = settings(view('u-me', true), 'advanced');
     expect(toggle(container).getAttribute('aria-checked')).toBe('true');
     fireEvent.click(toggle(container));
     expect(toggle(container).getAttribute('aria-checked')).toBe('false');
@@ -167,7 +166,7 @@ describe('Connect your lanes, under Advanced (0033)', () => {
 
 describe('my own settings for a pool (0039)', () => {
   it('keeps what I wrote here off my Home with one switch, on by default', () => {
-    const { container } = settings(view('u-other'), 'pool');
+    const { container } = settings(view('u-other'), 'advanced');
     const toggle = container.querySelector('[data-settings-on-home] [role="switch"]')!;
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     fireEvent.click(toggle);
@@ -223,10 +222,11 @@ describe('notification settings, from the bell in a pool (H32, 0059)', () => {
 
   it('lets a member set their own, and shows the defaults read-only', async () => {
     const { container } = await notifications(false);
-    expect(container.querySelector('[data-notification-choice^="default-"]')).toBeNull();
-    expect(container.querySelector('[data-default="new_post"]')!.textContent).toContain(
-      'Only when I’m invited',
-    );
+    // Mine first; the defaults behind their own tab (review).
+    expect(
+      container.querySelector('[data-notification-group="mine"]')!.getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(container.querySelector('[data-default]')).toBeNull();
     const all = container.querySelector<HTMLButtonElement>(
       '[data-notification-choice="mine-new_post-all"]',
     )!;
@@ -237,8 +237,18 @@ describe('notification settings, from the bell in a pool (H32, 0059)', () => {
     );
   });
 
+  it('shows a member the defaults read-only, under their tab', async () => {
+    const { container } = await notifications(false);
+    fireEvent.click(container.querySelector('[data-notification-group="defaults"]')!);
+    expect(container.querySelector('[data-notification-choice^="default-"]')).toBeNull();
+    expect(container.querySelector('[data-default="new_post"]')!.textContent).toContain(
+      'Only when I’m invited',
+    );
+  });
+
   it('lets the creator set the defaults for members', async () => {
     const { container } = await notifications(true);
+    fireEvent.click(container.querySelector('[data-notification-group="defaults"]')!);
     const on = container.querySelector<HTMLButtonElement>(
       '[data-notification-choice="default-reaction-on"]',
     )!;
@@ -248,5 +258,45 @@ describe('notification settings, from the bell in a pool (H32, 0059)', () => {
     await waitFor(() =>
       expect(prefs).toEqual([['default', { poolId: 'p-a', type: 'reaction', value: 'on' }]]),
     );
+  });
+});
+
+describe('the pool settings sheet’s shape (review)', () => {
+  it('has underline tabs, the Pool tab in two columns on a desktop, the switches under Advanced', () => {
+    const pool = settings(view('u-me'), 'pool');
+    const tab = (key: string) =>
+      pool.container.querySelector<HTMLElement>(`[data-settings-tab="${key}"]`)!;
+    expect(tab('pool').getAttribute('role')).toBe('tab');
+    expect(tab('pool').getAttribute('aria-selected')).toBe('true');
+    expect(tab('pool').className).toContain('text-ink');
+    expect(tab('pool').querySelector('.bg-ink')).not.toBeNull();
+    expect(tab('theme').className).toContain('text-pool-500');
+    // Photo and name narrow at the left, the lanes wide at the right.
+    const columns = pool.container.querySelector<HTMLElement>('[data-settings-pool]')!;
+    expect(columns.className).toContain('lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]');
+    expect(
+      [...columns.children].map((c) =>
+        c.hasAttribute('data-settings-name')
+          ? 'name'
+          : c.hasAttribute('data-settings-lanes')
+            ? 'lanes'
+            : '?',
+      ),
+    ).toEqual(['name', 'lanes']);
+    expect(pool.container.querySelector('[data-settings-on-home]')).toBeNull();
+    pool.unmount();
+    const advanced = settings(view('u-me'), 'advanced');
+    const order = [
+      ...advanced.container.querySelectorAll(
+        '[data-settings-on-home], [data-settings-invite-all], [data-settings-advanced]',
+      ),
+    ].map((el) =>
+      el.hasAttribute('data-settings-on-home')
+        ? 'on-home'
+        : el.hasAttribute('data-settings-invite-all')
+          ? 'invite-all'
+          : 'connect',
+    );
+    expect(order).toEqual(['on-home', 'invite-all', 'connect']);
   });
 });

@@ -31,7 +31,10 @@ vi.mock('@/features/notifications/push-client', () => ({
   isStandalone: () => false,
   pushState: () => Promise.resolve(device.state),
   enablePush: () => Promise.resolve(null),
-  disablePush: () => Promise.resolve(null),
+  disablePush: () => {
+    device.state = 'off';
+    return Promise.resolve(null);
+  },
   resyncPush: () => Promise.resolve(),
 }));
 const turnedOff = vi.hoisted(() => [] as string[]);
@@ -74,8 +77,12 @@ describe('the bell (0059)', () => {
     // The settings: the global switches, then this pool's, the defaults the creator's.
     expect(doc.querySelector('[data-notification-settings]')).not.toBeNull();
     await waitFor(() =>
-      expect(doc.querySelector('[data-notification-choice^="default-"]')).not.toBeNull(),
+      expect(doc.querySelector('[data-notification-group="defaults"]')).not.toBeNull(),
     );
+    fireEvent.click(doc.querySelector('[data-notification-group="defaults"]')!);
+    expect(doc.querySelector('[data-notification-choice^="default-"]')).not.toBeNull();
+    // Off here: no Turn off at the bottom (it is for a device with them on).
+    expect(doc.querySelector('[data-device-notifications-off]')).toBeNull();
     expect(doc.querySelector('[data-settings-notifications="p-a"]')!.textContent).toContain(
       'In Our Pool',
     );
@@ -127,5 +134,31 @@ describe('invite links, in plain words (0059)', () => {
       expect(row.querySelector('[data-copy-invite], [data-revoke-invite]')).toBeNull();
     }
     expect(container.textContent).not.toMatch(/revoke|token/i);
+  });
+});
+
+describe('turning notifications off on this device (review)', () => {
+  it('sits at the bottom of Notification settings while they are on, and unsubscribes', async () => {
+    device.state = 'on';
+    const { container } = render(
+      <NotificationsProvider initialUnread={0}>
+        <Bell />
+      </NotificationsProvider>,
+    );
+    await act(async () => fireEvent.click(container.querySelector('[data-notifications-bell]')!));
+    const doc = container.ownerDocument;
+    // The list says nothing of it once they are on.
+    expect(doc.querySelector('[data-turn-on]')).toBeNull();
+    fireEvent.click(doc.querySelector('[data-notification-settings-open]')!);
+    const off = await waitFor(() => {
+      const found = doc.querySelector<HTMLButtonElement>('[data-device-notifications-off]');
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    expect(off.textContent).toBe('Turn off notifications on this device');
+    expect(off.className).toContain('text-pool-500');
+    await act(async () => fireEvent.click(off));
+    await waitFor(() => expect(off.isConnected).toBe(false));
+    device.state = 'off';
   });
 });
