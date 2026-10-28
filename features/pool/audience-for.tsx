@@ -9,9 +9,9 @@ import { SplashAudience } from './splash-audience';
 
 /**
  * A record page's Audience chip (H23, 0033, H45), one rule for Home's page
- * and the pool's: my Home record and my pool record get a row per pool I am
- * in, each on a pool lane, any of them switched off; switching off a pool
- * record's last pool asks which of my lanes keeps it. Anything else has none.
+ * and the pool's: my Home record and my record written in a pool get a row
+ * per pool I am in, each on a pool lane; the latter's own pool always on
+ * (0056) until Move to Home, in the sheet's `…`. Anything else has none.
  */
 export function audienceFor({
   board,
@@ -26,7 +26,7 @@ export function audienceFor({
   board: Splash | null;
   summary: SplashSummary;
   me: string;
-  /** My lanes, for "Keep it in which of your lanes?". */
+  /** My lanes, for Move to Home's "Keep it in which of your lanes?". */
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   /** Where I filed it on Home (H45), if anywhere. */
   filed?: string | null;
@@ -49,7 +49,8 @@ export function audienceFor({
           together: { everyone: Boolean(p.inviteAll), picked: picks[p.poolId] ?? [] },
         }))}
       pools={pools}
-      keepIn={board.own_pool_id ? { lanes: categories, filed } : null}
+      locked={board.own_pool_id}
+      moveHome={board.own_pool_id ? { lanes: categories, filed } : null}
     />
   );
 }

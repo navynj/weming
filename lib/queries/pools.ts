@@ -579,8 +579,6 @@ export async function getMyPlacements(supabase: DuringClient, me: string): Promi
       'splash_id, pool_id, pool_lane_id, shared, invite_all, splash:splashes!inner(owner_id), pool:pools(id)',
     )
     .eq('splash.owner_id', me)
-    // Earliest shared first: a pool record whose origin is off shows in the
-    // column of the first pool still on (H45).
     .order('created_at')
     .returns<
       {

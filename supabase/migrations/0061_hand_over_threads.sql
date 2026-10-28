@@ -231,6 +231,28 @@ $$;
 
 revoke execute on function public._hand_over_thread(uuid, uuid) from public, anon, authenticated;
 
+-- A pool record stays placed and shared in its own pool (0014, 0056), but
+-- for one case: its owner left that pool with remove and its thread was
+-- handed over there (above), so that placement is off, naming the joint
+-- record. Nothing else relaxes the rule.
+create or replace function public.check_own_pool_placed()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.own_pool_id is not null and not exists (
+    select 1 from public.splash_placements p
+     where p.splash_id = new.id and p.pool_id = new.own_pool_id
+       and (p.shared or p.handed_to is not null)
+  ) then
+    raise exception 'a Just-mine splash must be placed in its pool' using errcode = '23514';
+  end if;
+  return null;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- when: leaving with remove, deleting the record, deleting the account
 -- ---------------------------------------------------------------------------

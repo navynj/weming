@@ -7,23 +7,23 @@ import { saveLane } from '@/features/lanes/actions';
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { MyCategory } from '@/lib/queries/profile';
 
-export type KeepIn = {
-  /** My lanes, to keep it in. */
+export type MoveHome = {
+  /** My lanes, to move it into. */
   lanes: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   /** Where I filed it on Home, if anywhere: the chip it starts on. */
   filed?: string | null;
-  /** It leaves its last pool for this lane of mine. */
-  onKeep: (laneId: string) => void;
+  /** It becomes a record of this lane of mine, every pool kept. */
+  onMove: (laneId: string) => void;
 };
 
 /**
- * "Keep it in which of your lanes?" (H45): asked once, in Audience, when
- * switching a pool off would leave my pool record in none. A lane of mine,
- * or a new one; saving makes it a record of that lane. Cancel leaves the
- * pool on.
+ * Move to Home (H45), from the Audience sheet's `…`: "Keep it in which of
+ * your lanes?" — a lane of mine, or a new one. Saving makes my record
+ * written in a pool a record of that lane; every pool keeps it as it is,
+ * and its origin's switch unlocks. Cancel changes nothing.
  */
-export function KeepInLane({ keepIn, onCancel }: { keepIn: KeepIn; onCancel: () => void }) {
-  const [laneId, setLaneId] = useState<string | null>(keepIn.filed ?? null);
+export function MoveToHome({ move, onCancel }: { move: MoveHome; onCancel: () => void }) {
+  const [laneId, setLaneId] = useState<string | null>(move.filed ?? null);
   const [making, setMaking] = useState(false);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
@@ -33,7 +33,7 @@ export function KeepInLane({ keepIn, onCancel }: { keepIn: KeepIn; onCancel: () 
 
   async function keep(): Promise<void> {
     if (!making) {
-      if (laneId) keepIn.onKeep(laneId);
+      if (laneId) move.onMove(laneId);
       return;
     }
     setSaving(true);
@@ -43,19 +43,19 @@ export function KeepInLane({ keepIn, onCancel }: { keepIn: KeepIn; onCancel: () 
       setMessage(made.ok ? 'That lane didn’t save. Try again.' : made.message);
       return;
     }
-    keepIn.onKeep(made.id);
+    move.onMove(made.id);
   }
 
   return (
     <div
       role="alertdialog"
       aria-label="Keep it in which of your lanes?"
-      data-keep-in-lane
+      data-move-to-home
       className="bg-pool-100 flex flex-col gap-3 rounded-2xl p-4"
     >
       <p className="text-ink text-sm font-semibold">Keep it in which of your lanes?</p>
       <p className="text-pool-500 -mt-2 text-xs">
-        It will be in no pool. It becomes a record of that lane, yours alone.
+        It stays shared everywhere it is now, and becomes a record of that lane.
       </p>
       {making ? (
         <div className="flex items-center gap-2">
@@ -65,7 +65,7 @@ export function KeepInLane({ keepIn, onCancel }: { keepIn: KeepIn; onCancel: () 
             onChange={(event) => setName(event.target.value)}
             maxLength={24}
             aria-label="New lane name"
-            data-keep-new-lane-name
+            data-move-new-lane-name
             placeholder="Lane name"
             className="text-ink min-w-0 flex-1 rounded-xl bg-white px-3 py-2 text-sm outline-none"
           />
@@ -73,14 +73,14 @@ export function KeepInLane({ keepIn, onCancel }: { keepIn: KeepIn; onCancel: () 
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <LaneChips
-            categories={keepIn.lanes}
+            categories={move.lanes}
             selectedId={laneId}
             onSelect={setLaneId}
             surface="white"
           />
           <button
             type="button"
-            data-keep-new-lane
+            data-move-new-lane
             onClick={() => setMaking(true)}
             className="text-pool-500 h-9 shrink-0 text-sm"
           >
@@ -103,12 +103,12 @@ export function KeepInLane({ keepIn, onCancel }: { keepIn: KeepIn; onCancel: () 
         </button>
         <button
           type="button"
-          data-keep-in-lane-go
+          data-move-to-home-go
           disabled={!ready || saving}
           onClick={() => void keep()}
           className="bg-main-900 flex-1 rounded-full py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
-          Keep it here
+          Move to Home
         </button>
       </div>
     </div>

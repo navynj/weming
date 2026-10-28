@@ -1458,6 +1458,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _answered_by_others: {
+        Args: { owner: string; pid: string; rid: string }
+        Returns: boolean
+      }
       _board_layout_clear: { Args: { l: Json; paths: string[] }; Returns: Json }
       _board_layout_merge: { Args: { base: Json; patch: Json }; Returns: Json }
       _board_layout_prune: { Args: { l: Json; media: string[] }; Returns: Json }
@@ -1476,6 +1480,10 @@ export type Database = {
       _layout_number: {
         Args: { hi: number; lo: number; v: Json }
         Returns: boolean
+      }
+      _leave_placeholder: {
+        Args: { owner: string; pid: string; rid: string; target: string }
+        Returns: undefined
       }
       _notification_pool: {
         Args: { actor: string; recipient: string; rid: string }
@@ -1616,10 +1624,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      keep_in_lane: {
-        Args: { p_my_lane: string; p_splash: string }
-        Returns: undefined
-      }
       lane_is_mine_in: { Args: { plid: string }; Returns: boolean }
       leave_pool: {
         Args: { p_keep: boolean; p_pool: string }
@@ -1632,6 +1636,10 @@ export type Database = {
       member_visible: { Args: { pid: string; uid: string }; Returns: boolean }
       move_pool_splash: {
         Args: { p_pool_lane: string; p_splash: string }
+        Returns: undefined
+      }
+      move_to_home: {
+        Args: { p_my_lane: string; p_splash: string }
         Returns: undefined
       }
       my_left_pool_ripples: {

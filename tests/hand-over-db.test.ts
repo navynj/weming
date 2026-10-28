@@ -342,6 +342,43 @@ describe('leaving with remove', () => {
   });
 });
 
+describe('leaving with remove, my record written in that pool', () => {
+  it('hands its thread over, and the record stays mine and editable, its origin handed', async () => {
+    const w = await world();
+    const own = crypto.randomUUID();
+    const lane = (
+      await asUser(w.ana).from('pool_lanes').select('id').eq('pool_id', w.crew).single()
+    ).data!.id;
+    const made = await asUser(w.ana).rpc('create_own_pool_splash', {
+      p_id: own,
+      p_pool: w.crew,
+      p_pool_lane: lane,
+      p_title: 'Swim',
+    });
+    expect(made.error).toBeNull();
+    await asUser(w.ana).rpc('set_placement_together', {
+      p_splash: own,
+      p_pool: w.crew,
+      p_users: [w.ben],
+      p_everyone: false,
+    });
+    const bens = await write(w.ben, 'Ben on the swim', own, w.crew);
+    expect(
+      (await asUser(w.ana).rpc('leave_pool', { p_pool: w.crew, p_keep: false })).error,
+    ).toBeNull();
+    const joint = (await jointIn(w.ben, w.crew)).find((j) => j.title === 'Swim')!;
+    expect((await asUser(w.ben).from('ripples').select('splash_id').eq('id', bens)).data).toEqual([
+      { splash_id: joint.id },
+    ]);
+    // Its origin placement is off, naming the joint record: the rule's one exception.
+    const renamed = await asUser(w.ana)
+      .from('splashes')
+      .update({ title: 'Swim, kept' })
+      .eq('id', own);
+    expect(renamed.error).toBeNull();
+  });
+});
+
 describe('leaving with keep', () => {
   it('hands nothing over: the record stays in the pool with every side', async () => {
     const w = await world();

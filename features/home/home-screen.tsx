@@ -213,8 +213,7 @@ export async function HomeScreen({
   // A joint entry sits in the lane of mine I filed it in, else in its pool's
   // column (H45): my filing, never the record.
   const linkedLane = new Map(joints.map((j) => [j.id, filings[j.id] ?? null]));
-  // My pool records too: filed, else the column of the first pool it is
-  // shared to — its origin, unless that is off (H45).
+  // My pool records too: filed, else their pool's column (H45).
   const myPlacements = mine.length > 0 ? placed : [];
   const filledMine = new Set(
     mine
@@ -228,10 +227,7 @@ export async function HomeScreen({
   const ownAt = new Map(
     mine.flatMap((s) => {
       if (!s.own_pool_id) return [];
-      const at =
-        myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id && p.shared) ??
-        myPlacements.find((p) => p.splashId === s.id && p.shared) ??
-        myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
+      const at = myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
       return at ? [[s.id, at] as const] : [];
     }),
   );

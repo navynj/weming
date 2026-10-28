@@ -1,16 +1,20 @@
--- 0060: Home filing, per record and mine alone; a pool record's origin can
--- be switched off (2026-10-28).
+-- 0060: Home filing, per record and mine alone; Move to Home (2026-10-28).
 --
 -- Planned and approved in the session (H45): "New owner-only table, e.g.
 -- home_filing(user_id, splash_id, my_lane_id): where a record that isn't in
 -- one of my lanes appears on my Home. No row = its pool's column (as now)."
 -- "Backfill home_filing from every existing link whose home lane currently
 -- places a joint or pool record in one of my lanes, so every Home column
--- stays exactly where it is." And, retiring "Move to Home…": "In a pool
--- record's Audience, the origin pool is no longer locked on ... If turning
--- it off would leave the record in no pool, ask once in the Audience sheet:
--- 'Keep it in which of your lanes?' ... Saving gives the record that lane
--- and it becomes an ordinary Home record."
+-- stays exactly where it is." And, before the merge, replacing the origin
+-- unlock: "Keep the origin lock for pool records ... keep the database rule
+-- that a record with own_pool_id must keep its origin placement shared."
+-- "'Move to Home' in the Audience sheet ... Saving: the record gets that
+-- lane and becomes an ordinary Home record (own_pool_id cleared); every
+-- current placement stays exactly as it is, including the origin pool,
+-- still shared on the same pool lane; my filing for it is deleted. From
+-- then on the origin switch is unlocked like any other pool." "Reuse
+-- keep_in_lane's logic without turning anything off; rename it
+-- move_to_home."
 --
 -- Expand, switch, contract: lane_mappings and its functions stay, read by
 -- the old app, until a later contract migration drops them (with approval
@@ -18,10 +22,8 @@
 -- someone's ripples (_detach_thread, delete_pool) read the filing first and
 -- the home link after it.
 --
--- A pool record's rule is now: placed in its own pool (the deferred check),
--- and shared to at least one pool while its owner keeps it so (the
--- placement hold). Switching off the last one goes through keep_in_lane,
--- which gives it a lane of mine in the same act.
+-- A pool record's rules are untouched (0014, 0056): its origin placement
+-- stays, shared, in its pool. move_to_home is the way out of them.
 --
 -- Additive: one table with its policies, a backfill, functions replaced
 -- with the same signatures, one new function. No DDL beyond that.
@@ -163,74 +165,15 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- a pool record: placed in its pool, shared to at least one
+-- Move to Home
 -- ---------------------------------------------------------------------------
 
--- Placed in its own pool, on or off (was: shared there). Being shared
--- somewhere is the placement hold's to keep.
-create or replace function public.check_own_pool_placed()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if new.own_pool_id is not null and not exists (
-    select 1 from public.splash_placements p
-     where p.splash_id = new.id and p.pool_id = new.own_pool_id
-  ) then
-    raise exception 'a pool record must be placed in its pool' using errcode = '23514';
-  end if;
-  return null;
-end;
-$$;
-
-create or replace function public.hold_own_pool_placement()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  own uuid;
-  sid uuid := coalesce(new.splash_id, old.splash_id);
-begin
-  select own_pool_id into own from public.splashes where id = sid;
-  -- Not a pool record, or the splash itself is being deleted (the cascade
-  -- runs after its row is gone), or the pool is torn down, or a reshape
-  -- (keep_in_lane, a hand-over) is at work: no rule here.
-  if own is null
-     or coalesce(current_setting('weming.pool_teardown', true), '') = 'on'
-     or coalesce(current_setting('weming.reshape', true), '') = 'on' then
-    return coalesce(new, old);
-  end if;
-  if tg_op = 'UPDATE' and old.pool_id = own and new.pool_id <> old.pool_id then
-    raise exception 'a pool record stays placed in its pool' using errcode = '42501';
-  end if;
-  if tg_op = 'UPDATE' and old.pool_id <> own and new.pool_id = own then
-    raise exception 'a pool record has one placement in its pool' using errcode = '42501';
-  end if;
-  if tg_op = 'DELETE' and old.pool_id = own then
-    raise exception 'a pool record stays placed in its pool' using errcode = '42501';
-  end if;
-  -- Its origin can be switched off like any pool (H45), but not the last
-  -- one on: that asks for a lane of mine (keep_in_lane).
-  if (tg_op = 'DELETE' and old.shared or tg_op = 'UPDATE' and old.shared and not new.shared)
-     and not exists (
-       select 1 from public.splash_placements p
-        where p.splash_id = sid and p.pool_id <> old.pool_id and p.shared
-     ) then
-    raise exception 'Keep it in one of your lanes first.' using errcode = '42501';
-  end if;
-  return coalesce(new, old);
-end;
-$$;
-
--- "Keep it in which of your lanes?" (H45): my pool record leaves its last
--- pool and becomes a record of my lane. Every placement is switched off,
--- never removed, so members' ripples there are hidden, not deleted, and come
--- back if it is shared there again (0035).
-create function public.keep_in_lane(p_splash uuid, p_my_lane uuid)
+-- My pool record becomes a record of my lane (H45, the Audience sheet's
+-- "Move to Home"). Nothing is switched off: every placement stays as it is,
+-- its origin's included, still shared on the same pool lane, so members'
+-- ripples there stay where they are; only the tie to its pool goes, and with
+-- it the origin's lock. A record of my lane needs no filing.
+create function public.move_to_home(p_splash uuid, p_my_lane uuid)
 returns void
 language plpgsql
 security definer
@@ -243,25 +186,22 @@ begin
     select 1 from public.splashes
      where id = p_splash and owner_id = uid and own_pool_id is not null
   ) then
-    raise exception 'only your pool record is kept in your lane this way' using errcode = '42501';
+    raise exception 'only your record written in a pool moves to Home' using errcode = '42501';
   end if;
   if not exists (select 1 from public.my_categories where id = p_my_lane and user_id = uid) then
     raise exception 'that lane is not yours' using errcode = '42501';
   end if;
   perform set_config('weming.reshape', 'on', true);
-  update public.splash_placements
-     set shared = false, updated_at = now()
-   where splash_id = p_splash and shared;
   update public.splashes
      set own_pool_id = null, declared_lane_id = p_my_lane
    where id = p_splash;
-  delete from public.home_filing where user_id = uid and splash_id = p_splash;
   perform set_config('weming.reshape', 'off', true);
+  delete from public.home_filing where user_id = uid and splash_id = p_splash;
 end;
 $$;
 
-revoke execute on function public.keep_in_lane(uuid, uuid) from public, anon;
-grant execute on function public.keep_in_lane(uuid, uuid) to authenticated;
+revoke execute on function public.move_to_home(uuid, uuid) from public, anon;
+grant execute on function public.move_to_home(uuid, uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- where someone's ripples land when a record or a pool goes: their filing
