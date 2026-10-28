@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useRouter } from 'next/navigation';
 
 import { InstallOffer } from '@/features/install/install-offer';
+import { useSplashOpening } from '@/features/splash/opening-context';
 import { setBadge } from '@/lib/notifications/badge';
 
 import { loadUnreadCount } from './actions';
@@ -58,7 +59,9 @@ export function NotificationsProvider({
 
   // A notification clicked while the app is open: the worker focuses this
   // window and says where to go, and the app routes in place (public/sw.js).
+  // A record opens as its sheet at once, from what the bell last listed (review).
   const router = useRouter();
+  const openings = useSplashOpening();
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     function onMessage(event: MessageEvent): void {
@@ -68,13 +71,14 @@ export function NotificationsProvider({
         typeof data.url === 'string' &&
         data.url.startsWith('/')
       ) {
-        router.push(data.url);
+        if (openings) openings.open(data.url);
+        else router.push(data.url);
       }
     }
     navigator.serviceWorker.addEventListener('message', onMessage);
     void resyncPush().catch(() => {});
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
-  }, [router]);
+  }, [openings, router]);
 
   return (
     <Context.Provider

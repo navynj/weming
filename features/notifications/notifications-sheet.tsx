@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
@@ -10,6 +10,8 @@ import { TurnOnNotifications } from '@/features/install/turn-on';
 import { Settings } from 'lucide-react';
 
 import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
+import { useSplashOpening } from '@/features/splash/opening-context';
+import { rememberHeader } from '@/features/splash/splash-opening';
 import { EMPTY } from '@/lib/empty-states';
 import { notificationPath, notificationText } from '@/lib/notifications/model';
 import type { NotificationItem } from '@/lib/queries/notifications';
@@ -23,7 +25,14 @@ import { useNotifications } from './notifications-provider';
  * optimistic — the dot and the row change at once, and a refusal puts
  * them back. The list is read when the sheet opens, so it is not a page's
  * rows and has no re-read to wait for.
+ *
+ * A tap opens the record's sheet in the same frame this one goes, with the
+ * title and icon the row carries and a skeleton below until the page lands
+ * (review); the first unread records are fetched as the list arrives, and any
+ * row as it is pressed, so most taps find the page already here.
  */
+const PREFETCH_UNREAD = 3;
+
 export function NotificationsSheet({
   onClose,
   onSettings,
@@ -33,7 +42,9 @@ export function NotificationsSheet({
   onSettings?: () => void;
 }) {
   const router = useRouter();
+  const openings = useSplashOpening();
   const { unread, setUnread } = useNotifications();
+  const prefetched = useRef(new Set<string>());
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -44,12 +55,26 @@ export function NotificationsSheet({
         if (!live) return;
         setItems(rows);
         setUnread(rows.filter((n) => !n.read).length);
+        for (const n of rows) rememberHeader(notificationPath(n), headerOf(n));
+        rows
+          .filter((n) => !n.read)
+          .slice(0, PREFETCH_UNREAD)
+          .forEach(prefetch);
       })
       .catch(() => live && setMessage('Notifications could not be loaded. Try again.'));
     return () => {
       live = false;
     };
+    // Read once, as the sheet opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setUnread]);
+
+  function prefetch(item: NotificationItem): void {
+    const path = notificationPath(item);
+    if (!openings || prefetched.current.has(path.split('#')[0])) return;
+    prefetched.current.add(path.split('#')[0]);
+    openings.prefetch(path);
+  }
 
   async function mark(ids: string[] | null): Promise<void> {
     const before = items;
@@ -69,7 +94,8 @@ export function NotificationsSheet({
   function openOne(item: NotificationItem): void {
     if (!item.read) void mark([item.id]);
     onClose();
-    router.push(notificationPath(item));
+    if (openings) openings.open(notificationPath(item), headerOf(item));
+    else router.push(notificationPath(item));
     if (item.type === 'new_post' && item.invited) offerInstall();
   }
 
@@ -125,6 +151,7 @@ export function NotificationsSheet({
                 type="button"
                 data-notification={item.id}
                 data-unread={item.read ? undefined : ''}
+                onPointerDown={() => prefetch(item)}
                 onClick={() => openOne(item)}
                 className="flex w-full items-start gap-3 py-3 text-left"
               >
@@ -152,6 +179,14 @@ export function NotificationsSheet({
       )}
     </PoolSheet>
   );
+}
+
+function headerOf(item: NotificationItem): {
+  title: string | null;
+  icon: string | null;
+  poolName: string;
+} {
+  return { title: item.title, icon: item.icon, poolName: item.poolName };
 }
 
 /** "now", "5m", "3h", "2d", then the date: enough to place it, no more. */

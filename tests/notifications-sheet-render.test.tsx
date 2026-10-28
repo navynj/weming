@@ -50,6 +50,7 @@ const item = (over: Partial<NotificationItem>): NotificationItem => ({
   actorName: 'Mina',
   poolName: 'Our Pool',
   title: null,
+  icon: null,
   poolId: 'p1',
   splashId: 's1',
   rippleId: 'r1',

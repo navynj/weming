@@ -5,16 +5,19 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { MotionConfig, animate, motion, useDragControls, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import { FLIP_SPRING } from '@/features/home/use-flip';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+
+import { useSplashOpening } from './opening-context';
 
 /** A pull past this, or a flick faster than this, lets the sheet go. */
 const DISMISS_PX = 120;
@@ -27,6 +30,21 @@ const Close = createContext<(() => void) | null>(null);
 /** Closes the splash sheet this is inside (its delete, for one), or null outside one. */
 export function useCloseSplash(): (() => void) | null {
   return useContext(Close);
+}
+
+// Sheets can overlap for a frame (an opening one handing over to its page),
+// so the screen behind is held by a count, not by whoever closes last.
+let locks = 0;
+let unlockedOverflow = '';
+function holdScreen(): () => void {
+  const root = document.documentElement;
+  if (locks === 0) unlockedOverflow = root.style.overflow;
+  locks += 1;
+  root.style.overflow = 'hidden';
+  return () => {
+    locks -= 1;
+    if (locks === 0) root.style.overflow = unlockedOverflow;
+  };
 }
 
 const FOCUSABLE =
@@ -51,14 +69,23 @@ const FOCUSABLE =
 export function SplashModal({
   closeTo,
   onLeave,
+  silentExit,
   children,
 }: {
   closeTo: string | null;
   /** How it leaves when not by a route of its own (the settings sheet, 0059): its own history step. */
   onLeave?: () => void;
+  /** Asked as it unmounts: true when another sheet took its place, so no exit plays. */
+  silentExit?: () => boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const openings = useSplashOpening();
+  // A sheet already up for this record, opened on a notification's tap
+  // (splash-opening): this one takes its place as it is, without rising
+  // again; or it was closed while this was on its way, and this one goes.
+  const [handoff] = useState(() => (onLeave ? null : (openings?.peek(pathname) ?? null)));
   const reduce = usePrefersReducedMotion();
   const controls = useDragControls();
   const { sheet: compose } = useInputSheet();
@@ -87,25 +114,42 @@ export function SplashModal({
     else router.back();
   }, [closeTo, onLeave, router]);
 
+  // Before the first paint, so the two sheets never show at once; once only,
+  // though development runs it twice.
+  const handedOver = useRef(false);
+  useLayoutEffect(() => {
+    if (!handoff || handedOver.current) return;
+    handedOver.current = true;
+    openings?.settle();
+    if (handoff === 'dismissed') {
+      closing.current = true;
+      leave();
+    }
+    // Once, as it mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The screen behind holds still; focus comes in, and goes back on close.
   // Closed by the route instead (back, or any navigation away), the sheet is
   // already gone when this runs, so it leaves a still copy of itself to play
   // the exit on (review): the back button closes with the same spring.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    const root = document.documentElement;
-    const before = root.style.overflow;
     const node = frame.current;
     const body = scroller.current;
-    root.style.overflow = 'hidden';
+    const release = holdScreen();
     panel.current?.focus({ preventScroll: true });
     return () => {
-      root.style.overflow = before;
+      release();
       opener?.focus?.({ preventScroll: true });
       // Only a real removal: React's development double-run of effects
       // cleans up while the sheet is still on the page, and must not play it.
-      if (!closing.current && node && !node.isConnected) playExit(node, body?.scrollTop ?? 0);
+      if (!closing.current && !silentExit?.() && node && !node.isConnected) {
+        playExit(node, body?.scrollTop ?? 0);
+      }
     };
+    // Once, as it mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Escape closes — not while the compose sheet is up over it, nor while a
@@ -227,8 +271,8 @@ export function SplashModal({
             data-sheet-scrim
             onClick={close}
             className="bg-main-900/60 absolute inset-0"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: leaving ? 0 : 1 }}
+            initial={handoff === 'adopt' ? false : { opacity: 0 }}
+            animate={{ opacity: leaving || handoff === 'dismissed' ? 0 : 1 }}
             transition={{ duration: 0.2 }}
           />
           <motion.div
@@ -248,8 +292,8 @@ export function SplashModal({
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 1 }}
             onDragEnd={onDragEnd}
-            initial={hidden}
-            animate={leaving ? hidden : shown}
+            initial={handoff === 'adopt' ? false : hidden}
+            animate={leaving || handoff === 'dismissed' ? hidden : shown}
             transition={transition}
             onAnimationComplete={() => {
               if (leaving) leave();

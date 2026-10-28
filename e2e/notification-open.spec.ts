@@ -235,3 +235,81 @@ for (const from of ['Home', 'the pool'] as const) {
     }
   });
 }
+
+test('a notification opens its sheet at once, and its page lands in place at the reply', async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(180_000);
+  const c = cases.find((x) => x.anchor?.startsWith('reply-'))!;
+  const id = await notificationFor(c);
+  await signIn(page, baseURL!);
+  // The record's page, prefetch and navigation alike, held back.
+  const DELAY_MS = 3_000;
+  await page.route(
+    (url) => url.pathname === `/pool/${pool}/splash/${c.splash}`,
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+      await route.continue();
+    },
+  );
+  await page.goto('/');
+  const bell = page.locator('[data-notifications-bell]:visible').first();
+  await expect(bell).toBeVisible({ timeout: 90_000 });
+  await bell.click();
+  const row = page.locator(`[data-notification="${id}"]`);
+  await expect(row).toBeVisible();
+
+  // When the tap lands, when the opening sheet's header is on the page, and
+  // whether any sheet rises or leaves after the page arrives.
+  await page.evaluate(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__tap = null;
+    w.__header = null;
+    w.__adopted = null;
+    w.__ghosts = 0;
+    document.addEventListener('click', () => (w.__tap ??= performance.now()), { capture: true });
+    new MutationObserver(() => {
+      if (
+        w.__tap !== null &&
+        w.__header === null &&
+        document.querySelector('[data-opening-title]')
+      ) {
+        w.__header = performance.now();
+      }
+      const page = document.querySelector('[data-splash-modal] [data-splash-page]');
+      if (page && w.__adopted === null) {
+        const sheet = page.closest<HTMLElement>('[data-splash-sheet]')!;
+        w.__adopted = getComputedStyle(sheet).transform;
+      }
+      if (document.querySelector('[data-splash-leaving]')) w.__ghosts = 1;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await row.click();
+
+  const opening = page.locator('[data-splash-opening]');
+  await expect(opening).toBeVisible();
+  await expect(opening.locator('[data-opening-title]')).toHaveText(c.title);
+  await expect(opening.locator('[data-splash-skeleton]')).toBeVisible();
+  const { tap, header } = await page.evaluate(() => {
+    const w = window as unknown as { __tap: number; __header: number };
+    return { tap: w.__tap, header: w.__header };
+  });
+  expect(header - tap, 'the header and skeleton within 100ms of the tap').toBeLessThan(100);
+  // The page is still on its way: the skeleton holds, no other sheet.
+  await expect(page.locator('[data-splash-page]')).toHaveCount(0);
+
+  const landed = page.locator('[data-splash-page]:visible');
+  await expect(landed).toBeVisible({ timeout: 60_000 });
+  await expect(landed).toContainText(c.title);
+  await expect(opening).toHaveCount(0);
+  await expect(page.locator('[data-splash-modal]')).toHaveCount(1);
+  await expect(page.locator(`[id="${c.anchor}"]`)).toBeInViewport();
+  const { adopted, ghosts } = await page.evaluate(() => {
+    const w = window as unknown as { __adopted: string; __ghosts: number };
+    return { adopted: w.__adopted, ghosts: w.__ghosts };
+  });
+  // Taken over where it stood: no second rise, no exit played.
+  expect(['none', 'matrix(1, 0, 0, 1, 0, 0)']).toContain(adopted);
+  expect(ghosts).toBe(0);
+});
