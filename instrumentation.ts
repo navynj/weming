@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 
-import { sentryOptions } from '@/lib/observability';
+import { scrubTraceHeader, sentryOptions } from '@/lib/observability';
 
 /**
  * Runs once when a server instance starts (Next's `instrumentation.ts`
@@ -23,6 +23,7 @@ export async function register(): Promise<void> {
       process.env.NEXT_PUBLIC_SENTRY_RELEASE,
     ),
   );
+  scrubTraceHeader(Sentry.getClient());
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { assertServerEnv } = await import('./lib/env');
     assertServerEnv();

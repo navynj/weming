@@ -7,7 +7,7 @@ vi.mock('@sentry/nextjs', () => ({
   },
 }));
 
-import { scrubEvent, scrubText, sentryOptions } from '@/lib/observability';
+import { scrubEvent, scrubName, scrubText, sentryOptions } from '@/lib/observability';
 import { reported, reportFailure } from '@/lib/report-failure';
 
 beforeEach(() => {
@@ -76,6 +76,60 @@ describe('what reaches Sentry (privacy first)', () => {
     expect(scrubText('Payload too large')).toBe('Payload too large');
   });
 
+  it('sends a span as its route pattern: no record url, no id, no title', () => {
+    const SPLASH = '0b9c6f1e-3d2a-4c8b-9e7f-1a2b3c4d5e6f';
+    const span = sentryOptions('production', 'abc').beforeSendSpan({
+      trace_id: 't',
+      span_id: 's',
+      name: `GET https://example.app/splash/${SPLASH}?write=1&token=secret`,
+      start_timestamp: 1,
+      end_timestamp: 2,
+      status: 'ok',
+      is_segment: true,
+      attributes: {
+        'sentry.op': 'http.server',
+        'http.request.method': 'GET',
+        'http.response.status_code': 200,
+        'sentry.segment.name': `GET /splash/${SPLASH}`,
+        'url.full': `https://example.app/splash/${SPLASH}?write=1`,
+        'http.query': 'write=1&token=secret',
+        'splash.id': SPLASH,
+        'splash.title': 'my diary',
+        'http.request.body': '{"note":"what I wrote"}',
+        'http.request.header.cookie': 'sb-access-token=x',
+        'lcp.url': `https://x.supabase.co/storage/${USER}/beach day.jpg`,
+        'user.email': 'me@example.com',
+        'browser.web_vital.lcp.value': { value: 812, unit: 'millisecond' },
+      },
+      links: [{ context: { traceId: 't', spanId: 'l' }, attributes: { title: 'my diary' } }],
+    } as never);
+    expect(span.name).toBe('GET /splash/[id]');
+    expect(span.attributes).toEqual({
+      'sentry.op': 'http.server',
+      'http.request.method': 'GET',
+      'http.response.status_code': 200,
+      'sentry.segment.name': 'GET /splash/[id]',
+      'url.full': '/splash/[id]',
+      'browser.web_vital.lcp.value': { value: 812, unit: 'millisecond' },
+    });
+    expect(JSON.stringify(span)).not.toMatch(
+      new RegExp(`${SPLASH}|diary|what I wrote|secret|beach|me@example|sb-access`),
+    );
+  });
+
+  it('puts every dynamic segment back to its pattern, and leaves pages alone', () => {
+    const ID = '0b9c6f1e-3d2a-4c8b-9e7f-1a2b3c4d5e6f';
+    expect(scrubName(`/pool/${ID}/splash/${ID}`)).toBe('/pool/[id]/splash/[id]');
+    expect(scrubName(`/pool/${ID}/lane/7`)).toBe('/pool/[id]/lane/[id]');
+    expect(scrubName('/join/k3yS3cr3t')).toBe('/join/[token]');
+    expect(scrubName('/lane/12')).toBe('/lane/[id]');
+    expect(scrubName('/pool/new')).toBe('/pool/new');
+    expect(scrubName('GET /splash/[id]')).toBe('GET /splash/[id]');
+    expect(scrubName(`select from ripples where id = '${ID}'`)).toBe(
+      "select from ripples where id = '[id]'",
+    );
+  });
+
   it('sends nothing locally, every error and a tenth of traces in production, no traces in a preview', () => {
     expect(sentryOptions(undefined, '').enabled).toBe(false);
     expect(sentryOptions('production', 'abc')).toMatchObject({
@@ -91,6 +145,10 @@ describe('what reaches Sentry (privacy first)', () => {
       tracesSampleRate: 0,
     });
     expect(sentryOptions('production', 'abc').beforeBreadcrumb()).toBeNull();
+    // Streamed spans never reach the transaction hooks: none is left to look like it guards them.
+    expect(sentryOptions('production', 'abc')).not.toHaveProperty('beforeSendTransaction');
+    expect(sentryOptions('production', 'abc')).not.toHaveProperty('ignoreTransactions');
+    expect(sentryOptions('production', 'abc')).not.toHaveProperty('traceLifecycle');
   });
 });
 
