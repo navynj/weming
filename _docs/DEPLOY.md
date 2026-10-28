@@ -23,6 +23,10 @@ one place where a wrong value fails silently.
 **Project `during`, ref `yjwkjvzbbujoapeuyjul`, region `us-west-1`**, in the
 Whaleblue Studio org. It already existed; no second project was created.
 
+**Functions run in `sfo1`** (`vercel.json` `regions`, 2026-10-27), next to
+`us-west-1`: a render makes its Supabase calls in sequence, so each one pays
+the distance between the function and the database.
+
 **G3's second-free-org plan turned out to be unnecessary.** The org holds two
 projects — `Plot`, which is INACTIVE (paused, so it does not hold an active
 slot), and `during`. Nothing had to be deleted or moved. G3's reasoning still
