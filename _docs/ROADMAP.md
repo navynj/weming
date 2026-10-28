@@ -103,6 +103,9 @@ Until then each stays in the database, unread by the app.
 
 Home Weekly zoom; one year ago today; background auto-collection (timeline autofill; Spotify first); Lists UI and multi-pool routing settings; notifications (Splash opened / Swim started / Link request only, max 2/day); Splash-born ephemeral pools; open/searchable pools; desktop score layout + ambient window; couple weekly grouping on Splash; recurrence engine; note-convention parsing; photo book export; dark mode (night pool); TTL setting UI (instant/1d/3d/7d).
 
+- **A Content Security Policy for pages** (Yoonji, 2026-10-27): today only `/sw.js` sends one. Plan it as its own change — report-only first, then enforced — covering Supabase, Sentry, youtube-nocookie.com (the player's frame), i.ytimg.com (thumbnails) and our own assets.
+- **A single photo between the label and the other photos** (H34): photos are drawn as one layer at their top photo's rank in a post's order; place each photo on its own only if people ask.
+
 ## Standing rules
 
 - A phase's list never grows mid-session; new ideas go to "Later, unscheduled" or to DECISIONS.md.
