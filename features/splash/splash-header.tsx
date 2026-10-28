@@ -44,6 +44,7 @@ export function SplashHeader({
   canPin = true,
   canDelete = true,
   laneChip = undefined,
+  description = null,
 }: {
   splash: SplashSummary;
   categories: MyCategory[];
@@ -63,6 +64,12 @@ export function SplashHeader({
   canDelete?: boolean;
   /** In a pool: the pool lane's chip in place of my lane tags (others' lanes are theirs). */
   laneChip?: { icon: string | null; name: string } | null;
+  /**
+   * The description's field, asked for from the menu (review): hidden until
+   * Add description, and Hide description takes it away again. Null where
+   * it is not mine to write.
+   */
+  description?: { shown: boolean; onToggle: () => void } | null;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(splash.title);
@@ -140,7 +147,7 @@ export function SplashHeader({
 
         {audience}
 
-        {canPin || canDelete ? (
+        {canPin || canDelete || description ? (
           <div className="relative shrink-0">
             <button
               type="button"
@@ -176,6 +183,22 @@ export function SplashHeader({
                         <Pin aria-hidden size={14} />
                       )}
                       {splash.pinnedAt ? 'Unpin' : 'Pin'}
+                    </button>
+                  </li>
+                ) : null}
+                {description ? (
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-description-toggle={description.shown ? 'hide' : 'add'}
+                      onClick={() => {
+                        setMenu('closed');
+                        description.onToggle();
+                      }}
+                      className="text-ink hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
+                    >
+                      {description.shown ? 'Hide description' : 'Add description'}
                     </button>
                   </li>
                 ) : null}

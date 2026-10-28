@@ -20,7 +20,7 @@ import type { PoolScope } from '@/features/pool/compose-scope';
 import { poolSplashHref } from '@/features/pool/pool-cards';
 import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker';
 import type { Together } from '@/features/pool/pool-pick';
-import { dropSplash } from '@/features/splash/actions';
+import { dropSplash, setSplashDescription } from '@/features/splash/actions';
 import { defaultBlockDay, isRange } from '@/features/splash/block-day';
 import { DayChip } from '@/features/splash/day-chip';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
@@ -29,6 +29,7 @@ import type { IsoDate } from '@/lib/time';
 import { usePeople } from '@/features/people/people-provider';
 import type { PendingDrop } from '@/features/input-sheet/sheet-provider';
 
+import { ComposeTop } from './compose-top';
 import { SheetFooter } from './sheet-frame';
 import { composeDrop } from './split-title';
 
@@ -92,6 +93,9 @@ export function SplashComposer({
   // The post's own icon (0008); empty lets the lane's emoji stand for it.
   const [icon, setIcon] = useState('');
   const [bodyText, setBodyText] = useState('');
+  // The splash's description (0037), asked for from the top line's `…`.
+  const [describing, setDescribing] = useState(false);
+  const [description, setDescription] = useState('');
   const [laneId, setLaneId] = useState<string | null>(null);
   // From a pool: a pool lane, and Together (0033).
   const [pick, setPick] = useState<PoolPick>(null);
@@ -199,7 +203,7 @@ export function SplashComposer({
         own_pool_id: own && pool ? pool.poolId : null,
         created_by: null,
         joint_invite_all: false,
-        description: null,
+        description: describing && description.trim() ? description.trim() : null,
         type: 'free',
         prompt: null,
         ends_at: null,
@@ -283,54 +287,72 @@ export function SplashComposer({
           }
         : undefined;
 
+    // Written after the splash itself, by the same action the page uses: any
+    // drop path, mine or joint (RLS holds who may).
+    const described = describing ? description.trim() : '';
+    const withDescription =
+      (made: () => Promise<{ ok: true } | { ok: false; message: string }>) =>
+      async (): Promise<{ ok: true } | { ok: false; message: string }> => {
+        const done = await made();
+        if (!done.ok || !described) return done;
+        const saved = await setSplashDescription(id, described);
+        return saved.ok
+          ? saved
+          : { ok: false, message: `Dropped, but the description was not saved: ${saved.message}` };
+      };
+
     onDrop({
       splash,
       month: declaredStart.slice(0, 7),
       note: body.length > 0 ? body : null,
       ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
       ...(home ? { home } : {}),
-      commit: own
-        ? () =>
-            dropOwnPoolSplash({
-              id,
-              poolId: pool!.poolId,
-              poolLaneId: pick.poolLaneId,
-              title,
-              icon: icon || null,
-              body,
-              media: mediaPaths,
-              declaredStart,
-              declaredEnd,
-              blockDay,
-            })
-        : joint
+      commit: withDescription(
+        own
           ? () =>
-              createJointSplash({
+              dropOwnPoolSplash({
                 id,
                 poolId: pool!.poolId,
                 poolLaneId: pick.poolLaneId,
                 title,
                 icon: icon || null,
                 body,
+                media: mediaPaths,
                 declaredStart,
                 declaredEnd,
                 blockDay,
-                invitees: together.everyone ? [] : together.picked,
-                everyone: together.everyone,
               })
-          : async () => {
-              const made = await dropSplash(input);
-              if (!made.ok || shared.length === 0) return made;
-              const placed = await placeNewSplash(id, shared);
-              return placed.ok
-                ? placed
-                : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
-            },
+          : joint
+            ? () =>
+                createJointSplash({
+                  id,
+                  poolId: pool!.poolId,
+                  poolLaneId: pick.poolLaneId,
+                  title,
+                  icon: icon || null,
+                  body,
+                  declaredStart,
+                  declaredEnd,
+                  blockDay,
+                  invitees: together.everyone ? [] : together.picked,
+                  everyone: together.everyone,
+                })
+            : async () => {
+                const made = await dropSplash(input);
+                if (!made.ok || shared.length === 0) return made;
+                const placed = await placeNewSplash(id, shared);
+                return placed.ok
+                  ? placed
+                  : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
+              },
+      ),
     });
 
     setTitleText('');
     setIcon('');
     setBodyText('');
+    setDescribing(false);
+    setDescription('');
     setLaneId(null);
     setPick(null);
     setTogether(noOne());
@@ -343,6 +365,7 @@ export function SplashComposer({
 
   return (
     <div data-splash-composer className="flex flex-col gap-5">
+      <ComposeTop describing={describing} onDescribing={setDescribing} />
       {/* The title, large and bold; Enter moves on to the body, so the
           first line is still the title and the rest still follows it.
           Not while an IME is composing (Korean, say): that Enter commits
@@ -375,6 +398,21 @@ export function SplashComposer({
           className="text-main-900 placeholder:text-main-900 min-w-0 flex-1 resize-none text-3xl/snug font-semibold outline-none placeholder:opacity-20"
         />
       </div>
+      {/* The description, only once asked for (review): under the title,
+          small, its placeholder faint, so it is not taken for the body. */}
+      {describing ? (
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          autoFocus
+          rows={1}
+          maxLength={2000}
+          placeholder="Describe this splash"
+          aria-label="Description"
+          data-compose-description-field
+          className="text-ink placeholder:text-ink -mt-2 w-full resize-none text-sm/relaxed outline-none placeholder:opacity-30"
+        />
+      ) : null}
       {/* Backspace at the very start of the body walks the cursor back up
           to the end of the title, the way a notes app does. */}
       <textarea

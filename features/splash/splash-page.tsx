@@ -228,6 +228,21 @@ export function SplashPage({
     return Promise.resolve();
   }
 
+  // The description's field (review): there when it has words, else only
+  // once asked for from the header's menu, so it is not taken for a block.
+  const describable = !orphan && (scope === 'mine' || scope === 'joint');
+  const [describing, setDescribing] = useState(false);
+  const descriptionShown = describing || Boolean(page.splash.description);
+  function toggleDescription(): void {
+    if (!descriptionShown) {
+      setDescribing(true);
+      return;
+    }
+    // Hidden again: back to no description, its words with it.
+    setDescribing(false);
+    if (page.splash.description) describe('');
+  }
+
   /** The description, shown at once (0037); empty takes it off. */
   function describe(text: string): void {
     run(
@@ -389,6 +404,9 @@ export function SplashPage({
           canPin={!orphan && scope !== 'theirs'}
           canDelete={scope === 'mine' || (scope === 'joint' && pool!.canDeleteJoint)}
           laneChip={pool ? pool.laneChip : undefined}
+          description={
+            describable ? { shown: descriptionShown, onToggle: toggleDescription } : null
+          }
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A
@@ -407,11 +425,16 @@ export function SplashPage({
         />
 
         {/* Its description (0037): under the header, a divider from the ripples. */}
-        <SplashDescription
-          value={page.splash.description}
-          editable={!orphan && (scope === 'mine' || scope === 'joint')}
-          onSave={describe}
-        />
+        {descriptionShown ? (
+          <SplashDescription
+            value={page.splash.description}
+            editable={describable}
+            // Just asked for: the field open and in focus, its placeholder faint.
+            opened={describing && !page.splash.description}
+            onSave={describe}
+            onEmpty={() => setDescribing(false)}
+          />
+        ) : null}
 
         {poolTags.length > 0 ? (
           <p data-origin-tags className="text-pool-500 flex flex-wrap gap-x-3 pb-4 text-xs">

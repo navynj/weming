@@ -3,10 +3,19 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const drops: Record<string, unknown>[] = [];
+/** What was written, in order: the splash, then its description. */
+const written: string[] = [];
+const described: [string, string][] = [];
 vi.mock('@/features/splash/actions', () => ({
   dropSplash: (input: Record<string, unknown>) => {
     drops.push(input);
+    written.push('splash');
     return Promise.resolve({ ok: true, splash: { id: 's-new', title: input.title } });
+  },
+  setSplashDescription: (id: string, text: string) => {
+    described.push([id, text]);
+    written.push('description');
+    return Promise.resolve({ ok: true });
   },
 }));
 const placed: { splashId: string; picks: { poolId: string; poolLaneId: string }[] }[] = [];
@@ -138,6 +147,59 @@ function sheet() {
   );
   return { ...view, onDrop, drop: () => view.getByText('Drop') as HTMLButtonElement };
 }
+
+describe('the composer’s top line and the description (review)', () => {
+  beforeEach(() => {
+    written.length = 0;
+    described.length = 0;
+  });
+
+  it('shows who writes at the left and `…` at the right; no description field unasked', () => {
+    const view = sheet();
+    const top = view.container.querySelector('[data-compose-top]')!;
+    expect(top.firstElementChild!.hasAttribute('data-compose-author')).toBe(true);
+    expect(top.lastElementChild!.querySelector('[data-compose-more]')).not.toBeNull();
+    expect(view.container.querySelector('[data-compose-description-field]')).toBeNull();
+    expect(view.container.textContent).not.toContain('Add splash description');
+  });
+
+  it('adds the description from `…`, faint until written, and saves it after the splash', async () => {
+    const view = sheet();
+    fireEvent.click(view.container.querySelector('[data-compose-more]')!);
+    fireEvent.click(view.container.querySelector('[data-compose-description="add"]')!);
+    const field = view.container.querySelector<HTMLTextAreaElement>(
+      '[data-compose-description-field]',
+    )!;
+    expect(document.activeElement).toBe(field);
+    expect(field.className).toContain('placeholder:opacity-30');
+    fireEvent.change(field, { target: { value: '  Three days up north.  ' } });
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Whistler' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(described).toHaveLength(1));
+    expect(written).toEqual(['splash', 'description']);
+    expect(described[0][1]).toBe('Three days up north.');
+    expect(described[0][0]).toBe(drops.at(-1)!.id);
+    expect(handoffs.at(-1)!.splash).toMatchObject({ description: 'Three days up north.' });
+    // The next splash starts without one.
+    expect(view.container.querySelector('[data-compose-description-field]')).toBeNull();
+  });
+
+  it('drops nothing of a description hidden again', async () => {
+    const view = sheet();
+    fireEvent.click(view.container.querySelector('[data-compose-more]')!);
+    fireEvent.click(view.container.querySelector('[data-compose-description="add"]')!);
+    fireEvent.change(view.container.querySelector('[data-compose-description-field]')!, {
+      target: { value: 'Not this' },
+    });
+    fireEvent.click(view.container.querySelector('[data-compose-more]')!);
+    fireEvent.click(view.container.querySelector('[data-compose-description="hide"]')!);
+    expect(view.container.querySelector('[data-compose-description-field]')).toBeNull();
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Whistler' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(written).toEqual(['splash']));
+    expect(described).toEqual([]);
+  });
+});
 
 describe('the first line is the title (SPEC 6)', () => {
   it('splits at the first Enter, and a single line is untitled', () => {

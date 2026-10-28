@@ -518,11 +518,22 @@ describe('my record’s sides, a tab per pool (0035)', () => {
 });
 
 describe('a splash’s description (0037)', () => {
-  it('waits behind "+ Add description", then saves what was written when the field is left', async () => {
+  /** The header's `…`, then its description item. */
+  function fromMenu(container: HTMLElement, which: 'add' | 'hide'): void {
+    fireEvent.click(container.querySelector('[data-splash-header] [aria-label="More"]')!);
+    fireEvent.click(container.querySelector(`[data-description-toggle="${which}"]`)!);
+  }
+
+  it('is hidden until Add description in the header’s menu, then saves what was written when the field is left (review)', async () => {
     const { container } = page();
-    expect(container.querySelector('[data-splash-description]')).toBeNull();
-    fireEvent.click(container.querySelector('[data-splash-description-add]')!);
+    // No field and no "+ Add description" standing in the page.
+    expect(container.querySelector('[data-splash-description-block]')).toBeNull();
+    expect(container.textContent).not.toContain('Add description');
+    fromMenu(container, 'add');
     const field = container.querySelector<HTMLTextAreaElement>('[data-splash-description-field]')!;
+    // Open, in focus, its placeholder faint.
+    expect(document.activeElement).toBe(field);
+    expect(field.className).toContain('placeholder:opacity-30');
     fireEvent.change(field, { target: { value: '  A weekend in Whistler.  ' } });
     // Set apart from the ripples by a divider.
     expect(container.querySelector('[data-splash-description-block]')!.className).toContain(
@@ -534,6 +545,33 @@ describe('a splash’s description (0037)', () => {
         board.id,
         'A weekend in Whistler.',
       ]),
+    );
+  });
+
+  it('hides an empty field again from the menu, or when left with no words', () => {
+    const { container } = page();
+    fromMenu(container, 'add');
+    expect(container.querySelector('[data-splash-description-field]')).not.toBeNull();
+    fromMenu(container, 'hide');
+    expect(container.querySelector('[data-splash-description-block]')).toBeNull();
+    fromMenu(container, 'add');
+    fireEvent.blur(container.querySelector('[data-splash-description-field]')!);
+    expect(container.querySelector('[data-splash-description-block]')).toBeNull();
+    // The menu says Add again.
+    fireEvent.click(container.querySelector('[data-splash-header] [aria-label="More"]')!);
+    expect(container.querySelector('[data-description-toggle="add"]')).not.toBeNull();
+    expect(calls.some((c) => c.name === 'setSplashDescription')).toBe(false);
+  });
+
+  it('shows one that has words, and Hide description takes it off', async () => {
+    const { container } = page({
+      splash: { ...summarizeSplash(board, blocks, TZ, NOW), description: 'Kept' },
+    });
+    expect(container.querySelector('[data-splash-description]')!.textContent).toBe('Kept');
+    fromMenu(container, 'hide');
+    expect(container.querySelector('[data-splash-description-block]')).toBeNull();
+    await waitFor(() =>
+      expect(calls.find((c) => c.name === 'setSplashDescription')?.args).toEqual([board.id, '']),
     );
   });
 
@@ -560,5 +598,7 @@ describe('a splash’s description (0037)', () => {
       },
     });
     expect(reader.container.querySelector('[data-splash-description-block]')).toBeNull();
+    // Nor a menu item to add one.
+    expect(reader.container.querySelector('[data-description-toggle]')).toBeNull();
   });
 });
