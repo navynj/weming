@@ -12,7 +12,7 @@ export type HeaderFace = { userId: string; initials: string };
 
 /**
  * The header (0059), one structure on Home and in a pool. Row 1: the place
- * — Home with my face, or the pool's photo or monogram and its name — then
+ * — Home alone, or the pool's photo or monogram and its name — then
  * the bell, the faces, "+" (a pool's, the invite), the gear. Row 2: the
  * place's tabs. My own face opens my profile; anyone else's, the members.
  */
@@ -28,7 +28,8 @@ export function PlaceHeader({
   tabs,
   bell = null,
 }: {
-  mark: ReactNode;
+  /** The place's mark; none on Home, whose face is only among the faces. */
+  mark?: ReactNode;
   name: string;
   faces: HeaderFace[];
   me: string | null;
@@ -43,7 +44,7 @@ export function PlaceHeader({
   return (
     <header data-place-header className="flex shrink-0 flex-col gap-4 px-4 pt-4 pb-6">
       <div data-place-header-row className="flex items-center gap-2">
-        {mark}
+        {mark ?? null}
         <h1
           data-place-title
           className="min-w-0 flex-1 truncate text-3xl/tight font-semibold text-white"

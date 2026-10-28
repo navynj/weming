@@ -30,7 +30,6 @@ import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
 import { PlaceHeader } from '@/features/header/place-header';
-import { Avatar } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 import { ProfileSheet } from '@/features/people/profile-sheet';
 import { ThemePicker } from '@/features/people/theme-picker';
@@ -348,17 +347,10 @@ export function HomeGround({
           // Wide, every view on the left takes two thirds and the stack one (review).
           className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
-          {/* The header (0059), a pool's in shape: Home with my face, the
-              bell, my face, the gear; the views beneath. */}
+          {/* The header (0059), a pool's in shape: Home alone, the bell, my
+              face, the gear; the views beneath. */}
           <div data-home-header>
             <PlaceHeader
-              mark={
-                <Avatar
-                  id={me}
-                  initials={initials}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/25 text-xs font-medium text-white"
-                />
-              }
               name="Home"
               faces={me ? [{ userId: me, initials }] : []}
               me={me}
