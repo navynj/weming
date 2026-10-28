@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+import { othersLeave } from './pool-helpers';
 
 /**
  * Per-pool invitees on my records (0035, SHARING-V2 §7–8), through PostgREST
@@ -313,6 +314,7 @@ describe('what makes my record leave or end', () => {
         .eq('title', 'In Crew')
         .single()
     ).data!.id;
+    await othersLeave(crew, ana);
     const done = await asUser(ana).rpc('delete_pool', { p_pool: crew });
     expect(done.error).toBeNull();
     const calPost = (

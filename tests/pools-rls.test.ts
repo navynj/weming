@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+import { handOn } from './pool-helpers';
 
 /**
  * The Pool path (H23), proved through PostgREST with real user tokens: the
@@ -926,7 +927,14 @@ describe('the creator’s account', () => {
 });
 
 describe('leaving', () => {
+  it('refuses the owner: they hand the pool on first (0064)', async () => {
+    const refused = await asUser(ana).rpc('leave_pool', { p_pool: pool, p_keep: true });
+    expect(refused.error?.code).toBe('42501');
+    expect(refused.error?.message).toMatch(/owner can't leave/);
+  });
+
   it('hides a leaver’s placements when they remove them, and keeps them when they keep', async () => {
+    await handOn(pool, ana, ben);
     const left = await asUser(ana).rpc('leave_pool', { p_pool: pool, p_keep: false });
     expect(left.error).toBeNull();
 

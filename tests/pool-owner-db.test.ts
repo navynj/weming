@@ -85,6 +85,16 @@ async function share(who: string, pool: string, lane: string, title: string): Pr
   return id;
 }
 
+/** An owner gone from their pool, as the creator could leave before 0064; no function leaves one so now. */
+async function ownerLeft(pool: string, owner: string): Promise<void> {
+  const done = await asAdmin()
+    .from('pool_members')
+    .update({ left_at: new Date().toISOString(), keep_on_leave: true })
+    .eq('pool_id', pool)
+    .eq('user_id', owner);
+  if (done.error) throw done.error;
+}
+
 async function ownerOf(pool: string): Promise<string | null> {
   return (await asAdmin().from('pools').select('owner_id').eq('id', pool).single()).data!.owner_id;
 }
@@ -324,7 +334,7 @@ describe('settling an owner (the 0063 backfill, per pool)', () => {
 
   it('gives an owner who has left’s pool to the longest-standing current member', async () => {
     const w = await world();
-    await asUser(w.ana).rpc('leave_pool', { p_pool: w.pool, p_keep: true });
+    await ownerLeft(w.pool, w.ana);
     const said = await asAdmin().rpc('_settle_pool_owner', { pid: w.pool });
     expect(said.data).toBe('given');
     expect(await ownerOf(w.pool)).toBe(w.ben);
@@ -332,7 +342,7 @@ describe('settling an owner (the 0063 backfill, per pool)', () => {
 
   it('gives a pool with no owner to the longest-standing current member', async () => {
     const w = await world();
-    await asUser(w.ana).rpc('leave_pool', { p_pool: w.pool, p_keep: true });
+    await ownerLeft(w.pool, w.ana);
     // Ben left and came back: his stint now starts after Cal's.
     await asUser(w.ben).rpc('leave_pool', { p_pool: w.pool, p_keep: true });
     await join(w.ben, w.token);
@@ -344,9 +354,10 @@ describe('settling an owner (the 0063 backfill, per pool)', () => {
   it('tears down a pool with no current members, returning people’s words', async () => {
     const w = await world();
     const record = await share(w.ben, w.pool, w.lane, 'Kept here');
-    for (const who of [w.ben, w.cal, w.ana]) {
+    for (const who of [w.ben, w.cal]) {
       await asUser(who).rpc('leave_pool', { p_pool: w.pool, p_keep: true });
     }
+    await ownerLeft(w.pool, w.ana);
     const said = await asAdmin().rpc('_settle_pool_owner', { pid: w.pool });
     expect(said.data).toBe('torn');
     expect((await asAdmin().from('pools').select('id').eq('id', w.pool)).data).toEqual([]);

@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+import { handOn, othersLeave } from './pool-helpers';
 
 // Signing photos runs as the viewer (lib/media.ts): the server client is
 // whoever `as.user` names.
@@ -104,6 +105,9 @@ async function world(): Promise<World> {
   ];
   const [crew, crewLane] = await openPool(ana, 'Crew', [ben, cal]);
   const [club, clubLane] = await openPool(ana, 'Club', [eve]);
+  // Ana writes and leaves as a member: the owner cannot leave (0064).
+  await handOn(crew, ana, cal);
+  await handOn(club, ana, eve);
   const record = crypto.randomUUID();
   const lane = (await asAdmin().from('my_categories').select('id').eq('user_id', ana).single())
     .data!.id;
@@ -431,7 +435,8 @@ describe('deleting the record', () => {
   it('deleting the pool afterwards returns Ben’s ripple to him; the placeholder goes with the pool', async () => {
     const w = await world();
     await asUser(w.ana).from('splashes').delete().eq('id', w.record);
-    const done = await asUser(w.ana).rpc('delete_pool', { p_pool: w.crew });
+    await othersLeave(w.crew, w.cal);
+    const done = await asUser(w.cal).rpc('delete_pool', { p_pool: w.crew });
     expect(done.error).toBeNull();
     const bens = (
       await asAdmin().from('ripples').select('splash_id').eq('id', w.benRipple).single()

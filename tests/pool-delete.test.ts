@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getMyOriginTags } from '@/lib/queries/pools';
 
 import { asAdmin, asUser } from './as-user';
+import { othersLeave } from './pool-helpers';
 
 /**
  * Deleting a pool (0015), against the real schema with throwaway users:
@@ -197,7 +198,15 @@ describe('deleting a pool (0015)', () => {
     await asAdmin().from('pools').update({ owner_id: ana }).eq('id', pool);
   });
 
+  it('is refused to the owner while anyone else is a current member (0064)', async () => {
+    const refused = await asUser(ana).rpc('delete_pool', { p_pool: pool });
+    expect(refused.error?.code).toBe('42501');
+    expect(refused.error?.message).toBe('Remove everyone else or transfer ownership first.');
+    expect((await asAdmin().from('pools').select('id').eq('id', pool)).data).toHaveLength(1);
+  });
+
   it('leaves nothing pool-side behind when the creator deletes it', async () => {
+    await othersLeave(pool, ana);
     const done = await asUser(ana).rpc('delete_pool', { p_pool: pool });
     expect(done.error).toBeNull();
     const admin = asAdmin();

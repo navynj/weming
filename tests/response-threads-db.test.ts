@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+import { othersLeave } from './pool-helpers';
 
 /**
  * Replies and reactions follow threads (0053): the leak found in production,
@@ -240,6 +241,7 @@ describe('a deleted pool’s thread is closed, never deleted (0054)', () => {
       await asAdmin().from('ripple_replies').select('id').eq('thread_pool_id', beta)
     ).data!.map((r) => r.id);
     expect(written.length).toBeGreaterThan(0);
+    await othersLeave(beta, ana);
     const gone = await asUser(ana).rpc('delete_pool', { p_pool: beta });
     expect(gone.error).toBeNull();
     pools.splice(pools.indexOf(beta), 1);

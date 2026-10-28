@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+import { handOn } from './pool-helpers';
 
 /**
  * My pool records shared to my other pools (0056). Ana writes a record in
@@ -187,7 +188,9 @@ describe('a pool record shared to my other pools (0056)', () => {
     await asUser(ana)
       .from('splash_placements')
       .insert({ splash_id: sid, pool_id: beta, pool_lane_id: betaLane });
-    // Ana leaves Alpha, removing her records there (keep: false).
+    // Ana leaves Alpha, removing her records there (keep: false), as a
+    // member: the owner cannot leave (0064).
+    await handOn(alpha, ana, ben);
     const left = await asUser(ana).rpc('leave_pool', { p_pool: alpha, p_keep: false });
     expect(left.error).toBeNull();
     expect(await reads(ben, sid)).toBe(false);
