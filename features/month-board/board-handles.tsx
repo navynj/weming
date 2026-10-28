@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useImperativeHandle, useRef, type CSSProperties, type Ref } from 'react';
+import {
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Ref,
+} from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -23,6 +31,7 @@ import {
   moved,
   partPatch,
   resized,
+  samePart,
   shareOf,
   spanned,
   spannedFromLeft,
@@ -93,6 +102,104 @@ const SIZE_DEAD_PX = 4;
 const HANDLE = 'pointer-events-auto absolute flex h-11 w-11 items-center justify-center';
 const DOT = 'block h-3 w-3 rounded-full border border-main-900 bg-white';
 
+/**
+ * Where the rotate handle stands off its part (review): above it, unless
+ * that spot lies on another part of the same piece (or on the frame's own
+ * size or width handle); then to its right, below, left. Its 44px seat
+ * reaches outward from the part, the stem back to the outline.
+ */
+type Side = 'top' | 'right' | 'bottom' | 'left';
+const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left'];
+const ROTATE_AT: Record<Side, string> = {
+  top: '-top-11 left-1/2 -translate-x-1/2',
+  right: '-right-11 top-1/2 -translate-y-1/2',
+  bottom: '-bottom-11 left-1/2 -translate-x-1/2',
+  left: '-left-11 top-1/2 -translate-y-1/2',
+};
+const STEM_AT: Record<Side, string> = {
+  top: 'top-1/2 left-1/2 h-[22px] w-px -translate-x-1/2',
+  bottom: 'bottom-1/2 left-1/2 h-[22px] w-px -translate-x-1/2',
+  right: 'right-1/2 top-1/2 h-px w-[22px] -translate-y-1/2',
+  left: 'left-1/2 top-1/2 h-px w-[22px] -translate-y-1/2',
+};
+/** The handle's seat, and whether it is clear of the piece's other parts. */
+type Seat = { side: Side; clear: boolean };
+
+/** Every part a piece or band draws: what a rotate handle keeps off. */
+const PARTS =
+  '[data-board-label], [data-board-sticker], [data-board-photo-card], [data-board-wave], [data-board-band], [data-band-icon]';
+
+/** The element(s) a part is drawn as. */
+function selectorOf(part: BoardPart): string {
+  if (part.kind === 'label') return '[data-board-label], [data-board-band]';
+  if (part.kind === 'icon') return '[data-board-sticker], [data-band-icon]';
+  if (part.kind === 'wave') return '[data-board-wave]';
+  return `[data-board-photo-card="${part.path.replace(/["\\]/g, '\\$&')}"]`;
+}
+
+/**
+ * The other parts of the piece `from` sits in: never the part itself, nor
+ * what holds it or what it holds (a band's icon sits inside its label).
+ */
+export function siblingParts(from: Element, part: BoardPart): Element[] {
+  const piece = from.closest('[data-board-piece], [data-board-tape]');
+  if (!piece) return [];
+  const own = [...piece.querySelectorAll(selectorOf(part))];
+  return [...piece.querySelectorAll(PARTS)].filter(
+    (el) =>
+      !el.matches(selectorOf(part)) &&
+      !el.contains(from) &&
+      !own.some((o) => el.contains(o) || o.contains(el)),
+  );
+}
+
+function overlaps(a: DOMRect, b: DOMRect): boolean {
+  // Touching edges are not overlapping: the seat starts on the outline.
+  const EPS = 0.5;
+  return (
+    a.width > 0 &&
+    a.height > 0 &&
+    b.width > 0 &&
+    b.height > 0 &&
+    a.left < b.right - EPS &&
+    b.left < a.right - EPS &&
+    a.top < b.bottom - EPS &&
+    b.top < a.bottom - EPS
+  );
+}
+
+/** The first side whose seat, as drawn (turned with the part), lies on none of the obstacles. */
+function seatFor(frame: HTMLElement, part: BoardPart): Seat {
+  const rects = (els: Element[]): DOMRect[] => els.map((el) => el.getBoundingClientRect());
+  const own = rects(
+    [...frame.querySelectorAll('[data-edit-handle]')].filter(
+      (h) => h.getAttribute('data-edit-handle') !== 'rotate',
+    ),
+  );
+  const others = rects(siblingParts(frame, part));
+  const free = (side: Side, against: DOMRect[]): boolean => {
+    const probe = frame.querySelector(`[data-edit-probe="${side}"]`);
+    if (!probe) return false;
+    const r = probe.getBoundingClientRect();
+    return against.every((o) => !overlaps(r, o));
+  };
+  const clear = SIDES.find((side) => free(side, [...own, ...others]));
+  if (clear) return { side: clear, clear: true };
+  return { side: SIDES.find((side) => free(side, own)) ?? 'top', clear: false };
+}
+
+/** The part of the piece under a point, other than `part`: where a tap on the handle lands. */
+function siblingAt(from: Element, part: BoardPart, x: number, y: number): Element | null {
+  const siblings = siblingParts(from, part);
+  const stack =
+    typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(x, y) : [];
+  for (const el of stack) {
+    const hit = siblings.find((s) => s === el || s.contains(el));
+    if (hit) return hit;
+  }
+  return null;
+}
+
 /** What a tap on the board is on when it lets an active piece go: none of these. */
 export const ON_PIECE =
   '[data-board-piece], [data-board-tape], [data-edit-toolbar], [data-board-slot]';
@@ -138,6 +245,7 @@ export function PartFrame({
   widthInside = false,
   onHold,
   onHeld,
+  onPick,
   ref,
 }: {
   part: BoardPart;
@@ -154,6 +262,8 @@ export function PartFrame({
   onHold?: (share: Point | null) => void;
   /** A handle is down (the part rises over every piece) or let go (it drops back). */
   onHeld?: (held: boolean) => void;
+  /** Selects another part of the piece: a tap on the rotate handle over it (review). */
+  onPick?: (part: BoardPart) => void;
   /**
    * Drawn over every piece, its body lets pointers through to what is
    * beneath — a sticker on the label's corner stays a tap away — and the
@@ -169,9 +279,21 @@ export function PartFrame({
   const frame = useRef<number | null>(null);
   const pending = useRef<PartValues | null>(null);
   // The latest of everything a gesture reads, without re-binding its listeners.
-  const latest = useRef({ part, values, units, tools, editing, onHold, onHeld });
+  const latest = useRef({ part, values, units, tools, editing, onHold, onHeld, onPick });
   useEffect(() => {
-    latest.current = { part, values, units, tools, editing, onHold, onHeld };
+    latest.current = { part, values, units, tools, editing, onHold, onHeld, onPick };
+  });
+  // The rotate handle's seat, read from what is drawn each time it is drawn:
+  // the piece's other parts move without this frame's props saying so. Set
+  // only when it changes, so it settles in a pass.
+  const [seat, setSeat] = useState<Seat>({ side: 'top', clear: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!tools.rotate || !root.current) return;
+    const next = seatFor(root.current, part);
+    setSeat((current) =>
+      current.side === next.side && current.clear === next.clear ? current : next,
+    );
   });
   const stop = useRef<() => void>(() => {});
   useEffect(() => () => stop.current(), []);
@@ -271,6 +393,12 @@ export function PartFrame({
     stop.current();
     latest.current.onHeld?.(false);
     const release = latest.current.onHold;
+    // A tap on the rotate handle (under 8px) where it lies over another part
+    // of the piece selects that part; only a drag turns (review).
+    if (g.kind === 'rotate' && !g.moved && root.current) {
+      const under = siblingAt(root.current, latest.current.part, event.clientX, event.clientY);
+      if (under) latest.current.onPick?.(partAt(under));
+    }
     if (g.moved) {
       flush();
       latest.current.editing.commit();
@@ -382,21 +510,38 @@ export function PartFrame({
         style={{ right: 3, bottom: 3 }}
       />
       {tools.rotate ? (
-        <span
-          data-edit-handle="rotate"
-          aria-hidden
-          onClick={swallow}
-          onPointerDown={(event) => begin('rotate', event)}
-          className={`${HANDLE} -top-11 left-1/2 -translate-x-1/2 cursor-grab`}
-          style={still}
-        >
-          {/* A stem down to the outline, so it reads as the frame's, not a mark on the water. */}
+        <>
+          {/* Unseen seats, one a side, measured to choose where the handle stands. */}
+          {SIDES.map((side) => (
+            <span
+              key={side}
+              aria-hidden
+              data-edit-probe={side}
+              className={`pointer-events-none invisible absolute h-11 w-11 ${ROTATE_AT[side]}`}
+            />
+          ))}
           <span
             aria-hidden
-            className="absolute top-1/2 left-1/2 h-[22px] w-px -translate-x-1/2 bg-white"
-          />
-          <span className={`${DOT} relative h-3.5 w-3.5`} />
-        </span>
+            data-edit-rotate-seat={seat.side}
+            data-clear={seat.clear ? '' : undefined}
+            className={`pointer-events-none absolute flex h-11 w-11 items-center justify-center ${ROTATE_AT[seat.side]}`}
+          >
+            {/* A stem to the outline, so it reads as the frame's, not a mark on the water. */}
+            <span aria-hidden className={`absolute bg-white ${STEM_AT[seat.side]}`} />
+            <span
+              data-edit-handle="rotate"
+              aria-hidden
+              onClick={swallow}
+              onPointerDown={(event) => begin('rotate', event)}
+              // 44px reaching outward from the part; where no side is clear of
+              // the piece's other parts, no more than the dot itself.
+              className={`pointer-events-auto relative flex cursor-grab items-center justify-center ${seat.clear ? 'h-11 w-11' : 'h-5 w-5'}`}
+              style={still}
+            >
+              <span className={`${DOT} relative h-3.5 w-3.5`} />
+            </span>
+          </span>
+        </>
       ) : null}
       {tools.size ? (
         <span
@@ -456,13 +601,25 @@ export function PartFrame({
  * water — the text size stepper when the label is selected ("T | − 14 +"),
  * Undo, More and Done — and what the save is doing: "Saving…", then "Saved".
  */
+/**
+ * Where a toolbar starts or ends (`x`, by `align`) in its container's
+ * pixels, kept between `min` and `max`: the board's edges there.
+ */
+export type ToolbarSeat = { x: number; align: 'left' | 'right'; min: number; max: number };
+
 export function EditToolbar({
   editing,
   fontSize,
   layers = null,
+  parts = [],
+  seat = null,
   style,
 }: {
   editing: BoardEditing;
+  /** The piece's parts, as chips that select one (review): shown when there is more than one. */
+  parts?: { part: BoardPart; name: string }[];
+  /** Placed by its own width, within the board; else `style` places it. */
+  seat?: ToolbarSeat | null;
   /** The label's text size as drawn, while the label is selected; else no stepper. */
   fontSize: number | null;
   /** The piece's layer moves (stacking.ts), each possible or not; none for a band along its days. */
@@ -476,6 +633,21 @@ export function EditToolbar({
     latest.current = layers;
   });
   const hasLayers = layers !== null;
+  // Its own width, as drawn (it wraps on a phone), read each time it is
+  // drawn; set only when it changes, so it settles in a pass.
+  const bar = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const w = bar.current?.offsetWidth ?? 0;
+    if (w !== width) setWidth(w);
+  });
+  const left = seat
+    ? Math.max(
+        seat.min,
+        Math.min(seat.align === 'right' ? seat.x - width : seat.x, seat.max - width),
+      )
+    : undefined;
   useEffect(() => {
     if (!hasLayers) return;
     const onKey = (event: KeyboardEvent): void => {
@@ -498,6 +670,7 @@ export function EditToolbar({
   }, [hasLayers]);
   return (
     <div
+      ref={bar}
       data-edit-toolbar
       role="toolbar"
       aria-label="Layout"
@@ -506,8 +679,29 @@ export function EditToolbar({
       // A white bar on the ground stays white with ink (0032).
       // Wraps to a second row on a phone rather than leave the board.
       className="surface text-ink pointer-events-auto absolute flex w-max flex-wrap items-center gap-0.5 rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md"
-      style={style}
+      style={left === undefined ? style : { ...style, left }}
     >
+      {parts.length > 1 ? (
+        <div data-edit-parts className="flex items-center" role="group" aria-label="Part">
+          {parts.map(({ part, name }) => {
+            const on = samePart(part, editing.part);
+            return (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={on}
+                data-edit-part-chip={name}
+                onClick={() => editing.tap(editing.activeId!, part)}
+                // Selection is ink (H20f); the rest muted.
+                className={`flex h-7 items-center rounded-full px-2 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
+              >
+                {name}
+              </button>
+            );
+          })}
+          <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
+        </div>
+      ) : null}
       {fontSize !== null ? (
         <div data-edit-text-size className="flex items-center" role="group" aria-label="Text size">
           <Type aria-hidden size={14} className="mx-1.5" />

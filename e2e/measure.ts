@@ -60,11 +60,7 @@ export async function select(page: Page, part: Part): Promise<void> {
   await label.click();
   if (part === 'icon')
     await page.locator('[data-board-piece="sticker"] [data-board-sticker]').click();
-  // Dispatched: the label's rotate handle (a 44px target) stands centred
-  // above the label, and on a phone's half week covers most of this small
-  // photo. What is measured is the drag that follows, not this tap.
-  if (part === 'photo')
-    await page.locator('[data-board-photo-card="fixture/photo.webp"]').dispatchEvent('click');
+  if (part === 'photo') await page.locator('[data-board-photo-card="fixture/photo.webp"]').click();
   await page.locator(`[data-edit-frame="${part === 'width' ? 'label' : part}"]`).waitFor();
 }
 

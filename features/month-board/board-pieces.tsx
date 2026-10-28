@@ -37,6 +37,7 @@ import {
   EditToolbar,
   NO_TOOLS,
   PartFrame,
+  type ToolbarSeat,
   partAt,
   type FrameHandle,
   type FrameUnits,
@@ -748,9 +749,23 @@ export function BoardPieceView({
       widthInside={labelRight > metrics.width - 22}
       onHold={onHold}
       onHeld={setHeld}
+      onPick={(part) => editing!.tap(card.splash.id, part)}
       ref={frameRef}
     />
   ) : null;
+  const toolbar = toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line);
+  // The toolbar's part chips (review), in the panel's order; the photos newest first.
+  const parts: { part: BoardPart; name: string }[] = active
+    ? [
+        ...(piece.compact ? [] : [{ part: LABEL_PART, name: 'Label' }]),
+        ...(piece.stickerBox && icon ? [{ part: { kind: 'icon' } as const, name: 'Icon' }] : []),
+        ...[...piece.fan].reverse().map((photo, at) => ({
+          part: { kind: 'photo', path: photo.path } as const,
+          name: `Photo ${at + 1}`,
+        })),
+        ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
+      ]
+    : [];
   // The selected part's frame, over every piece: placed and turned exactly as
   // the part, so its outline and handles are never covered, while the part
   // itself keeps its place in the order.
@@ -1012,11 +1027,9 @@ export function BoardPieceView({
           editing={editing!}
           fontSize={selected?.kind === 'label' ? piece.type.size : null}
           layers={layers}
-          style={{
-            ...toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line),
-            zIndex: overAll(total, 3),
-            maxWidth: metrics.width,
-          }}
+          parts={parts}
+          seat={toolbar.seat}
+          style={{ top: toolbar.top, zIndex: overAll(total, 3), maxWidth: metrics.width }}
         />
       ) : null}
       {/* Its own tap, beside the drawing: outside the hidden layer, so it is announced. */}
@@ -1084,8 +1097,20 @@ export function BoardTapeView({
         tools={period ? NO_TOOLS : { ...TOOLS[kind], width: false }}
         editing={editing!}
         origin={kind === 'label' ? 'left' : 'center'}
+        onPick={(part) => editing!.tap(tape.id, part)}
       />
     ) : null;
+  // A band's part chips (review): not on a range along its days, which takes its text size alone.
+  const parts: { part: BoardPart; name: string }[] =
+    active && !period
+      ? [
+          { part: LABEL_PART, name: 'Label' },
+          ...(icon && layout.icon?.inline === false
+            ? [{ part: { kind: 'icon' } as const, name: 'Icon' }]
+            : []),
+          ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
+        ]
+      : [];
   return (
     <>
       <div
@@ -1149,6 +1174,7 @@ export function BoardTapeView({
         <EditToolbar
           editing={editing!}
           fontSize={selected?.kind === 'label' ? size : null}
+          parts={parts}
           style={{ left: tape.x, top: tape.y + tape.h + 10 }}
         />
       ) : null}
@@ -1186,20 +1212,26 @@ function tapeSelected(part: BoardPart, layout: BoardLayoutJson): BoardPart {
 
 /**
  * The toolbar's seat (review): under the label as it is moved — below its
- * own handles and the wave's — towards the board's middle, so it stays on it.
+ * own handles and the wave's — towards the board's middle, and never past
+ * the board's edges (a phone's half week put it off the left one).
  */
 function toolbarAt(
   piece: BoardPiece,
   moved: { x?: number; y?: number } | undefined,
   metrics: BoardMetrics,
   line: number,
-): CSSProperties {
+): { top: number; seat: ToolbarSeat } {
   const box = piece.labelBox;
   const x = box.x + (moved?.x ?? 0) * metrics.column;
   const top = box.y + (moved?.y ?? 0) * line + box.h + 26;
-  return piece.x + x + box.w / 2 > metrics.width / 2
-    ? { left: x + box.w, top, transform: 'translateX(-100%)' }
-    : { left: x, top };
+  const within = { min: -piece.x, max: metrics.width - piece.x };
+  return {
+    top,
+    seat:
+      piece.x + x + box.w / 2 > metrics.width / 2
+        ? { x: x + box.w, align: 'right', ...within }
+        : { x, align: 'left', ...within },
+  };
 }
 
 /**

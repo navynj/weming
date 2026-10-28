@@ -642,3 +642,155 @@ describe('direct manipulation: the page around it', () => {
     await settle();
   });
 });
+
+describe('the rotate handle keeps off the piece’s other parts (review)', () => {
+  const P0 = 'a1/s2-0.webp';
+  const P1 = 'a1/s2-1.webp';
+  /** On top: two photos (P0 the newest), the icon inline in their caption, and a wave. */
+  const busy = (): Card[] => [
+    card('s2', 'Lynn Canyon', '2026-10-22', {
+      photos: [
+        { rippleId: 's2-b', path: P0 },
+        { rippleId: 's2-b', path: P1 },
+      ],
+      layout: { icon: { inline: false }, wave: { on: true } },
+    }),
+    card('s1', 'Grand Austria Hotel', '2026-10-21'),
+  ];
+  const box = (x: number, y: number, w: number, h: number): DOMRect =>
+    ({
+      x,
+      y,
+      left: x,
+      top: y,
+      right: x + w,
+      bottom: y + h,
+      width: w,
+      height: h,
+      toJSON: () => ({}),
+    }) as DOMRect;
+  /** jsdom lays nothing out: each element's box, as the test says, else nothing. */
+  function boxes(of: (el: Element) => DOMRect | null): () => void {
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      return of(this) ?? original.call(this);
+    };
+    return () => {
+      Element.prototype.getBoundingClientRect = original;
+    };
+  }
+  const PROBES: Record<string, DOMRect> = {
+    top: box(0, -44, 44, 44),
+    right: box(100, 0, 44, 44),
+    bottom: box(0, 40, 44, 44),
+    left: box(-44, 0, 44, 44),
+  };
+  const probe = (el: Element): DOMRect | null => {
+    const side = el.getAttribute('data-edit-probe');
+    return side ? PROBES[side] : null;
+  };
+
+  it('chips each part on the toolbar, the selected one in ink, and a chip selects its part', () => {
+    const { container } = home(busy());
+    fireEvent.click(label(container, 's2'));
+    const chips = [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')];
+    // Photos carry the icon inline in their caption: no Icon chip.
+    expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Photo 1', 'Photo 2', 'Wave']);
+    const chip = (name: string) => q(container, `[data-edit-part-chip="${name}"]`);
+    expect(chip('Label').className).toContain('bg-ink');
+    expect(chip('Label').getAttribute('aria-pressed')).toBe('true');
+    expect(chip('Photo 1').className).not.toContain('bg-ink');
+    expect(chip('Photo 1').className).toContain('text-pool-500');
+    fireEvent.click(chip('Photo 2'));
+    expect(q(container, `[data-board-piece="s2"] [data-edit-overlay="photo"]`).style.width).toBe(
+      q(container, `[data-board-photo-card="${P1}"]`).style.width,
+    );
+    expect(chip('Photo 2').className).toContain('bg-ink');
+    expect(chip('Label').className).not.toContain('bg-ink');
+    fireEvent.click(chip('Wave'));
+    expect(q(container, '[data-edit-frame="wave"]')).not.toBeNull();
+    expect(saved).toHaveLength(0);
+  });
+
+  it('chips a sticker set apart from the words as Icon', () => {
+    const { container } = home([
+      card('s2', 'Lynn Canyon', '2026-10-22', { layout: { icon: { inline: false } } }),
+      card('s1', 'Grand Austria Hotel', '2026-10-21'),
+    ]);
+    fireEvent.click(label(container, 's2'));
+    const chips = [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')];
+    expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Icon']);
+    fireEvent.click(q(container, '[data-edit-part-chip="Icon"]'));
+    expect(q(container, '[data-edit-frame="icon"]')).not.toBeNull();
+  });
+
+  it('shows no chips on a piece with one part', () => {
+    const { container } = home();
+    fireEvent.click(label(container, 's2'));
+    expect(container.querySelector('[data-edit-toolbar]')).not.toBeNull();
+    expect(container.querySelector('[data-edit-parts]')).toBeNull();
+  });
+
+  it('stands above the part, else right, below, left: the first spot clear of its siblings and its own handles', () => {
+    const restore = boxes((el) => {
+      if (el.matches(`[data-board-photo-card="${P0}"]`)) return box(0, -60, 44, 50);
+      if (el.matches('[data-edit-handle="width"]')) return box(90, 0, 44, 44);
+      return probe(el);
+    });
+    try {
+      const { container } = home(busy());
+      fireEvent.click(label(container, 's2'));
+      const seat = q(container, '[data-edit-rotate-seat]');
+      expect(seat.dataset.editRotateSeat).toBe('bottom');
+      expect(seat.hasAttribute('data-clear')).toBe(true);
+      // Its stem follows it: up from the handle to the outline.
+      expect(seat.querySelector('span')!.className).toContain('bottom-1/2');
+      expect(q(container, '[data-edit-handle="rotate"]').className).toContain('h-11');
+    } finally {
+      restore();
+    }
+  });
+
+  it('stands above where it is when nothing is in the way', () => {
+    const { container } = home(busy());
+    fireEvent.click(label(container, 's2'));
+    expect(q(container, '[data-edit-rotate-seat]').dataset.editRotateSeat).toBe('top');
+  });
+
+  it('shrinks to its dot where every side lies on a sibling', () => {
+    const restore = boxes((el) =>
+      el.matches(`[data-board-photo-card="${P0}"]`) ? box(-100, -100, 400, 400) : probe(el),
+    );
+    try {
+      const { container } = home(busy());
+      fireEvent.click(label(container, 's2'));
+      const seat = q(container, '[data-edit-rotate-seat]');
+      expect(seat.dataset.editRotateSeat).toBe('top');
+      expect(seat.hasAttribute('data-clear')).toBe(false);
+      expect(q(container, '[data-edit-handle="rotate"]').className).toContain('h-5');
+    } finally {
+      restore();
+    }
+  });
+
+  it('a tap on the handle over a sibling selects the sibling; only a drag turns', async () => {
+    const { container } = home(busy());
+    fireEvent.click(label(container, 's2'));
+    const photo = q(container, `[data-board-photo-card="${P0}"]`);
+    const handle = q(container, '[data-edit-handle="rotate"]');
+    const original = document.elementsFromPoint;
+    document.elementsFromPoint = () => [handle, photo.firstElementChild ?? photo];
+    try {
+      const at = { clientX: 20, clientY: 20, pointerId: 1, pointerType: 'mouse', button: 0 };
+      fireEvent.pointerDown(handle, at);
+      // Under 8px: a tap.
+      fireEvent.pointerMove(window, { ...at, clientX: 25 });
+      fireEvent.pointerUp(window, { ...at, clientX: 25 });
+      await settle();
+      expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
+      expect(saved).toHaveLength(0);
+    } finally {
+      document.elementsFromPoint = original;
+    }
+  });
+});
