@@ -54,6 +54,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/home-filing-db.test.ts',
   'tests/shared-settings-db.test.ts',
   'tests/pool-owner-db.test.ts',
+  'tests/delete-account-db.test.ts',
 ];
 
 /**

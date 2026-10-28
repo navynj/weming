@@ -1554,6 +1554,7 @@ export type Database = {
         Args: { cid: string; plid: string; sid: string; uid: string }
         Returns: undefined
       }
+      _pool_heir: { Args: { leaving: string; pid: string }; Returns: string }
       _require_member: { Args: { pid: string }; Returns: string }
       _require_only_mine: {
         Args: { sid: string; uid: string }
@@ -1578,6 +1579,7 @@ export type Database = {
       _splash_lane: { Args: { sid: string }; Returns: string }
       _teardown_pool: { Args: { p_pool: string }; Returns: undefined }
       _theme_color_ok: { Args: { c: string }; Returns: boolean }
+      account_deletion_preview: { Args: never; Returns: Json }
       add_joint_invitees: {
         Args: { p_everyone?: boolean; p_splash: string; p_users: string[] }
         Returns: undefined
@@ -1641,6 +1643,7 @@ export type Database = {
         Returns: string
       }
       delete_joint_splash: { Args: { p_splash: string }; Returns: undefined }
+      delete_my_account: { Args: never; Returns: Json }
       delete_pool: { Args: { p_pool: string }; Returns: undefined }
       delete_reply: { Args: { p_reply: string }; Returns: undefined }
       edit_reply: {

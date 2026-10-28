@@ -6,9 +6,15 @@
 #   backups/<stamp>/storage/manifest.json  object count, bytes, one row per object
 #
 # All gitignored. Locally it uses the linked project and, for storage, the
-# service key the logged-in Supabase CLI hands over; it never prints it. An
-# object unchanged since the previous local backup (same etag) is hard-linked
-# from there instead of downloaded, and every folder stays complete on its own.
+# service key the logged-in Supabase CLI hands over; it never prints it.
+#
+# Locally, nothing stays plain at rest (Yoonji, 2026-10-28): the dump and the
+# storage folder are packed and encrypted with age to the same public key as
+# the weekly artifact, as backups/<stamp>.tar.gz.age. The plain dump alone
+# stays, for the push it was made for; db-push.sh deletes it when the push
+# ends, and the next backup seals anything plain still lying here. Archives
+# older than 60 days are deleted, so the 60 days the account-deletion sheet
+# promises hold here too.
 #
 # In CI (.github/workflows/backup.yml) the same script runs with
 # SUPABASE_DB_URL, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from secrets,
@@ -77,5 +83,70 @@ rm -f "${out}/.dump-schema.err" "${out}/.dump-data.err"
 echo "✓ ${dump} ($(wc -l < "$dump" | tr -d ' ') lines)"
 
 echo "→ downloading storage"
+# A plain folder from an earlier backup lends its unchanged objects; locally
+# none stays plain, so this reuses only in a run that kept one.
 previous="$(ls -d "${out}"/*/storage 2>/dev/null | grep -v "/${stamp}/" | sort | tail -1 || true)"
 node scripts/backup-storage.mjs "${out}/${stamp}/storage" ${previous:+--previous "$previous"}
+
+# CI packs and encrypts in its own steps (backup-run.yml), outside the repo.
+[ -n "${BACKUP_OUT:-}" ] && exit 0
+
+key="${BACKUP_AGE_PUBLIC_KEY:-$(gh variable get BACKUP_AGE_PUBLIC_KEY -R navynj/weming 2>/dev/null || true)}"
+case "$key" in
+  age1*) ;;
+  *)
+    echo "✖ No age public key (BACKUP_AGE_PUBLIC_KEY, or the repo variable through gh)." >&2
+    echo "  The backup is written but plain: ${dump} and ${out}/${stamp}/" >&2
+    exit 1
+    ;;
+esac
+
+# Packs the named entries of backups/ into <name>.tar.gz.age, checks the
+# archive and the age header, keeps the newest entry's time on the archive
+# (pruning reads it), and only then removes the plain entries.
+seal() {
+  local name="$1"
+  shift
+  local archive="${out}/${name}.tar.gz.age" plain
+  plain="$(mktemp "${TMPDIR:-/tmp}/weming-seal.XXXXXX")"
+  tar -C "$out" -czf "$plain" "$@"
+  tar -tzf "$plain" > /dev/null
+  age -r "$key" -o "$archive" "$plain"
+  rm -f "$plain"
+  [ "$(head -c 21 "$archive")" = "age-encryption.org/v1" ] || {
+    echo "✖ ${archive} is not an age file; the plain copy is kept" >&2
+    rm -f "$archive"
+    return 1
+  }
+  local newest
+  newest="$(cd "$out" && ls -td "$@" | head -1)"
+  touch -r "${out}/${newest}" "$archive"
+  (cd "$out" && rm -rf "$@")
+}
+
+# Anyone's plain copy that is not this push's dump: earlier backups and
+# their storage lists and folders, and local database dumps, each by stamp.
+for entry in "$out"/*.sql "$out"/*.storage.txt "$out"/*/; do
+  [ -e "$entry" ] || continue
+  base="$(basename "$entry")"
+  name="${base%.sql}"
+  name="${name%.storage.txt}"
+  [ "$name" = "$stamp" ] && continue
+  [ -e "${out}/${name}.tar.gz.age" ] && { echo "✖ ${name}: an archive by that name exists; left plain" >&2; continue; }
+  parts=()
+  for part in "${name}.sql" "${name}.storage.txt" "${name}"; do
+    [ -e "${out}/${part}" ] && parts+=("$part")
+  done
+  [ "${#parts[@]}" -gt 0 ] || continue
+  seal "$name" "${parts[@]}"
+  echo "✓ sealed ${name}"
+done
+
+# This backup: the dump and its storage. The dump stays plain until the push.
+cp -p "$dump" "${out}/${stamp}.plain.sql"
+seal "$stamp" "${stamp}.sql" "${stamp}"
+mv "${out}/${stamp}.plain.sql" "$dump"
+echo "✓ ${out}/${stamp}.tar.gz.age (the dump stays plain until the push ends)"
+
+# Kept 60 days, as the weekly artifact is.
+find "$out" -maxdepth 1 -name '*.tar.gz.age' -mtime +60 -print -delete | sed 's/^/✓ pruned /'

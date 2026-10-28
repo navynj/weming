@@ -13,7 +13,11 @@ const ERRORS: Record<string, string> = {
 export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>) {
   const params = await searchParams;
   const key = typeof params.error === 'string' ? params.error : null;
-  const message = key ? (ERRORS[key] ?? 'Sign-in failed. Try again.') : null;
+  const message = key
+    ? (ERRORS[key] ?? 'Sign-in failed. Try again.')
+    : params.deleted === '1'
+      ? 'Your account was deleted.'
+      : null;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6 text-center">

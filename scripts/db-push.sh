@@ -21,12 +21,15 @@ if [ -n "${DURING_BACKUP_RUN:-}" ]; then
   echo "  ✓ backup: pipeline run ${DURING_BACKUP_RUN}"
 else
   today="$(date +%Y%m%d)"
-  if ! ls backups/"${today}"-*.sql >/dev/null 2>&1; then
+  if ! ls backups/"${today}"-*.tar.gz.age >/dev/null 2>&1; then
     echo "✖ No backup from today. Production has no other copy." >&2
     echo "    pnpm backup" >&2
     exit 1
   fi
-  echo "  ✓ backup from today: $(ls -t backups/"${today}"-*.sql | head -1)"
+  echo "  ✓ backup from today: $(ls -t backups/"${today}"-*.tar.gz.age | head -1)"
+  # The plain dump lives for this push only (backup.sh): gone when it ends,
+  # whichever way. The sealed archive keeps the same contents.
+  trap 'rm -f backups/'"${today}"'-*.sql' EXIT
 fi
 
 # The database: the linked project by hand, a URL in the pipeline.

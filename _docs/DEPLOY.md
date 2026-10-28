@@ -420,13 +420,25 @@ manifest with the object count and bytes.
 
 ### Local: `pnpm backup`
 
-Writes `backups/<stamp>.sql` and `backups/<stamp>/storage/<bucket>/<path>`
-plus `backups/<stamp>/storage/manifest.json` (all gitignored). It reads
-production through the linked project; the storage service key comes from
-the logged-in Supabase CLI and is never printed. An object unchanged since
-the previous local backup (same etag) is hard-linked from it rather than
-downloaded, so every folder is complete on its own. `pnpm db:push` refuses
-without a dump from today.
+Dumps the database and downloads storage (`<stamp>.sql`,
+`<stamp>/storage/<bucket>/<path>`, `<stamp>/storage/manifest.json`), then
+**seals them**: one `backups/<stamp>.tar.gz.age`, encrypted with age to the
+same public key as the weekly artifact (`BACKUP_AGE_PUBLIC_KEY`, read from the
+environment or the repo variable through `gh`). Nothing stays plain at rest
+but this backup's `<stamp>.sql`, kept for the push it was made for:
+`pnpm db:push` refuses without an archive from today and deletes today's plain
+dump when it ends, either way. Each run also seals any plain copy still in
+`backups/` (earlier dumps, storage folders and lists, local database dumps),
+and deletes archives older than 60 days, so the 60 days the account-deletion
+sheet promises hold here as they do for the artifact. All gitignored. It
+reads production through the linked project; the storage service key comes
+from the logged-in Supabase CLI and is never printed.
+
+Open one with the offline private key:
+
+```sh
+age -d -i <path to weming-backup.key> backups/<stamp>.tar.gz.age | tar -xzf - -C ~/weming-restore
+```
 
 ### Weekly: the encrypted GitHub artifact
 

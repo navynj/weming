@@ -33,6 +33,7 @@ import { PlaceHeader } from '@/features/header/place-header';
 import { usePeople } from '@/features/people/people-provider';
 import { ProfileSheet } from '@/features/people/profile-sheet';
 import { ThemePicker } from '@/features/people/theme-picker';
+import { DeleteAccount } from '@/features/account/delete-account';
 import { SettingsSheet } from '@/features/settings/settings-sheet';
 import { useSettings } from '@/features/settings/use-settings';
 
@@ -501,6 +502,8 @@ export function HomeGround({
                   message={lanes.message}
                   onClose={() => setLanesRound((n) => n + 1)}
                 />
+                {/* At the very foot, after a rule (H53). */}
+                <DeleteAccount />
               </section>
             ),
           },
