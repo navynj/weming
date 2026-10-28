@@ -50,6 +50,7 @@ const item = (over: Partial<NotificationItem>): NotificationItem => ({
   actorName: 'Mina',
   poolName: 'Our Pool',
   title: null,
+  poolId: 'p1',
   splashId: 's1',
   rippleId: 'r1',
   replyId: 'y1',
@@ -91,7 +92,7 @@ describe('the notifications sheet (H32)', () => {
     expect(row.textContent).toContain('Mina replied in Our Pool');
     expect(row.hasAttribute('data-unread')).toBe(true);
     fireEvent.click(row);
-    expect(pushed).toEqual(['/splash/s1#reply-y1']);
+    expect(pushed).toEqual(['/pool/p1/splash/s1#reply-y1']);
     expect(closed).toBe(true);
     await waitFor(() => expect(marked).toEqual([['n1']]));
     expect(offered).toEqual([]);
@@ -103,7 +104,7 @@ describe('the notifications sheet (H32)', () => {
     const row = await find(container, '[data-notification="n2"]');
     expect(row.textContent).toContain('Mina invited you to add your side in Our Pool');
     fireEvent.click(row);
-    expect(pushed).toEqual(['/splash/s1']);
+    expect(pushed).toEqual(['/pool/p1/splash/s1']);
     expect(offered).toEqual([1]);
   });
 
@@ -112,7 +113,7 @@ describe('the notifications sheet (H32)', () => {
     const { container } = render(<NotificationsSheet onClose={() => {}} />);
     const row = await find(container, '[data-notification="n3"]');
     fireEvent.click(row);
-    expect(pushed).toEqual(['/splash/s1#block-r1']);
+    expect(pushed).toEqual(['/pool/p1/splash/s1#block-r1']);
     // Already read: nothing to mark.
     expect(marked).toEqual([]);
   });

@@ -23,6 +23,7 @@ export type NotificationItem = {
   actorName: string;
   poolName: string;
   title: string | null;
+  poolId: string;
   splashId: string;
   rippleId: string | null;
   replyId: string | null;
@@ -46,7 +47,7 @@ export async function getNotifications(
   const { data, error } = await supabase
     .from('notifications')
     .select(
-      'id, type, invited, count, created_at, read_at, actor_id, splash_id, ripple_id, reply_id, actor:profiles!notifications_actor_id_fkey(display_name), pool:pools(name), splash:splashes(title)',
+      'id, type, invited, count, created_at, read_at, actor_id, pool_id, splash_id, ripple_id, reply_id, actor:profiles!notifications_actor_id_fkey(display_name), pool:pools(name), splash:splashes(title)',
     )
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -65,6 +66,7 @@ export async function getNotifications(
             actorName: row.actor?.display_name ?? 'Someone',
             poolName: row.pool.name,
             title: row.splash.title || null,
+            poolId: row.pool_id,
             splashId: row.splash_id,
             rippleId: row.ripple_id,
             replyId: row.reply_id,

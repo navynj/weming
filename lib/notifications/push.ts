@@ -39,6 +39,7 @@ export function pushPayload(
       title: facts.title,
     }),
     url: notificationPath({
+      poolId: row.pool_id,
       splashId: row.splash_id,
       rippleId: row.ripple_id,
       replyId: row.reply_id,

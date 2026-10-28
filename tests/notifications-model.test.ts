@@ -65,14 +65,15 @@ describe('the words', () => {
 });
 
 describe('where a notification opens', () => {
-  it('opens the record at the reply, else the block, else the top', () => {
-    expect(notificationPath({ splashId: 's', rippleId: 'r', replyId: 'y' })).toBe(
-      '/splash/s#reply-y',
+  it('opens the record in its pool, at the reply, else the block, else the top (H42d)', () => {
+    const at = { poolId: 'p', splashId: 's' };
+    expect(notificationPath({ ...at, rippleId: 'r', replyId: 'y' })).toBe(
+      '/pool/p/splash/s#reply-y',
     );
-    expect(notificationPath({ splashId: 's', rippleId: 'r', replyId: null })).toBe(
-      '/splash/s#block-r',
+    expect(notificationPath({ ...at, rippleId: 'r', replyId: null })).toBe(
+      '/pool/p/splash/s#block-r',
     );
-    expect(notificationPath({ splashId: 's', rippleId: null, replyId: null })).toBe('/splash/s');
+    expect(notificationPath({ ...at, rippleId: null, replyId: null })).toBe('/pool/p/splash/s');
   });
 });
 
@@ -98,7 +99,7 @@ describe('the push payload', () => {
     expect(plain).toEqual({
       title: 'Weming',
       body: 'Mina replied in Our Pool',
-      url: '/splash/s1#reply-y1',
+      url: '/pool/p1/splash/s1#reply-y1',
       tag: 'n1',
       unread: 2,
     });
@@ -185,7 +186,7 @@ describe('delivery', () => {
     expect(JSON.parse(bodies[0])).toEqual({
       title: 'Weming',
       body: 'Mina invited you to add your side in Our Pool',
-      url: '/splash/s',
+      url: '/pool/p/splash/s',
       tag: 'n',
       unread: 1,
     });

@@ -99,13 +99,19 @@ export function notificationText(facts: NotificationFacts): string {
   }
 }
 
-/** Where a notification opens: the record, at the reply or the block. */
+/**
+ * Where a notification opens: the record in the pool it is about, at the
+ * reply or the block (H42d). Always the pool's reader: Home's reads only my
+ * own records, so another member's opened there as gone, and the pool picks
+ * the thread the reply was written in.
+ */
 export function notificationPath(target: {
+  poolId: string;
   splashId: string;
   rippleId: string | null;
   replyId: string | null;
 }): string {
-  const base = `/splash/${target.splashId}`;
+  const base = `/pool/${target.poolId}/splash/${target.splashId}`;
   if (target.replyId) return `${base}#reply-${target.replyId}`;
   if (target.rippleId) return `${base}#block-${target.rippleId}`;
   return base;
