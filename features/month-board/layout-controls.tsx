@@ -9,6 +9,7 @@ import { THEMES } from '@/lib/theme';
 
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
 import type { Recipe } from './layout';
+import { PartOrder } from './part-order';
 import { WAVE_DEFAULTS } from './board-pieces';
 import { LAYER_RANGE } from './stacking';
 import { useSignedPhotos } from './use-board-photos';
@@ -88,10 +89,15 @@ function Switch({
   name,
   on,
   onChange,
+  disabled = false,
+  note,
 }: {
   name: string;
   on: boolean;
   onChange: (on: boolean) => void;
+  disabled?: boolean;
+  /** Why it cannot be switched, beside it. */
+  note?: string;
 }) {
   return (
     <button
@@ -99,8 +105,10 @@ function Switch({
       role="switch"
       aria-checked={on}
       data-layout-switch={name}
+      disabled={disabled}
+      title={note}
       onClick={() => onChange(!on)}
-      className="flex items-center gap-2 text-xs text-white/80"
+      className="flex items-center gap-2 text-xs text-white/80 disabled:opacity-50"
     >
       <span
         className={`flex h-4 w-7 items-center rounded-full p-0.5 ${on ? 'justify-end bg-white' : 'justify-start bg-white/25'}`}
@@ -108,6 +116,7 @@ function Switch({
         <span className={`h-3 w-3 rounded-full ${on ? 'bg-main-900' : 'bg-white'}`} />
       </span>
       {name}
+      {note ? <span className="text-white/60">· {note}</span> : null}
     </button>
   );
 }
@@ -235,6 +244,13 @@ export function LayoutControls({
   const inline = icon.inline ?? recipe !== 'B';
   const pooled = home && card.joint === true && card.poolLayout !== undefined;
   const period = card.splash.range != null && card.splash.range.start < card.splash.range.end;
+  // Shown on the board (0055): at least one of photos, icon or label stays.
+  const shownCount =
+    photos.filter((p) => layout.photos?.[p.path]?.hidden !== true).length +
+    (icon.hidden === true ? 0 : 1) +
+    (label.hidden === true ? 0 : 1);
+  const lastOne = shownCount <= 1;
+  const KEEP = 'Keep at least one';
   const waveSize =
     wave.amp !== undefined ? wave.amp / WAVE_SIZE.amp : (wave.length ?? 0) / WAVE_SIZE.length || 1;
 
@@ -302,6 +318,16 @@ export function LayoutControls({
       {/* A period is a tape along its days (review): only its words' size is its own. */}
       {!period ? (
         <Group title="Icon">
+          {/* Off the board only, as a photo can be; the card and the page keep it (0055). */}
+          <Switch
+            name="Show icon on board"
+            on={icon.hidden !== true}
+            disabled={lastOne && icon.hidden !== true}
+            note={lastOne && icon.hidden !== true ? KEEP : undefined}
+            onChange={(on) =>
+              on ? onEdit({}, ['icon.hidden']) : onEdit({ icon: { hidden: true } })
+            }
+          />
           {/* A photo's caption keeps its icon inline: there is no sticker to switch to. */}
           {recipe !== 'C' ? (
             <Switch name="Inline" on={inline} onChange={(on) => onEdit({ icon: { inline: on } })} />
@@ -359,6 +385,17 @@ export function LayoutControls({
       ) : null}
 
       <Group title="Label">
+        {!period ? (
+          <Switch
+            name="Show label on board"
+            on={label.hidden !== true}
+            disabled={lastOne && label.hidden !== true}
+            note={lastOne && label.hidden !== true ? KEEP : undefined}
+            onChange={(on) =>
+              on ? onEdit({}, ['label.hidden']) : onEdit({ label: { hidden: true } })
+            }
+          />
+        ) : null}
         {!period ? (
           <>
             {/* Only a filled label has a fill to choose: one with someone
@@ -467,6 +504,8 @@ export function LayoutControls({
                   <Switch
                     name="Show on board"
                     on={shown}
+                    disabled={lastOne && shown}
+                    note={lastOne && shown ? KEEP : undefined}
                     onChange={(on) =>
                       on
                         ? onEdit({}, [field('hidden')])
@@ -522,6 +561,15 @@ export function LayoutControls({
             );
           })}
         </Group>
+      ) : null}
+
+      {!period ? (
+        <PartOrder
+          layout={layout}
+          photos={photos.map((p) => p.path)}
+          sticker={!inline && recipe !== 'C'}
+          onEdit={(patch) => onEdit(patch)}
+        />
       ) : null}
 
       {!period ? (

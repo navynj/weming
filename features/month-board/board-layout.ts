@@ -14,7 +14,15 @@ const y = z.number().min(-20).max(20);
 const tilt = z.number().min(-45).max(45);
 
 export const IconLayout = z
-  .object({ inline: z.boolean(), size: z.number().min(0.5).max(8), x, y, tilt })
+  // `hidden` (0055): off the board, as a photo's is (0044).
+  .object({
+    inline: z.boolean(),
+    size: z.number().min(0.5).max(8),
+    x,
+    y,
+    tilt,
+    hidden: z.boolean(),
+  })
   .partial()
   .strict();
 export const LabelLayout = z
@@ -27,6 +35,7 @@ export const LabelLayout = z
     width: z.number().min(0.3).max(4),
     // A filled label's fill (0027): white or ink. No fill is another kind of label, never a choice.
     style: z.enum(['white', 'ink']),
+    hidden: z.boolean(),
   })
   .partial()
   .strict();
@@ -35,6 +44,16 @@ export const PhotoLayout = z
   .object({ size: z.number().min(0.2).max(2), x, y, tilt, hidden: z.boolean() })
   .partial()
   .strict();
+/** A YouTube video in a ripple (0055): a photo's fields, keyed by its id. */
+export const VideoLayout = PhotoLayout;
+export const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+/** The most parts a post's order holds (0055): every one it can have. */
+export const ORDER_MAX = 40;
+/** A part's key in the order: label, icon, wave, photo:<media path>, video:<id>. */
+export const PartKey = z
+  .string()
+  .max(520)
+  .regex(/^(label|icon|wave|photo:.+|video:[A-Za-z0-9_-]{11})$/);
 export const WaveLayout = z
   .object({
     on: z.boolean(),
@@ -64,7 +83,15 @@ export const BoardLayout = z
     icon: IconLayout,
     label: LabelLayout,
     photos: z.record(z.string(), PhotoLayout).refine((p) => Object.keys(p).length <= 20),
+    videos: z
+      .record(z.string().regex(VIDEO_ID), VideoLayout)
+      .refine((v) => Object.keys(v).length <= 20),
     wave: WaveLayout,
+    // The post's parts back to front, each once (0055).
+    order: z
+      .array(PartKey)
+      .max(ORDER_MAX)
+      .refine((o) => new Set(o).size === o.length),
   })
   .partial()
   .strict();
@@ -91,6 +118,14 @@ export function mergeLayout(base: BoardLayoutJson, patch: BoardLayoutJson): Boar
       photos[path] = { ...photos[path], ...value };
     out.photos = photos;
   }
+  if (patch.videos) {
+    const videos = { ...base.videos };
+    for (const [id, value] of Object.entries(patch.videos))
+      videos[id] = { ...videos[id], ...value };
+    out.videos = videos;
+  }
+  // Replaced whole, never merged (0055).
+  if (patch.order) out.order = patch.order;
   return out;
 }
 
@@ -103,6 +138,11 @@ export function clearLayout(layout: BoardLayoutJson, paths: string[]): BoardLayo
       delete (out.photos[photo[1]] as Record<string, unknown>)[photo[2]];
     } else if (path.startsWith('photos.') && out.photos) {
       delete out.photos[path.slice(7)];
+    } else if (path.startsWith('videos.') && out.videos) {
+      // An id holds no dot: videos.<id> or videos.<id>.<field>.
+      const [, id, field] = path.split('.');
+      if (field && out.videos[id]) delete (out.videos[id] as Record<string, unknown>)[field];
+      else if (!field) delete out.videos[id];
     } else if (path.includes('.')) {
       const [group, field] = path.split('.') as [Group, string];
       if (out[group]) delete (out[group] as Record<string, unknown>)[field];
@@ -115,6 +155,11 @@ export function clearLayout(layout: BoardLayoutJson, paths: string[]): BoardLayo
   if (out.photos) {
     for (const [path, value] of Object.entries(out.photos)) {
       if (Object.keys(value).length === 0) delete out.photos[path];
+    }
+  }
+  if (out.videos) {
+    for (const [id, value] of Object.entries(out.videos)) {
+      if (Object.keys(value).length === 0) delete out.videos[id];
     }
   }
   for (const key of Object.keys(out) as (keyof BoardLayoutJson)[]) {
@@ -159,6 +204,14 @@ export function handMoved(layout: BoardLayoutJson | undefined): boolean {
  */
 export function isPeriod(splash: { range: { start: string; end: string } | null }): boolean {
   return splash.range != null && splash.range.start < splash.range.end;
+}
+
+/** The icon or the label taken off the board (0055): the card and the page keep it. */
+export function iconHidden(layout: BoardLayoutJson | undefined): boolean {
+  return layout?.icon?.hidden === true;
+}
+export function labelHidden(layout: BoardLayoutJson | undefined): boolean {
+  return layout?.label?.hidden === true;
 }
 
 /** The photos a card shows on the board: every one but those hidden from it (0044). */

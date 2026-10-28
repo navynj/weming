@@ -39,6 +39,7 @@ import { HomeGround } from '@/features/home/home-ground';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import type { BoardLayoutJson } from '@/features/month-board/board-layout';
 import { layoutWeekBoard } from '@/features/month-board/layout';
+import { zOf } from '@/features/month-board/stacking';
 import { MonthBoard } from '@/features/month-board/month-board';
 import { LAYOUT_SAVE_MS } from '@/features/month-board/use-layout-drafts';
 import { summarizeSplash, type Splash } from '@/features/splash/summary';
@@ -518,10 +519,10 @@ describe('hand-set layouts on the calendar (review)', () => {
     expect(label.style.transform).toMatch(/^translate\(/);
     expect(label.style.transform).toContain('px');
     // One order for the view (stacking.ts): its layer puts it over the later
-    // day's piece, four steps a place; the label and its tap on step 1.
-    expect(z('s1', 'label')).toBe('6');
-    expect(z('s1', 'pick')).toBe('6');
-    expect(z('s2', 'label')).toBe('2');
+    // day's piece; the label, at the back of its post (0055), and its tap on rank 1.
+    expect(z('s1', 'label')).toBe(String(zOf(1, 1)));
+    expect(z('s1', 'pick')).toBe(String(zOf(1, 1)));
+    expect(z('s2', 'label')).toBe(String(zOf(0, 1)));
     // The piece itself carries no transform or z: no stacking context of its own.
     const piece = container.querySelector<HTMLElement>('[data-board-piece="s1"]')!;
     expect(piece.style.transform).toBe('');
@@ -549,15 +550,15 @@ describe('hand-set layouts on the calendar (review)', () => {
     const z = (id: string): string =>
       container.querySelector<HTMLElement>(`[data-board-piece="${id}"] [data-board-label]`)!.style
         .zIndex;
-    expect(z('s2')).toBe('6');
+    expect(z('s2')).toBe(String(zOf(1, 1)));
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
     expect(container.querySelector('[data-layout-group="Position"]')).not.toBeNull();
     const slider = container.querySelector<HTMLInputElement>('input[aria-label="Layer"]')!;
     expect(slider.min).toBe('-20');
     expect(slider.max).toBe('20');
     fireEvent.change(slider, { target: { value: '-1' } });
-    expect(z('s2')).toBe('2');
-    expect(z('s1')).toBe('6');
+    expect(z('s2')).toBe(String(zOf(0, 1)));
+    expect(z('s1')).toBe(String(zOf(1, 1)));
     expect(container.querySelector('[data-layout-control="Layer"]')!.textContent).toContain(
       'Under −1',
     );
@@ -591,5 +592,58 @@ describe('hand-set layouts on the calendar (review)', () => {
       width: 980,
     }).pieces[0];
     expect(a.recipe).toBe('A');
+  });
+});
+
+describe('hiding the icon or the label, and the order within a post (0055)', () => {
+  const settle = async () =>
+    act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+  const open = (cards: Card[]) => {
+    const view = home(cards);
+    fireEvent.click(view.container.querySelector('[data-layout-toggle]')!);
+    return view;
+  };
+  const control = (root: Element, name: string) =>
+    root.querySelector<HTMLButtonElement>(`[data-layout-switch="${name}"]`)!;
+
+  it('hides the label from the board, saved as label.hidden', async () => {
+    vi.useFakeTimers();
+    media(true);
+    const { container } = open(ONE);
+    fireEvent.click(control(container, 'Show label on board'));
+    await settle();
+    expect(saved.at(-1)!.patch).toEqual({ label: { hidden: true } });
+    vi.useRealTimers();
+  });
+
+  it('keeps at least one of photos, icon and label: the last one’s switch is off', () => {
+    media(true);
+    const { container } = open([{ ...ONE[0], layout: { label: { hidden: true } } }]);
+    const iconSwitch = control(container, 'Show icon on board');
+    expect(iconSwitch.disabled).toBe(true);
+    expect(iconSwitch.textContent).toContain('Keep at least one');
+    expect(control(container, 'Show label on board').disabled).toBe(false);
+  });
+
+  it('moves a part up within the post, the whole order saved back to front', async () => {
+    vi.useFakeTimers();
+    media(true);
+    const { container } = open([{ ...ONE[0], layout: { wave: { on: true } } }]);
+    const items = () =>
+      [...container.querySelectorAll('[data-part-order-item]')].map((b) =>
+        b.getAttribute('data-part-order-item'),
+      );
+    // Front first: its sticker, then the wave over the label, by default.
+    expect(items()).toEqual(['icon', 'wave', 'label']);
+    fireEvent.click(container.querySelector('[data-part-order-item="label"]')!);
+    fireEvent.click(container.querySelector('[data-part-order-up]')!);
+    // Drawn at once, saved when it rests.
+    expect(items()).toEqual(['icon', 'label', 'wave']);
+    await settle();
+    expect(saved.at(-1)!.patch).toEqual({ order: ['wave', 'label', 'icon'] });
+    vi.useRealTimers();
   });
 });

@@ -807,26 +807,31 @@ export function PartChips({
   muted,
 }: {
   parts: PartChip[];
-  editing: Pick<BoardEditing, 'part' | 'activeId' | 'tap'>;
+  editing: Pick<BoardEditing, 'part' | 'activeId' | 'tap' | 'edit'>;
   tall: boolean;
   /** The unselected chips' text: muted on the white bar, on the water. */
   muted: string;
 }) {
   return (
     <>
-      {parts.map(({ part, name }) => {
-        const on = samePart(part, editing.part);
+      {parts.map(({ part, name, unhide }) => {
+        const on = !unhide && samePart(part, editing.part);
         return (
           <button
             key={name}
             type="button"
             aria-pressed={on}
+            aria-label={unhide ? `Show ${name.toLowerCase()} on the board` : undefined}
             data-edit-part-chip={name}
-            onClick={() => editing.tap(editing.activeId!, part)}
+            data-edit-part-hidden={unhide ? '' : undefined}
+            // Hidden from the board (0055): a tap shows it again, it is not selected.
+            onClick={() => (unhide ? editing.edit(unhide) : editing.tap(editing.activeId!, part))}
             className={`flex shrink-0 items-center ${tall ? 'h-11' : 'h-8'}`}
           >
             <span
-              className={`flex h-7 items-center rounded-full px-2 ${on ? 'bg-ink text-white' : muted}`}
+              className={`flex h-7 items-center rounded-full px-2 ${
+                on ? 'bg-ink text-white' : `${muted} ${unhide ? 'line-through opacity-60' : ''}`
+              }`}
             >
               {name}
             </span>

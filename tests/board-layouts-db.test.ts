@@ -371,3 +371,63 @@ describe('Members, stored as members (0048, 0049)', () => {
     expect(byMembers[splash]).toMatchObject({ label: { x: 2, tilt: -10 } });
   });
 });
+
+describe('hidden icon and label, the order within a post, videos (0055)', () => {
+  const VIDEO = 'dQw4w9WgXcQ';
+  type Laid = BoardLayoutJson & {
+    order?: string[];
+    videos?: Record<string, Record<string, number>>;
+  };
+  const pooled = async (): Promise<Laid> => (await read(ana, 'pool'))[0].layout as Laid;
+
+  it('takes icon.hidden and label.hidden, and clears them back', async () => {
+    expect((await set(ana, { icon: { hidden: true }, label: { hidden: true } })).error).toBeNull();
+    const laid = await pooled();
+    expect(laid.icon).toMatchObject({ hidden: true });
+    expect(laid.label).toMatchObject({ hidden: true });
+    await set(ana, {}, { clear: ['icon.hidden', 'label.hidden'] });
+    const back = await pooled();
+    expect(back.icon?.hidden).toBeUndefined();
+    expect(back.label?.hidden).toBeUndefined();
+  });
+
+  it('keeps the order whole, every kind of part in it', async () => {
+    const order = [
+      'label',
+      `photo:${PHOTO_B}`,
+      'wave',
+      `photo:${PHOTO_A}`,
+      `video:${VIDEO}`,
+      'icon',
+    ];
+    expect((await set(ana, { order })).error).toBeNull();
+    expect((await pooled()).order).toEqual(order);
+    // Replaced whole, never merged.
+    expect((await set(ana, { order: ['icon', 'label'] })).error).toBeNull();
+    expect((await pooled()).order).toEqual(['icon', 'label']);
+  });
+
+  it('refuses an order past 40, with a part twice, or with a part it does not know', async () => {
+    // Videos, which no prune removes: 41 distinct ids.
+    const many = Array.from({ length: 41 }, (_, i) => `video:${String(i).padStart(11, 'v')}`);
+    for (const order of [many, ['label', 'label'], ['sticker'], [`video:short`]]) {
+      expect((await set(ana, { order })).error).not.toBeNull();
+    }
+  });
+
+  it('lays a video out per id, field by field, as a photo', async () => {
+    expect((await set(ana, { videos: { [VIDEO]: { size: 0.6 } } })).error).toBeNull();
+    expect((await set(ana, { videos: { [VIDEO]: { tilt: 5, hidden: true } } })).error).toBeNull();
+    expect((await pooled()).videos?.[VIDEO]).toEqual({ size: 0.6, tilt: 5, hidden: true });
+    await set(ana, {}, { clear: [`videos.${VIDEO}.hidden`] });
+    expect((await pooled()).videos?.[VIDEO]).toEqual({ size: 0.6, tilt: 5 });
+    expect((await set(ana, { videos: { 'not-an-id': { size: 1 } } })).error).not.toBeNull();
+  });
+
+  it('drops a photo the post no longer carries from the order', async () => {
+    expect(
+      (await set(ana, { order: ['label', 'photo:gone/elsewhere.webp', `photo:${PHOTO_A}`] })).error,
+    ).toBeNull();
+    expect((await pooled()).order).toEqual(['label', `photo:${PHOTO_A}`]);
+  });
+});

@@ -33,7 +33,14 @@ import {
   type PhotoCard,
   photoMove,
 } from './layout';
-import { handMoved, isPeriod, mergeLayout, type BoardLayoutJson } from './board-layout';
+import {
+  handMoved,
+  iconHidden,
+  isPeriod,
+  labelHidden,
+  mergeLayout,
+  type BoardLayoutJson,
+} from './board-layout';
 import {
   EditToolbar,
   NO_TOOLS,
@@ -58,7 +65,18 @@ import {
   type PartValues,
 } from './handle-math';
 import { learnsAspect } from './photo-aspects';
-import { overAll, zOf, type LayerControls, type LayerMove, type Stacking } from './stacking';
+import {
+  defaultPartOrder,
+  overAll,
+  partOrder,
+  partRanks,
+  RING_RANK,
+  SLOT_RANK,
+  zOf,
+  type LayerControls,
+  type LayerMove,
+  type Stacking,
+} from './stacking';
 import type { BoardEditing, PartChip } from './use-board-editing';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
@@ -696,8 +714,29 @@ export function BoardPieceView({
   // The selected part takes the finger: dragging it never scrolls the board.
   const stillIf = (kind: BoardPart['kind']): CSSProperties | undefined =>
     selected?.kind === kind ? { touchAction: 'none' } : undefined;
-  const zFor = (step: 'label' | 'photos' | 'wave' | 'sticker', kind: BoardPart['kind']) =>
-    held && selected?.kind === kind ? overAll(total, 1) : zOf(order, step);
+  // Its parts' order within it (0055): saved, else label, photos (the first
+  // uploaded on top), wave, icon; what is hidden takes no place.
+  const hideIcon = iconHidden(layout);
+  const hideLabel = labelHidden(layout) || (piece.compact && piece.captionLines === 0);
+  const sticker = !!(piece.stickerBox && icon && !hideIcon);
+  const ranks = partRanks(
+    partOrder(
+      layout.order,
+      defaultPartOrder({
+        label: !hideLabel,
+        photos: [...piece.fan].reverse().map((p) => p.path),
+        wave: layout.wave?.on === true,
+        icon: sticker,
+      }),
+    ),
+  );
+  const rankOf = (key: string): number => ranks.get(key) ?? 1;
+  const photoRank = Math.max(1, ...piece.fan.map((p) => rankOf(`photo:${p.path}`)));
+  const fanDrawn = [...piece.fan].sort(
+    (a, b) => rankOf(`photo:${a.path}`) - rankOf(`photo:${b.path}`),
+  );
+  const zFor = (rank: number, kind: BoardPart['kind']) =>
+    held && selected?.kind === kind ? overAll(total, 1) : zOf(order, rank);
   const frameZ = overAll(total, 2);
   const id = card.splash.id;
   // The layer buttons: what each would do, on the pieces this one overlaps.
@@ -774,13 +813,33 @@ export function BoardPieceView({
   ) : null;
   const toolbar = toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line);
   // The toolbar's part chips (review), in the panel's order; the photos newest first.
+  // A hidden part (0055) keeps its chip, crossed out: a tap shows it again.
+  // The board's photos come without the hidden ones (boardPhotos), so those
+  // are read off the layout.
+  const hiddenPhotos = Object.entries(layout.photos ?? {})
+    .filter(([, set]) => set.hidden === true)
+    .map(([path]) => path);
   const parts: PartChip[] = active
     ? [
-        ...(piece.compact ? [] : [{ part: LABEL_PART, name: 'Label' }]),
-        ...(piece.stickerBox && icon ? [{ part: { kind: 'icon' } as const, name: 'Icon' }] : []),
+        ...(labelHidden(layout)
+          ? [{ part: LABEL_PART, name: 'Label', unhide: { label: { hidden: false } } }]
+          : hideLabel
+            ? []
+            : [{ part: LABEL_PART, name: 'Label' }]),
+        ...(hideIcon && icon
+          ? [{ part: { kind: 'icon' } as const, name: 'Icon', unhide: { icon: { hidden: false } } }]
+          : sticker
+            ? [{ part: { kind: 'icon' } as const, name: 'Icon' }]
+            : []),
+        // In the order they were uploaded: the fan is drawn back to front.
         ...[...piece.fan].reverse().map((photo, at) => ({
           part: { kind: 'photo', path: photo.path } as const,
           name: `Photo ${at + 1}`,
+        })),
+        ...hiddenPhotos.map((path, at) => ({
+          part: { kind: 'photo', path } as const,
+          name: `Hidden photo ${at + 1}`,
+          unhide: { photos: { [path]: { hidden: false } } },
         })),
         ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
       ]
@@ -868,7 +927,7 @@ export function BoardPieceView({
         // Keyboard and screen readers: a pointer taps what is drawn, wherever a
         // layout moved it (review: taps on a moved label missed).
         className={`pointer-events-none absolute inset-0 z-[1] block ${moving}`}
-        style={{ zIndex: zOf(order, 'label') }}
+        style={{ zIndex: zOf(order, rankOf('label')) }}
       />
       {/* What is drawn takes the tap, where a layout put it (review): the
           label, the sticker and each photo; the gaps between them do not. */}
@@ -885,11 +944,11 @@ export function BoardPieceView({
             className={`absolute z-[1] block ${fade} ${moving}`}
             style={{
               ...placed(piece.photoBox),
-              zIndex: zFor('photos', 'photo'),
+              zIndex: zFor(photoRank, 'photo'),
               ...stillIf('photo'),
             }}
           >
-            {piece.fan.map((photo, at) => (
+            {fanDrawn.map((photo, at) => (
               <PhotoCardView
                 key={photo.path}
                 photo={photo}
@@ -911,14 +970,16 @@ export function BoardPieceView({
             column={metrics.column}
             line={line}
             moving={moving}
-            z={zFor('wave', 'wave')}
+            z={zFor(rankOf('wave'), 'wave')}
             frameZ={frameZ}
             selectable={active}
             frame={selected?.kind === 'wave' ? frame : null}
           />
         ) : null}
-        {/* A phone's month (review): no label, no words, no faces. */}
-        {piece.compact ? null : (
+        {/* A phone's month (review): no label, no words, no faces — but the
+            label's one line when it is all there is to show (0055). Hidden
+            by hand, no label at all (0055). */}
+        {hideLabel ? null : (
           <span
             data-board-label
             className={`pointer-events-auto absolute z-[1] block cursor-pointer ${LABEL_CLASS[piece.label]} ${fade} ${moving}`}
@@ -926,7 +987,7 @@ export function BoardPieceView({
             style={{
               ...placed(label),
               transform: moveOf(nudge(layout.label, layout.piece), metrics.column, line),
-              zIndex: zFor('label', 'label'),
+              zIndex: zFor(rankOf('label'), 'label'),
               ...stillIf('label'),
               ...(reading && still
                 ? { outline: '2px solid var(--color-white)', outlineOffset: 2 }
@@ -956,7 +1017,7 @@ export function BoardPieceView({
                 maxHeight: piece.captionLines * line,
               }}
             >
-              {piece.inlineIcon && icon ? (
+              {piece.inlineIcon && icon && !hideIcon ? (
                 // Held to the words' line, so it never stretches it (review).
                 <span
                   aria-hidden
@@ -984,34 +1045,50 @@ export function BoardPieceView({
           // Out from the sticker, or the front of the label when the icon is inline.
           // Moved and turned exactly as what it rings: the sticker, or the label
           // whose front holds an inline icon.
-          piece.compact && piece.photoBox ? (
-            // A compact thumbnail has no label: the ring goes out from the photo.
-            <ReadingRipple
-              key={ripple}
-              box={piece.photoBox}
-              transform={moveOf(layout.piece, metrics.column, line)}
-              ring={{ x: 0, y: 0, w: piece.photoBox.w, h: piece.photoBox.h }}
-              z={zOf(order, 'sticker')}
-            />
+          // From the icon; with the icon hidden, the front of the label; with
+          // the label hidden too, the top photo's centre (0055).
+          !sticker && hideLabel && piece.photoBox && fanDrawn.length > 0 ? (
+            (() => {
+              const front = fanDrawn[fanDrawn.length - 1];
+              const box = {
+                x: piece.photoBox.x + front.x,
+                y: piece.photoBox.y + front.y,
+                w: front.w,
+                h: front.h,
+              };
+              return (
+                <ReadingRipple
+                  key={ripple}
+                  box={box}
+                  transform={moveOf(
+                    nudge(photoMove(layout.photos?.[front.path], front), layout.piece),
+                    metrics.column,
+                    line,
+                  )}
+                  ring={{ x: 0, y: 0, w: box.w, h: box.h }}
+                  z={zOf(order, RING_RANK)}
+                />
+              );
+            })()
           ) : (
             <ReadingRipple
               key={ripple}
-              box={piece.stickerBox && icon ? piece.stickerBox : label}
+              box={sticker ? piece.stickerBox! : label}
               transform={
-                piece.stickerBox && icon
+                sticker
                   ? moveOf(nudge(layout.icon, layout.piece), metrics.column, line)
                   : moveOf(nudge(layout.label, layout.piece), metrics.column, line)
               }
               ring={
-                piece.stickerBox && icon
-                  ? { x: 0, y: 0, w: piece.stickerBox.w, h: piece.stickerBox.h }
+                sticker
+                  ? { x: 0, y: 0, w: piece.stickerBox!.w, h: piece.stickerBox!.h }
                   : { x: piece.pad.left, y: piece.pad.top, w: piece.type.line, h: piece.type.line }
               }
-              z={zOf(order, 'sticker')}
+              z={zOf(order, RING_RANK)}
             />
           )
         ) : null}
-        {piece.stickerBox && icon ? (
+        {sticker ? (
           <span
             aria-hidden
             data-board-sticker
@@ -1020,23 +1097,23 @@ export function BoardPieceView({
             // Over its own label and any other (review).
             className={`pointer-events-auto absolute z-[2] flex cursor-pointer items-center justify-center leading-none ${fade} ${moving}`}
             style={{
-              ...placed(piece.stickerBox),
-              fontSize: piece.stickerBox.w,
+              ...placed(piece.stickerBox!),
+              fontSize: piece.stickerBox!.w,
               transform: moveOf(nudge(layout.icon, layout.piece), metrics.column, line),
-              zIndex: zFor('sticker', 'icon'),
+              zIndex: zFor(rankOf('icon'), 'icon'),
               ...stillIf('icon'),
             }}
           >
             {icon}
           </span>
-        ) : piece.compact && piece.stickerBox ? (
+        ) : piece.compact && piece.stickerBox && !hideIcon ? (
           // No lane to take an emoji from: a compact post is still something to tap.
           <span
             aria-hidden
             data-board-sticker
             data-board-dot
             className={`pointer-events-auto absolute flex cursor-pointer items-center justify-center ${fade} ${moving}`}
-            style={{ ...placed(piece.stickerBox), zIndex: zFor('sticker', 'icon') }}
+            style={{ ...placed(piece.stickerBox), zIndex: zFor(rankOf('icon'), 'icon') }}
           >
             <span className="block h-2 w-2 rounded-full bg-white" />
           </span>
@@ -1069,7 +1146,7 @@ export function BoardPieceView({
           onWrite={active ? () => {} : onWrite}
           muted={piece.muted}
           shift={moveOf(layout.piece, metrics.column, line)}
-          z={zOf(order, 'slot')}
+          z={zOf(order, SLOT_RANK)}
           moving={moving}
         />
       ) : null}

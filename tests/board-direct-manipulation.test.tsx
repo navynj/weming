@@ -690,6 +690,27 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     return side ? PROBES[side] : null;
   };
 
+  it('chips a part hidden from the board crossed out; a tap shows it again (0055)', () => {
+    const hidden = busy();
+    hidden[0] = {
+      ...hidden[0],
+      layout: { ...hidden[0].layout, photos: { [P1]: { hidden: true } } },
+    };
+    const { container } = home(hidden);
+    fireEvent.click(label(container, 's2'));
+    const names = () =>
+      [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')].map(
+        (c) => c.textContent,
+      );
+    expect(names()).toEqual(['Label', 'Photo 1', 'Hidden photo 1', 'Wave']);
+    const chip = q(container, '[data-edit-part-chip="Hidden photo 1"]');
+    expect(chip.hasAttribute('data-edit-part-hidden')).toBe(true);
+    expect(chip.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(chip);
+    // Shown at once: a photo again, no hidden chip.
+    expect(names()).toEqual(['Label', 'Photo 1', 'Photo 2', 'Wave']);
+  });
+
   it('chips each part on the toolbar, the selected one in ink, and a chip selects its part', () => {
     const { container } = home(busy());
     fireEvent.click(label(container, 's2'));

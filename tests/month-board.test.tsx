@@ -39,6 +39,7 @@ import {
   type BoardLayout,
   type Box,
 } from '@/features/month-board/layout';
+import type { BoardLayoutJson } from '@/features/month-board/board-layout';
 import { MonthBoard } from '@/features/month-board/month-board';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { summarizeSplash, type Splash, type SplashBlock } from '@/features/splash/summary';
@@ -1654,5 +1655,49 @@ describe('my side on someone else’s record, on Home (review)', () => {
     const layout = layoutWeekBoard([side], TODAY, { width: 980 });
     expect(layout.pieces[0].label).toBe('pale');
     expect(layout.pieces[0].pad.top).toBe(6);
+  });
+});
+
+describe('hiding the icon or the label on the board (0055)', () => {
+  const one = (layout: BoardLayoutJson, photos = 0) =>
+    ({ ...card('h1', 'Lynn Canyon walk', '2026-10-21', { photos }), layout }) as Card;
+  const pieceOf = (c: Card, opts: { width: number; compact?: boolean } = { width: 728 }) =>
+    layoutMonthBoard([c], '2026-10', opts).pieces.find((p) => p.id === 'h1')!;
+
+  it('an icon hidden: its words alone, no sticker, no inline icon', () => {
+    const piece = pieceOf(one({ icon: { hidden: true } }));
+    expect(piece.recipe).toBe('A');
+    expect(piece.inlineIcon).toBe(false);
+    expect(piece.stickerBox).toBeNull();
+    const { container } = board([one({ icon: { hidden: true } })]);
+    const drawn = container.querySelector('[data-board-piece="h1"]')!;
+    expect(drawn.querySelector('[data-board-icon]')).toBeNull();
+    expect(drawn.querySelector('[data-board-sticker]')).toBeNull();
+    expect(drawn.querySelector('[data-board-label]')).not.toBeNull();
+  });
+
+  it('a label hidden: the icon alone, no label drawn', () => {
+    const piece = pieceOf(one({ label: { hidden: true } }));
+    expect(piece.stickerBox).not.toBeNull();
+    expect(piece.captionLines).toBe(0);
+    const { container } = board([one({ label: { hidden: true } })]);
+    const drawn = container.querySelector('[data-board-piece="h1"]')!;
+    expect(drawn.querySelector('[data-board-label]')).toBeNull();
+    expect(drawn.querySelector('[data-board-sticker]')).not.toBeNull();
+  });
+
+  it('a label hidden with photos: the photos alone, nothing under them', () => {
+    const piece = pieceOf(one({ label: { hidden: true } }, 2));
+    expect(piece.photoBox).not.toBeNull();
+    expect(piece.labelBox.h).toBe(0);
+    expect(piece.h).toBe(piece.photoBox!.y + piece.photoBox!.h);
+  });
+
+  it('a compact month with the icon hidden and no photo: the label, one line', () => {
+    // A phone's width, as the compact month is drawn there.
+    const piece = pieceOf(one({ icon: { hidden: true } }), { width: 358, compact: true });
+    expect(piece.compact).toBe(true);
+    expect(piece.captionLines).toBe(1);
+    expect(piece.stickerBox).toBeNull();
   });
 });

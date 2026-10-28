@@ -1,6 +1,6 @@
 /**
  * Two or three photos on the board, as a pile of prints (review, 2026-10-27):
- * the first — the newest — at the recipe's size and on top; each one after
+ * the first — the first uploaded — at the recipe's size and on top; each one after
  * it at 65% of that width, underneath, set right and down by 35–45% of the
  * first photo's width and height, by hash, and further when that would hide
  * more than half of it; small stable tilts alternating either way. Every

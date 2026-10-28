@@ -3,7 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { placeCard, type Card } from '@/features/home/grid';
 import type { BoardLayoutJson } from '@/features/month-board/board-layout';
 import { layoutWeekBoard } from '@/features/month-board/layout';
-import { stackingOf, zOf } from '@/features/month-board/stacking';
+import { ORDER_MAX } from '@/features/month-board/board-layout';
+import {
+  defaultPartOrder,
+  partOrder,
+  partRanks,
+  RING_RANK,
+  SLOT_RANK,
+  stackingOf,
+  zOf,
+} from '@/features/month-board/stacking';
 import { summarizeSplash, type Splash } from '@/features/splash/summary';
 import { written } from './written-on';
 
@@ -71,16 +80,11 @@ describe('one stacking order for a board view (review, 2026-10-27)', () => {
     expect(s.order.get('thu')).toBeGreaterThan(s.order.get('wed')!);
   });
 
-  it('steps each part within its piece: slot, label and photos, wave, sticker', () => {
-    expect([
-      zOf(0, 'slot'),
-      zOf(0, 'label'),
-      zOf(0, 'photos'),
-      zOf(0, 'wave'),
-      zOf(0, 'sticker'),
-    ]).toEqual([1, 2, 2, 3, 4]);
-    // Every part of a higher piece over every part of a lower one.
-    expect(zOf(1, 'slot')).toBeGreaterThan(zOf(0, 'sticker'));
+  it('ranks each part within its piece, every part of a higher piece over a lower one', () => {
+    expect(zOf(0, SLOT_RANK)).toBeLessThan(zOf(0, 1));
+    expect(zOf(0, RING_RANK)).toBeGreaterThan(zOf(0, ORDER_MAX));
+    // The highest part of a lower piece, and its ring, under the slot of the next.
+    expect(zOf(1, SLOT_RANK)).toBeGreaterThan(zOf(0, RING_RANK));
   });
 
   it('moves one step past the nearest overlapping piece, or past every piece; none when nothing it overlaps is there', () => {
@@ -104,5 +108,56 @@ describe('one stacking order for a board view (review, 2026-10-27)', () => {
     // Saturday overlaps nothing: no move has a visible effect.
     for (const how of ['forward', 'backward', 'front', 'back'] as const)
       expect(s.move('sat', how)).toBeNull();
+  });
+});
+
+describe('the order within a post (0055)', () => {
+  const present = { label: true, photos: ['first.webp', 'second.webp'], wave: true, icon: true };
+
+  it('by default: photos above the label, the first uploaded on top, then wave and icon', () => {
+    expect(defaultPartOrder(present)).toEqual([
+      'label',
+      'photo:second.webp',
+      'photo:first.webp',
+      'wave',
+      'icon',
+    ]);
+  });
+
+  it('keeps a saved order, for the parts the post has now', () => {
+    const saved = [
+      'icon',
+      'photo:first.webp',
+      'label',
+      'photo:gone.webp',
+      'photo:second.webp',
+      'wave',
+    ];
+    expect(partOrder(saved, defaultPartOrder(present))).toEqual([
+      'icon',
+      'photo:first.webp',
+      'label',
+      'photo:second.webp',
+      'wave',
+    ]);
+  });
+
+  it('puts a part the saved order lacks where the default would have it', () => {
+    // A third photo uploaded after the order was saved; the wave turned on.
+    const now = { ...present, photos: [...present.photos, 'third.webp'] };
+    const saved = ['icon', 'label', 'photo:second.webp', 'photo:first.webp'];
+    expect(partOrder(saved, defaultPartOrder(now))).toEqual([
+      'icon',
+      'label',
+      'photo:third.webp',
+      'photo:second.webp',
+      'photo:first.webp',
+      'wave',
+    ]);
+    expect(partRanks(['label', 'icon']).get('icon')).toBe(2);
+  });
+
+  it('gives a hidden part no place', () => {
+    expect(defaultPartOrder({ ...present, label: false, icon: false })).not.toContain('label');
   });
 });

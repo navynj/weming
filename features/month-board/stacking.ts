@@ -1,4 +1,4 @@
-import type { BoardLayoutJson } from './board-layout';
+import { ORDER_MAX, type BoardLayoutJson } from './board-layout';
 import { photoMove, type BoardPiece, type Box } from './layout';
 
 /**
@@ -7,18 +7,64 @@ import { photoMove, type BoardPiece, type Box } from './layout';
  * that makes a stacking context, so a part's z competes with every other
  * piece's. A piece's place in the order is its hand-set layer first (0 when
  * unset), then the automatic order: earlier days under later ones, and
- * within a day the engine's order, in time. Within a piece its parts keep
- * fixed steps: "Add your side" 0, label and photos 1, wave 2, sticker 3.
+ * within a day the engine's order, in time. Within a piece its parts take
+ * the post's own order (0055, `partRanks`): "Add your side" at the bottom,
+ * then by default the label, the photos (the first uploaded on top), the
+ * wave, the icon — or as moved in "Within this post".
  *
  * Replaces 0044's lift of every piece moved by hand above all in place,
  * which put a moved photo over the next day's sticker whatever was asked.
  */
-export const PART_Z = { slot: 0, label: 1, photos: 1, wave: 2, sticker: 3 } as const;
-const STEP = 4;
+/** Room for every part a post can have (ORDER_MAX), the slot under them and the ring over them. */
+const STEP = ORDER_MAX + 3;
+/** Under every part of its piece: "Add your side". */
+export const SLOT_RANK = 0;
+/** Over every part of its piece: the reading ring. */
+export const RING_RANK = ORDER_MAX + 2;
 
-/** A part's z: its piece's place, its own step. */
-export function zOf(order: number, part: keyof typeof PART_Z): number {
-  return 1 + order * STEP + PART_Z[part];
+/** A part's z: its piece's place, then its rank within the piece (`partRanks`). */
+export function zOf(order: number, rank: number): number {
+  return 1 + order * STEP + rank;
+}
+
+/** A post's parts as they are drawn, back to front, by default (0055). */
+export function defaultPartOrder(present: {
+  label: boolean;
+  photos: string[];
+  wave: boolean;
+  icon: boolean;
+}): string[] {
+  return [
+    ...(present.label ? ['label'] : []),
+    // Back to front: the last uploaded at the back, the first on top.
+    ...[...present.photos].reverse().map((path) => `photo:${path}`),
+    ...(present.wave ? ['wave'] : []),
+    ...(present.icon ? ['icon'] : []),
+  ];
+}
+
+/**
+ * The post's order (0055): the one saved, for the parts it now has, each
+ * part it lacks put back where the default would have it — after the part
+ * the default puts before it.
+ */
+export function partOrder(saved: readonly string[] | undefined, defaults: string[]): string[] {
+  const present = new Set(defaults);
+  const out = (saved ?? []).filter((key) => present.has(key));
+  defaults.forEach((key, at) => {
+    if (out.includes(key)) return;
+    const before = defaults
+      .slice(0, at)
+      .reverse()
+      .find((k) => out.includes(k));
+    out.splice(before ? out.indexOf(before) + 1 : 0, 0, key);
+  });
+  return out;
+}
+
+/** Each part's rank within its piece: 1 at the back, the slot under all (SLOT_RANK). */
+export function partRanks(order: string[]): Map<string, number> {
+  return new Map(order.map((key, at) => [key, at + 1]));
 }
 
 /** Above every piece of a view of `total`: a part held by a handle, then the frame and the toolbar. */

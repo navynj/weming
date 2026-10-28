@@ -2,6 +2,7 @@ import type { Card } from '@/features/home/grid';
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
+import { iconHidden, labelHidden } from './board-layout';
 import { seedOf } from './layout-seed';
 import { spreadPhotos } from './photo-spread';
 
@@ -230,7 +231,7 @@ export type BoardPiece = {
   indent: number;
   /** C tucks up into the item above's bottom padding. */
   tuck: number;
-  /** The photo cards, back to front: the newest of the shown ones on top. */
+  /** The photo cards, back to front: the first uploaded of the shown ones on top (0055). */
   fan: PhotoCard[];
   /** Photos beyond those shown: the top card's "+N". */
   morePhotos: number;
@@ -493,6 +494,11 @@ function planDay(cards: Card[]): Plan[] {
   cards.forEach((card, at) => {
     if ((card.photos?.length ?? 0) > 0) {
       recipes.push('C');
+      return;
+    }
+    // Its icon hidden (0055): no sticker to carry, so A, its words alone.
+    if (iconHidden(card.layout)) {
+      recipes.push('A');
       return;
     }
     // Set by hand (review): Inline is A's icon, off is B's sticker; the rules step aside.
@@ -787,7 +793,7 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
   const { m, col } = ctx;
   const pad = { ...padY(plan.label, m), left: m.pad.side, right: m.pad.right };
   const fitFor = (w: number) => {
-    const lines = linesIn(card, w - pad.left - pad.right, 0, true, ctx);
+    const lines = linesIn(card, w - pad.left - pad.right, 0, !iconHidden(card.layout), ctx);
     return { lines, h: pad.top + lines * m.caption.line + pad.bottom };
   };
   const shape = (labelBox: Box, lines: number, overhang: boolean, span: number): Shape => ({
@@ -804,7 +810,7 @@ function shapeA(card: Card, plan: Plan, ctx: Context): Shape {
     stickerBox: null,
     pad,
     center: false,
-    inlineIcon: true,
+    inlineIcon: !iconHidden(card.layout),
     captionLines: lines,
     w: labelBox.x + labelBox.w,
     h: labelBox.h,
@@ -944,7 +950,7 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
   // caption that starts at its left edge, to the left.
   // A pile (photo-spread.ts) grows right from the lane's left line.
   const x = shown.length > 1 || draw(id, 'align', 2) === 0 ? 0 : Math.floor(m.column - auto);
-  // The newest first, on top; a following photo's size only when set by hand.
+  // The first uploaded first, on top (0055); a following photo's size only when set by hand.
   const pile = (scale: number) =>
     spreadPhotos(
       shown.map((p, at) => ({
@@ -968,7 +974,7 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     spread = pile((m.column - x) / spread.w);
   }
   const byPath = new Map(shown.map((p) => [p.path, p]));
-  // Back to front: the first — the newest — is drawn last, on top.
+  // Back to front: the first — the first uploaded — is drawn last, on top.
   const fan: PhotoCard[] = spread.cards
     .map((c) => ({
       ...byPath.get(c.path)!,
@@ -990,7 +996,7 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
   const right = x + size >= m.column - 1 ? m.pad.right : side;
   const pad = { ...v, right, left: side };
   const fitFor = (w: number) => {
-    const lines = linesIn(card, w - pad.left - pad.right, 0, true, ctx);
+    const lines = linesIn(card, w - pad.left - pad.right, 0, !iconHidden(card.layout), ctx);
     return { lines, h: v.top + lines * m.caption.line + v.bottom };
   };
   const set = handWidth(card, x, fitFor, m);
@@ -1021,16 +1027,30 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     stickerBox: null,
     pad,
     center: fit.span === 0,
-    inlineIcon: true,
+    inlineIcon: !iconHidden(card.layout),
     captionLines: fit.lines,
     w: Math.max(m.column, x + fit.w),
     h: labelBox.y + labelBox.h,
   };
 }
 
+/** C with its label hidden (0055): the photos alone, nothing under them. */
+function withoutCaption(shape: Shape): Shape {
+  const area = shape.photoBox!;
+  return {
+    ...shape,
+    labelBox: { x: area.x, y: area.y + area.h, w: area.w, h: 0 },
+    textBoxes: [],
+    captionLines: 0,
+    inlineIcon: false,
+    w: Math.max(area.x + area.w, 1),
+    h: area.y + area.h,
+  };
+}
+
 /**
  * A phone's month (review): seven lanes too narrow for words, so a post is
- * its icon as a sticker, centred in its lane, or its newest photo as a
+ * its icon as a sticker, centred in its lane, or its first photo as a
  * thumbnail the lane wide, never cropped; no label, no faces, no slot. The
  * label's box is kept, empty, where a wave hangs: under the sticker or
  * the photo. Stacked in time order, a breath apart.
@@ -1053,6 +1073,24 @@ function shapeCompact(card: Card, ctx: Context): Shape {
     captionLines: 0,
   };
   const photo = card.photos?.[0];
+  // Its icon hidden and no photo (0055): the label, one line clipped, the lane wide.
+  if (!photo && iconHidden(card.layout)) {
+    const pad = { top: 2, right: 2, bottom: 2, left: 2 };
+    const labelBox = { x: 0, y: 0, w: m.column, h: m.caption.line + pad.top + pad.bottom };
+    return {
+      ...common,
+      recipe: 'A',
+      variant: 'sticker',
+      stickerSize: null,
+      labelBox,
+      textBoxes: textOf(labelBox, pad, 0, 1, m),
+      stickerBox: null,
+      pad,
+      captionLines: 1,
+      w: m.column,
+      h: labelBox.h + COMPACT_GAP_PX,
+    };
+  }
   if (photo) {
     const ratio = ctx.measured[aspectKey(photo.path)] ?? PLACEHOLDER_ASPECT;
     const w = room;
@@ -1265,6 +1303,13 @@ function layoutBoard(
             emptyLeft: emptyLeftOf(cell.col),
           };
           if (compact) return shapeCompact(card, ctx);
+          // Its label hidden (0055): the icon alone, as a phone's month draws
+          // it; with photos, the photos with no caption under them.
+          if (labelHidden(card.layout)) {
+            return plan.recipe === 'C'
+              ? withoutCaption(shapeC(card, plan, ctx))
+              : shapeCompact(card, ctx);
+          }
           return plan.recipe === 'C'
             ? shapeC(card, plan, ctx)
             : plan.recipe === 'A'
