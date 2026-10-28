@@ -233,3 +233,40 @@ describe('notifications follow the thread (0053)', () => {
     expect((sent.data ?? []).every((n) => n.pool_id === beta)).toBe(true);
   });
 });
+
+describe('a deleted pool’s thread is closed, never deleted (0054)', () => {
+  it('keeps its replies and reactions, read by the owner and their writer only', async () => {
+    const written = (
+      await asAdmin().from('ripple_replies').select('id').eq('thread_pool_id', beta)
+    ).data!.map((r) => r.id);
+    expect(written.length).toBeGreaterThan(0);
+    const gone = await asUser(ana).rpc('delete_pool', { p_pool: beta });
+    expect(gone.error).toBeNull();
+    pools.splice(pools.indexOf(beta), 1);
+
+    const kept = await asAdmin()
+      .from('ripple_replies')
+      .select('id, thread_pool_id, thread_closed')
+      .in('id', written);
+    expect(kept.data).toHaveLength(written.length);
+    expect(kept.data!.every((r) => r.thread_closed && r.thread_pool_id === null)).toBe(true);
+
+    // Ben still reads the ripple through Alpha: a null pool must not open it to him.
+    expect((await replies(ben)).some((r) => written.includes(r.id))).toBe(false);
+    expect((await reactions(ben)).map((r) => r.user_id)).not.toContain(cal);
+    expect((await replies(ana)).map((r) => r.id)).toEqual(expect.arrayContaining(written));
+    expect((await reactions(ana)).map((r) => r.user_id)).toContain(cal);
+    expect((await replies(cal)).some((r) => written.includes(r.id))).toBe(true);
+  });
+
+  it('cannot be reopened or closed by hand', async () => {
+    const closed = (
+      await asAdmin().from('ripple_replies').select('id').eq('thread_closed', true).limit(1)
+    ).data![0].id;
+    const reopened = await asAdmin()
+      .from('ripple_replies')
+      .update({ thread_pool_id: alpha, thread_closed: false })
+      .eq('id', closed);
+    expect(reopened.error).not.toBeNull();
+  });
+});

@@ -842,6 +842,7 @@ export type Database = {
           created_at: string
           emoji: string
           ripple_id: string
+          thread_closed: boolean
           thread_pool_id: string | null
           user_id: string
         }
@@ -849,6 +850,7 @@ export type Database = {
           created_at?: string
           emoji: string
           ripple_id: string
+          thread_closed?: boolean
           thread_pool_id?: string | null
           user_id: string
         }
@@ -856,6 +858,7 @@ export type Database = {
           created_at?: string
           emoji?: string
           ripple_id?: string
+          thread_closed?: boolean
           thread_pool_id?: string | null
           user_id?: string
         }
@@ -893,6 +896,7 @@ export type Database = {
           hidden_by: string | null
           id: string
           ripple_id: string
+          thread_closed: boolean
           thread_pool_id: string | null
         }
         Insert: {
@@ -904,6 +908,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           ripple_id: string
+          thread_closed?: boolean
           thread_pool_id?: string | null
         }
         Update: {
@@ -915,6 +920,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           ripple_id?: string
+          thread_closed?: boolean
           thread_pool_id?: string | null
         }
         Relationships: [
@@ -1549,10 +1555,15 @@ export type Database = {
         Args: { rid: string; uid: string }
         Returns: boolean
       }
-      response_readable: {
-        Args: { rid: string; tp: string; writer: string }
-        Returns: boolean
-      }
+      response_readable:
+        | {
+            Args: { rid: string; tp: string; writer: string }
+            Returns: boolean
+          }
+        | {
+            Args: { closed: boolean; rid: string; tp: string; writer: string }
+            Returns: boolean
+          }
       revoke_invite: { Args: { p_invite: string }; Returns: undefined }
       ripple_author: { Args: { rid: string }; Returns: string }
       ripple_in_my_pools: { Args: { rid: string }; Returns: boolean }
