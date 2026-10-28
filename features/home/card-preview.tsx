@@ -83,7 +83,7 @@ export function CardResponseLine({ value, href }: { value: RippleResponsesValue;
       ) : null}
       {top && replies > 0 ? <span aria-hidden>·</span> : null}
       {replies > 0 ? (
-        <span data-card-replies className="tabular-nums">
+        <span data-card-reply-count className="tabular-nums">
           {replies === 1 ? '1 reply' : `${replies} replies`}
         </span>
       ) : null}

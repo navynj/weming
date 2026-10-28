@@ -19,10 +19,11 @@ const FACE_PX = 16;
 
 /**
  * What readers left under one ripple, on the top card (H25, review): its
- * reaction chips — reacting works here, in place — then its first two
- * replies, each its author's face and words, then "+n more replies". A reply
- * or "+n" opens the post's sheet scrolled to that reply; the card reads, the
- * sheet writes. Nothing where nothing was left and nothing can be.
+ * reaction chips — reacting works here, in place — then every reply, each
+ * its author's face and words, none folded behind "+n": the wide card has
+ * the room (H42i), and what its height cannot hold runs under its fade. A
+ * reply opens the post's sheet scrolled to it; the card reads, the sheet
+ * writes. Nothing where nothing was left and nothing can be.
  *
  * On my own record's Home card (`labels`), every pool's thread, each under
  * where it came from ("in Church"); I react in my own, from no pool.
@@ -92,10 +93,8 @@ function Thread({
 }) {
   const { me } = usePeople();
   const chips = chipsOf(value.reactions, rippleId, me ?? '');
-  const { shown, more } = repliesShown(value.replies, rippleId, false);
+  const { shown } = repliesShown(value.replies, rippleId, true);
   if (chips.length === 0 && shown.length === 0 && !canReact) return null;
-  // Where "+n" opens: the first reply the card does not show.
-  const next = more > 0 ? repliesShown(value.replies, rippleId, true).shown[shown.length] : null;
   return (
     <div
       data-card-responses={rippleId}
@@ -133,15 +132,6 @@ function Thread({
             </li>
           ))}
         </ol>
-      ) : null}
-      {next ? (
-        <Link
-          href={`${href}#reply-${next.id}`}
-          data-card-replies-more
-          className="text-pool-500 text-xs"
-        >
-          +{more} more {more === 1 ? 'reply' : 'replies'}
-        </Link>
       ) : null}
     </div>
   );

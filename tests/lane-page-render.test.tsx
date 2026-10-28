@@ -355,7 +355,7 @@ describe('a post moved to another pool lane (0020, review)', () => {
 });
 
 describe('the top card on a lane’s page reads responses, as Home does (H25, review)', () => {
-  it('shows each ripple’s reaction chips and its first two replies, then "+n"', () => {
+  it('shows each ripple’s reaction chips and every reply, none behind "+n" (H42i)', () => {
     // On a wide screen: a phone's top card is the title and first lines (H42f).
     screen.wide = true;
     const shared: Card = {
@@ -398,10 +398,9 @@ describe('the top card on a lane’s page reads responses, as Home does (H25, re
     expect([...responses.querySelectorAll('[data-card-reply]')].map((r) => r.textContent)).toEqual([
       'first',
       'second',
+      'third',
     ]);
-    expect(responses.querySelector('[data-card-replies-more]')!.getAttribute('href')).toBe(
-      '/splash/noodles#reply-re-2',
-    );
+    expect(responses.querySelector('[data-card-replies-more]')).toBeNull();
   });
 
   it('offers none on a post nobody else reads', () => {

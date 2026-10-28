@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * The top card as the reading surface (H25, review): each ripple's photos
  * under its words, its reaction chips — reacting in place, optimistically —
- * and its first two replies with "+n"; the card keeps its fixed height and
+ * and every reply (on a phone, one line of them); the card keeps its fixed height and
  * fades out what does not fit.
  */
 
@@ -207,16 +207,15 @@ describe('the top card reads each ripple in full (H25, review)', () => {
     expect(responses.querySelector('[data-reaction-add]')).not.toBeNull();
   });
 
-  it('shows the first two replies per ripple, then "+n" into the sheet at the next', () => {
+  it('shows every reply per ripple on a wide screen, none folded behind "+n" (H42i)', () => {
     const { container } = home([rich()]);
     const card = topCard(container);
     const first = card.querySelector('[data-card-responses="r1"]')!;
     const lines = [...first.querySelectorAll<HTMLAnchorElement>('[data-card-reply]')];
-    expect(lines.map((l) => l.textContent)).toEqual(['so jealous', 'which beach?']);
+    expect(lines.map((l) => l.textContent)).toEqual(['so jealous', 'which beach?', 'next time me']);
     expect(lines[0].getAttribute('href')).toBe('/splash/rich#reply-x1');
-    const more = first.querySelector<HTMLAnchorElement>('[data-card-replies-more]')!;
-    expect(more.textContent).toBe('+1 more reply');
-    expect(more.getAttribute('href')).toBe('/splash/rich#reply-x3');
+    expect(lines[2].getAttribute('href')).toBe('/splash/rich#reply-x3');
+    expect(card.querySelector('[data-card-replies-more]')).toBeNull();
     const second = card.querySelector('[data-card-responses="r2"]')!;
     expect(second.querySelectorAll('[data-card-reply]')).toHaveLength(1);
     expect(second.querySelector('[data-card-replies-more]')).toBeNull();
@@ -302,7 +301,7 @@ describe('the phone’s top card: one line of responses under the fade (H42f)', 
     const top = topCard(container);
     const line = top.querySelector<HTMLAnchorElement>('[data-card-response-line]')!;
     expect(line.querySelector('[data-card-reactions]')!.textContent).toBe('❤️3');
-    expect(line.querySelector('[data-card-replies]')!.textContent).toBe('4 replies');
+    expect(line.querySelector('[data-card-reply-count]')!.textContent).toBe('4 replies');
     // Under the faded body, not inside it.
     const body = top.querySelector('[data-card-body]')!;
     expect(body.contains(line)).toBe(false);
