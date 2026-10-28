@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, type ReactNode } from 'react';
-import { MoreHorizontal, Pencil, Pin, PinOff } from 'lucide-react';
+import { MoreHorizontal, Pin, PinOff } from 'lucide-react';
 
 import { OutlineChip } from '@/components/ui/chips/category-chip';
 import { WaveRule } from '@/components/ui/waves/wave-rule';
@@ -40,7 +40,6 @@ export function SplashHeader({
   onPin,
   onDelete,
   audience = null,
-  onOpenEdit = null,
   editLevel = 'all',
   canPin = true,
   canDelete = true,
@@ -54,8 +53,6 @@ export function SplashHeader({
   onDelete: () => Promise<void>;
   /** The Audience chip (H23), beside the lane tags; absent when I am in no pool. */
   audience?: ReactNode;
-  /** The pencil (review): only where I can edit this splash. */
-  onOpenEdit?: (() => void) | null;
   /**
    * What may be edited in place (review): all of it on my own splash; the
    * title and icon on a joint splash (any current member); nothing on
@@ -142,19 +139,6 @@ export function SplashHeader({
         )}
 
         {audience}
-
-        {onOpenEdit ? (
-          // Edit, beside the menu (review): the compose sheet in edit mode.
-          <button
-            type="button"
-            aria-label="Edit"
-            data-header-edit
-            onClick={onOpenEdit}
-            className="text-pool-500 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-          >
-            <Pencil aria-hidden size={16} />
-          </button>
-        ) : null}
 
         {canPin || canDelete ? (
           <div className="relative shrink-0">

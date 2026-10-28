@@ -20,7 +20,6 @@ import { RippleResponses } from '@/features/responses/ripple-responses';
 import { isUnseen, rememberSeen, useSeenBefore } from '@/features/responses/seen';
 import { useOpenedAt, useRippleResponses } from '@/features/responses/use-ripple-responses';
 import { authorClock } from '@/features/pool/times';
-import { usePoolEditScope } from '@/features/pool/edit-scope';
 
 import { deleteSplash, setSplashPinned, updateSplashHeader, setSplashDescription } from './actions';
 import { addBlock, editBlock } from './block-actions';
@@ -141,8 +140,7 @@ export function SplashPage({
   const scope = pool?.scope ?? 'mine';
   const orphan = splash.orphan;
   const router = useRouter();
-  const { markDeleted, openEdit, pendingEdits } = useInputSheet();
-  const editScope = usePoolEditScope();
+  const { markDeleted, pendingEdits } = useInputSheet();
   // Inside the splash sheet (review): a delete closes it over the screen beneath.
   const closeSheet = useCloseSplash();
   const { me } = usePeople();
@@ -391,10 +389,6 @@ export function SplashPage({
           canPin={!orphan && scope !== 'theirs'}
           canDelete={scope === 'mine' || (scope === 'joint' && pool!.canDeleteJoint)}
           laneChip={pool ? pool.laneChip : undefined}
-          // A block read alone has no post of mine to edit.
-          onOpenEdit={
-            orphan || scope === 'theirs' ? null : () => openEdit(page.splash.id, editScope)
-          }
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A
