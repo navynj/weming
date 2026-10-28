@@ -198,6 +198,13 @@ describe('a part removed by a hand-over (0061, H46)', () => {
     const part = view.container.querySelector('[data-block-entry="r-gone"]')!;
     expect(part.querySelector('[data-removed-part]')!.textContent).toBe('This part was removed');
     expect(part.textContent).not.toContain('YO');
+    // No face: its thread entry draws no avatar.
+    const entry = view.container.querySelector('[data-thread-entry="r-gone"]')!;
+    expect(entry.querySelector('[data-thread-removed]')).not.toBeNull();
+    expect(
+      entry.querySelector('[data-thread-avatar] [data-avatar], [data-thread-avatar] img'),
+    ).toBeNull();
+    expect(entry.querySelector('[data-thread-avatar]')!.textContent).toBe('');
     expect(part.querySelector('button[aria-label="Edit"]')).toBeNull();
   });
 });

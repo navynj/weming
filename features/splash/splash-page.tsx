@@ -475,6 +475,7 @@ export function SplashPage({
                         ? initialsOf[block.author_id]
                         : undefined,
                 authorId: block.author_id ?? undefined,
+                removed: block.author_id === null,
                 // Something new from someone else on my ripple since I last opened it (H25).
                 dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
                 body: (
