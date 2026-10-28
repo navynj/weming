@@ -280,6 +280,7 @@ describe('the board shows no reactions or replies (review)', () => {
             user_id: 'u-mina',
             emoji: '❤️',
             created_at: '2026-10-21T01:00:00Z',
+            thread_pool_id: null,
           })),
           replies: c.ripples.map((r) => ({
             id: `reply-${r.id}`,
@@ -290,6 +291,7 @@ describe('the board shows no reactions or replies (review)', () => {
             edited_at: null,
             hidden: false,
             former: false,
+            thread_pool_id: null,
           })),
         },
         locked: [],

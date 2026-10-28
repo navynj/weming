@@ -15,7 +15,7 @@ import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-ac
 import { deleteJointSplash } from '@/features/pool/actions';
 import { offerInstall } from '@/features/install/install-state';
 import { usePeople } from '@/features/people/people-provider';
-import { latestFromOthers, type RippleResponsesValue } from '@/features/responses/model';
+import { inThread, latestFromOthers, type RippleResponsesValue } from '@/features/responses/model';
 import { RippleResponses } from '@/features/responses/ripple-responses';
 import { isUnseen, rememberSeen, useSeenBefore } from '@/features/responses/seen';
 import { useOpenedAt, useRippleResponses } from '@/features/responses/use-ripple-responses';
@@ -149,15 +149,30 @@ export function SplashPage({
   // Mine to edit: my own ripples only — on Home others' are read there too (0035).
   const editable = (block: RippleWithSplash): boolean =>
     pool ? block.author_id === pool.me : !me || block.author_id === me;
-  const answered = useRippleResponses(responses);
-  // Opened at a reply from the board: its block's replies open in full (H25).
+  // Tabs per pool on my record (0035): the one picked; else, opened at a
+  // reply (a notification), its pool's (0053); else the first.
+  const [picked, setTab] = useState<string | null>(null);
   const openedAt = useOpenedAt();
+  const openedThread = responses.replies.find((r) => `reply-${r.id}` === openedAt)?.thread_pool_id;
+  const tab =
+    picked ??
+    (openedThread && threads.some((t) => t.poolId === openedThread)
+      ? openedThread
+      : (threads[0]?.poolId ?? null));
+  // Which blocks show: in a pool, the owner's and that pool's members'; on
+  // Home with tabs, the owner's and the tab's; else every one I can read.
+  const shownPool = pool ? pool.poolId : threads.length > 0 ? tab : null;
+  // Responses, the same way (0053): this pool's thread, or the tab's, with
+  // the owner's from no pool; written into the pool shown.
+  const answered = useRippleResponses(responses, shownPool);
+  const thread = inThread(answered.value, shownPool);
+  // Opened at a reply from the board: its block's replies open in full (H25).
   const [expanded, setExpanded] = useState<string[]>([]);
-  const openedRipple = answered.value.replies.find((r) => `reply-${r.id}` === openedAt)?.ripple_id;
+  const openedRipple = thread.replies.find((r) => `reply-${r.id}` === openedAt)?.ripple_id;
   const isExpanded = (id: string): boolean => expanded.includes(id) || id === openedRipple;
   // Seen as of this open, on this device; its dots stay until the next (H25).
   const seenBefore = useSeenBefore(splash.id);
-  const fromOthers = latestFromOthers(answered.value, me ?? '', (id) =>
+  const fromOthers = latestFromOthers(thread, me ?? '', (id) =>
     blocks.some((b) => b.id === id && b.author_id === me),
   );
   useEffect(() => rememberSeen(splash.id), [splash.id]);
@@ -180,11 +195,6 @@ export function SplashPage({
   const [editor, setEditor] = useState<EditorTarget | null>(() =>
     writing && !splash.orphan ? { kind: 'add', splashId: splash.id } : null,
   );
-  // Tabs per pool on my record (0035): the first opens.
-  const [tab, setTab] = useState<string | null>(threads[0]?.poolId ?? null);
-  // Which blocks show: in a pool, the owner's and that pool's members'; on
-  // Home with tabs, the owner's and the tab's; else every one I can read.
-  const shownPool = pool ? pool.poolId : threads.length > 0 ? tab : null;
   const showsBlock = (block: RippleWithSplash): boolean =>
     !block.thread_pool_id || shownPool === null || block.thread_pool_id === shownPool;
   const {
@@ -509,7 +519,7 @@ export function SplashPage({
                         <RippleResponses
                           rippleId={block.id}
                           rippleAuthor={block.author_id}
-                          value={answered.value}
+                          value={thread}
                           canRespond={respondable && !page.lockedIds.includes(block.id)}
                           expanded={isExpanded(block.id)}
                           onExpand={() => setExpanded((ids) => [...ids, block.id])}

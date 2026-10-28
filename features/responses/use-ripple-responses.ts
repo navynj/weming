@@ -14,7 +14,11 @@ import type { ReplyHandlers } from './reply-list';
  * change optimistic (CLAUDE.md, the principle): shown the moment it is made,
  * the action behind it, a refusal taking it back.
  */
-export function useRippleResponses(initial: RippleResponsesValue): {
+export function useRippleResponses(
+  initial: RippleResponsesValue,
+  /** The pool these are written in (0053): the pool shown, or null for the owner from no pool. */
+  pool: string | null = null,
+): {
   value: RippleResponsesValue;
   react: (rippleId: string, emoji: string) => void;
   handlers: (rippleId: string) => ReplyHandlers;
@@ -41,9 +45,9 @@ export function useRippleResponses(initial: RippleResponsesValue): {
     change(
       (current) => ({
         ...current,
-        reactions: toggled(current.reactions, rippleId, me, emoji).rows,
+        reactions: toggled(current.reactions, rippleId, me, emoji, undefined, pool).rows,
       }),
-      () => setReaction({ rippleId, emoji, on }),
+      () => setReaction({ rippleId, emoji, on, poolId: pool }),
     );
   }
 
@@ -62,10 +66,11 @@ export function useRippleResponses(initial: RippleResponsesValue): {
           edited_at: null,
           hidden: false,
           former: false,
+          thread_pool_id: pool,
         };
         change(
           (current) => replies(current, (rows) => [...rows, row]),
-          () => addReply({ id, rippleId, body }),
+          () => addReply({ id, rippleId, body, poolId: pool }),
         );
       },
       edit: (id, body) =>

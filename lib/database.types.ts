@@ -842,18 +842,21 @@ export type Database = {
           created_at: string
           emoji: string
           ripple_id: string
+          thread_pool_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           emoji: string
           ripple_id: string
+          thread_pool_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           emoji?: string
           ripple_id?: string
+          thread_pool_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -862,6 +865,13 @@ export type Database = {
             columns: ["ripple_id"]
             isOneToOne: false
             referencedRelation: "ripples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ripple_reactions_thread_pool_id_fkey"
+            columns: ["thread_pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
             referencedColumns: ["id"]
           },
           {
@@ -883,6 +893,7 @@ export type Database = {
           hidden_by: string | null
           id: string
           ripple_id: string
+          thread_pool_id: string | null
         }
         Insert: {
           author_id: string
@@ -893,6 +904,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           ripple_id: string
+          thread_pool_id?: string | null
         }
         Update: {
           author_id?: string
@@ -903,6 +915,7 @@ export type Database = {
           hidden_by?: string | null
           id?: string
           ripple_id?: string
+          thread_pool_id?: string | null
         }
         Relationships: [
           {
@@ -924,6 +937,13 @@ export type Database = {
             columns: ["ripple_id"]
             isOneToOne: false
             referencedRelation: "ripples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ripple_replies_thread_pool_id_fkey"
+            columns: ["thread_pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
             referencedColumns: ["id"]
           },
         ]
@@ -1352,6 +1372,10 @@ export type Database = {
         Returns: undefined
       }
       _require_uid: { Args: never; Returns: string }
+      _response_thread: {
+        Args: { rid: string; uid: string; wanted: string }
+        Returns: string
+      }
       _ripple_pools: { Args: { rid: string }; Returns: string[] }
       _set_links: {
         Args: { p_links: Json; pid: string; uid: string }
@@ -1366,10 +1390,20 @@ export type Database = {
         Args: { p_everyone?: boolean; p_splash: string; p_users: string[] }
         Returns: undefined
       }
-      add_reply: {
-        Args: { p_body: string; p_id?: string; p_ripple: string }
-        Returns: string
-      }
+      add_reply:
+        | {
+            Args: { p_body: string; p_id?: string; p_ripple: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_body: string
+              p_id: string
+              p_pool: string
+              p_ripple: string
+            }
+            Returns: string
+          }
       applied_migrations: { Args: never; Returns: string[] }
       board_layout_valid: { Args: { l: Json }; Returns: boolean }
       can_read_responses: { Args: { rid: string }; Returns: boolean }
@@ -1515,6 +1549,10 @@ export type Database = {
         Args: { rid: string; uid: string }
         Returns: boolean
       }
+      response_readable: {
+        Args: { rid: string; tp: string; writer: string }
+        Returns: boolean
+      }
       revoke_invite: { Args: { p_invite: string }; Returns: undefined }
       ripple_author: { Args: { rid: string }; Returns: string }
       ripple_in_my_pools: { Args: { rid: string }; Returns: boolean }
@@ -1530,6 +1568,20 @@ export type Database = {
           hidden: boolean
           id: string
           ripple_id: string
+        }[]
+      }
+      ripple_replies_in: {
+        Args: { p_ripples: string[] }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          edited_at: string
+          former: boolean
+          hidden: boolean
+          id: string
+          ripple_id: string
+          thread_pool_id: string
         }[]
       }
       ripple_span: {

@@ -122,11 +122,19 @@ export async function HomeSplash({ id }: { id: string }) {
   // A tab per pool once anyone has written a side (0035): the pools it is
   // shared to, and one switched off that still holds a side, muted.
   const placed = board ? placements.filter((p) => p.splashId === board.id) : [];
+  // Or once anyone has responded in a pool (0053): another pool's replies
+  // and reactions read only in that pool's tab.
+  const responded = (pid: string): boolean =>
+    responses.replies.some((r) => r.thread_pool_id === pid) ||
+    responses.reactions.some((r) => r.thread_pool_id === pid);
   const threads =
-    others.length === 0
+    others.length === 0 && !placed.some((p) => responded(p.poolId))
       ? []
       : placed
-          .filter((p) => p.shared || others.some((r) => r.thread_pool_id === p.poolId))
+          .filter(
+            (p) =>
+              p.shared || others.some((r) => r.thread_pool_id === p.poolId) || responded(p.poolId),
+          )
           .map((p) => ({
             poolId: p.poolId,
             label: pools.find((x) => x.id === p.poolId)?.name ?? 'A pool',

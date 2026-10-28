@@ -117,7 +117,8 @@ export type Card = {
    * where someone besides me can see the post, with my ripples that are
    * locked and so take nothing. The calendar board shows none of it.
    */
-  responded?: { value: RippleResponsesValue; locked: string[] };
+  /** `pool`: the pool the card is shown in, whose thread these are and new ones go to (0053). */
+  responded?: { value: RippleResponsesValue; locked: string[]; pool?: string | null };
   /** The newest reaction or reply someone else left on each ripple of mine on it: the unseen dot (H25). */
   respondedAt?: Record<string, string>;
 };

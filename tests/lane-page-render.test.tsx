@@ -360,6 +360,7 @@ describe('the top card on a lane’s page reads responses, as Home does (H25, re
               user_id: 'u-mina',
               emoji: '❤️',
               created_at: '2026-10-13T01:00:00Z',
+              thread_pool_id: null,
             },
           ],
           replies: ['first', 'second', 'third'].map((body, i) => ({
@@ -371,6 +372,7 @@ describe('the top card on a lane’s page reads responses, as Home does (H25, re
             edited_at: null,
             hidden: false,
             former: false,
+            thread_pool_id: null,
           })),
         },
         locked: [],

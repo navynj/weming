@@ -86,9 +86,11 @@ export async function PoolSplash({
         'ripple_id',
         blocks.length ? blocks.map((r) => r.id) : ['00000000-0000-0000-0000-000000000000'],
       ),
+    // This pool's thread only (0053), with the owner's from no pool.
     getRippleResponses(
       supabase,
       blocks.map((r) => r.id),
+      id,
     ),
   ]);
   const photos = Object.fromEntries(blocks.map((r, at) => [r.id, photoLists[at]]));

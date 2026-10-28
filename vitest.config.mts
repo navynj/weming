@@ -48,6 +48,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/joint-together-db.test.ts',
   'tests/notifications-db.test.ts',
   'tests/push-dispatch-db.test.ts',
+  'tests/response-threads-db.test.ts',
 ];
 
 /**

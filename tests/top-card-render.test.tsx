@@ -110,6 +110,7 @@ const reaction = (ripple: string, user: string, emoji: string, at: string): Reac
   user_id: user,
   emoji,
   created_at: `2026-09-21T${at}:00:00Z`,
+  thread_pool_id: null,
 });
 const reply = (id: string, ripple: string, body: string, at: string): ReplyRow => ({
   id,
@@ -120,6 +121,7 @@ const reply = (id: string, ripple: string, body: string, at: string): ReplyRow =
   edited_at: null,
   hidden: false,
   former: false,
+  thread_pool_id: null,
 });
 
 /** A post with two ripples: four photos and three replies on the first, one reply on the second. */
@@ -230,7 +232,9 @@ describe('the top card reads each ripple in full (H25, review)', () => {
     // By attribute value: jsdom's selector engine misses an astral emoji in a selector.
     fireEvent.click(withAttr(picker, 'data-reaction-quick', '🔥'));
     expect(withAttr(responses(), 'data-reaction', '🔥').textContent).toContain('1');
-    await waitFor(() => expect(reacted).toEqual([{ rippleId: 'r2', emoji: '🔥', on: true }]));
+    await waitFor(() =>
+      expect(reacted).toEqual([{ rippleId: 'r2', emoji: '🔥', on: true, poolId: null }]),
+    );
   });
 
   it('offers nothing to respond to where nobody else can read the post', () => {

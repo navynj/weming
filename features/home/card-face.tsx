@@ -83,7 +83,11 @@ export function CardFace({
   const { me } = usePeople();
   const seen = useSeen();
   // Reacting on the top card is optimistic, as on the page (CLAUDE.md, the principle).
-  const answered = useRippleResponses(card.responded?.value ?? NO_RESPONSES);
+  // Written into the pool the card is shown in (0053), none on Home.
+  const answered = useRippleResponses(
+    card.responded?.value ?? NO_RESPONSES,
+    card.responded?.pool ?? null,
+  );
   // Only the full card shows photos: a peeking edge signs none.
   const signed = useSignedPhotos(edge === 'full' ? (card.photos ?? NO_PHOTOS) : NO_PHOTOS);
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  inThread,
   chipsOf,
   isOneEmoji,
   lastGrapheme,
@@ -15,7 +16,13 @@ import { isUnseen } from '@/features/responses/seen';
 const ME = 'u-me';
 
 function reaction(ripple: string, user: string, emoji: string, at: string): ReactionRow {
-  return { ripple_id: ripple, user_id: user, emoji, created_at: `2026-10-26T10:${at}:00Z` };
+  return {
+    ripple_id: ripple,
+    user_id: user,
+    emoji,
+    created_at: `2026-10-26T10:${at}:00Z`,
+    thread_pool_id: null,
+  };
 }
 
 function reply(
@@ -34,6 +41,7 @@ function reply(
     edited_at: null,
     hidden: false,
     former: false,
+    thread_pool_id: null,
     ...over,
   };
 }
@@ -100,5 +108,26 @@ describe('the unseen dot (H25)', () => {
     // Before the browser knows this device: no dot.
     expect(isUnseen(latest.mine, undefined)).toBe(false);
     expect(isUnseen(undefined, null)).toBe(false);
+  });
+});
+
+describe('one pool’s thread (0053)', () => {
+  it('keeps that pool’s responses and the owner’s from no pool, never another pool’s', () => {
+    const value = {
+      reactions: [
+        { ...reaction('r1', 'u-a', '❤️', '01'), thread_pool_id: 'p-a' },
+        { ...reaction('r1', 'u-b', '🔥', '02'), thread_pool_id: 'p-b' },
+        reaction('r1', ME, '👏', '03'),
+      ],
+      replies: [
+        reply('in-a', 'r1', 'u-a', '04', { thread_pool_id: 'p-a' }),
+        reply('in-b', 'r1', 'u-b', '05', { thread_pool_id: 'p-b' }),
+        reply('owner', 'r1', ME, '06'),
+      ],
+    };
+    const a = inThread(value, 'p-a');
+    expect(a.reactions.map((r) => r.user_id)).toEqual(['u-a', ME]);
+    expect(a.replies.map((r) => r.id)).toEqual(['in-a', 'owner']);
+    expect(inThread(value, null)).toBe(value);
   });
 });

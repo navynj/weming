@@ -357,9 +357,11 @@ export async function getPoolView(
     layouts: await getPoolLayouts(supabase, poolId),
     laneLayouts: await getPoolLayouts(supabase, poolId, 'lane'),
     membersLayouts: await getPoolLayouts(supabase, poolId, 'members'),
+    // This pool's thread only (0053), with the owner's from no pool.
     responded: await getRippleResponses(
       supabase,
       ripples.map((r) => r.id),
+      poolId,
     ),
     lockedIds: await getLockedIds(
       supabase,
@@ -371,6 +373,7 @@ export async function getPoolView(
       ripples.flatMap((r) =>
         r.author_id === me && r.splash_id ? [{ id: r.id, splashKey: r.splash_id }] : [],
       ),
+      poolId,
     ),
   };
 }

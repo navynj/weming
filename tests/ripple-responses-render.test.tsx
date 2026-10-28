@@ -26,6 +26,7 @@ function reply(id: string, author: string, at: number, over: Partial<ReplyRow> =
     edited_at: null,
     hidden: false,
     former: false,
+    thread_pool_id: null,
     ...over,
   };
 }
@@ -34,6 +35,7 @@ const reaction = (user: string, emoji: string, at: number): ReactionRow => ({
   user_id: user,
   emoji,
   created_at: `2026-10-26T09:0${at}:00Z`,
+  thread_pool_id: null,
 });
 
 function view(

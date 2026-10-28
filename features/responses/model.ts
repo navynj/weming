@@ -20,6 +20,8 @@ export type ReactionRow = {
   user_id: string;
   emoji: string;
   created_at: string;
+  /** The pool it was left in (0053); null for the record's owner from no pool. */
+  thread_pool_id: string | null;
 };
 
 export type ReplyRow = {
@@ -33,7 +35,21 @@ export type ReplyRow = {
   hidden: boolean;
   /** Left every pool the ripple lives in, keeping their records ("Former member"). */
   former: boolean;
+  /** The pool it was written in (0053); null for the record's owner from no pool. */
+  thread_pool_id: string | null;
 };
+
+/**
+ * One pool's thread (0053): its responses and the owner's from no pool. A
+ * pool shows only its own; the owner reads another pool's only in that
+ * pool's tab. Null: no pool to narrow to, everything readable shows.
+ */
+export function inThread(value: RippleResponsesValue, pool: string | null): RippleResponsesValue {
+  if (pool === null) return value;
+  const ours = (row: { thread_pool_id: string | null }): boolean =>
+    row.thread_pool_id === null || row.thread_pool_id === pool;
+  return { reactions: value.reactions.filter(ours), replies: value.replies.filter(ours) };
+}
 
 /** One reaction chip: an emoji, how many, whether one is mine, and who (oldest first). */
 export type ReactionChip = { emoji: string; count: number; mine: boolean; who: string[] };
@@ -91,11 +107,18 @@ export function toggled(
   me: string,
   emoji: string,
   at: string = new Date().toISOString(),
+  pool: string | null = null,
 ): { rows: ReactionRow[]; on: boolean } {
   const mine = (r: ReactionRow) =>
     r.ripple_id === rippleId && r.user_id === me && r.emoji === emoji;
   if (rows.some(mine)) return { rows: rows.filter((r) => !mine(r)), on: false };
-  return { rows: [...rows, { ripple_id: rippleId, user_id: me, emoji, created_at: at }], on: true };
+  return {
+    rows: [
+      ...rows,
+      { ripple_id: rippleId, user_id: me, emoji, created_at: at, thread_pool_id: pool },
+    ],
+    on: true,
+  };
 }
 
 /** A block's replies, oldest first: the first two, and how many more wait behind "+n more replies". */

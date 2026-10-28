@@ -24,8 +24,12 @@ function revalidate(): void {
   revalidatePath('/', 'layout');
 }
 
+// The pool it is left in (0053): the pool shown, or none for the owner on Home.
+const Pool = z.uuid().nullable().default(null);
+
 const Reaction = z.object({
   rippleId: z.uuid(),
+  poolId: Pool,
   emoji: z.string().refine(isOneEmoji, 'One emoji.'),
   on: z.boolean(),
 });
@@ -35,7 +39,7 @@ export async function setReaction(input: z.input<typeof Reaction>): Promise<Acti
   pushAfter();
   const parsed = Reaction.safeParse(input);
   if (!parsed.success) return refused('That is not one emoji.');
-  const { rippleId, emoji, on } = parsed.data;
+  const { rippleId, emoji, on, poolId } = parsed.data;
   const supabase = await createClient();
   const {
     data: { user },
@@ -45,7 +49,7 @@ export async function setReaction(input: z.input<typeof Reaction>): Promise<Acti
     ? await supabase
         .from('ripple_reactions')
         .upsert(
-          { ripple_id: rippleId, user_id: user.id, emoji },
+          { ripple_id: rippleId, user_id: user.id, emoji, thread_pool_id: poolId },
           { onConflict: 'ripple_id,user_id,emoji', ignoreDuplicates: true },
         )
     : await supabase
@@ -60,7 +64,7 @@ export async function setReaction(input: z.input<typeof Reaction>): Promise<Acti
 
 const Body = z.string().trim().min(1, 'Write something first.').max(REPLY_MAX);
 
-const NewReply = z.object({ id: z.uuid(), rippleId: z.uuid(), body: Body });
+const NewReply = z.object({ id: z.uuid(), rippleId: z.uuid(), body: Body, poolId: Pool });
 
 /** A reply, its id minted in the browser so the one on screen is the real one. */
 export async function addReply(input: z.input<typeof NewReply>): Promise<ActionOutcome> {
@@ -72,6 +76,7 @@ export async function addReply(input: z.input<typeof NewReply>): Promise<ActionO
     p_ripple: parsed.data.rippleId,
     p_body: parsed.data.body,
     p_id: parsed.data.id,
+    p_pool: parsed.data.poolId as string,
   });
   if (error) return refused(error.message);
   revalidate();

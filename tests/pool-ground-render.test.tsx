@@ -357,8 +357,20 @@ describe('a joint splash on the grid (H23)', () => {
       ...A,
       responded: {
         reactions: [
-          { ripple_id: 'r-j1', user_id: ME, emoji: '❤️', created_at: '2026-10-21T01:00:00Z' },
-          { ripple_id: 'r-j2', user_id: MINA, emoji: '🔥', created_at: '2026-10-21T02:00:00Z' },
+          {
+            ripple_id: 'r-j1',
+            user_id: ME,
+            emoji: '❤️',
+            created_at: '2026-10-21T01:00:00Z',
+            thread_pool_id: null,
+          },
+          {
+            ripple_id: 'r-j2',
+            user_id: MINA,
+            emoji: '🔥',
+            created_at: '2026-10-21T02:00:00Z',
+            thread_pool_id: null,
+          },
         ],
         replies: [],
       },

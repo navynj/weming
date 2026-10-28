@@ -1,4 +1,9 @@
-import type { ReactionRow, ReplyRow, RippleResponsesValue } from '@/features/responses/model';
+import {
+  inThread,
+  type ReactionRow,
+  type ReplyRow,
+  type RippleResponsesValue,
+} from '@/features/responses/model';
 import type { DuringClient } from '@/lib/queries/profile';
 
 /**
@@ -8,26 +13,30 @@ import type { DuringClient } from '@/lib/queries/profile';
  * chose remove — none of it arrives.
  */
 
-/** Every reaction and reply on these ripples I may read. */
+/**
+ * Every reaction and reply on these ripples I may read; given a pool, only
+ * that pool's thread and the owner's from no pool (0053).
+ */
 export async function getRippleResponses(
   supabase: DuringClient,
   rippleIds: string[],
+  pool: string | null = null,
 ): Promise<RippleResponsesValue> {
   if (rippleIds.length === 0) return { reactions: [], replies: [] };
   const [reactions, replies] = await Promise.all([
     supabase
       .from('ripple_reactions')
-      .select('ripple_id, user_id, emoji, created_at')
+      .select('ripple_id, user_id, emoji, created_at, thread_pool_id')
       .in('ripple_id', rippleIds)
       .order('created_at'),
-    supabase.rpc('ripple_replies_for', { p_ripples: rippleIds }),
+    supabase.rpc('ripple_replies_in', { p_ripples: rippleIds }),
   ]);
   if (reactions.error) throw reactions.error;
   if (replies.error) throw replies.error;
-  return {
-    reactions: reactions.data as ReactionRow[],
-    replies: replies.data as ReplyRow[],
-  };
+  return inThread(
+    { reactions: reactions.data as ReactionRow[], replies: replies.data as ReplyRow[] },
+    pool,
+  );
 }
 
 /**
@@ -55,12 +64,14 @@ export async function getResponsesOnMine(
   supabase: DuringClient,
   me: string,
   mine: { id: string; splashKey: string }[],
+  pool: string | null = null,
 ): Promise<Record<string, Record<string, string>>> {
   const out: Record<string, Record<string, string>> = {};
   if (mine.length === 0) return out;
   const value = await getRippleResponses(
     supabase,
     mine.map((r) => r.id),
+    pool,
   );
   const keyOf = new Map(mine.map((r) => [r.id, r.splashKey]));
   const note = (rippleId: string, who: string, at: string) => {

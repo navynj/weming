@@ -207,6 +207,7 @@ export function poolCards(
                   replies: view.responded.replies.filter((r) => ids.has(r.ripple_id)),
                 },
                 locked: view.lockedIds ?? [],
+                pool: view.pool.id,
               }
             : undefined,
           respondedAt: view.respondedAt?.[card.splash.id],
