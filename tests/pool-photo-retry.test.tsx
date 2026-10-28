@@ -13,6 +13,7 @@ const calls = vi.hoisted(() => ({
   refreshed: 0,
 }));
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/pool/new',
   useRouter: () => ({
     push: () => {},
@@ -142,7 +143,7 @@ describe('a new pool’s photo that did not upload (review)', () => {
     expect(getByRole('status').textContent).toContain(PHOTO_FAILED);
     expect(container.querySelector('[data-photo-toast-retry]')).toBeNull();
     const link = container.querySelector('a[data-photo-toast-settings]')!;
-    expect(link.getAttribute('href')).toBe('/pool/p-new/settings');
+    expect(link.getAttribute('href')).toBe('/pool/p-new?settings=pool');
     expect(link.textContent).toBe('Open settings');
   });
 

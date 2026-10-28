@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prefetched = vi.hoisted(() => [] as { href: string; kind?: string }[]);
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useRouter: () => ({
     push: () => {},

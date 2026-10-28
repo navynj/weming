@@ -38,7 +38,7 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 bg-white px-6 text-center">
         <p data-invite-invalid className="text-ink text-lg font-medium">
-          This invite link is no longer valid.
+          This invite link no longer works. Ask for a new one.
         </p>
         <Link href="/" className="text-main-900 text-sm font-semibold">
           Go to Home

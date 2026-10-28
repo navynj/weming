@@ -55,18 +55,15 @@ import { rippleMedia } from '@/lib/ripple-media';
  *
  * `?m=YYYY-MM` opens on that month's newest post; `?top=<id>` opens with
  * that post on top — where a post's page sends Home back to (review);
- * `?manage=lanes` opens lane management, from a lane page.
  */
 export async function HomeScreen({
   m,
   top,
-  manage,
   view,
   welcome = false,
 }: {
   m?: string;
   top?: string;
-  manage?: string;
   /** `?view=`: the view to open on, from a lane page's tabs (review); else the Calendar. */
   view?: string;
   /** `?welcome`: a first sign-in, so the notifications card while I am in no pool (review). */
@@ -514,7 +511,6 @@ export async function HomeScreen({
         initials={initialsOf(profile.display_name)}
         scrollToMonth={month}
         topParam={top ?? null}
-        manageLanes={manage === 'lanes'}
         initialView={homeViewParam(view)}
         poolColumns={poolColumns}
       />

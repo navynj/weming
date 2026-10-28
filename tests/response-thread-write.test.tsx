@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
 const sent = vi.hoisted(() => [] as unknown[]);

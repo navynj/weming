@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),
 }));
@@ -89,10 +90,9 @@ const avatar = (root: Element) =>
   root.querySelector<HTMLElement>(
     '[data-home-foot="phone"] [data-home-tab] [data-avatar-photo], [data-home-foot="phone"] [data-home-tab] span',
   )!;
-/** My profile opens from the header's gear (review). */
+/** My profile opens from my face in the header (0059). */
 const openProfile = (root: Element) =>
-  // The strip's gear, before my face (0032).
-  fireEvent.click(root.querySelector<HTMLElement>('[data-strip-settings]')!);
+  fireEvent.click(root.querySelector<HTMLElement>('[data-place-face="me"]')!);
 const thread = (root: Element, id: string) =>
   root.querySelector<HTMLElement>(`[data-thread-entry="${id}"] [data-thread-avatar]`)!;
 
@@ -146,7 +146,7 @@ afterEach(() => {
 });
 
 describe('the profile editor (0018)', () => {
-  it('opens from the strip’s gear before my face; Save waits for a change and a 1–40 character name', () => {
+  it('opens from my face in the header (0059); Save waits for a change and a 1–40 character name', () => {
     const { container, getByLabelText } = home({ [ME]: { name: 'Yoonji Lee', photo: null } });
     openProfile(container);
     const save = container.querySelector<HTMLButtonElement>('[data-profile-save]')!;

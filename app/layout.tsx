@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import { Poppins } from 'next/font/google';
 
 import { Providers } from '@/app/providers';
-import { getMyProfile } from '@/lib/queries/profile';
+import { getMyTheme } from '@/lib/queries/theme';
 import { createClient } from '@/lib/supabase/server';
-import { asTheme, DEFAULT_THEME, type Theme } from '@/lib/theme';
+import { DEFAULT_THEME, resolveTheme, type MyTheme } from '@/lib/theme';
 import './globals.css';
 
 // Poppins is not a variable font, so every weight is listed explicitly;
@@ -59,15 +59,18 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
 };
 
-/** My theme (0032), worn from the first paint; signed out, the blue water. */
-async function myTheme(): Promise<Theme> {
-  // The request's one profile read (lib/queries/profile.ts), shared with the pages.
-  const profile = await getMyProfile(await createClient()).catch(() => null);
-  return profile ? asTheme(profile.theme_color, profile.theme_mode) : DEFAULT_THEME;
+/** My theme (0059), worn from the first paint as Home's; a pool wears its own on arrival. */
+async function myTheme(): Promise<MyTheme> {
+  return getMyTheme(await createClient()).catch(() => ({
+    home: DEFAULT_THEME.color,
+    mode: DEFAULT_THEME.mode,
+    everywhere: false,
+  }));
 }
 
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
-  const theme = await myTheme();
+  const mine = await myTheme();
+  const theme = resolveTheme(mine, null);
   return (
     <html
       lang="en"
@@ -76,7 +79,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
       className={`${poppins.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <Providers theme={theme}>{children}</Providers>
+        <Providers theme={mine}>{children}</Providers>
       </body>
     </html>
   );

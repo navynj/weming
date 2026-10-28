@@ -192,3 +192,33 @@ export function asTheme(color: unknown, mode: unknown): Theme {
     mode: THEME_MODES.includes(mode as ThemeMode) ? (mode as ThemeMode) : DEFAULT_THEME.mode,
   };
 }
+
+/** What I set for my theme (0059): my Home colour, my mode, and whether my colour applies in every pool. */
+export type MyTheme = { home: ThemeColor; mode: ThemeMode; everywhere: boolean };
+
+/** A pool's two sources (0059): its members' colour, and mine there. */
+export type PoolColors = { pool: ThemeColor | null; mine: ThemeColor | null };
+
+/**
+ * The colour a place wears (0059, Yoonji, in the session). In a pool: my
+ * colour here ?? my Home colour if I apply it everywhere ?? the pool's ??
+ * my Home colour ?? the app's. On Home (no pool): my Home colour ?? the
+ * app's. The mode is always mine.
+ */
+export function resolveTheme(mine: Partial<MyTheme> | null, place: PoolColors | null): Theme {
+  const home = mine?.home ?? null;
+  const mode = mine?.mode ?? DEFAULT_THEME.mode;
+  const color = place
+    ? (place.mine ??
+      (mine?.everywhere && home ? home : null) ??
+      place.pool ??
+      home ??
+      DEFAULT_THEME.color)
+    : (home ?? DEFAULT_THEME.color);
+  return { color, mode };
+}
+
+/** A stored colour read safely: anything unknown is none. */
+export function asThemeColor(value: unknown): ThemeColor | null {
+  return THEME_COLORS.includes(value as ThemeColor) ? (value as ThemeColor) : null;
+}

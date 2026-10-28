@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The Add ripple slot reaches for the sheet, which reaches for the router.
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
 }));

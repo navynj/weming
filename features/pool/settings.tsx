@@ -4,141 +4,85 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { saveLane } from '@/features/lanes/actions';
-import type { MyCategory } from '@/lib/queries/profile';
+import { useShellData } from '@/features/home/shell-data';
+import { ThemePicker } from '@/features/people/theme-picker';
+import { SettingsSheet } from '@/features/settings/settings-sheet';
 import type { PoolView } from '@/lib/queries/pools';
-import type { PoolNotificationPrefs } from '@/lib/queries/notifications';
-import { PoolNotifications } from '@/features/notifications/pool-notifications';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { PoolPhotoField, previewOf, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
 import { renamePool, setLaneLinks, setPoolInviteAll, setPoolOnHome } from './actions';
 import { DeletePool } from './delete-pool';
-import { InvitePanel } from './invite-panel';
 import { LeaveSheet } from './members-sheet';
 import { LaneMatch, Switch } from './lane-match';
 import { settleMarkers, type Links, type Markers } from './match';
-import { PrimaryButton, StepPage } from './step-page';
+import { PoolLanesSheet } from './pool-lanes-sheet';
+import { PrimaryButton } from './step-page';
 
 /**
- * Pool settings (H23): the invite link, the creator's name and photo (0021,
- * 0024), notifications (H32), and under Advanced, Connect your lanes (0033): links and their two
- * defaults. Unlinking switches nothing off and moves no record.
+ * A pool's settings (0059): a sheet over the pool from the header's gear,
+ * its tabs drawn at once from the pool the screen already holds. Pool: its
+ * photo and name, its lanes, Show on my Home, Invite everyone — each any
+ * current member's. Theme: the pool's colour and mine there. Advanced:
+ * Connect your lanes, then Leave, or Delete for its creator. The invite
+ * link is the header's "+"; notifications are the bell's.
  */
-export function PoolSettings({
-  view,
-  categories,
-  me,
-  notifications,
-}: {
-  view: PoolView;
-  categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
-  me: string;
-  notifications: PoolNotificationPrefs;
-}) {
+export function PoolSettingsSheet({ view, me }: { view: PoolView; me: string }) {
+  return (
+    <SettingsSheet
+      title="Pool settings"
+      tabs={[
+        { key: 'pool', label: 'Pool', render: () => <PoolTab view={view} /> },
+        { key: 'theme', label: 'Theme', render: () => <ThemePicker /> },
+        { key: 'advanced', label: 'Advanced', render: () => <AdvancedTab view={view} me={me} /> },
+      ]}
+    />
+  );
+}
+
+function PoolTab({ view }: { view: PoolView }) {
   const router = useRouter();
   const poolId = view.pool.id;
-  const initial: Links = Object.fromEntries(
-    view.lanes.map((lane) => [
-      lane.id,
-      view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
-    ]),
-  );
-  const [links, setLinks] = useState<Links>(initial);
-  const keys = view.lanes.map((lane) => lane.id);
-  const initialMarkers: Markers = settleMarkers(
-    keys,
-    initial,
-    Object.fromEntries(
-      view.myLinks.map((l) => [
-        l.poolLaneId,
-        { isDefault: l.isDefault, shareByDefault: l.shareByDefault, isHome: l.isHome },
-      ]),
-    ),
-  );
-  const [markers, setMarkers] = useState<Markers>(initialMarkers);
-  const [advanced, setAdvanced] = useState(false);
-  const [mine, setMine] = useState(categories);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   // The name shows at once; a refusal takes it back and says why.
   const name = useOptimisticAction(view.pool.name);
   const photo = useOptimisticAction<string | null>(view.pool.photo ?? null);
   const inviteAll = useOptimisticAction(view.pool.inviteAllByDefault ?? false);
   const onHome = useOptimisticAction(view.pool.myOnHome ?? true);
-  const [leaving, setLeaving] = useState(false);
-  const changed =
-    JSON.stringify(links) !== JSON.stringify(initial) ||
-    JSON.stringify(settleMarkers(keys, links, markers)) !== JSON.stringify(initialMarkers);
-
   return (
-    <StepPage step={null} onBack={() => router.push(`/pool/${poolId}`)}>
-      <p className="text-pool-500 text-sm">{name.value}</p>
-      <h1 className="text-main-900 mt-1 text-3xl/tight font-semibold">Pool settings</h1>
+    <>
+      <PoolName
+        name={name.value}
+        photo={photo.value}
+        message={name.message ?? photo.message}
+        onSave={(next, change) => {
+          if (next !== name.value) {
+            name.run(
+              () => next,
+              () => renamePool(poolId, next),
+            );
+          }
+          if (change.kind !== 'keep') {
+            // Shown at once; the upload and the row run behind it (0024).
+            photo.run(
+              () => previewOf(change, photo.value),
+              async () => {
+                const failed = await savePoolPhoto(poolId, change);
+                if (failed) return { ok: false, message: failed };
+                router.refresh();
+                return { ok: true };
+              },
+            );
+          }
+        }}
+      />
 
-      {view.pool.ownerId === me ? (
-        <PoolName
-          name={name.value}
-          photo={photo.value}
-          message={name.message ?? photo.message}
-          onSave={(next, change) => {
-            if (next !== name.value) {
-              name.run(
-                () => next,
-                () => renamePool(poolId, next),
-              );
-            }
-            if (change.kind !== 'keep') {
-              // Shown at once; the upload and the row run behind it (0024).
-              photo.run(
-                () => previewOf(change, photo.value),
-                async () => {
-                  const failed = await savePoolPhoto(poolId, change);
-                  if (failed) return { ok: false, message: failed };
-                  router.refresh();
-                  return { ok: true };
-                },
-              );
-            }
-          }}
-        />
-      ) : null}
-
-      <section className="mt-10">
-        <h2 className="text-ink mb-3 font-semibold">Invite link</h2>
-        <InvitePanel poolId={poolId} invites={view.invites} />
-      </section>
-
-      <section data-settings-invite-all className="mt-10">
-        <label className="flex items-center justify-between gap-4">
-          <span className="flex flex-col gap-0.5">
-            <span className="text-ink text-sm font-medium">
-              Invite everyone to new posts by default
-            </span>
-            <span className="text-pool-500 text-xs">
-              Together starts on Everyone when you write in this Pool.
-            </span>
-          </span>
-          <Switch
-            on={inviteAll.value}
-            label="Invite everyone to new posts by default"
-            onChange={(on) =>
-              inviteAll.run(
-                () => on,
-                () => setPoolInviteAll(poolId, on),
-                'Saved',
-              )
-            }
-          />
-        </label>
-        {inviteAll.message ? (
-          <p role="alert" className="text-pool-500 mt-2 text-xs">
-            {inviteAll.message}
-          </p>
-        ) : null}
+      <section data-settings-lanes className="mt-10">
+        <h2 className="text-ink mb-3 font-semibold">Lanes</h2>
+        <PoolLanesSheet poolId={poolId} lanes={view.lanes} onClose={() => {}} inline />
       </section>
 
       {/* Mine alone (0039): what I wrote here, on my Home or not. Nothing moves. */}
-      <section data-settings-on-home className="mt-6">
+      <section data-settings-on-home className="mt-10">
         <label className="flex items-center justify-between gap-4">
           <span className="flex flex-col gap-0.5">
             <span className="text-ink text-sm font-medium">Show on my Home</span>
@@ -165,27 +109,89 @@ export function PoolSettings({
         ) : null}
       </section>
 
-      <PoolNotifications
-        poolId={poolId}
-        isCreator={view.pool.ownerId === me}
-        prefs={notifications}
-      />
+      <section data-settings-invite-all className="mt-6">
+        <label className="flex items-center justify-between gap-4">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-ink text-sm font-medium">
+              Invite everyone to new posts by default
+            </span>
+            <span className="text-pool-500 text-xs">
+              New posts here start with everyone in the Pool invited.
+            </span>
+          </span>
+          <Switch
+            on={inviteAll.value}
+            label="Invite everyone to new posts by default"
+            onChange={(on) =>
+              inviteAll.run(
+                () => on,
+                () => setPoolInviteAll(poolId, on),
+                'Saved',
+              )
+            }
+          />
+        </label>
+        {inviteAll.message ? (
+          <p role="alert" className="text-pool-500 mt-2 text-xs">
+            {inviteAll.message}
+          </p>
+        ) : null}
+      </section>
+    </>
+  );
+}
 
-      <section data-settings-advanced className="mt-12 flex flex-1 flex-col">
+function AdvancedTab({ view, me }: { view: PoolView; me: string }) {
+  const router = useRouter();
+  const { categories } = useShellData();
+  const poolId = view.pool.id;
+  const initial: Links = Object.fromEntries(
+    view.lanes.map((lane) => [
+      lane.id,
+      view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
+    ]),
+  );
+  const [links, setLinks] = useState<Links>(initial);
+  const keys = view.lanes.map((lane) => lane.id);
+  const initialMarkers: Markers = settleMarkers(
+    keys,
+    initial,
+    Object.fromEntries(
+      view.myLinks.map((l) => [
+        l.poolLaneId,
+        { isDefault: l.isDefault, shareByDefault: l.shareByDefault, isHome: l.isHome },
+      ]),
+    ),
+  );
+  const [markers, setMarkers] = useState<Markers>(initialMarkers);
+  const [connecting, setConnecting] = useState(false);
+  const [mine, setMine] = useState(() =>
+    categories.map(({ id, name, icon }) => ({ id, name, icon })),
+  );
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const changed =
+    JSON.stringify(links) !== JSON.stringify(initial) ||
+    JSON.stringify(settleMarkers(keys, links, markers)) !== JSON.stringify(initialMarkers);
+
+  return (
+    <>
+      <section data-settings-advanced className="flex flex-col">
         <button
           type="button"
           data-settings-advanced-toggle
-          aria-expanded={advanced}
-          onClick={() => setAdvanced((open) => !open)}
+          aria-expanded={connecting}
+          onClick={() => setConnecting((open) => !open)}
           className="text-ink flex items-center justify-between font-semibold"
         >
-          Advanced
+          Connect your lanes
           <span aria-hidden className="text-pool-500 text-sm font-normal">
-            {advanced ? 'Hide' : 'Show'}
+            {connecting ? 'Hide' : 'Show'}
           </span>
         </button>
-        {advanced ? (
-          <div data-settings-links className="mt-6 flex flex-1 flex-col">
+        {connecting ? (
+          <div data-settings-links className="mt-6 flex flex-col">
             <LaneMatch
               poolName={view.pool.name}
               lanes={view.lanes.map((lane) => ({
@@ -232,10 +238,11 @@ export function PoolSettings({
                     );
                     setBusy(false);
                     if (!done.ok) return setMessage(done.message);
-                    router.push(`/pool/${poolId}`);
+                    setMessage('Saved');
+                    router.refresh();
                   }}
                 >
-                  {busy ? 'Saving…' : 'Save lane links'}
+                  {busy ? 'Saving…' : 'Save'}
                 </PrimaryButton>
               }
             />
@@ -259,11 +266,11 @@ export function PoolSettings({
         )}
       </section>
       {leaving ? <LeaveSheet poolId={poolId} onClose={() => setLeaving(false)} /> : null}
-    </StepPage>
+    </>
   );
 }
 
-/** The pool's name, the creator's to change (0021): a field and its own Save. */
+/** The pool's photo and name (0021, 0024), any current member's to change (0059): a field and its own Save. */
 function PoolName({
   name,
   photo,
@@ -281,7 +288,7 @@ function PoolName({
   const next = draft.trim();
   const changed = (next !== '' && next !== name) || change.kind !== 'keep';
   return (
-    <section data-settings-name className="mt-10">
+    <section data-settings-name>
       <h2 className="text-ink mb-3 font-semibold">Photo and name</h2>
       <div className="mb-4">
         <PoolPhotoField name={draft || name} current={photo} change={change} onChange={setChange} />

@@ -7,6 +7,8 @@ import { initialsOf } from '@/features/home/grid';
 import { offerInstall } from '@/features/install/install-state';
 import { Avatar } from '@/features/people/avatar';
 import { TurnOnNotifications } from '@/features/install/turn-on';
+import { Settings } from 'lucide-react';
+
 import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
 import { EMPTY } from '@/lib/empty-states';
 import { notificationPath, notificationText } from '@/lib/notifications/model';
@@ -22,7 +24,14 @@ import { useNotifications } from './notifications-provider';
  * them back. The list is read when the sheet opens, so it is not a page's
  * rows and has no re-read to wait for.
  */
-export function NotificationsSheet({ onClose }: { onClose: () => void }) {
+export function NotificationsSheet({
+  onClose,
+  onSettings,
+}: {
+  onClose: () => void;
+  /** Its gear (0059): the notification settings, a sheet of their own. */
+  onSettings?: () => void;
+}) {
   const router = useRouter();
   const { unread, setUnread } = useNotifications();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
@@ -70,16 +79,29 @@ export function NotificationsSheet({ onClose }: { onClose: () => void }) {
     <PoolSheet label="Notifications" onClose={onClose}>
       <div className="flex items-baseline justify-between">
         <SheetTitle>Notifications</SheetTitle>
-        {anyUnread ? (
-          <button
-            type="button"
-            data-mark-all-read
-            onClick={() => void mark(null)}
-            className="text-main-900 text-sm font-medium"
-          >
-            Mark all read
-          </button>
-        ) : null}
+        <span className="flex items-center gap-3">
+          {anyUnread ? (
+            <button
+              type="button"
+              data-mark-all-read
+              onClick={() => void mark(null)}
+              className="text-main-900 text-sm font-medium"
+            >
+              Mark all read
+            </button>
+          ) : null}
+          {onSettings ? (
+            <button
+              type="button"
+              aria-label="Notification settings"
+              data-notification-settings-open
+              onClick={onSettings}
+              className="text-pool-500 flex h-9 w-9 items-center justify-center"
+            >
+              <Settings aria-hidden size={18} />
+            </button>
+          ) : null}
+        </span>
       </div>
       {message ? (
         <p role="alert" className="text-pool-500 mb-3 text-sm">

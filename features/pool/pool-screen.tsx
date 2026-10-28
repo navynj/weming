@@ -1,6 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 
 import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
+import { PlaceTheme } from '@/features/people/theme-provider';
+import { getMyTheme, getPoolColors } from '@/lib/queries/theme';
+import { resolveTheme } from '@/lib/theme';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { poolViewParam } from '@/features/pool/pool-views';
 import { getMyProfile } from '@/lib/queries/profile';
@@ -52,9 +55,17 @@ export async function PoolScreen({
       }
     : null;
   if (!view) notFound();
+  // Its colour (0059): the pool's and mine there, with mine, resolved once
+  // here so the screen wears it from the first paint.
+  const [colors, mine] = await Promise.all([
+    getPoolColors(supabase, view.pool.id, profile.id),
+    getMyTheme(supabase),
+  ]);
+  const worn = resolveTheme(mine, colors);
 
   return (
-    <main className="water-ground flex h-dvh min-h-0 flex-col">
+    <main data-theme={worn.color} className="water-ground flex h-dvh min-h-0 flex-col">
+      <PlaceTheme poolId={view.pool.id} colors={colors} />
       {/* Editing from here edits with this pool's lanes (0022). */}
       <PoolEditScope scope={poolScopeOf(view)}>
         <PoolGround

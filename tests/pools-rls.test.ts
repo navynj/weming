@@ -993,9 +993,21 @@ describe('keeping a pool off my Home (0039)', () => {
   });
 });
 
-describe('renaming a pool (0021)', () => {
-  it('is refused to a member who is not its creator', async () => {
-    const { error } = await asUser(ben).rpc('rename_pool', { p_pool: pool, p_name: 'Bens' });
+describe('renaming a pool (0021, 0059)', () => {
+  it('is any current member’s, not only its creator’s', async () => {
+    const before = (await asAdmin().from('pools').select('name').eq('id', pool).single()).data!
+      .name;
+    expect(
+      (await asUser(ben).rpc('rename_pool', { p_pool: pool, p_name: 'Bens' })).error,
+    ).toBeNull();
+    expect((await asAdmin().from('pools').select('name').eq('id', pool).single()).data!.name).toBe(
+      'Bens',
+    );
+    await asUser(ben).rpc('rename_pool', { p_pool: pool, p_name: before });
+  });
+
+  it('is refused to someone outside the pool', async () => {
+    const { error } = await asUser(cal).rpc('rename_pool', { p_pool: pool, p_name: 'Cals' });
     expect(error?.code).toBe('42501');
   });
 });

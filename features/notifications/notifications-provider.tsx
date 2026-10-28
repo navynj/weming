@@ -8,12 +8,14 @@ import { setBadge } from '@/lib/notifications/badge';
 
 import { loadUnreadCount } from './actions';
 import { NotificationsSheet } from './notifications-sheet';
+import { NotificationSettingsSheet, type BellPlace } from './notification-settings-sheet';
 import { resyncPush } from './push-client';
 
 type Notifications = {
   unread: number;
   setUnread: (next: number | ((current: number) => number)) => void;
-  open: () => void;
+  /** The bell, from a place (0059): its settings are that place's. */
+  open: (place?: BellPlace) => void;
 };
 
 const Context = createContext<Notifications>({ unread: 0, setUnread: () => {}, open: () => {} });
@@ -32,7 +34,9 @@ export function NotificationsProvider({
 }) {
   const [unread, setUnread] = useState(initialUnread);
   const [loaded, setLoaded] = useState(initialUnread);
-  const [open, setOpen] = useState(false);
+  // The list, or its settings from the gear (0059), and where the bell was.
+  const [open, setOpen] = useState<'list' | 'settings' | null>(null);
+  const [place, setPlace] = useState<BellPlace>(null);
   // A re-read page brings a fresh count.
   if (loaded !== initialUnread) {
     setLoaded(initialUnread);
@@ -73,9 +77,23 @@ export function NotificationsProvider({
   }, [router]);
 
   return (
-    <Context.Provider value={{ unread, setUnread, open: () => setOpen(true) }}>
+    <Context.Provider
+      value={{
+        unread,
+        setUnread,
+        open: (at = null) => {
+          setPlace(at);
+          setOpen('list');
+        },
+      }}
+    >
       {children}
-      {open ? <NotificationsSheet onClose={() => setOpen(false)} /> : null}
+      {open === 'list' ? (
+        <NotificationsSheet onClose={() => setOpen(null)} onSettings={() => setOpen('settings')} />
+      ) : null}
+      {open === 'settings' ? (
+        <NotificationSettingsSheet place={place} onClose={() => setOpen(null)} />
+      ) : null}
       <InstallOffer />
     </Context.Provider>
   );

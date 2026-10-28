@@ -34,10 +34,14 @@ function revalidatePool(poolId: string | null = null): void {
   if (poolId) revalidatePath(`/pool/${poolId}`);
 }
 
+/** What a dead invite link says, here and on the join page (0059). */
+const DEAD_LINK = 'This invite link no longer works. Ask for a new one.';
+
 /** A database refusal as the author should read it: our own words, else a plain one. */
 function said(error: { message: string; code?: string } | null): string {
   if (!error) return 'That did not go through. Try again.';
-  if (error.code === '42501' && /no longer valid/.test(error.message)) return error.message;
+  // A dead invite, in plain words (0059).
+  if (error.code === '42501' && /no longer valid/.test(error.message)) return DEAD_LINK;
   if (error.code === '42501' && /ripples? by other members/.test(error.message)) {
     return error.message;
   }
@@ -45,10 +49,7 @@ function said(error: { message: string; code?: string } | null): string {
     return 'Each of your lanes has one default here.';
   }
   if (error.code === '42501' && /together here/.test(error.message)) return error.message;
-  if (error.code === '42501' && /creator renames/.test(error.message)) {
-    return 'Only the Pool’s creator can rename it.';
-  }
-  if (error.code === '42501') return 'You are not a member of this Pool.';
+  if (error.code === '42501') return 'You’re not in this Pool anymore.';
   return error.message;
 }
 
@@ -108,7 +109,7 @@ export async function joinPool(input: z.infer<typeof Join>): Promise<Made> {
 
 async function joinPoolWork(input: z.infer<typeof Join>): Promise<Made> {
   const parsed = Join.safeParse(input);
-  if (!parsed.success) return { ok: false, message: 'This invite link is no longer valid.' };
+  if (!parsed.success) return { ok: false, message: DEAD_LINK };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('join_pool', {
     p_token: parsed.data.token,
@@ -123,7 +124,8 @@ async function joinPoolWork(input: z.infer<typeof Join>): Promise<Made> {
 /** Pool settings → Advanced: my links here and their defaults, the whole set. */
 export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>): Promise<Done> {
   const parsed = z.object({ poolId: z.uuid(), links: LINKS }).safeParse({ poolId, links });
-  if (!parsed.success) return { ok: false, message: 'Those links are not valid.' };
+  if (!parsed.success)
+    return { ok: false, message: 'Those lane connections didn’t save. Try again.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_lane_links', {
     p_pool: poolId,
@@ -142,7 +144,7 @@ export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>)
 
 /** Pool settings: "Invite everyone to new posts by default" (0033), any current member. */
 export async function setPoolInviteAll(poolId: string, on: boolean): Promise<Done> {
-  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_pool_invite_all', { p_pool: poolId, p_on: on });
   if (error) return { ok: false, message: said(error) };
@@ -152,7 +154,7 @@ export async function setPoolInviteAll(poolId: string, on: boolean): Promise<Don
 
 /** Pool settings: what I wrote in this pool shows on my Home, or not (0039). Mine alone. */
 export async function setPoolOnHome(poolId: string, on: boolean): Promise<Done> {
-  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_pool_on_home', { p_pool: poolId, p_on: on });
   if (error) return { ok: false, message: said(error) };
@@ -162,14 +164,14 @@ export async function setPoolOnHome(poolId: string, on: boolean): Promise<Done> 
 
 /** The creator sets or clears the pool's photo (0024); the bytes went up from the browser first. */
 export async function setPoolPhoto(poolId: string, on: boolean): Promise<Done> {
-  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_pool_photo', { p_pool: poolId, p_on: on });
   if (error) {
     return {
       ok: false,
       message:
-        error.code === '42501' ? 'Only the Pool’s creator can change its photo.' : error.message,
+        error.code === '42501' ? 'Only someone in this Pool can change its photo.' : error.message,
     };
   }
   revalidatePool(poolId);
@@ -199,7 +201,7 @@ export type Invite =
 
 /** "Create invite link": a fresh token, seven days, revocable. */
 export async function createInvite(poolId: string): Promise<Invite> {
-  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('create_invite', { p_pool: poolId });
   const row = data?.[0];
@@ -210,13 +212,17 @@ export async function createInvite(poolId: string): Promise<Invite> {
     .select('id')
     .eq('token', row.token)
     .single();
-  if (!made) return { ok: false, message: 'The link was made but could not be read back.' };
+  if (!made)
+    return {
+      ok: false,
+      message: 'The link was made but didn’t show up. Close this and open it again.',
+    };
   revalidatePool(poolId);
   return { ok: true, id: made.id, token: row.token, expiresAt: row.expires_at };
 }
 
 export async function revokeInvite(poolId: string, inviteId: string): Promise<Done> {
-  if (!z.uuid().safeParse(inviteId).success) return { ok: false, message: 'No such invite.' };
+  if (!z.uuid().safeParse(inviteId).success) return { ok: false, message: 'That link is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('revoke_invite', { p_invite: inviteId });
   if (error) return { ok: false, message: said(error) };
@@ -226,7 +232,7 @@ export async function revokeInvite(poolId: string, inviteId: string): Promise<Do
 
 /** "Leave Pool": keep my records here (Former member), or hide them. Never deletes. */
 export async function leavePool(poolId: string, keep: boolean): Promise<Done> {
-  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('leave_pool', { p_pool: poolId, p_keep: keep });
   if (error) return { ok: false, message: said(error) };
@@ -294,7 +300,7 @@ export async function setPlacement(
       poolLaneId: z.uuid().nullable(),
     })
     .safeParse({ splashId, poolId, shared, poolLaneId });
-  if (!parsed.success) return { ok: false, message: 'That audience is not valid.' };
+  if (!parsed.success) return { ok: false, message: 'That didn’t save. Try again.' };
   const supabase = await createClient();
   const {
     data: { user },
@@ -346,7 +352,7 @@ export async function setPlacementTogether(
   const parsed = z
     .object({ splashId: z.uuid(), poolId: z.uuid(), picked: z.array(z.uuid()).max(64) })
     .safeParse({ splashId, poolId, picked });
-  if (!parsed.success) return { ok: false, message: 'Those people are not valid.' };
+  if (!parsed.success) return { ok: false, message: 'Some of those people aren’t in this Pool.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_placement_together', {
     p_splash: splashId,
@@ -392,7 +398,7 @@ export async function addJointInvitees(
   const parsed = z
     .object({ splashId: z.uuid(), users: z.array(z.uuid()).max(64) })
     .safeParse({ splashId, users });
-  if (!parsed.success) return { ok: false, message: 'Those people are not valid.' };
+  if (!parsed.success) return { ok: false, message: 'Some of those people aren’t in this Pool.' };
   if (users.length === 0 && !everyone) return { ok: true };
   const supabase = await createClient();
   const { error } = await supabase.rpc('add_joint_invitees', {
@@ -510,7 +516,7 @@ async function createJointSplashWork(input: z.input<typeof Joint>): Promise<Made
 
 /** Delete a joint splash: only while every ripple on it is mine (0011). */
 export async function deleteJointSplash(poolId: string, splashId: string): Promise<Done> {
-  if (!z.uuid().safeParse(splashId).success) return { ok: false, message: 'No such splash.' };
+  if (!z.uuid().safeParse(splashId).success) return { ok: false, message: 'That splash is gone.' };
   const supabase = await createClient();
   const { data: blocks } = await supabase
     .from('ripples')
@@ -603,7 +609,7 @@ async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Ma
  * marked), shared records stay.
  */
 export async function deletePool(poolId: string): Promise<Done> {
-  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('delete_pool', { p_pool: poolId });
   if (error) {

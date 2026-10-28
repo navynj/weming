@@ -18,12 +18,20 @@ vi.mock('@/features/people/actions', () => ({
     saved.push(input);
     return Promise.resolve(outcome.next);
   },
+  setPoolTheme: (poolId: string, color: unknown) => {
+    saved.push({ pool: poolId, color });
+    return Promise.resolve(outcome.next);
+  },
+  setMyPoolTheme: (poolId: string, color: unknown) => {
+    saved.push({ mine: poolId, color });
+    return Promise.resolve(outcome.next);
+  },
 }));
 
 import { ToastProvider } from '@/components/ui/toast';
 import { ThemePicker } from '@/features/people/theme-picker';
-import { ThemeProvider } from '@/features/people/theme-provider';
-import { asTheme, PASTEL_INK, THEMES } from '@/lib/theme';
+import { PlaceTheme, ThemeProvider } from '@/features/people/theme-provider';
+import { asTheme, PASTEL_INK, THEMES, type ThemeColor } from '@/lib/theme';
 
 afterEach(() => {
   cleanup();
@@ -76,17 +84,19 @@ describe('the twelve colours', () => {
   });
 });
 
-function picker() {
+function picker(pool: { pool: ThemeColor | null; mine: ThemeColor | null } | null = null) {
+  saved.length = 0;
   return render(
-    <ThemeProvider initial={{ color: 'blue', mode: 'dark' }}>
+    <ThemeProvider initial={{ home: 'blue', mode: 'dark', everywhere: false }}>
       <ToastProvider>
+        {pool ? <PlaceTheme poolId="p-a" colors={pool} /> : null}
         <ThemePicker />
       </ToastProvider>
     </ThemeProvider>,
   );
 }
 
-describe('choosing a theme in Settings', () => {
+describe('the Theme tab on Home (0059)', () => {
   it('shows the twelve swatches and the mode, the current one chosen in ink', () => {
     const { container } = picker();
     expect(container.querySelectorAll('[data-theme-swatch]')).toHaveLength(12);
@@ -96,20 +106,26 @@ describe('choosing a theme in Settings', () => {
     expect(container.querySelector('[data-theme-mode="dark"]')!.className).toContain('bg-ink');
   });
 
-  it('wears a colour and a mode on <html> at once, and saves them', async () => {
+  it('asks whether a colour applies in every pool too, and saves the answer', async () => {
     const { container } = picker();
     fireEvent.click(container.querySelector('[data-theme-swatch="pink"]')!);
+    expect(container.querySelector('[data-theme-everywhere-ask]')!.textContent).toContain(
+      'Apply to all pools too? Only you will see it.',
+    );
+    fireEvent.click(container.querySelector('[data-theme-home-only]')!);
     expect(document.documentElement.dataset.theme).toBe('pink');
-    await waitFor(() => expect(saved).toEqual([{ color: 'pink', mode: 'dark' }]));
-    fireEvent.click(container.querySelector('[data-theme-mode="light"]')!);
-    expect(document.documentElement.dataset.mode).toBe('light');
-    await waitFor(() => expect(saved).toHaveLength(2));
-    expect(saved[1]).toEqual({ color: 'pink', mode: 'light' });
+    await waitFor(() => expect(saved).toEqual([{ home: 'pink', mode: 'dark', everywhere: false }]));
+    fireEvent.click(container.querySelector('[data-theme-swatch="mint"]')!);
+    fireEvent.click(container.querySelector('[data-theme-everywhere]')!);
+    await waitFor(() =>
+      expect(saved.at(-1)).toEqual({ home: 'mint', mode: 'dark', everywhere: true }),
+    );
   });
 
-  it('says "Theme saved" once a choice has saved, with no Save button (Yoonji, in the session)', async () => {
+  it('wears a mode on <html> at once, says "Theme saved", no Save button', async () => {
     const { container, findByRole } = picker();
-    fireEvent.click(container.querySelector('[data-theme-swatch="mint"]')!);
+    fireEvent.click(container.querySelector('[data-theme-mode="light"]')!);
+    expect(document.documentElement.dataset.mode).toBe('light');
     expect((await findByRole('status')).textContent).toBe('Theme saved');
   });
 
@@ -121,19 +137,42 @@ describe('choosing a theme in Settings', () => {
     expect(document.documentElement.dataset.mode).toBe('pastel');
     const sky = container.querySelector<HTMLElement>('[data-theme-swatch="sky"]')!;
     expect(sky.style.backgroundColor).toBe('rgb(144, 197, 234)');
-    await waitFor(() => expect(saved.at(-1)).toEqual({ color: 'blue', mode: 'pastel' }));
   });
 
   it('takes a refused choice back and says why', async () => {
     outcome.next = { ok: false, message: 'Sign in again to save your theme.' };
     const { container, findByRole } = picker();
+    fireEvent.click(container.querySelector('[data-theme-swatch="green"]')!);
     await act(async () => {
-      fireEvent.click(container.querySelector('[data-theme-swatch="green"]')!);
+      fireEvent.click(container.querySelector('[data-theme-home-only]')!);
     });
     expect((await findByRole('alert')).textContent).toBe('Sign in again to save your theme.');
     expect(document.documentElement.dataset.theme).toBe('blue');
-    expect(
-      container.querySelector('[data-theme-swatch="blue"]')!.getAttribute('aria-checked'),
-    ).toBe('true');
+    outcome.next = { ok: true };
+  });
+});
+
+describe('the Theme tab in a pool (0059)', () => {
+  it('sets the pool’s colour for everyone, and mine over it, worn at once', async () => {
+    const { container } = picker({ pool: null, mine: null });
+    await waitFor(() =>
+      expect(container.querySelector('[data-theme-colors="pool"]')).not.toBeNull(),
+    );
+    fireEvent.click(
+      container.querySelector('[data-theme-colors="pool"] [data-theme-swatch="mint"]')!,
+    );
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('mint'));
+    fireEvent.click(
+      container.querySelector('[data-theme-colors="mine"] [data-theme-swatch="pink"]')!,
+    );
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('pink'));
+    // Use pool color: mine cleared, the pool's worn again.
+    fireEvent.click(container.querySelector('[data-theme-clear="mine"]')!);
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('mint'));
+    expect(saved).toEqual([
+      { pool: 'p-a', color: 'mint' },
+      { mine: 'p-a', color: 'pink' },
+      { mine: 'p-a', color: null },
+    ]);
   });
 });

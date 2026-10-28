@@ -14,7 +14,8 @@ vi.mock('@/features/notifications/actions', () => ({
   removePushSubscription: () => Promise.resolve({ ok: true }),
 }));
 
-import { NotificationSettings } from '@/features/notifications/notification-settings';
+import { TurnOnNotifications } from '@/features/install/turn-on';
+import { GlobalNotificationSwitches } from '@/features/notifications/notification-settings';
 
 afterEach(() => {
   cleanup();
@@ -27,7 +28,7 @@ const toggle = (container: HTMLElement, label: string) =>
 
 describe('settings → notifications (H32)', () => {
   it('starts with neither on: not paused, no titles on the lock screen', async () => {
-    const { container } = render(<NotificationSettings />);
+    const { container } = render(<GlobalNotificationSwitches />);
     await waitFor(() => expect(toggle(container, 'Pause all notifications').disabled).toBe(false));
     expect(toggle(container, 'Pause all notifications').getAttribute('aria-checked')).toBe('false');
     expect(toggle(container, 'Show titles in notifications').getAttribute('aria-checked')).toBe(
@@ -36,7 +37,7 @@ describe('settings → notifications (H32)', () => {
   });
 
   it('pauses at once and saves behind it', async () => {
-    const { container } = render(<NotificationSettings />);
+    const { container } = render(<GlobalNotificationSwitches />);
     await waitFor(() => expect(toggle(container, 'Pause all notifications').disabled).toBe(false));
     fireEvent.click(toggle(container, 'Pause all notifications'));
     expect(toggle(container, 'Pause all notifications').getAttribute('aria-checked')).toBe('true');
@@ -45,7 +46,7 @@ describe('settings → notifications (H32)', () => {
 
   it('takes a refused change back and says why', async () => {
     refuse = true;
-    const { container, findByRole } = render(<NotificationSettings />);
+    const { container, findByRole } = render(<GlobalNotificationSwitches />);
     await waitFor(() =>
       expect(toggle(container, 'Show titles in notifications').disabled).toBe(false),
     );
@@ -57,9 +58,9 @@ describe('settings → notifications (H32)', () => {
   });
 
   it('says so where this browser cannot show notifications', async () => {
-    const { container } = render(<NotificationSettings />);
+    const { container } = render(<TurnOnNotifications inSheet />);
     await waitFor(() =>
-      expect(container.querySelector('[data-push-setup]')!.textContent).toContain(
+      expect(container.querySelector('[data-turn-on]')!.textContent).toContain(
         'The bell still collects them',
       ),
     );

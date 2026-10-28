@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const pushed: string[] = [];
 const replaced: string[] = [];
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => '/pool/p-a',
   useRouter: () => ({
     push: (to: string) => pushed.push(to),
@@ -433,7 +434,7 @@ describe('Members (H23)', () => {
 });
 
 describe('switching pools (H23)', () => {
-  it('lists settings, my face, then my pools on the strip, the current one ringed, news dotted', () => {
+  it('lists my face, then my pools on the strip, the current one ringed, news dotted', () => {
     const { container } = ground(A);
     const strip = container.querySelector('[data-home-foot="phone"] [data-place-strip]')!;
     const order = [...strip.children].map(
@@ -444,7 +445,8 @@ describe('switching pools (H23)', () => {
         (el.hasAttribute('data-strip-new') && 'new'),
     );
     // The order I joined them in, newest first; the `+` closes the strip.
-    expect(order).toEqual(['settings', 'home', 'p-a', 'p-b', 'new']);
+    // No gear on the strip (0059): the header's.
+    expect(order).toEqual(['home', 'p-a', 'p-b', 'new']);
     const current = strip.querySelector('[data-strip-pool="p-a"]')!;
     expect(current.getAttribute('aria-current')).toBe('page');
     // Selected: a white border, and a pool is a rounded square, not a circle.
@@ -551,7 +553,8 @@ describe('switching pools (H23)', () => {
 describe('leaving (H23)', () => {
   it('asks to keep or remove before anything happens', () => {
     const { container, getByText } = ground(A);
-    fireEvent.click(container.querySelector('[data-pool-members]')!);
+    // Another member's face opens the members (0059).
+    fireEvent.click(container.querySelector('[data-place-face]:not([data-place-face="me"])')!);
     expect(container.ownerDocument.querySelector('[data-former-member]')).not.toBeNull();
     fireEvent.click(getByText('Leave Pool'));
     expect(getByText('Keep your records in this Pool?')).toBeTruthy();
@@ -562,8 +565,10 @@ describe('leaving (H23)', () => {
 
 describe('pool lanes (H23)', () => {
   it('keeps the add form open, cleared, after each lane so the next can follow', () => {
+    // The pool's lanes are its settings sheet's Pool tab (0059).
+    window.history.replaceState(null, '', '/pool/p-a?settings=pool');
     const { container, getByText } = ground(A);
-    fireEvent.click(container.querySelector('[data-manage-pool-lanes]')!);
+    window.history.replaceState(null, '', '/');
     fireEvent.click(getByText('+ Add lane'));
     const doc = container.ownerDocument;
     for (const name of ['Books', 'Walks']) {
@@ -688,7 +693,7 @@ describe('faces (0018)', () => {
   it('shows each member’s photo in the header, the Members headers and the members sheet', () => {
     setView('members');
     const { container } = faces(A);
-    expect(srcs(container.querySelector('[data-pool-members]'))).toEqual([
+    expect(srcs(container.querySelector('[data-place-faces]'))).toEqual([
       'https://signed/me',
       'https://signed/mina',
     ]);
@@ -699,7 +704,7 @@ describe('faces (0018)', () => {
     expect(container.querySelector(`[data-lane-header="${MINA}"]`)!.textContent).toContain(
       'Mina Kim',
     );
-    fireEvent.click(container.querySelector('[data-pool-members]')!);
+    fireEvent.click(container.querySelector(`[data-place-face="${MINA}"]`)!);
     expect(srcs(container.querySelector(`[data-member="${MINA}"]`))).toEqual([
       'https://signed/mina',
     ]);
@@ -1090,5 +1095,37 @@ describe('whose a record is, in a pool (review)', () => {
   it('never in Members, whose column says who', () => {
     setView('members');
     expect(ground(A).container.querySelector('[data-board-author]')).toBeNull();
+  });
+});
+
+describe('the header, Home’s in shape (0059)', () => {
+  it('is the pool, the bell, its members’ faces, the invite, the gear; then the four views', () => {
+    const { container } = ground(A);
+    const header = container.querySelector('[data-pool-header]')!;
+    expect(header.querySelector('[data-place-title]')!.textContent).toBe('Our Pool');
+    const row = header.querySelector('[data-place-header-row]')!;
+    const order = [
+      ...row.querySelectorAll(
+        '[data-notifications-bell], [data-place-face], [data-pool-invite], [data-place-settings]',
+      ),
+    ].map((el) =>
+      el.hasAttribute('data-notifications-bell')
+        ? 'bell'
+        : el.hasAttribute('data-place-face')
+          ? 'face'
+          : el.hasAttribute('data-pool-invite')
+            ? 'invite'
+            : 'gear',
+    );
+    expect(order[0]).toBe('bell');
+    expect(order.slice(-2)).toEqual(['invite', 'gear']);
+    expect(order.filter((o) => o === 'face').length).toBeGreaterThan(0);
+    expect(
+      [...header.querySelectorAll('[data-place-tabs] [data-view-option]')].map(
+        (o) => o.textContent,
+      ),
+    ).toEqual(['Calendar', 'Members', 'Lane', 'List']);
+    // No lane glyph or settings link beside the views any more.
+    expect(container.querySelector('[data-manage-pool-lanes], [data-pool-settings]')).toBeNull();
   });
 });

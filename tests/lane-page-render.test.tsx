@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pushed: string[] = [];
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/lane/c-food',
   useRouter: () => ({
     push: (to: string) => pushed.push(to),
@@ -134,9 +135,9 @@ describe('the views’ tabs on a lane’s page (review)', () => {
     fireEvent.click(tabs.querySelector('[data-view-option="board"]')!);
     fireEvent.click(tabs.querySelector('[data-view-option="date"]')!);
     expect(pushed).toEqual(['/?view=board', '/?view=date']);
-    // Settings live in the strip (0032), not beside the tabs.
+    // No settings beside the tabs; the strip has no gear now (0059): the header's.
     expect(tabs.querySelector('[data-home-settings]')).toBeNull();
-    expect(container.querySelector('[data-strip-settings]')).not.toBeNull();
+    expect(container.querySelector('[data-strip-settings]')).toBeNull();
   });
 
   it('keep a pool’s four tabs on its lane’s page, each back to the pool on that view', () => {

@@ -2,29 +2,18 @@
 
 import { useEffect, useState } from 'react';
 
-import { PushSetup } from '@/features/install/push-setup';
 import { Switch } from '@/features/pool/lane-match';
 import type { NotificationSettings as Settings } from '@/lib/queries/notifications';
 
 import { loadNotificationSettings, setNotificationSettings } from './actions';
 
 /**
- * Settings → Notifications (H32): Pause all notifications, which overrides
- * every pool; Show titles in notifications, off, so the lock screen says
- * only who and where; and this device's install and permission. Each switch
- * shows at once and saves behind it; a refusal puts it back and says why.
+ * The two that hold across every pool (H32), in the bell's Notification
+ * settings (0059): Pause all notifications, which overrides every pool;
+ * Show titles in notifications, off, so the lock screen says only who and
+ * where. Each switch shows at once and saves behind it; a refusal puts it
+ * back and says why.
  */
-export function NotificationSettings() {
-  return (
-    <section data-notification-settings className="flex w-full flex-col gap-4">
-      <h2 className="text-ink font-semibold">Notifications</h2>
-      <GlobalNotificationSwitches />
-      <PushSetup />
-    </section>
-  );
-}
-
-/** The two switches that hold across every pool, loaded and saved on their own. */
 export function GlobalNotificationSwitches() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [message, setMessage] = useState<string | null>(null);

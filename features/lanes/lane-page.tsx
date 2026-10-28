@@ -149,7 +149,7 @@ export function LanePage({
             the ground's header, so they do not move between the two. */}
         <header data-lane-tabs className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
           <Link
-            href={pool ? `/pool/${pool.poolId}` : '/?manage=lanes'}
+            href={pool ? `/pool/${pool.poolId}` : '/?settings=home'}
             aria-label={pool ? 'Pool lanes' : 'Lanes'}
             className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
           >
@@ -166,7 +166,7 @@ export function LanePage({
           </div>
           {pool ? (
             <Link
-              href={`/pool/${pool.poolId}/settings`}
+              href={`/pool/${pool.poolId}?settings=pool`}
               aria-label="Pool settings"
               className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
             >
@@ -274,7 +274,7 @@ export function LanePage({
 
         {pool ? null : (
           <Link
-            href="/?manage=lanes"
+            href="/?settings=home"
             data-manage-lanes-link
             className="mt-10 block text-center text-sm text-white/70 underline-offset-4 hover:underline"
           >

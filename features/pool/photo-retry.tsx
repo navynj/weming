@@ -77,7 +77,7 @@ export function PhotoRetryToast({ poolId }: { poolId: string }) {
       <p className="text-ink min-w-0 flex-1 text-sm">{PHOTO_FAILED}</p>
       {state === 'again' ? (
         <Link
-          href={`/pool/${poolId}/settings`}
+          href={`/pool/${poolId}?settings=pool`}
           data-photo-toast-settings
           onClick={() => set(null)}
           className="text-main-900 shrink-0 text-sm font-semibold"

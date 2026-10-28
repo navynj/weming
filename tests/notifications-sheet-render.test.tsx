@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const pushed: string[] = [];
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
   useRouter: () => ({ push: (url: string) => pushed.push(url), refresh: () => {} }),
 }));
 const marked: (string[] | null)[] = [];

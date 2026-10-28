@@ -9,6 +9,7 @@ const router = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/splash/s1',
   useRouter: () => router,
 }));

@@ -13,6 +13,7 @@ const { replaced, joined, saved } = vi.hoisted(() => ({
   saved: [] as unknown[],
 }));
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/join/t',
   useRouter: () => ({
     push: () => {},

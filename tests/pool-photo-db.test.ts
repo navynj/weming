@@ -85,17 +85,19 @@ afterAll(async () => {
 });
 
 describe('setting a pool photo (0024)', () => {
-  it('is refused to a member who is not the creator, in storage and in the row', async () => {
-    const { error } = await asUser(ben).storage.from(POOL_PHOTO_BUCKET).upload(pool, PHOTO, {
+  it('is any current member’s to upload (0059); refused to someone outside, in storage and in the row', async () => {
+    const mine = await asUser(ben).storage.from(POOL_PHOTO_BUCKET).upload(pool, PHOTO, {
       contentType: 'image/webp',
       upsert: true,
     });
-    expect(error).not.toBeNull();
-    as.user = ben;
-    expect(await setPoolPhoto(pool, true)).toEqual({
-      ok: false,
-      message: 'Only the Pool’s creator can change its photo.',
+    expect(mine.error).toBeNull();
+    const theirs = await asUser(cal).storage.from(POOL_PHOTO_BUCKET).upload(pool, PHOTO, {
+      contentType: 'image/webp',
+      upsert: true,
     });
+    expect(theirs.error).not.toBeNull();
+    as.user = cal;
+    expect((await setPoolPhoto(pool, true)).ok).toBe(false);
   });
 
   it('is the creator’s: upload, then the row names version 1', async () => {

@@ -12,8 +12,6 @@ import { createClient } from '@/lib/supabase/client';
 
 import { saveProfile } from './actions';
 import { AVATAR_ACCEPT, decodePhoto, encodeAvatar, sourceRect, type CropView } from './crop';
-import { ThemePicker } from './theme-picker';
-import { NotificationSettings } from '@/features/notifications/notification-settings';
 import { CropFrame, FRAME_PX } from './crop-frame';
 import { displayName, NAME_MAX } from './name';
 import { usePeople } from './people-provider';
@@ -25,12 +23,9 @@ type Photo =
   { kind: 'keep' } | { kind: 'remove' } | { kind: 'new'; image: HTMLImageElement; view: CropView };
 
 /**
- * Settings (0018, 0032): a bottom sheet from the strip's gear, before my
- * face, at every width — my photo and name, then my theme, then
- * notifications (H32). The theme applies
- * the moment it is picked and saves on its own; Save is for the profile.
- *
- * My profile (0018): a bottom sheet, at every width.
+ * My profile (0018; 0059): from my face in the header, on Home or among a
+ * pool's members — my photo and name alone; the theme is the gear's,
+ * notifications the bell's. A bottom sheet, at every width.
  * Tap the large avatar to pick a photo, crop it square; "Remove photo" goes
  * back to initials; the name is 1–40 characters. Save shows the new face on
  * every surface at once and the upload and save run behind it; a refusal
@@ -201,10 +196,6 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
               </span>
             )}
           </label>
-
-          <ThemePicker />
-
-          <NotificationSettings />
 
           <div className="flex w-full gap-3">
             <button

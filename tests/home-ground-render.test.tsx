@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),
 }));
@@ -46,6 +47,7 @@ const deletes: { id: string; resolve: (outcome: unknown) => void }[] = [];
 
 import { byNewest, placeCard, type Card } from '@/features/home/grid';
 import { HomeGround } from '@/features/home/home-ground';
+import { PeopleProvider } from '@/features/people/people-provider';
 import type { HomeView } from '@/features/home/view-toggle';
 
 /** The view a test's Home opens on: a visit opens on the Calendar (review); these choose. */
@@ -222,23 +224,25 @@ function ground(
   topParam: string | null = null,
 ) {
   return render(
-    <InputSheetProvider>
-      {dropped ? <Dropper splash={dropped} month={month ?? '2026-09'} /> : null}
-      {deleted ? <Deleter id={deleted} /> : null}
-      <SheetProbe />
-      <HomeGround
-        initialView={homeView}
-        cards={cards(posts)}
-        pinned={posts.filter((p) => p.pinnedAt)}
-        categories={categories}
-        today={TODAY}
-        timeZone={TZ}
-        initials="YL"
-        scrollToMonth={month}
-        topParam={topParam}
-        board={board}
-      />
-    </InputSheetProvider>,
+    <PeopleProvider me="u-me" people={{ 'u-me': { name: 'Yoonji Lee', photo: null } }}>
+      <InputSheetProvider>
+        {dropped ? <Dropper splash={dropped} month={month ?? '2026-09'} /> : null}
+        {deleted ? <Deleter id={deleted} /> : null}
+        <SheetProbe />
+        <HomeGround
+          initialView={homeView}
+          cards={cards(posts)}
+          pinned={posts.filter((p) => p.pinnedAt)}
+          categories={categories}
+          today={TODAY}
+          timeZone={TZ}
+          initials="YL"
+          scrollToMonth={month}
+          topParam={topParam}
+          board={board}
+        />
+      </InputSheetProvider>
+    </PeopleProvider>,
   );
 }
 
@@ -301,12 +305,11 @@ describe('the water ground (H22)', () => {
     for (const mark of container.querySelectorAll('[data-mark]')) {
       expect(mark.className).toContain('bg-white');
     }
-    // No face floats above the lanes on Home (review). Settings open from the
-    // strip's gear, before my face (0032); the header carries none.
+    // No face floats above the lanes on Home (review). Settings are the
+    // header's gear (0059); the strip has none.
     expect(container.querySelector('[data-avatar-row]')).toBeNull();
-    expect(container.querySelector('[data-home-header] [data-home-settings]')).toBeNull();
-    const strip = container.querySelector('[data-home-foot="phone"] [data-place-strip]')!;
-    expect(strip.firstElementChild!.hasAttribute('data-strip-settings')).toBe(true);
+    expect(container.querySelector('[data-home-header] [data-place-settings]')).not.toBeNull();
+    expect(container.querySelector('[data-strip-settings]')).toBeNull();
   });
 });
 
@@ -474,14 +477,22 @@ describe('the lane grid', () => {
     expect(container.querySelector('[data-lane-detail]')).toBeNull();
   });
 
-  it('opens lane management from the header\u2019s lane glyph, and the new-lane sheet from the +', () => {
+  it('keeps my lanes in the settings sheet’s Home tab (0059), and the new-lane sheet on the +', () => {
+    window.history.replaceState(null, '', '/?settings=home');
     const { container, getByLabelText, getByRole } = ground();
-    expect(container.querySelector('[data-grid-header] [data-edit-lanes]')).toBeNull();
-    fireEvent.click(container.querySelector('[data-home-header] [data-manage-lanes]')!);
-    expect(getByRole('dialog', { name: 'Edit lanes' })).toBeTruthy();
-    fireEvent.click(getByLabelText('Close'));
-    fireEvent.click(getByLabelText('New lane'));
-    expect(getByRole('dialog', { name: 'New lane' })).toBeTruthy();
+    expect(
+      container.querySelector(
+        '[data-settings-sheet="home"] ~ * [data-lanes-editor], [data-settings-panel="home"] [data-lanes-editor]',
+      ),
+    ).not.toBeNull();
+    expect(container.querySelector('[data-manage-lanes]')).toBeNull();
+    window.history.replaceState(null, '', '/');
+    cleanup();
+    const again = ground();
+    fireEvent.click(again.getByLabelText('New lane'));
+    expect(again.getByRole('dialog', { name: 'New lane' })).toBeTruthy();
+    void getByLabelText;
+    void getByRole;
   });
 });
 
@@ -878,11 +889,28 @@ describe('pinned posts as cards (round 3)', () => {
 });
 
 describe('the header and the Date view (round 3)', () => {
-  it('has the lane glyph and the Lane | Date toggle, no Home title and no =', () => {
+  it('is the shared header (0059): Home, the bell, my face, the gear, then the views', () => {
     const { container } = ground();
     const header = container.querySelector('[data-home-header]')!;
-    expect(header.querySelector('[data-manage-lanes] [data-lane-icon]')).not.toBeNull();
-    expect(header.textContent).not.toContain('Home');
+    expect(header.querySelector('[data-place-title]')!.textContent).toBe('Home');
+    const row = header.querySelector('[data-place-header-row]')!;
+    expect(
+      [
+        ...row.querySelectorAll(
+          '[data-notifications-bell], [data-place-face], [data-place-settings]',
+        ),
+      ].map(
+        (el) =>
+          el.getAttribute('data-place-face') ??
+          (el.hasAttribute('data-place-settings') ? 'gear' : 'bell'),
+      ),
+    ).toEqual(['bell', 'me', 'gear']);
+    expect(header.querySelector('[data-pool-invite]')).toBeNull();
+    expect(
+      [...header.querySelectorAll('[data-place-tabs] [data-view-option]')].map(
+        (o) => o.textContent,
+      ),
+    ).toEqual(['Calendar', 'Lane', 'List']);
     const lanes = header.querySelector('[data-view-option="lane"]')!;
     expect(lanes.getAttribute('aria-selected')).toBe('true');
     expect(lanes.className).toContain('bg-white');

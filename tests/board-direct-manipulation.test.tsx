@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),
 }));
@@ -121,7 +122,9 @@ const TWO = [
 
 function home(cards: Card[] = TWO) {
   return render(
-    <ThemeProvider initial={DEFAULT_THEME}>
+    <ThemeProvider
+      initial={{ home: DEFAULT_THEME.color, mode: DEFAULT_THEME.mode, everywhere: false }}
+    >
       <InputSheetProvider>
         <HomeGround
           cards={cards}

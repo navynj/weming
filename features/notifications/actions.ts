@@ -8,11 +8,14 @@ import { isValue, NOTIFICATION_TYPES, type NotificationType } from '@/lib/notifi
 import {
   getNotifications,
   getNotificationSettings,
+  getPoolNotificationPrefs,
   getUnreadCount,
   type NotificationItem,
   type NotificationSettings,
+  type PoolNotificationPrefs,
 } from '@/lib/queries/notifications';
 import { createClient } from '@/lib/supabase/server';
+import { getMyPoolNames } from '@/lib/queries/pools';
 
 /**
  * Notifications (H32). The database decides who may change what (0052:
@@ -69,7 +72,7 @@ export async function setMyNotificationPref(input: z.input<typeof Pref>): Promis
           .from('member_notification_prefs')
           .upsert({ pool_id: poolId, user_id: user.id, type, value });
   if (error) return refused(error.code === '42501' ? 'You’re not in this Pool.' : error.message);
-  revalidatePath(`/pool/${poolId}/settings`);
+  revalidatePath(`/pool/${poolId}`);
   return { ok: true };
 }
 
@@ -91,7 +94,7 @@ export async function setPoolNotificationDefault(
       error.code === '42501' ? 'Only the Pool’s creator sets its defaults.' : error.message,
     );
   }
-  revalidatePath(`/pool/${poolId}/settings`);
+  revalidatePath(`/pool/${poolId}`);
   return { ok: true };
 }
 
@@ -156,4 +159,31 @@ export async function removePushSubscription(endpoint: string): Promise<ActionOu
   const supabase = await createClient();
   const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', parsed.data);
   return error ? refused(error.message) : { ok: true };
+}
+
+/** One pool's notification settings for me (0059): read when the bell's gear opens them. */
+export async function loadPoolNotificationPrefs(poolId: string): Promise<PoolNotificationPrefs> {
+  if (!z.uuid().safeParse(poolId).success) throw new Error('That Pool is not known.');
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Sign in again.');
+  return getPoolNotificationPrefs(supabase, poolId, user.id);
+}
+
+/** Mine in every pool I am in (0059), for Home's notification settings: one group per pool. */
+export async function loadMyPoolsNotificationPrefs(): Promise<
+  { poolId: string; name: string; prefs: PoolNotificationPrefs }[]
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Sign in again.');
+  const pools = await getMyPoolNames(supabase, user.id);
+  const prefs = await Promise.all(
+    pools.map((p) => getPoolNotificationPrefs(supabase, p.id, user.id)),
+  );
+  return pools.map((p, at) => ({ poolId: p.id, name: p.name, prefs: prefs[at] }));
 }

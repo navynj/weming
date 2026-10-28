@@ -28,6 +28,7 @@ vi.mock('@/features/pool/actions', () => ({
 }));
 const pathname = '/';
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));

@@ -1,16 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Settings } from 'lucide-react';
 
 import { Monogram } from '@/components/ui/monogram';
 
 import { GroundFoot } from '@/features/home/ground-foot';
 import { withEdits, type Card } from '@/features/home/grid';
 import { LaneGrid, type Ring } from '@/features/home/lane-grid';
-import { LaneIcon } from '@/features/home/lane-icon';
 import { PinnedCards } from '@/features/home/pinned-cards';
 import { StairBoard } from '@/features/home/stair-board';
 import { useFlip } from '@/features/home/use-flip';
@@ -20,7 +17,6 @@ import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
 import type { PoolView } from '@/lib/queries/pools';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
-import { Avatar } from '@/features/people/avatar';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
 import { LayoutPanel } from '@/features/month-board/layout-panel';
 import { LayoutSheet } from '@/features/month-board/layout-sheet';
@@ -29,14 +25,16 @@ import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
-import { Bell } from '@/features/notifications/bell';
+import { PlaceHeader } from '@/features/header/place-header';
+import { ProfileSheet } from '@/features/people/profile-sheet';
+import { useSettings } from '@/features/settings/use-settings';
 
 import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
 import { MembersSheet } from './members-sheet';
 import { poolCards, poolColumns, poolPinned, withPoolMoves, type PoolViewKind } from './pool-cards';
-import { PoolLanesSheet } from './pool-lanes-sheet';
+import { PoolSettingsSheet } from './settings';
 import { rememberVisit } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
 
@@ -56,7 +54,7 @@ function viewName(view: PoolViewKind): string {
 /** How many members' initials the header shows before the `+`. */
 const HEADER_AVATARS = 3;
 
-type Sheet = 'members' | 'invite' | 'lanes' | null;
+type Sheet = 'members' | 'invite' | null;
 
 /**
  * A pool's home (H23; `_docs/mockups/pool-home.png`, `pool-swimmers.png`):
@@ -91,6 +89,8 @@ export function PoolGround({
   // here holds while I stay.
   const [kind, setKind] = useState<PoolViewKind>(initialView);
   const [sheet, setSheet] = useState<Sheet>(null);
+  const settings = useSettings();
+  const [profile, setProfile] = useState(false);
   const {
     openSheet,
     pendingDrop,
@@ -280,71 +280,25 @@ export function PoolGround({
           // Wide, every view on the left takes two thirds and the stack one (review).
           className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
-          <header data-pool-header className="flex shrink-0 items-center gap-2 px-4 pt-4">
-            {/* The pool's photo or monogram, then its name (0024); going to
-                another pool is the strip's (review). */}
-            <Monogram name={view.pool.name} size="row" photo={view.pool.photo ?? null} />
-            <h1
-              data-pool-title
-              className="min-w-0 flex-1 truncate text-3xl/tight font-semibold text-white"
-            >
-              {view.pool.name}
-            </h1>
-            <Bell />
-            <span className="flex shrink-0 items-center">
-              {/* The members' faces are the way to the member list (review). */}
-              <button
-                type="button"
-                aria-label="Members"
-                data-pool-members
-                onClick={() => setSheet('members')}
-                className="flex items-center"
-              >
-                {current.slice(0, HEADER_AVATARS).map((member, at) => (
-                  <Avatar
-                    key={member.userId}
-                    id={member.userId}
-                    initials={member.initials}
-                    // Solid, so an avatar never shows the one beneath it (review).
-                    className={`text-main-900/60 ring-main-900 bg-joint-face flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-medium ring-2 ${
-                      at > 0 ? '-ml-2' : ''
-                    }`}
-                  />
-                ))}
-              </button>
-              <button
-                type="button"
-                aria-label="Invite"
-                data-pool-invite
-                onClick={() => setSheet('invite')}
-                className="ml-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white"
-              >
-                <Plus aria-hidden size={16} />
-              </button>
-            </span>
-          </header>
-
-          <div className="flex shrink-0 items-center gap-3 px-4 pt-4 pb-6">
-            <button
-              type="button"
-              aria-label="Pool lanes"
-              data-manage-pool-lanes
-              onClick={() => setSheet('lanes')}
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
-            >
-              <LaneIcon size={20} />
-            </button>
-            <div className="min-w-0 flex-1">
-              <SegmentedToggle view={kind} onChange={setKind} options={VIEWS} />
-            </div>
-            <Link
-              href={`/pool/${poolId}/settings`}
-              aria-label="Pool settings"
-              data-pool-settings
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
-            >
-              <Settings aria-hidden size={20} />
-            </Link>
+          {/* The header (0059), Home's in shape: the pool, the bell, its
+              members' faces (mine opens my profile), the invite, the gear;
+              the views beneath. */}
+          <div data-pool-header>
+            <PlaceHeader
+              mark={<Monogram name={view.pool.name} size="row" photo={view.pool.photo ?? null} />}
+              name={view.pool.name}
+              faces={current.slice(0, HEADER_AVATARS).map((m) => ({
+                userId: m.userId,
+                initials: m.initials,
+              }))}
+              me={me}
+              onMyFace={() => setProfile(true)}
+              onOtherFace={() => setSheet('members')}
+              onInvite={() => setSheet('invite')}
+              onSettings={() => settings.open('pool')}
+              bell={{ poolId, name: view.pool.name, isCreator: view.pool.ownerId === me }}
+              tabs={<SegmentedToggle view={kind} onChange={setKind} options={VIEWS} />}
+            />
           </div>
 
           {dropMessage || pinned.message ? (
@@ -477,9 +431,9 @@ export function PoolGround({
           onClose={() => setSheet(null)}
         />
       ) : null}
-      {sheet === 'lanes' ? (
-        <PoolLanesSheet poolId={poolId} lanes={view.lanes} onClose={() => setSheet(null)} />
-      ) : null}
+      {/* The gear's sheet (0059): Pool, Theme, Advanced, over the pool. */}
+      <PoolSettingsSheet view={view} me={me} />
+      {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
       {sheet === 'invite' ? (
         <PoolSheet label="Invite" onClose={() => setSheet(null)}>
           <SheetTitle>Invite to {view.pool.name}</SheetTitle>

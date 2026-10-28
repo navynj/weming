@@ -266,13 +266,14 @@ export async function getPoolView(
         }[]
       >(),
     supabase.from('splashes').select('*').eq('pool_id', poolId).is('owner_id', null),
+    // The newest links, turned off and run out among them, so the list can
+    // say which no longer work (0059).
     supabase
       .from('pool_invites')
       .select('*')
       .eq('pool_id', poolId)
-      .is('revoked_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(10),
     supabase
       .from('pool_members')
       .select('on_home')

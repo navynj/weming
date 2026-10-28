@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { PoolLane } from '@/lib/queries/pools';
@@ -18,18 +18,22 @@ export function PoolLanesSheet({
   poolId,
   lanes,
   onClose,
+  inline = false,
 }: {
   poolId: string;
   lanes: PoolLane[];
   onClose: () => void;
+  /** Its rows alone, in the settings sheet's Pool tab (0059). */
+  inline?: boolean;
 }) {
   const shown = useOptimisticAction(lanes);
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   // Each lane added remounts the form empty, so the next can be typed at once.
   const [added, setAdded] = useState(0);
+  const Frame = inline ? InlineFrame : PoolSheet;
   return (
-    <PoolSheet label="Pool lanes" onClose={onClose}>
-      <SheetTitle>Pool lanes</SheetTitle>
+    <Frame label="Pool lanes" onClose={onClose}>
+      {inline ? null : <SheetTitle>Pool lanes</SheetTitle>}
       {shown.message ? (
         <p role="alert" className="text-pool-500 mb-3 text-sm">
           {shown.message}
@@ -105,7 +109,7 @@ export function PoolLanesSheet({
           + Add lane
         </button>
       )}
-    </PoolSheet>
+    </Frame>
   );
 }
 
@@ -171,4 +175,9 @@ function PoolLaneForm({
       </div>
     </div>
   );
+}
+
+/** Inline (0059): the rows in a tab of the settings sheet, with no sheet of their own. */
+function InlineFrame({ children }: { label: string; onClose: () => void; children: ReactNode }) {
+  return <div data-pool-lanes-editor>{children}</div>;
 }

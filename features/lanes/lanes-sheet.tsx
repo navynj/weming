@@ -27,12 +27,16 @@ export function LanesSheet({
   apply,
   message,
   onClose,
+  inline = false,
 }: {
   categories: MyCategory[];
   apply: ReturnType<typeof useOptimisticAction<MyCategory[]>>['run'];
   /** The last refusal, from Home's optimistic lane state. */
   message?: string | null;
+  /** Closes the sheet; inline, ends an edit (the tab starts the rows afresh). */
   onClose: () => void;
+  /** Its rows alone, in the settings sheet (0059). */
+  inline?: boolean;
 }) {
   // The order the hand has given, and the words it has typed, over the lanes
   // Home holds; a lane that is gone from Home is gone from here too.
@@ -148,6 +152,107 @@ export function LanesSheet({
     );
   }
 
+  const body = (
+    <>
+      <h2 className="text-main-900 text-2xl font-semibold">Lanes</h2>
+
+      <ol ref={list} className="flex flex-col gap-2">
+        {rows.map((row, index) => (
+          <li
+            key={row.id}
+            data-lane-row={row.id}
+            data-dragging={dragging === row.id ? '' : undefined}
+            className="flex items-center gap-3 transition-[opacity,transform] duration-100 motion-reduce:transition-none"
+            style={dragging === row.id ? { opacity: 0.6, transform: 'scale(1.02)' } : undefined}
+          >
+            <button
+              type="button"
+              aria-label={`Move ${row.name || 'this lane'}`}
+              data-lane-grip
+              onPointerDown={(event) => dragFrom(row.id, event)}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  moveTo(row.id, index - 1);
+                }
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  moveTo(row.id, index + 1);
+                }
+              }}
+              className="text-pool-500 flex h-10 w-6 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+            >
+              <GripVertical aria-hidden size={16} />
+            </button>
+            <EmojiInput
+              value={row.icon}
+              onChange={(icon) => edit(row.id, { icon })}
+              label={`Icon for ${row.name || 'this lane'}`}
+            />
+            <input
+              value={row.name}
+              onChange={(event) => edit(row.id, { name: event.target.value })}
+              aria-label="Lane name"
+              placeholder="Enter the lane name"
+              maxLength={24}
+              className="text-ink placeholder:text-pool-500 border-pool-100 min-w-0 flex-1 border-b py-2 text-base outline-none"
+            />
+            {confirming === row.id ? (
+              <span className="flex shrink-0 items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => remove(row.id)}
+                  className="text-main-900 font-medium"
+                >
+                  Delete
+                </button>
+                <button type="button" onClick={() => setConfirming(null)} className="text-pool-500">
+                  Keep
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                aria-label={`Delete ${row.name || 'this lane'}`}
+                onClick={() => setConfirming(row.id)}
+                className="text-pool-500 flex h-8 w-8 shrink-0 items-center justify-center"
+              >
+                <Trash2 aria-hidden size={14} />
+              </button>
+            )}
+          </li>
+        ))}
+      </ol>
+
+      {message ? (
+        <p role="alert" className="text-pool-500 text-sm">
+          {message}
+        </p>
+      ) : null}
+
+      <div className="flex items-center justify-end gap-3 pt-2 text-sm">
+        <button type="button" onClick={onClose} className="text-pool-500">
+          Cancel
+        </button>
+        {/* Blue means action: the one filled thing here saves (H20f). */}
+        <button
+          type="button"
+          disabled={(changed.length === 0 && !reordered) || !complete}
+          onClick={save}
+          className="bg-main-900 rounded-full px-5 py-2 font-medium text-white disabled:opacity-50"
+        >
+          Save
+        </button>
+      </div>
+    </>
+  );
+  // In the settings sheet's Home tab (0059): the rows alone, no sheet of their own.
+  if (inline)
+    return (
+      <div data-lanes-editor className="flex flex-col gap-4">
+        {body}
+      </div>
+    );
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
       <button
@@ -166,100 +271,7 @@ export function LanesSheet({
           className="flex min-h-0 flex-col gap-4 overflow-y-auto px-7 pt-8"
           style={{ paddingBottom: 'calc(1.75rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <h2 className="text-main-900 text-2xl font-semibold">Lanes</h2>
-
-          <ol ref={list} className="flex flex-col gap-2">
-            {rows.map((row, index) => (
-              <li
-                key={row.id}
-                data-lane-row={row.id}
-                data-dragging={dragging === row.id ? '' : undefined}
-                className="flex items-center gap-3 transition-[opacity,transform] duration-100 motion-reduce:transition-none"
-                style={dragging === row.id ? { opacity: 0.6, transform: 'scale(1.02)' } : undefined}
-              >
-                <button
-                  type="button"
-                  aria-label={`Move ${row.name || 'this lane'}`}
-                  data-lane-grip
-                  onPointerDown={(event) => dragFrom(row.id, event)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'ArrowUp') {
-                      event.preventDefault();
-                      moveTo(row.id, index - 1);
-                    }
-                    if (event.key === 'ArrowDown') {
-                      event.preventDefault();
-                      moveTo(row.id, index + 1);
-                    }
-                  }}
-                  className="text-pool-500 flex h-10 w-6 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
-                >
-                  <GripVertical aria-hidden size={16} />
-                </button>
-                <EmojiInput
-                  value={row.icon}
-                  onChange={(icon) => edit(row.id, { icon })}
-                  label={`Icon for ${row.name || 'this lane'}`}
-                />
-                <input
-                  value={row.name}
-                  onChange={(event) => edit(row.id, { name: event.target.value })}
-                  aria-label="Lane name"
-                  placeholder="Enter the lane name"
-                  maxLength={24}
-                  className="text-ink placeholder:text-pool-500 border-pool-100 min-w-0 flex-1 border-b py-2 text-base outline-none"
-                />
-                {confirming === row.id ? (
-                  <span className="flex shrink-0 items-center gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => remove(row.id)}
-                      className="text-main-900 font-medium"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirming(null)}
-                      className="text-pool-500"
-                    >
-                      Keep
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    aria-label={`Delete ${row.name || 'this lane'}`}
-                    onClick={() => setConfirming(row.id)}
-                    className="text-pool-500 flex h-8 w-8 shrink-0 items-center justify-center"
-                  >
-                    <Trash2 aria-hidden size={14} />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ol>
-
-          {message ? (
-            <p role="alert" className="text-pool-500 text-sm">
-              {message}
-            </p>
-          ) : null}
-
-          <div className="flex items-center justify-end gap-3 pt-2 text-sm">
-            <button type="button" onClick={onClose} className="text-pool-500">
-              Cancel
-            </button>
-            {/* Blue means action: the one filled thing here saves (H20f). */}
-            <button
-              type="button"
-              disabled={(changed.length === 0 && !reordered) || !complete}
-              onClick={save}
-              className="bg-main-900 rounded-full px-5 py-2 font-medium text-white disabled:opacity-50"
-            >
-              Save
-            </button>
-          </div>
+          {body}
         </div>
       </section>
     </div>

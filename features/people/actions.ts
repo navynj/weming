@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
@@ -59,11 +60,18 @@ export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
 }
 
 const themeInput = z.object({
-  color: z.enum(THEME_COLORS as [ThemeColor, ...ThemeColor[]]),
+  home: z.enum(THEME_COLORS as [ThemeColor, ...ThemeColor[]]),
   mode: z.enum(['dark', 'light', 'pastel']),
+  /** My Home colour over every pool's, unless I chose one there (0059). */
+  everywhere: z.boolean(),
 });
 
-/** Saves my theme (0032): one colour and a mode, on my profile alone. */
+/**
+ * Saves my theme (0059): my Home colour, my mode and whether it applies in
+ * every pool, in settings nobody else reads. Written to my profile too
+ * (0032) until the app that reads only the settings has replaced the one
+ * that read the profile; a later contract drops those columns.
+ */
 export async function saveTheme(raw: z.input<typeof themeInput>): Promise<ProfileSaved> {
   const parsed = themeInput.safeParse(raw);
   if (!parsed.success) return { ok: false, message: 'That theme is not one of the twelve.' };
@@ -72,10 +80,58 @@ export async function saveTheme(raw: z.input<typeof themeInput>): Promise<Profil
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: 'Sign in again to save your theme.' };
+  const { home, mode, everywhere } = parsed.data;
+  const [settings, profile] = await Promise.all([
+    supabase
+      .from('my_theme_settings')
+      .upsert({ user_id: user.id, home_color: home, mode, apply_everywhere: everywhere }),
+    supabase.from('profiles').update({ theme_color: home, theme_mode: mode }).eq('id', user.id),
+  ]);
+  const error = settings.error ?? profile.error;
+  if (error) return { ok: false, message: error.message };
+  return { ok: true };
+}
+
+const poolColor = z.enum(THEME_COLORS as [ThemeColor, ...ThemeColor[]]).nullable();
+
+/** A pool's colour (0059): any current member sets or clears it. */
+export async function setPoolTheme(
+  poolId: string,
+  color: ThemeColor | null,
+): Promise<ProfileSaved> {
+  const parsed = z.object({ poolId: z.uuid(), color: poolColor }).safeParse({ poolId, color });
+  if (!parsed.success) return { ok: false, message: 'That colour is not one of the twelve.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_pool_theme', {
+    p_pool: parsed.data.poolId,
+    p_theme: parsed.data.color as string,
+  });
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.code === '42501' ? 'Only someone in this Pool can change its colour.' : error.message,
+    };
+  }
+  revalidatePath(`/pool/${parsed.data.poolId}`);
+  return { ok: true };
+}
+
+/** My colour in one pool (0059), over every other for me there; null uses the pool's. */
+export async function setMyPoolTheme(
+  poolId: string,
+  color: ThemeColor | null,
+): Promise<ProfileSaved> {
+  const parsed = z.object({ poolId: z.uuid(), color: poolColor }).safeParse({ poolId, color });
+  if (!parsed.success) return { ok: false, message: 'That colour is not one of the twelve.' };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Sign in again to save your colour.' };
   const { error } = await supabase
-    .from('profiles')
-    .update({ theme_color: parsed.data.color, theme_mode: parsed.data.mode })
-    .eq('id', user.id);
+    .from('member_pool_settings')
+    .upsert({ pool_id: parsed.data.poolId, user_id: user.id, theme: parsed.data.color });
   if (error) return { ok: false, message: error.message };
   return { ok: true };
 }

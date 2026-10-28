@@ -115,3 +115,75 @@ test('a pool visited before comes back without a round trip', async ({ page, bas
   // Only the refresh behind the drawn board may have asked, after it was drawn.
   expect(held.length).toBeLessThanOrEqual(1);
 });
+
+/** Row 1's controls, in order: bell, faces, invite, gear (0059). */
+async function headerOrder(page: Page): Promise<string[]> {
+  return page
+    .locator('[data-place-header-row]:visible')
+    .first()
+    .evaluate((row) =>
+      [
+        ...row.querySelectorAll(
+          '[data-notifications-bell], [data-place-face], [data-pool-invite], [data-place-settings]',
+        ),
+      ].map((el) =>
+        el.hasAttribute('data-notifications-bell')
+          ? 'bell'
+          : el.hasAttribute('data-place-face')
+            ? 'face'
+            : el.hasAttribute('data-pool-invite')
+              ? 'invite'
+              : 'gear',
+      ),
+    );
+}
+
+async function everyHeaderControlOnScreen(page: Page, where: string): Promise<void> {
+  const viewport = page.viewportSize()!;
+  const controls = page.locator('[data-place-header]:visible button');
+  const count = await controls.count();
+  expect(count, where).toBeGreaterThan(3);
+  for (let i = 0; i < count; i += 1) {
+    const box = (await controls.nth(i).boundingBox())!;
+    expect(box.x, `${where} #${i} left`).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, `${where} #${i} right`).toBeLessThanOrEqual(viewport.width + 0.5);
+  }
+}
+
+test('one header on Home and in a pool, at a phone’s width and a desktop’s; the gear’s sheet (0059)', async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(120_000);
+  await signIn(page, baseURL!);
+  for (const size of [
+    { width: 390, height: 844 },
+    { width: 1280, height: 900 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.goto('/');
+    await expect(page.locator('[data-place-header]:visible').first()).toBeVisible({
+      timeout: 60_000,
+    });
+    expect(await headerOrder(page)).toEqual(['bell', 'face', 'gear']);
+    await everyHeaderControlOnScreen(page, `Home at ${size.width}`);
+
+    await page.goto(`/pool/${pool}`);
+    await expect(page.locator(`[data-pool-ground="${pool}"]`)).toBeVisible({ timeout: 60_000 });
+    expect(await headerOrder(page)).toEqual(['bell', 'face', 'invite', 'gear']);
+    await everyHeaderControlOnScreen(page, `the pool at ${size.width}`);
+  }
+
+  // The gear opens its sheet over the pool, in the URL, with no page load; back closes it.
+  await page.evaluate(() => ((window as unknown as { stayed: boolean }).stayed = true));
+  await page.locator('[data-place-settings]:visible').first().click();
+  await expect(page.locator('[data-settings-sheet="pool"]')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('settings')).toBe('pool');
+  await page.locator('[data-settings-tab="theme"]').click();
+  await expect(page.locator('[data-settings-sheet="theme"]')).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('[data-settings-sheet]')).toHaveCount(0);
+  expect(
+    await page.evaluate(() => (window as unknown as { stayed?: boolean }).stayed === true),
+  ).toBe(true);
+});

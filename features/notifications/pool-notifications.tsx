@@ -24,10 +24,16 @@ export function PoolNotifications({
   poolId,
   isCreator,
   prefs,
+  title = 'Notifications',
+  mineOnly = false,
 }: {
   poolId: string;
   isCreator: boolean;
   prefs: PoolNotificationPrefs;
+  /** The group's heading: a pool's name on Home's list (0059). */
+  title?: string;
+  /** Home's list (0059): my notifications per pool, without the members' defaults. */
+  mineOnly?: boolean;
 }) {
   const defaults = useOptimisticAction<ValuesByType>(prefs.poolDefaults);
   const mine = useOptimisticAction<ValuesByType>(prefs.mine);
@@ -35,8 +41,8 @@ export function PoolNotifications({
     defaults.value[type] ?? APP_DEFAULTS[type];
 
   return (
-    <section data-settings-notifications className="mt-10">
-      <h2 className="text-ink mb-1 font-semibold">Notifications</h2>
+    <section data-settings-notifications={poolId} className="mt-8">
+      <h2 className="text-ink mb-1 font-semibold">{title}</h2>
 
       <h3 className="text-ink mt-5 text-sm font-medium">Your notifications</h3>
       {prefs.paused ? (
@@ -85,46 +91,50 @@ export function PoolNotifications({
         </p>
       ) : null}
 
-      <h3 className="text-ink mt-8 text-sm font-medium">Defaults for members</h3>
-      <p className="text-pool-500 mt-1 text-xs">
-        {isCreator
-          ? 'What everyone here gets until they choose their own.'
-          : 'Set by the Pool’s creator; what you get until you choose your own.'}
-      </p>
-      <div className="mt-2 flex flex-col gap-4">
-        {NOTIFICATION_TYPES.map((type) =>
-          isCreator ? (
-            <Row key={type} label={TYPE_LABELS[type]}>
-              {VALUES[type].map((value) => (
-                <Chip
-                  key={value}
-                  on={poolValue(type) === value}
-                  data={`default-${type}-${value}`}
-                  onClick={() =>
-                    defaults.run(
-                      (current) => ({ ...current, [type]: value }),
-                      () => setPoolNotificationDefault({ poolId, type, value }),
-                      'Saved',
-                    )
-                  }
-                >
-                  {VALUE_LABELS[value]}
-                </Chip>
-              ))}
-            </Row>
-          ) : (
-            <p key={type} data-default={type} className="text-ink flex justify-between text-sm">
-              <span>{TYPE_LABELS[type]}</span>
-              <span className="text-pool-500">{VALUE_LABELS[poolValue(type)]}</span>
+      {mineOnly ? null : (
+        <>
+          <h3 className="text-ink mt-8 text-sm font-medium">Defaults for members</h3>
+          <p className="text-pool-500 mt-1 text-xs">
+            {isCreator
+              ? 'What everyone here gets until they choose their own.'
+              : 'Set by the Pool’s creator; what you get until you choose your own.'}
+          </p>
+          <div className="mt-2 flex flex-col gap-4">
+            {NOTIFICATION_TYPES.map((type) =>
+              isCreator ? (
+                <Row key={type} label={TYPE_LABELS[type]}>
+                  {VALUES[type].map((value) => (
+                    <Chip
+                      key={value}
+                      on={poolValue(type) === value}
+                      data={`default-${type}-${value}`}
+                      onClick={() =>
+                        defaults.run(
+                          (current) => ({ ...current, [type]: value }),
+                          () => setPoolNotificationDefault({ poolId, type, value }),
+                          'Saved',
+                        )
+                      }
+                    >
+                      {VALUE_LABELS[value]}
+                    </Chip>
+                  ))}
+                </Row>
+              ) : (
+                <p key={type} data-default={type} className="text-ink flex justify-between text-sm">
+                  <span>{TYPE_LABELS[type]}</span>
+                  <span className="text-pool-500">{VALUE_LABELS[poolValue(type)]}</span>
+                </p>
+              ),
+            )}
+          </div>
+          {defaults.message ? (
+            <p role="alert" className="text-pool-500 mt-2 text-xs">
+              {defaults.message}
             </p>
-          ),
-        )}
-      </div>
-      {defaults.message ? (
-        <p role="alert" className="text-pool-500 mt-2 text-xs">
-          {defaults.message}
-        </p>
-      ) : null}
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

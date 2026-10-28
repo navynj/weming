@@ -1,5 +1,6 @@
 import { SheetHost } from '@/features/input-sheet/sheet-host';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { ShellDataProvider } from '@/features/home/shell-data';
 import { TimezoneSync } from '@/features/auth/timezone-sync';
 import { initialsOf } from '@/features/home/grid';
 import { PeopleProvider } from '@/features/people/people-provider';
@@ -78,13 +79,15 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
       <PoolActivityProvider activity={activity} pools={stripPools}>
         <NotificationsProvider initialUnread={unread}>
           <InputSheetProvider>
-            <div className="flex min-h-dvh flex-col">
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-            </div>
-            {/* A splash opened from inside the app: a sheet over the screen (review). */}
-            {modal}
-            {context ? <SheetHost context={context} /> : null}
-            {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
+            <ShellDataProvider value={{ categories }}>
+              <div className="flex min-h-dvh flex-col">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+              </div>
+              {/* A splash opened from inside the app: a sheet over the screen (review). */}
+              {modal}
+              {context ? <SheetHost context={context} /> : null}
+              {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
+            </ShellDataProvider>
           </InputSheetProvider>
         </NotificationsProvider>
       </PoolActivityProvider>

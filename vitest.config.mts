@@ -50,6 +50,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/push-dispatch-db.test.ts',
   'tests/response-threads-db.test.ts',
   'tests/pool-record-sharing-db.test.ts',
+  'tests/shared-settings-db.test.ts',
 ];
 
 /**

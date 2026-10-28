@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refreshed = vi.fn();
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: refreshed }),
 }));
 type Sent = { splashId: string; poolId: string | null; patch: unknown; clear: string[] };

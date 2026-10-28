@@ -50,9 +50,12 @@ const FOCUSABLE =
  */
 export function SplashModal({
   closeTo,
+  onLeave,
   children,
 }: {
   closeTo: string | null;
+  /** How it leaves when not by a route of its own (the settings sheet, 0059): its own history step. */
+  onLeave?: () => void;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -79,9 +82,10 @@ export function SplashModal({
     setLeaving(true);
   }, [children]);
   const leave = useCallback(() => {
-    if (closeTo) router.replace(closeTo, { scroll: false });
+    if (onLeave) onLeave();
+    else if (closeTo) router.replace(closeTo, { scroll: false });
     else router.back();
-  }, [closeTo, router]);
+  }, [closeTo, onLeave, router]);
 
   // The screen behind holds still; focus comes in, and goes back on close.
   // Closed by the route instead (back, or any navigation away), the sheet is

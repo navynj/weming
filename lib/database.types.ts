@@ -345,6 +345,39 @@ export type Database = {
           },
         ]
       }
+      member_pool_settings: {
+        Row: {
+          pool_id: string
+          theme: string | null
+          user_id: string
+        }
+        Insert: {
+          pool_id: string
+          theme?: string | null
+          user_id: string
+        }
+        Update: {
+          pool_id?: string
+          theme?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_pool_settings_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_pool_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       my_categories: {
         Row: {
           created_at: string
@@ -378,6 +411,35 @@ export type Database = {
             foreignKeyName: "my_categories_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      my_theme_settings: {
+        Row: {
+          apply_everywhere: boolean
+          home_color: string
+          mode: string
+          user_id: string
+        }
+        Insert: {
+          apply_everywhere?: boolean
+          home_color?: string
+          mode?: string
+          user_id: string
+        }
+        Update: {
+          apply_everywhere?: boolean
+          home_color?: string
+          mode?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "my_theme_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -667,6 +729,7 @@ export type Database = {
           owner_id: string | null
           photo_path: string | null
           photo_version: number | null
+          theme: string | null
           visibility: Database["public"]["Enums"]["pool_visibility"]
         }
         Insert: {
@@ -681,6 +744,7 @@ export type Database = {
           owner_id?: string | null
           photo_path?: string | null
           photo_version?: number | null
+          theme?: string | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Update: {
@@ -695,6 +759,7 @@ export type Database = {
           owner_id?: string | null
           photo_path?: string | null
           photo_version?: number | null
+          theme?: string | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Relationships: [
@@ -1395,6 +1460,7 @@ export type Database = {
         Returns: undefined
       }
       _splash_lane: { Args: { sid: string }; Returns: string }
+      _theme_color_ok: { Args: { c: string }; Returns: boolean }
       add_joint_invitees: {
         Args: { p_everyone?: boolean; p_splash: string; p_users: string[] }
         Returns: undefined
@@ -1485,6 +1551,7 @@ export type Database = {
       is_current_member: { Args: { pid: string }; Returns: boolean }
       is_linked: { Args: { other: string }; Returns: boolean }
       is_pool_creator: { Args: { object_name: string }; Returns: boolean }
+      is_pool_member_object: { Args: { object_name: string }; Returns: boolean }
       join_pool: {
         Args: { p_include_history: boolean; p_links: Json; p_token: string }
         Returns: string
@@ -1649,6 +1716,10 @@ export type Database = {
       }
       set_pool_photo: {
         Args: { p_on: boolean; p_pool: string }
+        Returns: undefined
+      }
+      set_pool_theme: {
+        Args: { p_pool: string; p_theme: string }
         Returns: undefined
       }
       set_splash_lane: {

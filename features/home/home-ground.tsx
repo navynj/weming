@@ -17,7 +17,6 @@ import { FlipBoard } from './diving-board-flip';
 import { GroundFoot } from './ground-foot';
 import { byNewest, newestIn, placeCard, withEdits, type Card, type GridColumn } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
-import { LaneIcon } from './lane-icon';
 import { PinnedCards } from './pinned-cards';
 import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
@@ -30,7 +29,13 @@ import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
-import { Bell } from '@/features/notifications/bell';
+import { PlaceHeader } from '@/features/header/place-header';
+import { Avatar } from '@/features/people/avatar';
+import { usePeople } from '@/features/people/people-provider';
+import { ProfileSheet } from '@/features/people/profile-sheet';
+import { ThemePicker } from '@/features/people/theme-picker';
+import { SettingsSheet } from '@/features/settings/settings-sheet';
+import { useSettings } from '@/features/settings/use-settings';
 
 /**
  * Which board Home shows (review, 2026-10-22): the **stair** — read cards
@@ -74,7 +79,6 @@ export function HomeGround({
   initials,
   scrollToMonth,
   topParam = null,
-  manageLanes = false,
   poolColumns = [],
   board = BOARD,
   initialView = 'board',
@@ -90,8 +94,6 @@ export function HomeGround({
   scrollToMonth: string | null;
   /** `?top=`: the post to open with on top, where a post's page sends Home back to. */
   topParam?: string | null;
-  /** `?manage=lanes`: open with lane management up, from a lane page. */
-  manageLanes?: boolean;
   /**
    * After my lanes, one column per pool holding my pool records and joint
    * records with no home lane (0014, 0033), headed by the pool's monogram and name.
@@ -102,7 +104,11 @@ export function HomeGround({
   initialView?: HomeView;
 }) {
   const [newLane, setNewLane] = useState(false);
-  const [editingLanes, setEditingLanes] = useState(manageLanes);
+  // The gear's sheet (0059), and my profile from my face.
+  const settings = useSettings();
+  const [lanesRound, setLanesRound] = useState(0);
+  const [profile, setProfile] = useState(false);
+  const { me } = usePeople();
   // Every visit opens on the Calendar, not the view used last (review); a
   // view chosen here holds while I stay.
   const [view, setView] = useState<HomeView>(initialView);
@@ -342,24 +348,25 @@ export function HomeGround({
           // Wide, every view on the left takes two thirds and the stack one (review).
           className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-[2]"
         >
-          {/* The header (round 3): lane management at the left and the view
-              toggle beside it. Settings live in the strip (0032). */}
-          <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
-            <button
-              type="button"
-              aria-label="Lanes"
-              data-manage-lanes
-              onClick={() => setEditingLanes(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
-            >
-              <LaneIcon size={20} />
-            </button>
-            {/* The toggle fills the header's width beside the glyph (review). */}
-            <div className="min-w-0 flex-1">
-              <ViewToggle view={view} onChange={setView} />
-            </div>
-            <Bell />
-          </header>
+          {/* The header (0059), a pool's in shape: Home with my face, the
+              bell, my face, the gear; the views beneath. */}
+          <div data-home-header>
+            <PlaceHeader
+              mark={
+                <Avatar
+                  id={me}
+                  initials={initials}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/25 text-xs font-medium text-white"
+                />
+              }
+              name="Home"
+              faces={me ? [{ userId: me, initials }] : []}
+              me={me}
+              onMyFace={() => setProfile(true)}
+              onSettings={() => settings.open('home')}
+              tabs={<ViewToggle view={view} onChange={setView} />}
+            />
+          </div>
 
           {dropMessage || lanes.message ? (
             <p role="alert" className="shrink-0 px-6 pb-2 text-sm text-white/80">
@@ -485,17 +492,31 @@ export function HomeGround({
       {newLane ? (
         <CategorySheet category={null} apply={lanes.run} onClose={() => setNewLane(false)} />
       ) : null}
-      {editingLanes ? (
-        <LanesSheet
-          categories={lanes.value}
-          apply={lanes.run}
-          message={lanes.message}
-          onClose={() => {
-            setEditingLanes(false);
-            if (manageLanes) router.replace('/');
-          }}
-        />
-      ) : null}
+      <SettingsSheet
+        title="Settings"
+        tabs={[
+          {
+            key: 'home',
+            label: 'Home',
+            render: () => (
+              <section data-settings-lanes className="flex flex-col gap-3">
+                <h2 className="text-ink font-semibold">My lanes</h2>
+                {/* Cancel or Save starts the rows afresh from Home's lanes. */}
+                <LanesSheet
+                  key={lanesRound}
+                  categories={lanes.value}
+                  apply={lanes.run}
+                  message={lanes.message}
+                  onClose={() => setLanesRound((n) => n + 1)}
+                  inline
+                />
+              </section>
+            ),
+          },
+          { key: 'theme', label: 'Theme', render: () => <ThemePicker /> },
+        ]}
+      />
+      {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
     </div>
   );
 }

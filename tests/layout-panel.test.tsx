@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),
 }));
@@ -116,7 +117,7 @@ function media(wide: boolean): void {
 
 function home(cards: Card[], theme: Theme = DEFAULT_THEME) {
   return render(
-    <ThemeProvider initial={theme}>
+    <ThemeProvider initial={{ home: theme.color, mode: theme.mode, everywhere: false }}>
       <InputSheetProvider>
         <HomeGround
           cards={cards}
