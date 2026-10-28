@@ -15,8 +15,10 @@ export async function sharedSplashIds(
   me: string,
   mine: Splash[],
   joints: Splash[],
+  /** My placements, when the caller has read them already. */
+  known?: Awaited<ReturnType<typeof getMyPlacements>>,
 ): Promise<Set<string>> {
-  const placed = await getMyPlacements(supabase, me);
+  const placed = known ?? (await getMyPlacements(supabase, me));
   return new Set([
     ...joints.map((j) => j.id),
     ...mine.flatMap((s) => (s.own_pool_id ? [s.id] : [])),

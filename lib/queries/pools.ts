@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { initialsOf } from '@/features/home/grid';
 import type { LinkMarkers } from '@/features/pool/links';
 import { originTag } from '@/features/pool/origin-tag';
@@ -233,15 +234,15 @@ export async function getPoolView(
   poolId: string,
   me: string,
 ): Promise<PoolView | null> {
-  const { data: pool, error } = await supabase
-    .from('pools')
-    .select('id, name, owner_id, photo_version, invite_all_by_default')
-    .eq('id', poolId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!pool) return null;
-
-  const [members, lanes, links, placements, joints, invites, myRow] = await Promise.all([
+  // One round trip for everything keyed by the pool alone (review: a place
+  // switch was ~16 sequential calls); a pool I cannot read returns nothing
+  // from any of them, and is not found.
+  const [poolRow, members, lanes, links, placements, joints, invites, myRow] = await Promise.all([
+    supabase
+      .from('pools')
+      .select('id, name, owner_id, photo_version, invite_all_by_default')
+      .eq('id', poolId)
+      .maybeSingle(),
     membersOf(supabase, [poolId]),
     supabase.from('pool_lanes').select('*').eq('pool_id', poolId).order('position'),
     supabase
@@ -279,9 +280,11 @@ export async function getPoolView(
       .eq('user_id', me)
       .maybeSingle(),
   ]);
-  for (const result of [lanes, links, placements, joints, invites]) {
+  for (const result of [poolRow, lanes, links, placements, joints, invites]) {
     if (result.error) throw result.error;
   }
+  const pool = poolRow.data;
+  if (!pool) return null;
 
   // My own switched-off placements come back to me (I am their author); the
   // pool shows only what is shared, to me as to everyone.
@@ -289,8 +292,8 @@ export async function getPoolView(
   const splashes: Splash[] = [...shown.map((p) => p.splash!), ...(joints.data ?? [])];
   const splashIds = splashes.map((s) => s.id);
 
-  let ripples: PoolRipple[] = [];
-  if (splashIds.length > 0) {
+  const readRipples = async (): Promise<PoolRipple[]> => {
+    if (splashIds.length === 0) return [];
     const { data, error: rippleError } = await supabase
       .from('ripples')
       .select(RIPPLE_COLUMNS)
@@ -309,8 +312,41 @@ export async function getPoolView(
         .in('ripple_id', mineIds);
       for (const row of locks ?? []) locked.add(row.ripple_id);
     }
-    ripples = data.filter((r) => !locked.has(r.id));
-  }
+    return data.filter((r) => !locked.has(r.id));
+  };
+  // The rest needs only the splashes: read beside the ripples, not after.
+  const [ripples, together, byPool, layouts, laneLayouts, membersLayouts] = await Promise.all([
+    readRipples(),
+    getJointTogether(
+      supabase,
+      (joints.data ?? []).map((j) => j.id),
+    ),
+    getPlacementTogether(
+      supabase,
+      shown.map((p) => p.splash_id),
+    ),
+    getPoolLayouts(supabase, poolId),
+    getPoolLayouts(supabase, poolId, 'lane'),
+    getPoolLayouts(supabase, poolId, 'members'),
+  ]);
+  const mineIds = ripples.flatMap((r) => (r.author_id === me ? [r.id] : []));
+  // This pool's thread only (0053), with the owner's from no pool.
+  const [responded, lockedIds, respondedAt] = await Promise.all([
+    getRippleResponses(
+      supabase,
+      ripples.map((r) => r.id),
+      poolId,
+    ),
+    getLockedIds(supabase, mineIds),
+    getResponsesOnMine(
+      supabase,
+      me,
+      ripples.flatMap((r) =>
+        r.author_id === me && r.splash_id ? [{ id: r.id, splashKey: r.splash_id }] : [],
+      ),
+      poolId,
+    ),
+  ]);
 
   return {
     pool: {
@@ -342,39 +378,16 @@ export async function getPoolView(
     splashes,
     ripples,
     invites: invites.data ?? [],
-    together: await getJointTogether(
-      supabase,
-      (joints.data ?? []).map((j) => j.id),
-    ),
+    together,
     placementTogether: Object.fromEntries(
-      Object.entries(
-        await getPlacementTogether(
-          supabase,
-          shown.map((p) => p.splash_id),
-        ),
-      ).map(([id, byPool]) => [id, byPool[poolId] ?? []]),
+      Object.entries(byPool).map(([id, inPools]) => [id, inPools[poolId] ?? []]),
     ),
-    layouts: await getPoolLayouts(supabase, poolId),
-    laneLayouts: await getPoolLayouts(supabase, poolId, 'lane'),
-    membersLayouts: await getPoolLayouts(supabase, poolId, 'members'),
-    // This pool's thread only (0053), with the owner's from no pool.
-    responded: await getRippleResponses(
-      supabase,
-      ripples.map((r) => r.id),
-      poolId,
-    ),
-    lockedIds: await getLockedIds(
-      supabase,
-      ripples.flatMap((r) => (r.author_id === me ? [r.id] : [])),
-    ),
-    respondedAt: await getResponsesOnMine(
-      supabase,
-      me,
-      ripples.flatMap((r) =>
-        r.author_id === me && r.splash_id ? [{ id: r.id, splashKey: r.splash_id }] : [],
-      ),
-      poolId,
-    ),
+    layouts,
+    laneLayouts,
+    membersLayouts,
+    responded,
+    lockedIds,
+    respondedAt,
   };
 }
 
@@ -391,7 +404,7 @@ export type MyLink = {
   poolLaneId: string;
 } & LinkMarkers;
 
-export async function getMyLinks(supabase: DuringClient, me: string): Promise<MyLink[]> {
+async function readMyLinks(supabase: DuringClient, me: string): Promise<MyLink[]> {
   // Two reads: lane_mappings reaches pools only through pool_lanes' composite
   // key, which PostgREST cannot embed by name.
   const [{ data: links, error }, pools] = await Promise.all([
@@ -428,7 +441,7 @@ export type PoolFace = { id: string; name: string; initials: string };
  * The pools I am in now, by name, with their lanes in order: the Audience
  * sheet's rows and chips, and Home's monograms.
  */
-export async function getMyPoolNames(
+async function readMyPoolNames(
   supabase: DuringClient,
   me: string,
 ): Promise<
@@ -709,3 +722,7 @@ export async function getMyOriginTags(
   }
   return tags;
 }
+
+/** Read once per request and client: the shell and Home both ask (review: round trips). */
+export const getMyLinks = cache(readMyLinks);
+export const getMyPoolNames = cache(readMyPoolNames);

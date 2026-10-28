@@ -82,68 +82,119 @@ export async function HomeScreen({
   const today = todayIn(profile.timezone);
   const month = m ? scopedMonth(m, today) : null;
 
-  const [ripples, categories, mine, pools, originTags, links] = await Promise.all([
-    getMyTrail(supabase, profile.id),
-    getMyCategories(supabase),
-    getMySplashes(supabase, profile.id),
-    getMyPoolNames(supabase, profile.id),
-    getMyOriginTags(supabase, profile.id),
-    getMyLinks(supabase, profile.id),
-  ]);
+  // Every read below that needs only who I am, in one wave (review: a
+  // place switch was ~16 sequential round trips); each later one starts as
+  // soon as what it needs is known and is awaited only where it is used.
+  const [ripples, categories, mine, pools, originTags, links, made, myThreads, leftPool, placed] =
+    await Promise.all([
+      getMyTrail(supabase, profile.id),
+      getMyCategories(supabase),
+      getMySplashes(supabase, profile.id),
+      getMyPoolNames(supabase, profile.id),
+      getMyOriginTags(supabase, profile.id),
+      getMyLinks(supabase, profile.id),
+      // One I made with no ripple of mine yet sits in its pool's column (review).
+      getMyJointShells(supabase, profile.id),
+      // Friends' records I added my side to (0035).
+      getMyThreadRipples(supabase),
+      // Ones on a joint splash of a pool I left (0041): that pool's column.
+      getMyLeftPoolRipples(supabase),
+      getMyPlacements(supabase, profile.id),
+    ]);
   // My ripples on joint splashes show here too (H23): the splash, with only
   // my ripples on it, in my lane its pool lane is brought into (H24). One I
   // can no longer read (a pool I left) still shows its ripples, as posts of
   // one.
   const mineIds = new Set(mine.map((s) => s.id));
-  const [written, made] = await Promise.all([
+  // Friends' records I added my side to (0035): each in the pool I wrote it
+  // in, as that pool sees it; the record row read while it is shared there,
+  // else kept from my side's own reading, "no longer shared".
+  const threadOf = new Map(myThreads.map((t) => [t.splashId, t]));
+  const friendIds = [...threadOf.keys()];
+  // The second wave: what the first named.
+  const [written, { data: friendRows }, { data: theirRows }, withByPool] = await Promise.all([
     getJointSplashes(supabase, [
       ...new Set(
         ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
       ),
     ]),
-    // One I made with no ripple of mine yet sits in its pool's column (review).
-    getMyJointShells(supabase, profile.id),
-  ]);
-  const joints = [...written, ...made.filter((shell) => !written.some((j) => j.id === shell.id))];
-  // Friends' records I added my side to (0035): each in the pool I wrote it
-  // in, as that pool sees it; the record row read while it is shared there,
-  // else kept from my side's own reading, "no longer shared".
-  const [myThreads, leftPool] = await Promise.all([
-    getMyThreadRipples(supabase),
-    // Ones on a joint splash of a pool I left (0041): that pool's column.
-    getMyLeftPoolRipples(supabase),
-  ]);
-  const threadOf = new Map(myThreads.map((t) => [t.splashId, t]));
-  const friendIds = [...threadOf.keys()];
-  const { data: friendRows } = friendIds.length
-    ? await supabase.from('splashes').select('*').in('id', friendIds)
-    : { data: [] as Splash[] };
-  const friends: Splash[] = friendIds.map(
-    (id) => (friendRows ?? []).find((row) => row.id === id) ?? fromThread(threadOf.get(id)!),
-  );
-  const friendIdSet = new Set(friendIds);
-  // Every ripple I can read on my records and theirs (0035): Home shows a
-  // record with exactly those. On a friend's, only the pool I wrote in.
-  const { data: theirRows } =
+    friendIds.length
+      ? supabase.from('splashes').select('*').in('id', friendIds)
+      : Promise.resolve({ data: [] as Splash[] }),
+    // Every ripple I can read on my records and theirs (0035): Home shows a
+    // record with exactly those. On a friend's, only the pool I wrote in.
     mine.length + friendIds.length > 0
-      ? await supabase
+      ? supabase
           .from('ripples')
           .select(WITH_SPLASH)
           .in('splash_id', [...mine.map((s) => s.id), ...friendIds])
           .neq('author_id', profile.id)
           .is('parent_ripple_id', null)
           .returns<RippleWithSplash[]>()
-      : { data: [] as RippleWithSplash[] };
+      : Promise.resolve({ data: [] as RippleWithSplash[] }),
+    // With, per pool, on my records (0035): filled on Home once any pool has
+    // someone with it.
+    getPlacementTogether(
+      supabase,
+      mine.map((s) => s.id),
+    ),
+  ]);
+  const joints = [...written, ...made.filter((shell) => !written.some((j) => j.id === shell.id))];
+  const friends: Splash[] = friendIds.map(
+    (id) => (friendRows ?? []).find((row) => row.id === id) ?? fromThread(threadOf.get(id)!),
+  );
+  const friendIdSet = new Set(friendIds);
   const theirs = (theirRows ?? []).filter((r) => {
     const friend = r.splash_id ? threadOf.get(r.splash_id) : undefined;
     return !friend || !r.thread_pool_id || r.thread_pool_id === friend.poolId;
   });
-  const { data: theirNames } = theirs.length
-    ? await supabase
+  // The third wave, started together: what the joints and the others' ripples name.
+  const namesRead = theirs.length
+    ? supabase
         .from('profiles')
         .select('id, display_name')
         .in('id', [...new Set(theirs.map((r) => r.author_id))])
-    : { data: [] as { id: string; display_name: string }[] };
+    : Promise.resolve({ data: [] as { id: string; display_name: string }[] });
+  const jointReads =
+    joints.length > 0
+      ? Promise.all([
+          supabase
+            .from('ripples')
+            .select('splash_id, author_id, created_at')
+            .in(
+              'splash_id',
+              joints.map((j) => j.id),
+            )
+            .is('parent_ripple_id', null)
+            .order('created_at'),
+          supabase
+            .from('pool_members')
+            .select('pool_id, user_id')
+            .in('pool_id', [...new Set(joints.map((j) => j.pool_id!))])
+            .is('left_at', null),
+          getJointTogether(
+            supabase,
+            joints.map((j) => j.id),
+          ),
+        ])
+      : null;
+  const jointLanesRead =
+    joints.length > 0
+      ? supabase
+          .from('pool_lanes')
+          .select('id, name, icon')
+          .in('id', [...new Set(joints.map((j) => j.pool_lane_id!))])
+      : null;
+  // The calendar's layouts (0025): mine on Home; else, for a joint splash,
+  // its pool's — wholly one or the other, never a mix. And the Lane view's,
+  // kept apart (0045).
+  const jointPlaces = joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! }));
+  const layoutsRead = Promise.all([
+    getHomeLayouts(supabase, profile.id, jointPlaces),
+    getHomeLayouts(supabase, profile.id, jointPlaces, 'lane'),
+  ]);
+  const sharedRead = sharedSplashIds(supabase, profile.id, mine, joints, placed);
+  const { data: theirNames } = await namesRead;
   const initialsBy = new Map((theirNames ?? []).map((n) => [n.id, initialsOf(n.display_name)]));
   const boards = [...mine, ...joints, ...friends];
   const summaries = summarizeSplashes(boards, [...ripples, ...theirs], profile.timezone, now);
@@ -153,13 +204,7 @@ export async function HomeScreen({
   // column (H24, 0033): derived from my marker, never a ripple.
   const linkedLane = new Map(joints.map((j) => [j.id, homeLaneFor(j.pool_lane_id, links)]));
   // My pool records too (0033): the home lane for the pool lane they are on.
-  const myPlacements = mine.length > 0 ? await getMyPlacements(supabase, profile.id) : [];
-  // With, per pool, on my records (0035): filled on Home once any pool has
-  // someone with it.
-  const withByPool = await getPlacementTogether(
-    supabase,
-    mine.map((s) => s.id),
-  );
+  const myPlacements = mine.length > 0 ? placed : [];
   const filledMine = new Set(
     mine
       .filter(
@@ -186,26 +231,7 @@ export async function HomeScreen({
     { together: boolean; writers: CardFace[]; awaiting: CardFace[] }
   >();
   if (joints.length > 0) {
-    const [{ data: wrote }, { data: members }, together] = await Promise.all([
-      supabase
-        .from('ripples')
-        .select('splash_id, author_id, created_at')
-        .in(
-          'splash_id',
-          joints.map((j) => j.id),
-        )
-        .is('parent_ripple_id', null)
-        .order('created_at'),
-      supabase
-        .from('pool_members')
-        .select('pool_id, user_id')
-        .in('pool_id', [...new Set(joints.map((j) => j.pool_id!))])
-        .is('left_at', null),
-      getJointTogether(
-        supabase,
-        joints.map((j) => j.id),
-      ),
-    ]);
+    const [{ data: wrote }, { data: members }, together] = await jointReads!;
     const face = (id: string): CardFace => ({
       authorId: id,
       initials: id === profile.id ? initialsOf(profile.display_name) : '',
@@ -230,10 +256,7 @@ export async function HomeScreen({
   // The joint splash's pool lane, for its tag "<Pool> · <emoji> <pool lane>".
   const jointLane = new Map<string, { name: string; icon: string | null }>();
   if (joints.length > 0) {
-    const { data: lanes } = await supabase
-      .from('pool_lanes')
-      .select('id, name, icon')
-      .in('id', [...new Set(joints.map((j) => j.pool_lane_id!))]);
+    const { data: lanes } = await jointLanesRead!;
     const laneById = new Map((lanes ?? []).map((l) => [l.id, l]));
     for (const j of joints) {
       const lane = laneById.get(j.pool_lane_id!);
@@ -257,11 +280,16 @@ export async function HomeScreen({
     ]),
   ];
   const ownLaneIcon = new Map<string, string | null>();
-  if (ownLane.size > 0) {
-    const { data: lanes } = await supabase
-      .from('pool_lanes')
-      .select('id, icon')
-      .in('id', [...new Set(ownLane.values())]);
+  // Read beside the pools' photos below.
+  const ownLanesRead =
+    ownLane.size > 0
+      ? supabase
+          .from('pool_lanes')
+          .select('id, icon')
+          .in('id', [...new Set(ownLane.values())])
+      : null;
+  if (ownLanesRead) {
+    const { data: lanes } = await ownLanesRead;
     const iconOf = new Map((lanes ?? []).map((l) => [l.id, l.icon]));
     for (const [id, lane] of ownLane) ownLaneIcon.set(id, iconOf.get(lane) ?? null);
   }
@@ -437,16 +465,8 @@ export async function HomeScreen({
         : card;
     })
     .sort(byNewest);
-  // The calendar's layouts (0025): mine on Home; else, for a joint splash,
-  // its pool's — wholly one or the other, never a mix.
-  const jointPlaces = joints.map((j) => ({ splashId: j.id, poolId: j.pool_id! }));
-  // And the Lane view's, kept apart (0045).
-  const [layouts, laneLayouts] = await Promise.all([
-    getHomeLayouts(supabase, profile.id, jointPlaces),
-    getHomeLayouts(supabase, profile.id, jointPlaces, 'lane'),
-  ]);
-  // What readers left (H25), only where someone besides me can see the post.
-  const sharedIds = await sharedSplashIds(supabase, profile.id, mine, joints);
+  // The layouts and which posts others read (H25), read in the third wave.
+  const [[layouts, laneLayouts], sharedIds] = await Promise.all([layoutsRead, sharedRead]);
   const [answered, respondedAt] = await Promise.all([
     withResponded(supabase, cards, sharedIds, {
       me: profile.id,

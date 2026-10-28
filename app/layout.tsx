@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Poppins } from 'next/font/google';
 
 import { Providers } from '@/app/providers';
+import { getMyProfile } from '@/lib/queries/profile';
 import { createClient } from '@/lib/supabase/server';
 import { asTheme, DEFAULT_THEME, type Theme } from '@/lib/theme';
 import './globals.css';
@@ -60,17 +61,9 @@ export const viewport: Viewport = {
 
 /** My theme (0032), worn from the first paint; signed out, the blue water. */
 async function myTheme(): Promise<Theme> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return DEFAULT_THEME;
-  const { data } = await supabase
-    .from('profiles')
-    .select('theme_color, theme_mode')
-    .eq('id', user.id)
-    .maybeSingle();
-  return data ? asTheme(data.theme_color, data.theme_mode) : DEFAULT_THEME;
+  // The request's one profile read (lib/queries/profile.ts), shared with the pages.
+  const profile = await getMyProfile(await createClient()).catch(() => null);
+  return profile ? asTheme(profile.theme_color, profile.theme_mode) : DEFAULT_THEME;
 }
 
 export default async function RootLayout({ children }: LayoutProps<'/'>) {

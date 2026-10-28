@@ -1,5 +1,5 @@
 import type { Database } from '@/lib/database.types';
-import type { DuringClient } from '@/lib/queries/profile';
+import { getAuthUser, type DuringClient } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
 export type Ripple = Database['public']['Tables']['ripples']['Row'];
@@ -49,9 +49,7 @@ export async function getMyRipplesForDate(
   supabase: DuringClient,
   occurredOn: IsoDate,
 ): Promise<RippleWithSplash[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return [];
 
   return getRipplesForDate(supabase, user.id, occurredOn);

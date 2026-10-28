@@ -26,42 +26,50 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
   const profile = await getMyProfile(supabase);
 
   // A page without a profile redirects to sign-in on its own, so the shell
-  // just renders around it.
+  // just renders around it. Everything needing only the profile is read in
+  // one wave, and what needs the pools in the next (review: round trips).
+  const [categories, links, pools, people, unread] = profile
+    ? await Promise.all([
+        getMyCategories(supabase),
+        // The Audience chip's defaults and rows (H23).
+        getMyLinks(supabase, profile.id),
+        getMyPoolNames(supabase, profile.id),
+        // Every face the shell draws, signed once here (0018).
+        getPeople(supabase),
+        // The bell's dot (H32); a failed count is no dot, never a broken shell.
+        getUnreadCount(supabase).catch(() => 0),
+      ])
+    : [[], [], [], {}, 0];
   const context = profile
     ? {
-        categories: await getMyCategories(supabase),
+        categories,
         timeZone: profile.timezone,
         today: todayIn(profile.timezone),
-        // The Audience chip's defaults and rows (H23).
-        links: await getMyLinks(supabase, profile.id),
-        pools: await getMyPoolNames(supabase, profile.id),
+        links,
+        pools,
         initials: initialsOf(profile.display_name),
       }
     : null;
-  // Every face the shell draws, signed once here (0018).
-  const people = profile ? await getPeople(supabase) : {};
-  // What is new in each pool, for the Pool tab's dot (review).
-  const latest = context
-    ? await getPoolActivity(
-        supabase,
-        profile!.id,
-        context.pools.map((p) => p.id),
-      )
-    : new Map<string, string>();
-  // Each pool's photo for the strip (0024), signed once here.
-  const poolPhotos = context
-    ? await signPoolPhotos(
-        supabase,
-        context.pools.map((p) => ({ id: p.id, version: p.photoVersion })),
-      )
-    : {};
-  const stripPools = (context?.pools ?? []).map((p) => ({
+  const [latest, poolPhotos] = context
+    ? await Promise.all([
+        // What is new in each pool, for the Pool tab's dot (review).
+        getPoolActivity(
+          supabase,
+          profile!.id,
+          pools.map((p) => p.id),
+        ),
+        // Each pool's photo for the strip (0024), signed once here.
+        signPoolPhotos(
+          supabase,
+          pools.map((p) => ({ id: p.id, version: p.photoVersion })),
+        ),
+      ])
+    : [new Map<string, string>(), {} as Record<string, string | null>];
+  const stripPools = pools.map((p) => ({
     id: p.id,
     name: p.name,
     photo: poolPhotos[p.id] ?? null,
   }));
-  // The bell's dot (H32); a failed count is no dot, never a broken shell.
-  const unread = profile ? await getUnreadCount(supabase).catch(() => 0) : 0;
   const activity: Record<string, string | null> = Object.fromEntries(
     (context?.pools ?? []).map((p) => [p.id, latest.get(p.id) ?? null]),
   );

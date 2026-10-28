@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 
@@ -5,7 +6,14 @@ import type { Database } from '@/lib/database.types';
 import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
 import { fetchWithDeadline } from '@/lib/supabase/fetch';
 
-export async function createClient() {
+/**
+ * One client per request (review: a place switch asked the auth server for
+ * the same user up to five times): every server component of a render
+ * shares it, so what is cached on it — the signed-in user, my profile — is
+ * asked once. Outside a render (an action, a route handler) `cache` passes
+ * through and each call makes its own, as before.
+ */
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
 
   // Named reads (lib/env.ts): a missing variable fails as `Missing <NAME>`.
@@ -27,4 +35,4 @@ export async function createClient() {
       },
     },
   });
-}
+});

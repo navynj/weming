@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database.types';
 import { supabaseServiceRoleKey, supabaseUrl } from '@/lib/env';
+import { getAuthUser } from '@/lib/queries/profile';
 import { createClient } from '@/lib/supabase/server';
 import { MEDIA_BUCKET } from '@/lib/media-bucket';
 
@@ -106,10 +107,8 @@ export async function signOwnMedia(paths: string[]): Promise<SignedMedia> {
   if (paths.length === 0) return unsigned;
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // The request's one answer from the auth server (lib/queries/profile.ts).
+    const user = await getAuthUser(await createClient());
     if (!user) return unsigned;
 
     const own = paths.filter((path) => path.startsWith(`${user.id}/`));
