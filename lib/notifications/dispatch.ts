@@ -36,7 +36,13 @@ export async function dispatchPushes(actorId: string): Promise<void> {
   if (error) throw error;
   const keys = vapidKeys();
   const now = Date.now();
-  const due = (claimed ?? []).filter((row) => now - Date.parse(row.created_at) < TOO_LATE_MS);
+  // About a record only: one about the pool ("owner", 0063) is written as
+  // pushed already, and would never be claimed here.
+  const due = (claimed ?? []).flatMap((row) =>
+    row.splash_id && row.type !== 'owner' && now - Date.parse(row.created_at) < TOO_LATE_MS
+      ? [{ ...row, splash_id: row.splash_id }]
+      : [],
+  );
   if (!keys || due.length === 0) return;
 
   const recipients = [...new Set(due.map((row) => row.recipient_id))];

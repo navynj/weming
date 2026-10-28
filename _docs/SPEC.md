@@ -61,6 +61,7 @@ Retired vocabulary (do not reuse): Stream, Deck, Pan, Table, Event, Moment, Log,
 - **A record reaches a pool only when its author turns that pool on, record by record** (Audience, H45). No lane of mine is mapped to a pool's lanes, and nothing shares by default; joining a pool connects nothing.
 - **Where a record that is not in my lanes shows on my Home is mine alone** (Home filing, H45): its pool's column, or a lane of mine I filed it in. Display only; no one else sees it.
 - A record other members wrote in outlives its owner leaving with remove, deleting it, or deleting their account: that pool's thread becomes the pool's joint record (H46).
+- **A pool has one owner** (H52): its creator unless handed on. Everything members can do stays every member's; the owner alone transfers ownership (to a current member, at once, an in-app notification to them), removes a member (exactly leaving with Remove, for them: hidden, never deleted, back if they join again; no notification; no link lets them back until the owner allows it), deletes the pool (only as the one current member left) and sets the members' notification defaults. The owner cannot leave: *Transfer ownership to leave*.
 - Per-drop override: a small audience chip on the input sheet. One spectrum: everyone, selected lists/pools, only me (lock). Lock is not a separate toggle. **Absent in P1** (H20g): no audience exists solo, so fragments default to Everyone and the lock toggles in the detail sheet; the chip re-enters the sheet at P2.
 - **Lane membership is per-space and derived** (H20h): a Ripple keeps one personal category; pool-side lane assignment lives on the sharing record (the P3 join table carries `pool_lane_id`), never as an array on the fragment. Detach ends the pool-side membership.
 - My category names are mine; pool lane names are the group's. Mapping connects them without forcing shared vocabulary.
@@ -125,7 +126,7 @@ Swimmers / Lanes / Splash
 
 ### 5.9 Notifications (H32)
 
-Three types, set per pool: **New posts** (All · Only when I'm invited · Off), **Replies** (on my ripples, on ripples of my records, in a thread I replied in), **Reactions** (to my ripples; the first in an hour per pool notifies, the rest fold into it silently). Never for my own actions. Effective value = paused ? off : mine ?? the pool's default ?? the app's (Only when I'm invited · on · off). Pool settings → Notifications holds *Defaults for members* (the creator edits) and *Your notifications* (each member, *Use pool default* first). Profile settings hold *Pause all notifications* and *Show titles in notifications* (off).
+Three types, set per pool: **New posts** (All · Only when I'm invited · Off), **Replies** (on my ripples, on ripples of my records, in a thread I replied in), **Reactions** (to my ripples; the first in an hour per pool notifies, the rest fold into it silently). Never for my own actions. Effective value = paused ? off : mine ?? the pool's default ?? the app's (Only when I'm invited · on · off). Pool settings → Notifications holds *Defaults for members* (the owner edits, H52) and *Your notifications* (each member, *Use pool default* first). Profile settings hold *Pause all notifications* and *Show titles in notifications* (off).
 
 - **One pool per notification:** the ripple's thread pool (a joint record's own pool); else the pool the actor and I share where the record is placed, the one I joined first. Its settings decide, and it is named in the text.
 - **In the app:** a bell in Home's and each pool's header row with the unread dot; its sheet lists notifications newest first, each opening the record at the ripple or reply and marking it read; *Mark all read*.
@@ -182,6 +183,8 @@ links(user_a, user_b)                     -- mutual, single row
 lists(owner), list_members(list, user)    -- private labels
 pools(ephemeral, born_from_splash?)       -- reserved flags
 pool_members(pool, user)                  -- independent of links
+pools.owner_id                            -- one owner, a current member (H52)
+pool_removed_members(pool, user, removed_by, removed_at)  -- join_pool refuses them; the owner allows back (H52)
 pool_lanes(pool, name, icon, order)
 my_categories(user, name, icon, default_mode drop|timed)
 home_filing(user, splash, my_lane)        -- where a record not in my lanes shows on my Home (H45)

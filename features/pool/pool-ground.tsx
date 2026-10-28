@@ -432,6 +432,8 @@ export function PoolGround({
       {sheet === 'members' ? (
         <MembersSheet
           poolId={poolId}
+          poolName={view.pool.name}
+          ownerId={view.pool.ownerId}
           members={view.members}
           me={me}
           onClose={() => setSheet(null)}

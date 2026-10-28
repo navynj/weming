@@ -67,7 +67,7 @@ export type Placement = {
 };
 
 export type PoolView = {
-  /** `ownerId`: the creator, who alone may delete the pool (0015); null once their account is gone. */
+  /** `ownerId`: the owner (the creator unless it was handed on, 0063), who alone transfers, removes and deletes. */
   pool: Pick<PoolRow, 'id' | 'name'> & {
     ownerId: string | null;
     /** Pool settings: Everyone preselected in this pool's compose (0033). */
@@ -86,6 +86,8 @@ export type PoolView = {
   splashes: Splash[];
   ripples: PoolRipple[];
   invites: PoolInvite[];
+  /** Who the owner removed (0063), for Allow back; empty for everyone else, as RLS reads it. */
+  removed?: { userId: string; name: string }[];
   /** Who each joint record here is together with now (0033). */
   together?: Record<string, string[]>;
   /** Who each record of someone's, shared here, is with in this pool now (0035). */
@@ -235,7 +237,7 @@ export async function getPoolView(
   // One round trip for everything keyed by the pool alone (review: a place
   // switch was ~16 sequential calls); a pool I cannot read returns nothing
   // from any of them, and is not found.
-  const [poolRow, members, lanes, placements, joints, invites, myRow] = await Promise.all([
+  const [poolRow, members, lanes, placements, joints, invites, myRow, removed] = await Promise.all([
     supabase
       .from('pools')
       .select('id, name, owner_id, photo_version, invite_all_by_default')
@@ -272,8 +274,15 @@ export async function getPoolView(
       .eq('pool_id', poolId)
       .eq('user_id', me)
       .maybeSingle(),
+    supabase
+      .from('pool_removed_members')
+      .select(
+        'user_id, removed_at, profile:profiles!pool_removed_members_user_id_fkey(display_name)',
+      )
+      .eq('pool_id', poolId)
+      .order('removed_at', { ascending: false }),
   ]);
-  for (const result of [poolRow, lanes, placements, joints, invites]) {
+  for (const result of [poolRow, lanes, placements, joints, invites, removed]) {
     if (result.error) throw result.error;
   }
   const pool = poolRow.data;
@@ -352,6 +361,10 @@ export async function getPoolView(
       photo: null,
     },
     members: orderMembers(members.map(toMember), me),
+    removed: (removed.data ?? []).map((row) => ({
+      userId: row.user_id,
+      name: row.profile?.display_name ?? 'Someone',
+    })),
     lanes: lanes.data ?? [],
     placements: shown.map((p) => ({
       splashId: p.splash_id,

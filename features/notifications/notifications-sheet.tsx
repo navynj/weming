@@ -55,7 +55,7 @@ export function NotificationsSheet({
         if (!live) return;
         setItems(rows);
         setUnread(rows.filter((n) => !n.read).length);
-        for (const n of rows) rememberHeader(notificationPath(n), headerOf(n));
+        for (const n of rows) if (n.splashId) rememberHeader(notificationPath(n), headerOf(n));
         rows
           .filter((n) => !n.read)
           .slice(0, PREFETCH_UNREAD)
@@ -71,7 +71,7 @@ export function NotificationsSheet({
 
   function prefetch(item: NotificationItem): void {
     const path = notificationPath(item);
-    if (!openings || prefetched.current.has(path.split('#')[0])) return;
+    if (!openings || !item.splashId || prefetched.current.has(path.split('#')[0])) return;
     prefetched.current.add(path.split('#')[0]);
     openings.prefetch(path);
   }
@@ -94,7 +94,8 @@ export function NotificationsSheet({
   function openOne(item: NotificationItem): void {
     if (!item.read) void mark([item.id]);
     onClose();
-    if (openings) openings.open(notificationPath(item), headerOf(item));
+    // One about the pool itself (0063) opens the pool, not a record's sheet.
+    if (openings && item.splashId) openings.open(notificationPath(item), headerOf(item));
     else router.push(notificationPath(item));
     if (item.type === 'new_post' && item.invited) offerInstall();
   }

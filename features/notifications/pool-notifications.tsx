@@ -117,7 +117,7 @@ export function PoolNotifications({
           <p className="text-pool-500 mt-3 text-xs">
             {isCreator
               ? 'What everyone here gets until they choose their own.'
-              : 'Set by the Pool’s creator; what you get until you choose your own.'}
+              : 'Set by the Pool’s owner; what you get until you choose your own.'}
           </p>
           <div className="mt-2 flex flex-col gap-4">
             {NOTIFICATION_TYPES.map((type) =>

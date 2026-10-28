@@ -34,6 +34,16 @@ function said(error: { message: string; code?: string } | null): string {
     return error.message;
   }
   if (error.code === '42501' && /together here/.test(error.message)) return error.message;
+  // The owner's rules (0063, 0064) say themselves.
+  if (error.code === '42501' && /can.t join this Pool|owner/i.test(error.message)) {
+    return error.message;
+  }
+  if (
+    error.code === '22023' &&
+    /Pick someone|aren.t in this Pool|remove yourself/.test(error.message)
+  ) {
+    return error.message;
+  }
   if (error.code === '42501') return 'You’re not in this Pool anymore.';
   return error.message;
 }
@@ -610,12 +620,50 @@ export async function deletePool(poolId: string): Promise<Done> {
   if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('delete_pool', { p_pool: poolId });
-  if (error) {
-    return {
-      ok: false,
-      message: error.code === '42501' ? 'Only the Pool’s creator can delete it.' : error.message,
-    };
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  return { ok: true };
+}
+
+const PoolPerson = z.object({ poolId: z.uuid(), userId: z.uuid() });
+
+/** "Make someone else the owner" (0063): at once; they get an in-app notification. */
+export async function transferPoolOwner(poolId: string, userId: string): Promise<Done> {
+  if (!PoolPerson.safeParse({ poolId, userId }).success) {
+    return { ok: false, message: 'Pick someone who is in this Pool.' };
   }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('transfer_pool_owner', { p_pool: poolId, p_to: userId });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  return { ok: true };
+}
+
+/** "Remove from Pool" (0063): leaving with Remove, for them; no link lets them back. */
+export async function removePoolMember(poolId: string, userId: string): Promise<Done> {
+  if (!PoolPerson.safeParse({ poolId, userId }).success) {
+    return { ok: false, message: 'They aren’t in this Pool.' };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('remove_pool_member', { p_pool: poolId, p_user: userId });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  return { ok: true };
+}
+
+/** "Allow back" (0063): the owner lets a removed person join again with a link. */
+export async function allowBackPoolMember(poolId: string, userId: string): Promise<Done> {
+  if (!PoolPerson.safeParse({ poolId, userId }).success)
+    return { ok: false, message: 'That didn’t save. Try again.' };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('pool_removed_members')
+    .delete()
+    .eq('pool_id', poolId)
+    .eq('user_id', userId)
+    .select('user_id');
+  if (error) return { ok: false, message: said(error) };
+  if (!data?.length) return { ok: false, message: 'Only the Pool’s owner can do that.' };
   revalidatePool(poolId);
   return { ok: true };
 }

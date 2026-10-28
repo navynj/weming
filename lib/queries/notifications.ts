@@ -1,6 +1,7 @@
 import {
   isValue,
   NOTIFICATION_TYPES,
+  type NotificationKind,
   type NotificationType,
   type NotificationValue,
 } from '@/lib/notifications/model';
@@ -14,7 +15,7 @@ import type { DuringClient } from '@/lib/queries/profile';
 
 export type NotificationItem = {
   id: string;
-  type: NotificationType;
+  type: NotificationKind;
   invited: boolean;
   count: number;
   createdAt: string;
@@ -26,7 +27,8 @@ export type NotificationItem = {
   /** The record's own icon, for its sheet's header before the page arrives. */
   icon: string | null;
   poolId: string;
-  splashId: string;
+  /** Null on one about the pool itself ("made you the owner", 0063). */
+  splashId: string | null;
   rippleId: string | null;
   replyId: string | null;
 };
@@ -55,11 +57,11 @@ export async function getNotifications(
     .limit(limit);
   if (error) throw error;
   return (data ?? []).flatMap((row) =>
-    row.splash && row.pool
+    row.pool && (row.splash || row.type === 'owner')
       ? [
           {
             id: row.id,
-            type: row.type as NotificationType,
+            type: row.type as NotificationKind,
             invited: row.invited,
             count: row.count,
             createdAt: row.created_at,
@@ -67,8 +69,8 @@ export async function getNotifications(
             actorId: row.actor_id,
             actorName: row.actor?.display_name ?? 'Someone',
             poolName: row.pool.name,
-            title: row.splash.title || null,
-            icon: row.splash.icon || null,
+            title: row.splash?.title || null,
+            icon: row.splash?.icon || null,
             poolId: row.pool_id,
             splashId: row.splash_id,
             rippleId: row.ripple_id,

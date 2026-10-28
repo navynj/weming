@@ -6,32 +6,65 @@ import { useRouter } from 'next/navigation';
 import type { PoolMember } from '@/lib/queries/pools';
 import { Avatar, PersonName } from '@/features/people/avatar';
 
-import { leavePool } from './actions';
+import { useOptimisticAction } from '@/lib/use-optimistic-action';
+
+import { leavePool, removePoolMember } from './actions';
 import { PoolSheet, SheetTitle } from './sheet';
 
 /**
  * The member list (H23): current members, me first then join order (D7),
  * then former members who kept their records, marked so. At the foot,
- * *Leave Pool*, which asks one question before it does anything.
+ * *Leave Pool*, which asks one question before it does anything — for a
+ * member: the owner cannot leave (0063), and removes others from here.
  */
 export function MembersSheet({
   poolId,
+  poolName,
+  ownerId,
   members,
   me,
   onClose,
 }: {
   poolId: string;
+  poolName: string;
+  ownerId: string | null;
   members: PoolMember[];
   me: string;
   onClose: () => void;
 }) {
   const [leaving, setLeaving] = useState(false);
+  const [removing, setRemoving] = useState<PoolMember | null>(null);
+  // Gone from the list the moment the owner confirms (CLAUDE.md, optimistic).
+  const list = useOptimisticAction(members);
+  const owner = ownerId === me;
   if (leaving) return <LeaveSheet poolId={poolId} onClose={() => setLeaving(false)} />;
+  if (removing) {
+    return (
+      <RemoveSheet
+        name={removing.name}
+        poolName={poolName}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => {
+          const who = removing.userId;
+          setRemoving(null);
+          list.run(
+            (current) => current.filter((m) => m.userId !== who),
+            () => removePoolMember(poolId, who),
+          );
+        }}
+      />
+    );
+  }
   return (
     <PoolSheet label="Members" onClose={onClose}>
       <SheetTitle>Members</SheetTitle>
+      {list.message ? (
+        <p role="alert" className="text-pool-500 mb-3 text-sm">
+          {list.message}
+        </p>
+      ) : null}
       <ul className="flex flex-col">
-        {members.map((member) => (
+        {list.value.map((member) => (
           <li
             key={member.userId}
             data-member={member.userId}
@@ -50,18 +83,76 @@ export function MembersSheet({
               <span data-former-member className="text-pool-500 text-xs">
                 Former member
               </span>
+            ) : member.userId === ownerId ? (
+              <span data-pool-owner className="text-pool-500 text-xs">
+                Owner
+              </span>
+            ) : owner ? (
+              <button
+                type="button"
+                data-remove-member={member.userId}
+                onClick={() => setRemoving(member)}
+                className="text-pool-500 py-1 text-xs"
+              >
+                Remove from Pool
+              </button>
             ) : null}
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        data-leave-pool
-        onClick={() => setLeaving(true)}
-        className="text-pool-500 mt-6 self-start py-2 text-sm"
-      >
-        Leave Pool
-      </button>
+      {owner ? null : (
+        <button
+          type="button"
+          data-leave-pool
+          onClick={() => setLeaving(true)}
+          className="text-pool-500 mt-6 self-start py-2 text-sm"
+        >
+          Leave Pool
+        </button>
+      )}
+    </PoolSheet>
+  );
+}
+
+/**
+ * Removing (0063): exactly leaving with Remove, for them — what they wrote
+ * here is hidden, never deleted, and comes back if they are let back in and
+ * join again. They are not told.
+ */
+function RemoveSheet({
+  name,
+  poolName,
+  onClose,
+  onConfirm,
+}: {
+  name: string;
+  poolName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <PoolSheet label="Remove from Pool" onClose={onClose}>
+      <SheetTitle>
+        Remove {name} from {poolName}?
+      </SheetTitle>
+      <p className="text-pool-500 -mt-2 mb-6 text-sm/relaxed">
+        They lose access at once. What they wrote here is hidden from the Pool, never deleted, and
+        comes back if they join again. They can’t join with any link until you allow them back in
+        Advanced.
+      </p>
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          data-remove-confirm
+          onClick={onConfirm}
+          className="bg-ink h-14 rounded-full font-semibold text-white"
+        >
+          Remove from Pool
+        </button>
+        <button type="button" onClick={onClose} className="text-pool-500 py-2 text-sm">
+          Cancel
+        </button>
+      </div>
     </PoolSheet>
   );
 }

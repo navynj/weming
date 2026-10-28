@@ -42,6 +42,12 @@ describe('the words', () => {
     expect(notificationText({ ...base, type: 'reaction' })).toBe('Mina reacted in Our Pool');
   });
 
+  it('tells the new owner who handed the pool on (0063)', () => {
+    expect(notificationText({ ...base, type: 'owner' })).toBe(
+      'Mina made you the owner of Our Pool',
+    );
+  });
+
   it('phrases an invited post as an invite', () => {
     expect(notificationText({ ...base, type: 'new_post', invited: true })).toBe(
       'Mina invited you to add your side in Our Pool',
@@ -74,6 +80,10 @@ describe('where a notification opens', () => {
       '/pool/p/splash/s#block-r',
     );
     expect(notificationPath({ ...at, rippleId: null, replyId: null })).toBe('/pool/p/splash/s');
+    // About the pool itself (0063): the pool.
+    expect(notificationPath({ ...at, splashId: null, rippleId: null, replyId: null })).toBe(
+      '/pool/p',
+    );
   });
 });
 

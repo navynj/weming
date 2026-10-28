@@ -4,6 +4,8 @@
  */
 
 export type NotificationType = 'new_post' | 'reply' | 'reaction';
+/** What a row can be: a setting's type, or "made you the owner" (0063), in-app only and set by no one. */
+export type NotificationKind = NotificationType | 'owner';
 export type NewPostValue = 'all' | 'invited' | 'off';
 export type SwitchValue = 'on' | 'off';
 export type NotificationValue = NewPostValue | SwitchValue;
@@ -58,7 +60,7 @@ export function effectiveValue(
 }
 
 export type NotificationFacts = {
-  type: NotificationType;
+  type: NotificationKind;
   invited: boolean;
   count: number;
   actorName: string;
@@ -76,6 +78,8 @@ export function notificationText(facts: NotificationFacts): string {
   const { actorName, poolName } = facts;
   const title = facts.title?.trim() ? `“${facts.title.trim()}”` : null;
   switch (facts.type) {
+    case 'owner':
+      return `${actorName} made you the owner of ${poolName}`;
     case 'new_post':
       if (facts.invited) {
         return title
@@ -103,14 +107,16 @@ export function notificationText(facts: NotificationFacts): string {
  * Where a notification opens: the record in the pool it is about, at the
  * reply or the block (H42d). Always the pool's reader: Home's reads only my
  * own records, so another member's opened there as gone, and the pool picks
- * the thread the reply was written in.
+ * the thread the reply was written in. One about the pool itself (0063)
+ * opens the pool.
  */
 export function notificationPath(target: {
   poolId: string;
-  splashId: string;
+  splashId: string | null;
   rippleId: string | null;
   replyId: string | null;
 }): string {
+  if (!target.splashId) return `/pool/${target.poolId}`;
   const base = `/pool/${target.poolId}/splash/${target.splashId}`;
   if (target.replyId) return `${base}#reply-${target.replyId}`;
   if (target.rippleId) return `${base}#block-${target.rippleId}`;

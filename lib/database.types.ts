@@ -533,7 +533,7 @@ export type Database = {
           recipient_id: string
           reply_id: string | null
           ripple_id: string | null
-          splash_id: string
+          splash_id: string | null
           type: string
         }
         Insert: {
@@ -548,7 +548,7 @@ export type Database = {
           recipient_id: string
           reply_id?: string | null
           ripple_id?: string | null
-          splash_id: string
+          splash_id?: string | null
           type: string
         }
         Update: {
@@ -563,7 +563,7 @@ export type Database = {
           recipient_id?: string
           reply_id?: string | null
           ripple_id?: string | null
-          splash_id?: string
+          splash_id?: string | null
           type?: string
         }
         Relationships: [
@@ -758,6 +758,49 @@ export type Database = {
             columns: ["pool_id"]
             isOneToOne: false
             referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pool_removed_members: {
+        Row: {
+          pool_id: string
+          removed_at: string
+          removed_by: string | null
+          user_id: string
+        }
+        Insert: {
+          pool_id: string
+          removed_at?: string
+          removed_by?: string | null
+          user_id: string
+        }
+        Update: {
+          pool_id?: string
+          removed_at?: string
+          removed_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pool_removed_members_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pool_removed_members_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pool_removed_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1487,6 +1530,10 @@ export type Database = {
         Args: { hi: number; lo: number; v: Json }
         Returns: boolean
       }
+      _leave_member: {
+        Args: { keep: boolean; pid: string; uid: string }
+        Returns: undefined
+      }
       _leave_placeholder: {
         Args: { owner: string; pid: string; rid: string; target: string }
         Returns: undefined
@@ -1512,6 +1559,7 @@ export type Database = {
         Args: { sid: string; uid: string }
         Returns: undefined
       }
+      _require_owner: { Args: { pid: string }; Returns: string }
       _require_uid: { Args: never; Returns: string }
       _response_thread: {
         Args: { rid: string; uid: string; wanted: string }
@@ -1526,7 +1574,9 @@ export type Database = {
         Args: { cid: string; pid: string }
         Returns: undefined
       }
+      _settle_pool_owner: { Args: { pid: string }; Returns: string }
       _splash_lane: { Args: { sid: string }; Returns: string }
+      _teardown_pool: { Args: { p_pool: string }; Returns: undefined }
       _theme_color_ok: { Args: { c: string }; Returns: boolean }
       add_joint_invitees: {
         Args: { p_everyone?: boolean; p_splash: string; p_users: string[] }
@@ -1687,6 +1737,10 @@ export type Database = {
       }
       pool_creator_is_me: { Args: { pid: string }; Returns: boolean }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
+      remove_pool_member: {
+        Args: { p_pool: string; p_user: string }
+        Returns: undefined
+      }
       rename_pool: {
         Args: { p_name: string; p_pool: string }
         Returns: undefined
@@ -1812,6 +1866,10 @@ export type Database = {
         Returns: undefined
       }
       splash_writable: { Args: { sid: string }; Returns: boolean }
+      transfer_pool_owner: {
+        Args: { p_pool: string; p_to: string }
+        Returns: undefined
+      }
       visible_avatars: { Args: { uids: string[] }; Returns: string[] }
       visible_pool_photos: { Args: { pids: string[] }; Returns: string[] }
     }

@@ -10,8 +10,8 @@ import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { PoolPhotoField, previewOf, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
 import { renamePool, setPoolInviteAll, setPoolOnHome } from './actions';
-import { DeletePool } from './delete-pool';
 import { LeaveSheet } from './members-sheet';
+import { OwnerSection } from './owner-settings';
 import { Switch } from './switch';
 import { PoolLanesSheet } from './pool-lanes-sheet';
 
@@ -20,7 +20,8 @@ import { PoolLanesSheet } from './pool-lanes-sheet';
  * its tabs drawn at once from the pool the screen already holds. Pool: its
  * photo and name, and its lanes — each any current member's. Theme: the
  * pool's colour and mine there. Advanced: Show on my Home, Invite everyone,
- * then Leave, or Delete for its creator (lane links retired, H45). The
+ * then Leave, or the owner's acts (0063: transfer, Allow back, Delete only
+ * as the one member left; the owner cannot leave). Lane links retired, H45. The
  * invite link is the header's "+"; notifications are the bell's.
  */
 export function PoolSettingsSheet({ view, me }: { view: PoolView; me: string }) {
@@ -147,10 +148,10 @@ function AdvancedTab({ view, me }: { view: PoolView; me: string }) {
           </p>
         ) : null}
       </section>
-      {/* The creator alone deletes the pool (0015); a member leaves it there instead. */}
+      {/* The owner hands on, lets back and deletes (0063); a member leaves here instead. */}
       <section className="border-pool-100 mt-12 border-t pt-6">
         {view.pool.ownerId === me ? (
-          <DeletePool poolId={poolId} poolName={view.pool.name} />
+          <OwnerSection view={view} me={me} />
         ) : (
           <button
             type="button"

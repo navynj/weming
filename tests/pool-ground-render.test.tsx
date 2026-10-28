@@ -22,6 +22,9 @@ vi.mock('@/features/splash/actions', () => ({
 vi.mock('@/features/pool/actions', () => ({
   deleteJointSplash: () => Promise.resolve({ ok: true }),
   leavePool: () => Promise.resolve({ ok: true }),
+  removePoolMember: () => Promise.resolve({ ok: true }),
+  transferPoolOwner: () => Promise.resolve({ ok: true }),
+  allowBackPoolMember: () => Promise.resolve({ ok: true }),
   savePoolLane: () => Promise.resolve({ ok: true }),
   createInvite: () => Promise.resolve({ ok: false, message: 'not in tests' }),
   revokeInvite: () => Promise.resolve({ ok: true }),
@@ -561,7 +564,8 @@ describe('switching pools (H23)', () => {
 
 describe('leaving (H23)', () => {
   it('asks to keep or remove before anything happens', () => {
-    const { container, getByText } = ground(A);
+    // A member leaves; the owner cannot (0063).
+    const { container, getByText } = ground({ ...A, pool: { ...A.pool, ownerId: MINA } });
     // Another member's face opens the members (0059).
     fireEvent.click(container.querySelector('[data-place-face]:not([data-place-face="me"])')!);
     expect(container.ownerDocument.querySelector('[data-former-member]')).not.toBeNull();
@@ -569,6 +573,53 @@ describe('leaving (H23)', () => {
     expect(getByText('Keep your records in this Pool?')).toBeTruthy();
     expect(getByText('Keep them')).toBeTruthy();
     expect(getByText('Remove them')).toBeTruthy();
+  });
+});
+
+describe('the owner (0063)', () => {
+  it('removes a current member from the list, after a confirm, and never leaves', () => {
+    const { container, getByText, queryByText } = ground(A);
+    fireEvent.click(container.querySelector('[data-place-face]:not([data-place-face="me"])')!);
+    const doc = container.ownerDocument;
+    expect(queryByText('Leave Pool')).toBeNull();
+    // Not on me, not on a former member: on Mina only.
+    expect(
+      [...doc.querySelectorAll('[data-remove-member]')].map((b) =>
+        b.getAttribute('data-remove-member'),
+      ),
+    ).toEqual([MINA]);
+    fireEvent.click(doc.querySelector(`[data-remove-member="${MINA}"]`)!);
+    expect(getByText('Remove Mina from Our Pool?')).toBeTruthy();
+    fireEvent.click(doc.querySelector('[data-remove-confirm]')!);
+    expect(doc.querySelector(`[data-member="${MINA}"]`)).toBeNull();
+  });
+
+  it('shows Transfer ownership to leave, and Delete only as the one member left', () => {
+    window.history.replaceState(null, '', '/pool/p-a?settings=advanced');
+    const shared = ground({ ...A, removed: [{ userId: 'u-out', name: 'Out' }] });
+    const doc = shared.container.ownerDocument;
+    expect(doc.querySelector('[data-transfer-owner]')).not.toBeNull();
+    expect(doc.querySelector('[data-transfer-to-leave]')).not.toBeNull();
+    expect(doc.querySelector('[data-delete-pool]')).toBeNull();
+    expect(doc.querySelector('[data-delete-pool-blocked]')).not.toBeNull();
+    expect(doc.querySelector('[data-settings-leave-pool]')).toBeNull();
+    expect(doc.querySelector('[data-removed="u-out"]')).not.toBeNull();
+    fireEvent.click(doc.querySelector('[data-transfer-owner]')!);
+    // Only current members other than me are offered.
+    expect(
+      [...doc.querySelectorAll('[data-transfer-candidate]')].map((b) =>
+        b.getAttribute('data-transfer-candidate'),
+      ),
+    ).toEqual([MINA]);
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('offers Delete Pool to an owner who is the one member left', () => {
+    window.history.replaceState(null, '', '/pool/p-a?settings=advanced');
+    const { container } = ground({ ...A, members: A.members.filter((m) => m.userId !== MINA) });
+    window.history.replaceState(null, '', '/');
+    expect(container.querySelector('[data-delete-pool]')).not.toBeNull();
+    expect(container.querySelector('[data-transfer-owner]')).toBeNull();
   });
 });
 

@@ -53,6 +53,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/hand-over-db.test.ts',
   'tests/home-filing-db.test.ts',
   'tests/shared-settings-db.test.ts',
+  'tests/pool-owner-db.test.ts',
 ];
 
 /**
