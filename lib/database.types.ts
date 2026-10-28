@@ -99,6 +99,49 @@ export type Database = {
           },
         ]
       }
+      home_filing: {
+        Row: {
+          created_at: string
+          my_lane_id: string
+          splash_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          my_lane_id: string
+          splash_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          my_lane_id?: string
+          splash_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_filing_my_lane_id_fkey"
+            columns: ["my_lane_id"]
+            isOneToOne: false
+            referencedRelation: "my_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_filing_splash_id_fkey"
+            columns: ["splash_id"]
+            isOneToOne: false
+            referencedRelation: "splashes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_filing_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       joint_invitees: {
         Row: {
           id: string
@@ -1227,6 +1270,8 @@ export type Database = {
       splash_placements: {
         Row: {
           created_at: string
+          handed_at: string | null
+          handed_to: string | null
           invite_all: boolean
           origin_pool_lane_icon: string | null
           origin_pool_lane_name: string | null
@@ -1239,6 +1284,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          handed_at?: string | null
+          handed_to?: string | null
           invite_all?: boolean
           origin_pool_lane_icon?: string | null
           origin_pool_lane_name?: string | null
@@ -1251,6 +1298,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          handed_at?: string | null
+          handed_to?: string | null
           invite_all?: boolean
           origin_pool_lane_icon?: string | null
           origin_pool_lane_name?: string | null
@@ -1416,6 +1465,10 @@ export type Database = {
         Args: { made?: Json; pid: string; sid: string }
         Returns: undefined
       }
+      _hand_over_thread: {
+        Args: { p_pool: string; p_splash: string }
+        Returns: string
+      }
       _home_lane_for: { Args: { sid: string; uid: string }; Returns: string }
       _invite_pool: { Args: { p_token: string }; Returns: string }
       _joint_pool: { Args: { sid: string }; Returns: string }
@@ -1562,6 +1615,10 @@ export type Database = {
           splash_id: string
           user_id: string
         }[]
+      }
+      keep_in_lane: {
+        Args: { p_my_lane: string; p_splash: string }
+        Returns: undefined
       }
       lane_is_mine_in: { Args: { plid: string }; Returns: boolean }
       leave_pool: {

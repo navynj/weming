@@ -281,29 +281,27 @@ describe('what makes my record leave or end', () => {
     expect(side).toEqual([{ thread_pool_id: crew }]);
   });
 
-  it('deleting my record returns each member’s side to them as a post of one', async () => {
+  it('deleting my record hands each pool’s side over as its joint record (0061)', async () => {
     const del = await asUser(ana).from('splashes').delete().eq('id', RECORD);
     expect(del.error).toBeNull();
-    const benPosts = (
+    // No post of one: the side stays together, the pool's (H46).
+    expect(
+      (await asAdmin().from('splashes').select('id').eq('owner_id', ben).eq('title', 'Tofino'))
+        .data,
+    ).toHaveLength(0);
+    const joint = (
       await asAdmin()
         .from('splashes')
-        .select('id, title, declared_lane_id')
-        .eq('owner_id', ben)
+        .select('id')
+        .is('owner_id', null)
+        .eq('pool_id', crew)
         .eq('title', 'Tofino')
     ).data!;
-    expect(benPosts).toHaveLength(1);
+    expect(joint).toHaveLength(1);
     const moved = (
       await asAdmin().from('ripples').select('splash_id, thread_pool_id').eq('note', 'Ben in Crew')
     ).data!;
-    expect(moved).toEqual([{ splash_id: benPosts[0].id, thread_pool_id: null }]);
-    const laneName = (
-      await asAdmin()
-        .from('my_categories')
-        .select('name')
-        .eq('id', benPosts[0].declared_lane_id!)
-        .single()
-    ).data!.name;
-    expect(laneName).toBe('Trips');
+    expect(moved).toEqual([{ splash_id: joint[0].id, thread_pool_id: null }]);
   });
 
   it('deleting the pool returns members’ sides there to them too', async () => {
