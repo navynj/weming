@@ -106,6 +106,16 @@ describe('the Theme tab on Home (0059)', () => {
     expect(container.querySelector('[data-theme-mode="dark"]')!.className).toContain('bg-ink');
   });
 
+  it('stands the swatches and the mode on their own: no "My color" or "Mode" label (H43)', () => {
+    const { container } = picker();
+    expect(container.textContent).not.toMatch(/My color|Mode/);
+    // Still named for a screen reader.
+    expect(container.querySelector('[data-theme-colors="home"]')!.getAttribute('aria-label')).toBe(
+      'My color',
+    );
+    expect(container.querySelector('[role="radiogroup"][aria-label="Mode"]')).not.toBeNull();
+  });
+
   it('asks whether a colour applies in every pool too, and saves the answer', async () => {
     const { container } = picker();
     fireEvent.click(container.querySelector('[data-theme-swatch="pink"]')!);
@@ -175,14 +185,61 @@ describe('the Theme tab in a pool (0059)', () => {
       container.querySelector('[data-theme-colors="mine"] [data-theme-swatch="pink"]')!,
     );
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('pink'));
-    // Use pool color: mine cleared, the pool's worn again.
-    fireEvent.click(container.querySelector('[data-theme-clear="mine"]')!);
+    // Use my color off: mine cleared, the pool's worn again.
+    const use = () =>
+      container.querySelector<HTMLButtonElement>('[data-theme-use-mine] [role="switch"]')!;
+    expect(use().getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(use());
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('mint'));
     expect(saved).toEqual([
       { pool: 'p-a', color: 'mint' },
       { mine: 'p-a', color: 'pink' },
       { mine: 'p-a', color: null },
     ]);
+  });
+
+  it('puts "Use my color" beside the heading, off by default, the swatches muted with none chosen (H43)', async () => {
+    const { container } = picker({ pool: 'mint', mine: null });
+    await waitFor(() => expect(container.querySelector('[data-theme-use-mine]')).not.toBeNull());
+    const use = container.querySelector<HTMLButtonElement>(
+      '[data-theme-use-mine] [role="switch"]',
+    )!;
+    expect(use.getAttribute('aria-label')).toBe('Use my color');
+    expect(use.getAttribute('aria-checked')).toBe('false');
+    // On the heading's line, at its far right.
+    const heading = container.querySelector('[data-theme-use-mine]')!.parentElement!;
+    expect(heading.textContent).toContain('My color here');
+    expect(heading.lastElementChild!.hasAttribute('data-theme-use-mine')).toBe(true);
+    const swatches = container.querySelector('[data-theme-colors="mine"]')!;
+    expect(swatches.hasAttribute('data-muted')).toBe(true);
+    expect(swatches.querySelector('[aria-checked="true"]')).toBeNull();
+    expect(container.querySelector('[data-theme-clear="mine"]')).toBeNull();
+    expect(container.textContent).not.toContain('Use pool color');
+    expect(document.documentElement.dataset.theme).toBe('mint');
+    // On with none chosen: my Home colour.
+    fireEvent.click(use);
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('blue'));
+    expect(saved).toEqual([{ mine: 'p-a', color: 'blue' }]);
+    expect(use.getAttribute('aria-checked')).toBe('true');
+    expect(swatches.hasAttribute('data-muted')).toBe(false);
+    expect(swatches.querySelector('[data-theme-swatch="blue"]')!.getAttribute('aria-checked')).toBe(
+      'true',
+    );
+  });
+
+  it('turns the switch on with a swatch tapped while off (H43)', async () => {
+    const { container } = picker({ pool: 'mint', mine: null });
+    await waitFor(() => expect(container.querySelector('[data-theme-use-mine]')).not.toBeNull());
+    fireEvent.click(
+      container.querySelector('[data-theme-colors="mine"] [data-theme-swatch="pink"]')!,
+    );
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('pink'));
+    expect(
+      container
+        .querySelector('[data-theme-use-mine] [role="switch"]')!
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+    expect(saved).toEqual([{ mine: 'p-a', color: 'pink' }]);
   });
 
   it('shows a set pool default on its folded button; Mode stays at the bottom', async () => {

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import { THEMES, type ThemeColor, type ThemeMode } from '@/lib/theme';
+import { DEFAULT_THEME, THEMES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
 import { useToast } from '@/components/ui/toast';
+import { Switch } from '@/features/pool/lane-match';
 
 import { useTheme } from './theme-provider';
 
@@ -19,7 +20,10 @@ const MODES: { mode: ThemeMode; label: string }[] = [
  * one, whether it applies in every pool too — "Home only" or "Home and all
  * pools" — seen by me alone. In a pool: the pool's colour, shared by its
  * members and any member's to set or clear, and my colour there, over
- * everything for me. The mode — Dark, Light or Pastel — is always mine.
+ * everything for me, behind "Use my color" (H43): off, the pool's colour
+ * (or the usual fallback) and the swatches muted with none chosen; a
+ * swatch turns it on; on with none chosen, my Home colour; off clears mine
+ * here. The mode — Dark, Light or Pastel — is always mine, with no label.
  * Every choice shows at once and saves behind it (CLAUDE.md, the
  * principle); a refusal takes it back and says why. Chosen wears ink
  * (H20f). Every colour keeps 3:1 against its ground (tests/theme.test.tsx).
@@ -48,10 +52,21 @@ export function ThemePicker() {
             name="My color here"
             hint="Only you see it, over every other colour here."
             value={place.colors.mine}
+            muted={place.colors.mine === null}
             mode={theme.mode}
-            clear="Use pool color"
             data="mine"
             onPick={(color) => void done(chooseMyPoolColor(color))}
+            trailing={
+              <span data-theme-use-mine>
+                <Switch
+                  on={place.colors.mine !== null}
+                  label="Use my color"
+                  onChange={(on) =>
+                    void done(chooseMyPoolColor(on ? (mine.home ?? DEFAULT_THEME.color) : null))
+                  }
+                />
+              </span>
+            }
           />
           {/* The pool's own default (review): a quiet step further, closed each
               time the sheet opens; its colour shows on the button when set. */}
@@ -97,6 +112,7 @@ export function ThemePicker() {
         <>
           <Colours
             name="My color"
+            heading={false}
             value={mine.home}
             mode={theme.mode}
             data="home"
@@ -139,30 +155,27 @@ export function ThemePicker() {
         </>
       )}
 
-      <div className="flex flex-col gap-2">
-        <span className="text-pool-500 text-xs">Mode</span>
-        <div
-          role="radiogroup"
-          aria-label="Mode"
-          className="bg-pool-100 flex w-full rounded-full p-1 text-sm font-medium"
-        >
-          {MODES.map(({ mode, label }) => {
-            const on = mode === mine.mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                data-theme-mode={mode}
-                onClick={() => void done(chooseMode(mode))}
-                className={`flex-1 rounded-full py-1.5 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+      <div
+        role="radiogroup"
+        aria-label="Mode"
+        className="bg-pool-100 flex w-full rounded-full p-1 text-sm font-medium"
+      >
+        {MODES.map(({ mode, label }) => {
+          const on = mode === mine.mode;
+          return (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              data-theme-mode={mode}
+              onClick={() => void done(chooseMode(mode))}
+              className={`flex-1 rounded-full py-1.5 ${on ? 'bg-ink text-white' : 'text-pool-500'}`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       {message ? (
         <p role="alert" className="text-ink text-sm">
@@ -173,38 +186,55 @@ export function ThemePicker() {
   );
 }
 
-/** Twelve colours as swatches, the chosen one ringed in ink; `clear` offers none. */
+/**
+ * Twelve colours as swatches, the chosen one ringed in ink; `clear` offers
+ * none. `heading` false: the swatches stand alone, `name` their label only.
+ * `muted`: shown faded, none chosen, still a tap to choose; `trailing` sits
+ * at the heading's far right.
+ */
 function Colours({
   name,
+  heading = true,
   hint,
   value,
+  muted = false,
   mode,
   clear,
   data,
   onPick,
+  trailing,
 }: {
   name: string;
+  heading?: boolean;
   hint?: string;
   value: ThemeColor | null;
+  muted?: boolean;
   mode: ThemeMode;
   clear?: string;
   data: string;
   onPick: (color: ThemeColor | null) => void;
+  trailing?: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="flex flex-col gap-0.5">
-        <span className="text-ink text-sm font-medium">{name}</span>
-        {hint ? <span className="text-pool-500 text-xs">{hint}</span> : null}
-      </span>
+      {heading ? (
+        <span className="flex items-start gap-3">
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-ink text-sm font-medium">{name}</span>
+            {hint ? <span className="text-pool-500 text-xs">{hint}</span> : null}
+          </span>
+          {trailing}
+        </span>
+      ) : null}
       <div
         role="radiogroup"
         aria-label={name}
         data-theme-colors={data}
-        className="grid grid-cols-6 gap-3"
+        data-muted={muted ? '' : undefined}
+        className={`grid grid-cols-6 gap-3 ${muted ? 'opacity-40' : ''}`}
       >
         {THEMES.map((t) => {
-          const on = t.key === value;
+          const on = !muted && t.key === value;
           return (
             <button
               key={t.key}
