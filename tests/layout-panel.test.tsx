@@ -318,6 +318,24 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(label().className).toContain(auto === 'ink' ? 'bg-ink' : 'bg-white');
   });
 
+  it('marks the set style with a dot under its chip, every chip keeping its look (review)', () => {
+    media(true);
+    const { container } = home([{ ...ONE[0], together: true }]);
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    const style = container.querySelector('[data-layout-control="Style"]')!;
+    const marked = () =>
+      [...style.querySelectorAll('[data-chosen-dot]')].map((dot) => dot.parentElement!);
+    // Unset: Auto carries the one dot.
+    expect(marked()).toHaveLength(1);
+    expect(marked()[0].textContent).toBe('Auto');
+    const looks = [...style.querySelectorAll('button')].map((b) => b.className);
+    fireEvent.click(style.querySelector('[data-layout-choice="ink"]')!);
+    expect(marked()).toHaveLength(1);
+    expect(marked()[0].getAttribute('data-layout-choice')).toBe('ink');
+    // Picking changes no chip's look: only the dot moved.
+    expect([...style.querySelectorAll('button')].map((b) => b.className)).toEqual(looks);
+  });
+
   it('offers Style on my side of someone else’s record too, as on any record (0058)', () => {
     media(true);
     const { container } = home([{ ...ONE[0], side: true, pools: ['Our Pool'] }]);

@@ -41,7 +41,13 @@ import {
   type BoardPart,
   type PartValues,
 } from './handle-math';
-import { LabelSwatch, useLabelStyleNames, type LabelChoice } from './label-styles';
+import {
+  AutoSwatch,
+  ChosenDot,
+  LabelSwatch,
+  useLabelStyleNames,
+  type LabelChoice,
+} from './label-styles';
 import { LABEL_STYLES, type LabelStyle } from './layout';
 import type { LayerControls, LayerMove } from './stacking';
 import type { BoardEditing, PartChip } from './use-board-editing';
@@ -921,8 +927,8 @@ function StyleSwatch({
     if (style === undefined) editing.edit({}, ['label.style']);
     else editing.edit({ label: { style } });
   };
-  const choice = (on: boolean) =>
-    `flex ${phone ? 'h-11 min-w-11' : 'h-8 min-w-8'} items-center justify-center gap-1 rounded-full px-1.5 ${on ? 'bg-ink text-white' : ''}`;
+  // Every option keeps its own look; the chosen one has a dot under it (review).
+  const choice = `flex ${phone ? 'h-11 min-w-11' : 'h-8 min-w-8'} items-center justify-center px-1.5`;
   return (
     <span className="relative flex">
       <button
@@ -940,9 +946,9 @@ function StyleSwatch({
           role="menu"
           aria-label="Label style"
           data-edit-style-menu
-          // Selection is ink (H20f); a white card on the ground stays white (0032).
+          // A white card on the ground stays white (0032); the chosen one's dot is ink (H20f).
           // Centred on the swatch: under it on a desktop, above it on a phone's docked bar.
-          className={`surface absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-[20px] bg-white p-1 shadow-md ${
+          className={`surface absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-[20px] bg-white px-1 pt-1 pb-2 shadow-md ${
             phone ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}
         >
@@ -950,11 +956,16 @@ function StyleSwatch({
             type="button"
             role="menuitemradio"
             aria-checked={labelStyle.set === undefined}
+            aria-label="Auto"
+            title="Auto"
             data-edit-style-choice="auto"
             onClick={() => pick(undefined)}
-            className={`${choice(labelStyle.set === undefined)} px-2.5`}
+            className={choice}
           >
-            Auto
+            <span className="relative flex">
+              <AutoSwatch px={20} />
+              <ChosenDot on={labelStyle.set === undefined} />
+            </span>
           </button>
           {LABEL_STYLES.map((style) => (
             <button
@@ -966,9 +977,12 @@ function StyleSwatch({
               title={names[style]}
               data-edit-style-choice={style}
               onClick={() => pick(style)}
-              className={choice(labelStyle.set === style)}
+              className={choice}
             >
-              <LabelSwatch style={style} px={20} />
+              <span className="relative flex">
+                <LabelSwatch style={style} px={20} />
+                <ChosenDot on={labelStyle.set === style} />
+              </span>
             </button>
           ))}
         </span>

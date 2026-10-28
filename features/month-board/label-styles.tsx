@@ -1,5 +1,7 @@
 'use client';
 
+import { Sparkle } from 'lucide-react';
+
 import { useTheme } from '@/features/people/theme-provider';
 import { THEMES } from '@/lib/theme';
 
@@ -54,4 +56,38 @@ export function LabelSwatch({ style, px = 24 }: { style: LabelStyle; px?: number
       </span>
     </span>
   );
+}
+
+/**
+ * Auto as a swatch of its own (review): the swatch's size, a dashed outline
+ * and an "A" with a small sparkle, never filled — the rule picks the style.
+ */
+export function AutoSwatch({ px = 24 }: { px?: number }) {
+  return (
+    <span
+      aria-hidden
+      data-label-swatch="auto"
+      className="border-pool-500 text-pool-500 relative flex shrink-0 items-center justify-center rounded-md border border-dashed"
+      style={{ width: px, height: px }}
+    >
+      <span className="text-[10px] leading-none font-semibold">A</span>
+      <Sparkle aria-hidden size={6} strokeWidth={3} className="absolute top-0.5 right-0.5" />
+    </span>
+  );
+}
+
+/**
+ * The chosen style's marker (review): a 4px ink dot centred 4px under the
+ * option, never a fill — the swatches are fills, so a filled background
+ * would read as one more style. Inside a `relative` option; nothing when
+ * the option is not the chosen one.
+ */
+export function ChosenDot({ on }: { on: boolean }) {
+  return on ? (
+    <span
+      aria-hidden
+      data-chosen-dot
+      className="bg-ink absolute top-full left-1/2 mt-1 h-1 w-1 -translate-x-1/2 rounded-full"
+    />
+  ) : null;
 }

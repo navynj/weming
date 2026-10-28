@@ -1178,6 +1178,40 @@ describe('the toolbar’s style swatch and eye (0058)', () => {
     vi.useRealTimers();
   });
 
+  it('marks the chosen style with a dot under it, never a fill; Auto is a dashed swatch (review)', () => {
+    vi.useFakeTimers();
+    const { container } = home();
+    editLabel(container, 's2');
+    fireEvent.click(q(container, '[data-edit-style]'));
+    const menu = q(container, '[data-edit-style-menu]');
+    const dots = () => [...menu.querySelectorAll('[data-chosen-dot]')];
+    // Unset: Auto is the chosen one, the only dot.
+    expect(dots()).toHaveLength(1);
+    expect(
+      dots()[0].closest('[data-edit-style-choice]')!.getAttribute('data-edit-style-choice'),
+    ).toBe('auto');
+    const auto = q(menu, '[data-edit-style-choice="auto"] [data-label-swatch="auto"]');
+    expect(auto.className).toContain('border-dashed');
+    expect(auto.className).not.toMatch(/\bbg-/);
+    // No option is filled to say it is chosen.
+    for (const option of menu.querySelectorAll('[data-edit-style-choice]')) {
+      expect(option.className).not.toMatch(/\bbg-/);
+    }
+    fireEvent.click(q(container, '[data-edit-style-choice="glass"]'));
+    fireEvent.click(q(container, '[data-edit-style]'));
+    const again = q(container, '[data-edit-style-menu]');
+    const chosen = [...again.querySelectorAll('[data-chosen-dot]')];
+    expect(chosen).toHaveLength(1);
+    expect(
+      chosen[0].closest('[data-edit-style-choice]')!.getAttribute('data-edit-style-choice'),
+    ).toBe('glass');
+    // The swatch that opens it still shows the style as drawn.
+    expect(
+      q(container, '[data-edit-style] [data-label-swatch]').getAttribute('data-label-swatch'),
+    ).toBe('glass');
+    vi.useRealTimers();
+  });
+
   it('offers the swatch only while the label is selected; All has no eye', () => {
     const { container } = home();
     editLabel(container, 's2');

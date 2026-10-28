@@ -7,7 +7,7 @@ import type { Card } from '@/features/home/grid';
 
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
 import { LABEL_STYLES, type Recipe } from './layout';
-import { useLabelStyleNames } from './label-styles';
+import { ChosenDot, useLabelStyleNames } from './label-styles';
 import { PartOrder } from './part-order';
 import { LAYER_RANGE } from './stacking';
 import { useSignedPhotos } from './use-board-photos';
@@ -117,8 +117,9 @@ function Switch({
 }
 
 /**
- * A few named choices for one field (review: the label's style), the set
- * one white; Auto hands the field back to the recipe.
+ * A few named choices for one field (review: the label's style), each with
+ * its own look always; the set one has the toolbar's dot under it, never a
+ * fill. Auto hands the field back to the recipe.
  */
 function Choice<T extends string>({
   name,
@@ -133,8 +134,11 @@ function Choice<T extends string>({
   onChange: (v: T) => void;
   onReset: () => void;
 }) {
-  const chip = (on: boolean) =>
-    `rounded-full px-2.5 py-0.5 ${on ? 'text-main-900 bg-white' : 'bg-white/15 text-white/80'}`;
+  // One border width on all, so Auto's dashed one does not make it taller.
+  const chip = (auto: boolean) =>
+    `relative rounded-full border bg-white/15 px-2.5 py-0.5 text-white/80 ${
+      auto ? 'border-dashed border-white/50' : 'border-transparent'
+    }`;
   return (
     <div
       data-layout-control={name}
@@ -143,14 +147,16 @@ function Choice<T extends string>({
       className="flex items-center gap-2 text-xs"
     >
       <span className="w-20 shrink-0 text-white/80">{name}</span>
-      <div className="flex flex-wrap gap-1">
+      {/* Room under each row for the dot. */}
+      <div className="flex flex-wrap gap-x-1 gap-y-3 pb-2">
         <button
           type="button"
           aria-pressed={value === undefined}
           onClick={onReset}
-          className={chip(value === undefined)}
+          className={chip(true)}
         >
           Auto
+          <ChosenDot on={value === undefined} />
         </button>
         {options.map((option) => (
           <button
@@ -159,9 +165,10 @@ function Choice<T extends string>({
             aria-pressed={value === option.value}
             data-layout-choice={option.value}
             onClick={() => onChange(option.value)}
-            className={chip(value === option.value)}
+            className={chip(false)}
           >
             {option.label}
+            <ChosenDot on={value === option.value} />
           </button>
         ))}
       </div>
