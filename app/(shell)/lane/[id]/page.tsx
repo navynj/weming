@@ -10,6 +10,7 @@ import {
   type CardRipple,
 } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
+import { declaredRange, orderBlocks } from '@/features/splash/block-day';
 import { homeLaneFor } from '@/features/pool/links';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -85,11 +86,19 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
   );
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
 
-  // Each card's ripples with words or photos, oldest first, for the stack's
-  // thread; and its photos, shown under each ripple's words on the top card.
+  // Each card's ripples with words or photos, in the detail sheet's order
+  // (H42g), for the stack's thread; and its photos, shown under each
+  // ripple's words on the top card.
   const threads = new Map<string, CardRipple[]>();
   const photos = new Map<string, CardPhoto[]>();
-  for (const ripple of [...ripples].reverse()) {
+  const rangeOf = new Map([...mine, ...joints].map((s) => [s.id, declaredRange(s)]));
+  const byKey = new Map<string, typeof ripples>();
+  for (const ripple of ripples) {
+    const key = ripple.splash_id ?? ripple.id;
+    byKey.set(key, [...(byKey.get(key) ?? []), ripple]);
+  }
+  const inOrder = [...byKey].flatMap(([key, rows]) => orderBlocks(rows, rangeOf.get(key) ?? null));
+  for (const ripple of inOrder) {
     if (!ripple.note && ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
     const entry = { id: ripple.id, note: ripple.note ?? '', createdAt: ripple.created_at };

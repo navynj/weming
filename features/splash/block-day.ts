@@ -42,17 +42,41 @@ export function rangeDays(range: DateRange): IsoDate[] {
   return days;
 }
 
+/** A splash's declared range, or none: what `orderBlocks` reads a ripple's day against. */
+export function declaredRange(splash: {
+  declared_start: IsoDate | null;
+  declared_end: IsoDate | null;
+}): DateRange | null {
+  return splash.declared_start
+    ? { start: splash.declared_start, end: splash.declared_end ?? splash.declared_start }
+    : null;
+}
+
+/** When a ripple was written, as an instant: never its clock text, which carries an offset. */
+function writtenAt(createdAt: string): number {
+  const at = Date.parse(createdAt);
+  return Number.isNaN(at) ? 0 : at;
+}
+
 /**
- * Ripples inside a splash, in reading order (0031): by day — a ripple's own
- * inside a range, else the splash's start — then by when it was written. The
- * sort is stable: an exact tie keeps the order it came in.
+ * Ripples inside a splash, in reading order (0031, H42g) — the one order
+ * every list of them uses: the stack card, the detail sheet, a pool's
+ * threads, Home's per-pool tabs, a notification's ripple, the board's ring.
+ * On a range record, by the ripple's day (its own inside the range, else
+ * the start), then by when it was written; on any other, by when it was
+ * written alone — a frozen own date places nothing (H24). Written times
+ * compare as instants, never as local or author-local clock text, so the
+ * authors' zones cannot change the order; then by id, so a tie reads the
+ * same everywhere.
  */
-export function orderBlocks<T extends { occurred_on: IsoDate | null; created_at: string }>(
-  blocks: T[],
-  range: DateRange | null,
-): T[] {
-  const day = (b: T): string => blockDay(b.occurred_on, range) ?? '';
+export function orderBlocks<
+  T extends { occurred_on: IsoDate | null; created_at: string; id?: string },
+>(blocks: T[], range: DateRange | null): T[] {
+  const day = (b: T): string => (isRange(range) ? (blockDay(b.occurred_on, range) ?? '') : '');
   return [...blocks].sort(
-    (a, b) => day(a).localeCompare(day(b)) || a.created_at.localeCompare(b.created_at),
+    (a, b) =>
+      day(a).localeCompare(day(b)) ||
+      writtenAt(a.created_at) - writtenAt(b.created_at) ||
+      (a.id ?? '').localeCompare(b.id ?? ''),
   );
 }

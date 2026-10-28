@@ -67,7 +67,12 @@ const JOINT: Splash = {
   written_on: '2026-10-22',
 };
 
-function ripple(id: string, author: string, note: string): RippleWithSplash {
+function ripple(
+  id: string,
+  author: string,
+  note: string,
+  createdAt = '2026-10-22T18:00:00.000Z',
+): RippleWithSplash {
   return {
     id,
     author_id: author,
@@ -81,7 +86,7 @@ function ripple(id: string, author: string, note: string): RippleWithSplash {
     ended_at: null,
     planned: false,
     participants: [],
-    created_at: '2026-10-22T18:00:00.000Z',
+    created_at: createdAt,
     written_on: '2026-10-22',
     parent_ripple_id: null,
     splash_id: 's-joint',
@@ -90,7 +95,8 @@ function ripple(id: string, author: string, note: string): RippleWithSplash {
 }
 
 const BLOCKS = [
-  ripple('r-mina', MINA, 'Mina won by two'),
+  // Mina wrote first: the order is when each was written (H42g).
+  ripple('r-mina', MINA, 'Mina won by two', '2026-10-22T17:00:00.000Z'),
   ripple('r-me', ME, 'I want the expansion'),
 ];
 const POOL: PoolContext = {

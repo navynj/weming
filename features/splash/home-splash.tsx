@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { initialsOf } from '@/features/home/grid';
 import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
-import { orderBlocks } from '@/features/splash/block-day';
+import { declaredRange, orderBlocks } from '@/features/splash/block-day';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { signOwnMedia, signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -75,12 +75,10 @@ export async function HomeSplash({ id }: { id: string }) {
         .in('id', [...new Set(others.map((r) => r.author_id))])
     : { data: [] as { id: string; display_name: string }[] };
 
-  // By day inside a range, else as written (0031): a frozen date places nothing.
+  // The one order (H42g): by day inside a range, else as written; a frozen date places nothing.
   const blocks = orderBlocks(
     board ? [...ripples.filter((r) => r.splash_id === id), ...others] : [lone!],
-    board?.declared_start
-      ? { start: board.declared_start, end: board.declared_end ?? board.declared_start }
-      : null,
+    board ? declaredRange(board) : null,
   );
   const summary = board
     ? summarizeSplash(board, blocks, profile.timezone, now)

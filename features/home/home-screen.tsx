@@ -41,6 +41,7 @@ import { WITH_SPLASH, type RippleWithSplash } from '@/lib/queries/ripples';
 import { getMyTrail } from '@/lib/queries/trail';
 import { originTag } from '@/features/pool/origin-tag';
 import { poolSplashHref } from '@/features/pool/pool-cards';
+import { declaredRange, orderBlocks } from '@/features/splash/block-day';
 import type { Splash } from '@/features/splash/summary';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
@@ -323,12 +324,19 @@ export async function HomeScreen({
       };
     });
 
-  // A card's ripples: its blocks with words or photos, oldest first — the
-  // top card shows each one's photos under its words. A lone block's is its own.
-  // Mine first, then others' (0035), each oldest first.
+  // A card's ripples: its blocks with words or photos, in the detail sheet's
+  // order (H42g: by day on a range, else as written; mine and others' read
+  // together) — the top card shows each one's photos under its words. A lone
+  // block's is its own.
   const threads = new Map<string, CardRipple[]>();
-  const othersOldest = [...theirs].sort((a, b) => a.created_at.localeCompare(b.created_at));
-  for (const ripple of [...[...ripples].reverse(), ...othersOldest]) {
+  const rangeOf = new Map(boards.map((b) => [b.id, declaredRange(b)]));
+  const byKey = new Map<string, typeof ripples>();
+  for (const ripple of [...ripples, ...theirs]) {
+    const key = ripple.splash_id ?? ripple.id;
+    byKey.set(key, [...(byKey.get(key) ?? []), ripple]);
+  }
+  const inOrder = [...byKey].flatMap(([key, rows]) => orderBlocks(rows, rangeOf.get(key) ?? null));
+  for (const ripple of inOrder) {
     if (!ripple.note && ripple.media.length === 0) continue;
     const key = ripple.splash_id ?? ripple.id;
     const theirsToo = ripple.author_id !== profile.id;
@@ -355,9 +363,9 @@ export async function HomeScreen({
     else list.push({ label, count: 1 });
     sidesOf.set(r.splash_id, list);
   }
-  // A card's photos, for the Board view: every image across its ripples, oldest first.
+  // A card's photos, for the Board view: every image across its ripples, in their order.
   const photos = new Map<string, CardPhoto[]>();
-  for (const ripple of [...[...ripples].reverse(), ...othersOldest]) {
+  for (const ripple of inOrder) {
     const key = ripple.splash_id ?? ripple.id;
     const list = photos.get(key) ?? [];
     const media = rippleMedia(ripple);

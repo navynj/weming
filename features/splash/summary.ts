@@ -99,15 +99,14 @@ export function summarizeSplash(
     ? { start: splash.declared_start, end: splash.declared_end ?? splash.declared_start }
     : null;
   const range = declaredRange ?? { start: writtenOn, end: writtenOn };
-  // Blocks order by when they were written; their own dates place nothing.
+  // The post is placed by when its blocks were written (H24), compared as
+  // instants (H42g); their own dates place nothing. Listing them is
+  // `orderBlocks`'s, not this.
   const written = [...blocks].sort(
-    (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+    (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id),
   );
 
-  const latestCreatedAt = blocks.reduce<string | null>(
-    (latest, b) => (latest === null || b.created_at > latest ? b.created_at : latest),
-    null,
-  );
+  const latestCreatedAt = written.length > 0 ? written[written.length - 1].created_at : null;
 
   return {
     id: splash.id,

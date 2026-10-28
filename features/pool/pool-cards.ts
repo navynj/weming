@@ -1,5 +1,6 @@
 import { byNewest, placeCard, type Card, type GridColumn } from '@/features/home/grid';
 import { rippleMedia } from '@/lib/ripple-media';
+import { declaredRange, orderBlocks } from '@/features/splash/block-day';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { PoolRipple, PoolView } from '@/lib/queries/pools';
 
@@ -67,9 +68,13 @@ export function poolCards(
   for (const splash of view.splashes) {
     // On someone's record: the owner's ripples and this pool's members' sides
     // only — another pool's are not this pool's to see (0035).
-    const blocks = (byPost.get(splash.id) ?? [])
-      .filter((r) => !r.thread_pool_id || r.thread_pool_id === view.pool.id)
-      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    // In the detail sheet's order (H42g): by day on a range, else as written.
+    const blocks = orderBlocks(
+      (byPost.get(splash.id) ?? []).filter(
+        (r) => !r.thread_pool_id || r.thread_pool_id === view.pool.id,
+      ),
+      declaredRange(splash),
+    );
     const writer = splash.owner_id ?? splash.created_by;
     const summary: SplashSummary = summarizeSplash(
       splash,
