@@ -82,7 +82,7 @@ describe('profile bootstrap', () => {
 
     await expect(
       bootstrapProfile(asUser(userId), {
-        userId: '11111111-1111-1111-1111-111111111111',
+        userId: '8d798ff1-3d4e-4316-86e0-dd883cae41a0',
         displayName: 'Not Yoonji',
         avatarUrl: null,
         timezone: 'UTC',

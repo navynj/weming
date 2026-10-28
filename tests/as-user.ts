@@ -45,14 +45,14 @@ export function asUser(userId: string): SupabaseClient<Database> {
 }
 
 /** Seeded accounts (supabase/seed.sql). */
-export const YOONJI = '11111111-1111-1111-1111-111111111111';
-export const MINA = '22222222-2222-2222-2222-222222222222';
-export const JAE = '33333333-3333-3333-3333-333333333333';
+export const YOONJI = '8d798ff1-3d4e-4316-86e0-dd883cae41a0';
+export const MINA = 'a9a48458-96df-4da7-8b9d-b3f7a0b35351';
+export const JAE = '46eb0b0a-17ec-41b7-be7a-156f24618590';
 
 /** Yoonji's locked Ripple and one of her unlocked ones. */
-export const LOCKED_RIPPLE = 'b1000000-0000-0000-0000-000000000004';
-export const UNLOCKED_RIPPLE = 'b1000000-0000-0000-0000-000000000002';
-export const JAE_RIPPLE = 'b3000000-0000-0000-0000-000000000001';
+export const LOCKED_RIPPLE = '8a8046d5-5b9c-4598-9550-ffff4fd9cdd5';
+export const UNLOCKED_RIPPLE = 'bc3c7207-bd71-401a-a26d-7bde347f6285';
+export const JAE_RIPPLE = 'f3ad7f54-e879-420f-a44e-e5e2f22c8d55';
 
 /** Service-role client. Bypasses RLS, so it is only ever used for fixtures. */
 export function asAdmin(): SupabaseClient<Database> {
