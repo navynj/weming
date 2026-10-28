@@ -254,7 +254,7 @@ export function SplashModal({
             onAnimationComplete={() => {
               if (leaving) leave();
             }}
-            className="relative flex max-h-[min(92dvh,var(--sheet-room))] w-full flex-col overflow-hidden rounded-t-[32px] bg-white shadow-xl outline-none lg:max-h-[min(88dvh,var(--sheet-room))] lg:w-[min(1040px,90vw)]"
+            className="surface relative flex max-h-[min(92dvh,var(--sheet-room))] w-full flex-col overflow-hidden rounded-t-[32px] bg-white shadow-xl outline-none lg:max-h-[min(88dvh,var(--sheet-room))] lg:w-[min(1040px,90vw)]"
             style={
               {
                 '--sheet-room': viewport ? `${viewport.height - 16}px` : '100dvh',

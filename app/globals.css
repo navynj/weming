@@ -447,6 +447,12 @@ body {
 [data-mode='light'] .water-ground .surface-edge {
   box-shadow: 0 0 0 1px var(--color-pool-200);
 }
+/* An ink fill on the light ground — a label in its ink style, a menu —
+   keeps white words: the swap's white is the theme colour, which on a dark
+   theme vanishes into the ink. */
+[data-mode='light'] .water-ground .bg-ink {
+  --color-white: #ffffff;
+}
 
 /*
  * A post's page slides up over the ground (H21c): the white page above the
