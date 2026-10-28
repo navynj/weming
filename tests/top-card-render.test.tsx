@@ -275,3 +275,55 @@ describe('the top card reads each ripple in full (H25, review)', () => {
     expect(heavyHeight).toBe(`${CARD_PX}px`);
   });
 });
+
+describe('the phone’s top card: one line of responses under the fade (H42f)', () => {
+  const phone = (): void => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        onchange: null,
+        dispatchEvent: () => false,
+      }),
+    });
+  };
+
+  it('pins the top emoji with every reaction’s total and "n replies", outside the fade, opening the sheet at the first response', () => {
+    phone();
+    const card = rich();
+    card.responded!.value.reactions.push(reaction('r2', MINA, '🔥', '03'));
+    const { container } = home([card]);
+    const top = topCard(container);
+    const line = top.querySelector<HTMLAnchorElement>('[data-card-response-line]')!;
+    expect(line.querySelector('[data-card-reactions]')!.textContent).toBe('❤️3');
+    expect(line.querySelector('[data-card-replies]')!.textContent).toBe('4 replies');
+    // Under the faded body, not inside it.
+    const body = top.querySelector('[data-card-body]')!;
+    expect(body.contains(line)).toBe(false);
+    expect(body.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(line.className).toContain('shrink-0');
+    expect(line.getAttribute('href')).toBe('/splash/rich#responded');
+    // Nothing else returns: no chips, no reply previews, no thread.
+    expect(top.querySelector('[data-reaction], [data-reply], [data-ripple-thread]')).toBeNull();
+    expect(top.querySelectorAll('[data-card-response-line]')).toHaveLength(1);
+  });
+
+  it('says "1 reply", leaves out reactions when there are none, and draws nothing with no responses', () => {
+    phone();
+    const one = rich();
+    one.responded!.value = { reactions: [], replies: [reply('z1', 'r1', 'hi', '01')] };
+    const { container, unmount } = home([one]);
+    const line = topCard(container).querySelector('[data-card-response-line]')!;
+    expect(line.textContent).toBe('1 reply');
+    expect(line.querySelector('[data-card-reactions]')).toBeNull();
+    unmount();
+    const quiet = home([plain()]);
+    expect(topCard(quiet.container).querySelector('[data-card-response-line]')).toBeNull();
+  });
+});

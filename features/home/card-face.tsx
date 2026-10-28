@@ -15,7 +15,7 @@ import { isUnseen, useSeen } from '@/features/responses/seen';
 import { useRippleResponses } from '@/features/responses/use-ripple-responses';
 
 import { CardPhotos } from './card-photos';
-import { CardPreview } from './card-preview';
+import { CardPreview, CardResponseLine } from './card-preview';
 import { cardDate, postIcon, type Card, type CardLane, type CardPhoto } from './grid';
 import { LinkedText } from '@/components/ui/linked-text';
 
@@ -81,7 +81,7 @@ export function CardFace({
   /** Where the full card opens: the post's page, coming back to Home by default. */
   href?: string;
   onClickCapture?: (event: React.MouseEvent) => void;
-  /** The phone's top card (H42f): the title and the first lines of the post, nothing else. */
+  /** The phone's top card (H42f): the title, the first lines of the post, one line of responses. */
   compact?: boolean;
 }) {
   const { me } = usePeople();
@@ -185,6 +185,10 @@ export function CardFace({
             <CardPreview card={card} signed={signed} />
             {fade}
           </span>
+          {/* Pinned under the fade, never faded: the responses in one line. */}
+          {respond && card.ripples.length > 0 ? (
+            <CardResponseLine value={answered.value} href={target} />
+          ) : null}
         </span>
       </span>
     );
