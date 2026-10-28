@@ -248,8 +248,13 @@ const LaneEdit = z.object({
   description: DESCRIPTION,
 });
 
-/** A pool lane named, re-iconed or described by any member (no roles yet), or added. */
-export async function savePoolLane(input: z.infer<typeof LaneEdit>): Promise<Done> {
+/**
+ * A pool lane named, re-iconed or described by any member (no roles yet), or
+ * added; a new one answers with its id, so the lane rows can order it (H42b).
+ */
+export async function savePoolLane(
+  input: z.infer<typeof LaneEdit>,
+): Promise<Done & { id?: string }> {
   const parsed = LaneEdit.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'A lane needs a name.' };
   const lane = parsed.data;
@@ -270,12 +275,42 @@ export async function savePoolLane(input: z.infer<typeof LaneEdit>): Promise<Don
       .order('position', { ascending: false })
       .limit(1)
       .maybeSingle();
-    const { error } = await supabase
+    const { data: made, error } = await supabase
       .from('pool_lanes')
-      .insert({ ...fields, pool_id: lane.poolId, position: (last?.position ?? -1) + 1 });
+      .insert({ ...fields, pool_id: lane.poolId, position: (last?.position ?? -1) + 1 })
+      .select('id')
+      .single();
     if (error) return { ok: false, message: said(error) };
+    revalidatePool(lane.poolId);
+    return { ok: true, id: made.id };
   }
   revalidatePool(lane.poolId);
+  return { ok: true, id: lane.id };
+}
+
+/**
+ * A pool's lanes in the order given, by any current member, as renaming is
+ * (H42b): each lane's position, its pool named too so an id from another
+ * pool changes nothing. RLS holds who may (0010: current members update
+ * position).
+ */
+export async function reorderPoolLanes(poolId: string, ids: string[]): Promise<Done> {
+  const parsed = z
+    .object({ poolId: z.uuid(), ids: z.array(z.uuid()).min(1).max(64) })
+    .safeParse({ poolId, ids });
+  if (!parsed.success) return { ok: false, message: 'That order is not a list of lanes.' };
+  const supabase = await createClient();
+  for (const [position, id] of parsed.data.ids.entries()) {
+    const { data, error } = await supabase
+      .from('pool_lanes')
+      .update({ position })
+      .eq('id', id)
+      .eq('pool_id', parsed.data.poolId)
+      .select('id');
+    if (error) return { ok: false, message: said(error) };
+    if (!data?.length) return { ok: false, message: 'Only a member of this pool can do that.' };
+  }
+  revalidatePool(parsed.data.poolId);
   return { ok: true };
 }
 

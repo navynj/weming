@@ -564,25 +564,26 @@ describe('leaving (H23)', () => {
 });
 
 describe('pool lanes (H23)', () => {
-  it('keeps the add form open, cleared, after each lane so the next can follow', () => {
+  it('adds lanes as rows of Home’s lane editor, each empty and ready to type (H42b)', () => {
     // The pool's lanes are its settings sheet's Pool tab (0059).
     window.history.replaceState(null, '', '/pool/p-a?settings=pool');
     const { container, getByText } = ground(A);
     window.history.replaceState(null, '', '/');
-    fireEvent.click(getByText('+ Add lane'));
     const doc = container.ownerDocument;
+    const editor = doc.querySelector('[data-pool-lanes-editor]')!;
+    const before = editor.querySelectorAll('[data-lane-row]').length;
     for (const name of ['Books', 'Walks']) {
-      const field = doc.querySelector(
-        '[data-pool-lane-form] [aria-label="Lane name"]',
-      ) as HTMLInputElement;
+      fireEvent.click(getByText('+ Add lane'));
+      const fields = editor.querySelectorAll<HTMLInputElement>('[aria-label="Lane name"]');
+      const field = fields[fields.length - 1]!;
       expect(field.value).toBe('');
       fireEvent.change(field, { target: { value: name } });
-      fireEvent.keyDown(field, { key: 'Enter' });
-      expect(doc.querySelector('[data-pool-lane-form]')).not.toBeNull();
     }
-    const listed = [...doc.querySelectorAll('[data-pool-lane]')].map((el) => el.textContent);
-    expect(listed.some((t) => t?.includes('Books'))).toBe(true);
-    expect(listed.some((t) => t?.includes('Walks'))).toBe(true);
+    const names = [...editor.querySelectorAll<HTMLInputElement>('[aria-label="Lane name"]')].map(
+      (f) => f.value,
+    );
+    expect(names).toHaveLength(before + 2);
+    expect(names.slice(-2)).toEqual(['Books', 'Walks']);
   });
 });
 

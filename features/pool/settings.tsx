@@ -81,7 +81,7 @@ function PoolTab({ view }: { view: PoolView }) {
 
       <section data-settings-lanes className="mt-10 lg:mt-0 lg:min-w-0">
         <h2 className="text-ink mb-3 font-semibold">Lanes</h2>
-        <PoolLanesSheet poolId={poolId} lanes={view.lanes} onClose={() => {}} inline />
+        <PoolLanesSheet poolId={poolId} lanes={view.lanes} />
       </section>
     </div>
   );

@@ -10,6 +10,7 @@ vi.mock('next/navigation', () => ({
 const renamed: [string, string][] = [];
 const invitedAll: [string, boolean][] = [];
 const onHome: [string, boolean][] = [];
+const laneWrites: unknown[] = [];
 vi.mock('@/features/pool/actions', () => ({
   renamePool: (poolId: string, name: string) => {
     renamed.push([poolId, name]);
@@ -28,6 +29,14 @@ vi.mock('@/features/pool/actions', () => ({
   createInvite: () => Promise.resolve({ ok: false, message: 'not in tests' }),
   revokeInvite: () => Promise.resolve({ ok: true }),
   deletePool: () => Promise.resolve({ ok: true }),
+  savePoolLane: (input: { id: string | null }) => {
+    laneWrites.push(['save', input]);
+    return Promise.resolve({ ok: true, id: input.id ?? 'l-new' });
+  },
+  reorderPoolLanes: (poolId: string, ids: string[]) => {
+    laneWrites.push(['reorder', poolId, ids]);
+    return Promise.resolve({ ok: true });
+  },
 }));
 vi.mock('@/features/lanes/actions', () => ({ saveLane: () => Promise.resolve({ ok: true }) }));
 const prefs: [string, unknown][] = [];
@@ -85,6 +94,7 @@ afterEach(() => {
   invitedAll.length = 0;
   onHome.length = 0;
   prefs.length = 0;
+  laneWrites.length = 0;
 });
 
 const view = (ownerId: string, inviteAllByDefault = false): PoolView => ({
@@ -298,5 +308,59 @@ describe('the pool settings sheet’s shape (review)', () => {
           : 'connect',
     );
     expect(order).toEqual(['on-home', 'invite-all', 'connect']);
+  });
+});
+
+describe('the pool’s lanes are Home’s lane rows (H42b)', () => {
+  const lane = (id: string, name: string, position: number) => ({
+    id,
+    pool_id: 'p-a',
+    name,
+    icon: '🌊',
+    description: null,
+    position,
+  });
+  const withLanes = (ownerId: string): PoolView => ({
+    ...view(ownerId),
+    lanes: [lane('l-a', 'Work', 0), lane('l-b', 'Play', 1)],
+  });
+
+  it('reorders by the grip, for any current member, saved as one order', async () => {
+    const { container } = settings(withLanes('u-other'), 'pool');
+    const editor = container.querySelector('[data-pool-lanes-editor]')!;
+    expect(editor.querySelectorAll('[data-lane-grip]')).toHaveLength(2);
+    // No Delete: a pool lane's waits for roles.
+    expect(within(editor as HTMLElement).queryByLabelText(/^Delete/)).toBeNull();
+    fireEvent.keyDown(within(editor as HTMLElement).getByLabelText('Move Play'), {
+      key: 'ArrowUp',
+    });
+    expect(
+      [...editor.querySelectorAll('[data-lane-row]')].map((r) => r.getAttribute('data-lane-row')),
+    ).toEqual(['l-b', 'l-a']);
+    fireEvent.click(editor.querySelector('[data-lanes-save]')!);
+    await waitFor(() => expect(laneWrites).toEqual([['reorder', 'p-a', ['l-b', 'l-a']]]));
+  });
+
+  it('adds a lane in a row of its own, then orders it by the id it is given', async () => {
+    const { container } = settings(withLanes('u-me'), 'pool');
+    const editor = container.querySelector('[data-pool-lanes-editor]') as HTMLElement;
+    fireEvent.click(editor.querySelector('[data-add-lane]')!);
+    const names = within(editor).getAllByLabelText('Lane name') as HTMLInputElement[];
+    expect(names).toHaveLength(3);
+    fireEvent.change(names[2]!, { target: { value: '  Trips ' } });
+    fireEvent.change(within(editor).getAllByLabelText('Lane description')[0]!, {
+      target: { value: 'Office days' },
+    });
+    fireEvent.click(editor.querySelector('[data-lanes-save]')!);
+    await waitFor(() =>
+      expect(laneWrites).toEqual([
+        [
+          'save',
+          { id: 'l-a', poolId: 'p-a', name: 'Work', icon: '🌊', description: 'Office days' },
+        ],
+        ['save', { id: null, poolId: 'p-a', name: 'Trips', icon: null, description: null }],
+        ['reorder', 'p-a', ['l-a', 'l-b', 'l-new']],
+      ]),
+    );
   });
 });

@@ -500,7 +500,6 @@ export function HomeGround({
                   apply={lanes.run}
                   message={lanes.message}
                   onClose={() => setLanesRound((n) => n + 1)}
-                  inline
                 />
               </section>
             ),
