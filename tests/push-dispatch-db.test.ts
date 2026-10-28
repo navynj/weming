@@ -131,7 +131,8 @@ describe('dispatching', () => {
     expect(payload).toMatchObject({
       title: 'Weming',
       body: 'Ana invited you to add your side in Crew',
-      url: `/splash/${record}`,
+      // In its pool (H42d): Home's reader reads only my own records.
+      url: `/pool/${pool}/splash/${record}`,
     });
     expect(sent[0].body).not.toContain('Secret trip');
     expect(payload.unread).toBeGreaterThanOrEqual(1);
