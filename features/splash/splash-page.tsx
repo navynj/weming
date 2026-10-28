@@ -66,6 +66,9 @@ const NO_RESPONSES: RippleResponsesValue = { reactions: [], replies: [] };
 /** What the page holds and edits: the post and its blocks, as one value. */
 type PageState = { splash: SplashSummary; blocks: RippleWithSplash[]; lockedIds: string[] };
 
+/** The tab that reads every pool's thread at once (review); a pool id is never this. */
+const ALL_TAB = 'all';
+
 /**
  * A post's detail (SPEC 5, H21c), shown in the splash sheet over the screen it
  * was opened from (review): the header stack; the blocks oldest first, each
@@ -148,18 +151,18 @@ export function SplashPage({
   const editable = (block: RippleWithSplash): boolean =>
     pool ? block.author_id === pool.me : !me || block.author_id === me;
   // Tabs per pool on my record (0035): the one picked; else, opened at a
-  // reply (a notification), its pool's (0053); else the first.
+  // reply (a notification), its pool's (0053); else All (review).
   const [picked, setTab] = useState<string | null>(null);
   const openedAt = useOpenedAt();
   const openedThread = responses.replies.find((r) => `reply-${r.id}` === openedAt)?.thread_pool_id;
   const tab =
     picked ??
-    (openedThread && threads.some((t) => t.poolId === openedThread)
-      ? openedThread
-      : (threads[0]?.poolId ?? null));
+    (openedThread && threads.some((t) => t.poolId === openedThread) ? openedThread : ALL_TAB);
   // Which blocks show: in a pool, the owner's and that pool's members'; on
-  // Home with tabs, the owner's and the tab's; else every one I can read.
-  const shownPool = pool ? pool.poolId : threads.length > 0 ? tab : null;
+  // Home with a pool's tab, the owner's and that pool's; on All, or with no
+  // tabs, every one I can read — and a reply written there is the owner's
+  // from no pool, shown in every thread (0053).
+  const shownPool = pool ? pool.poolId : threads.length > 0 && tab !== ALL_TAB ? tab : null;
   // Responses, the same way (0053): this pool's thread, or the tab's, with
   // the owner's from no pool; written into the pool shown.
   const answered = useRippleResponses(responses, shownPool);
@@ -455,28 +458,42 @@ export function SplashPage({
 
       <div data-splash-blocks className="flex flex-col lg:pt-3">
         {threads.length > 0 ? (
-          // A tab per pool whose members wrote on my record (0035).
+          // All, then a tab per pool whose members wrote on my record (0035;
+          // review): underlined tabs, the chosen one in ink, as the toolbar's.
           <div
             role="tablist"
             data-thread-tabs
-            className="no-scrollbar flex gap-2 overflow-x-auto pb-2"
+            className="no-scrollbar border-pool-100 mb-3 flex overflow-x-auto border-b"
           >
-            {threads.map((t) => (
-              <button
-                key={t.poolId}
-                type="button"
-                role="tab"
-                aria-selected={tab === t.poolId}
-                data-thread-tab={t.poolId}
-                data-off={t.off ? '' : undefined}
-                onClick={() => setTab(t.poolId)}
-                className={`h-8 shrink-0 rounded-full px-3 text-sm ${
-                  tab === t.poolId ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
-                } ${t.off ? 'opacity-50' : ''}`}
-              >
-                {t.off ? `${t.label} (off)` : `${t.label} · ${t.count}`}
-              </button>
-            ))}
+            {[{ poolId: ALL_TAB, label: 'All', count: 0, off: false }, ...threads].map((t) => {
+              const on = tab === t.poolId;
+              return (
+                <button
+                  key={t.poolId}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  data-thread-tab={t.poolId}
+                  data-off={t.off ? '' : undefined}
+                  onClick={() => setTab(t.poolId)}
+                  className={`relative h-9 shrink-0 px-3 text-sm ${
+                    on ? 'text-ink font-medium' : 'text-pool-500'
+                  } ${t.off ? 'opacity-50' : ''}`}
+                >
+                  {t.poolId === ALL_TAB
+                    ? 'All'
+                    : t.off
+                      ? `${t.label} (off)`
+                      : `${t.label} · ${t.count}`}
+                  {on ? (
+                    <span
+                      aria-hidden
+                      className="bg-ink absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         ) : null}
         {/* Each block an entry of its own, threaded avatar to avatar (round 3). */}

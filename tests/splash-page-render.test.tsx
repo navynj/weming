@@ -504,11 +504,21 @@ describe('my record’s sides, a tab per pool (0035)', () => {
       initialsOf: { 'u-mina': 'MI', 'u-jae': 'JA' },
     });
     const tabs = [...container.querySelectorAll('[data-thread-tab]')].map((t) => t.textContent);
-    expect(tabs).toEqual(['Crew · 1', 'Club (off)']);
+    expect(tabs).toEqual(['All', 'Crew · 1', 'Club (off)']);
     expect(container.querySelector('[data-thread-tab="p-club"]')!.hasAttribute('data-off')).toBe(
       true,
     );
     const shown = () => container.querySelector('[data-blocks]')!.textContent ?? '';
+    // All first and chosen: every pool's at once.
+    expect(getByRole('tab', { name: 'All' }).getAttribute('aria-selected')).toBe('true');
+    expect(shown()).toContain('from Crew');
+    expect(shown()).toContain('from Club');
+    // Underlined, never filled: the chosen one in ink with a line under it.
+    const all = getByRole('tab', { name: 'All' });
+    expect(all.className).not.toContain('bg-ink');
+    expect(all.querySelector('span.bg-ink')).not.toBeNull();
+    expect(getByRole('tab', { name: 'Crew · 1' }).querySelector('span.bg-ink')).toBeNull();
+    fireEvent.click(getByRole('tab', { name: 'Crew · 1' }));
     expect(shown()).toContain('from Crew');
     expect(shown()).not.toContain('from Club');
     fireEvent.click(getByRole('tab', { name: 'Club (off)' }));
