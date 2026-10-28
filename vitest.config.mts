@@ -47,6 +47,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/left-pool-ripples-db.test.ts',
   'tests/joint-together-db.test.ts',
   'tests/notifications-db.test.ts',
+  'tests/push-dispatch-db.test.ts',
 ];
 
 /**
