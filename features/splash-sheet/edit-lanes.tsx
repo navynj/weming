@@ -231,9 +231,12 @@ export function useEditLanes(
   const conversion = planFromHome(current, laneId);
   const warnings = homeWarnings({ ...current, poolId: initial.poolId }, laneId, poolName);
   const mine = initial.kind === 'mine';
-  const audience = mine ? shared : (fresh ?? defaultAudience(laneId, links));
+  // A pool record moved Home keeps every pool it is in (0056): its Audience
+  // starts there, as a Home record's does; only a joint one starts anew.
+  const keeps = mine || initial.kind === 'own';
+  const audience = keeps ? shared : (fresh ?? defaultAudience(laneId, links));
   const setAudience = (next: (list: AudiencePick[]) => AudiencePick[]): void =>
-    mine ? setShared(next) : setFresh(next(audience));
+    keeps ? setShared(next) : setFresh(next(audience));
   const key = (list: AudiencePick[]): string =>
     list
       .map(

@@ -244,7 +244,7 @@ describe('reading my record’s sides', () => {
 });
 
 describe('what makes my record leave or end', () => {
-  it('refuses Move to Home and making it joint while members have written', async () => {
+  it('refuses making it joint while members have written; Move to Home keeps their side (0056)', async () => {
     const own = crypto.randomUUID();
     await asUser(ana).rpc('create_own_pool_splash', {
       p_id: own,
@@ -259,17 +259,26 @@ describe('what makes my record leave or end', () => {
       p_everyone: false,
     });
     expect((await write(cal, 'Cal on the pool record', crew, own)).error).toBeNull();
-    const home = await asUser(ana).rpc('splash_to_mine', {
-      p_splash: own,
-      p_my_lane: await lane(ana),
-    });
-    expect(home.error?.message).toMatch(/others have written here/);
     const joint = await asUser(ana).rpc('splash_to_together', {
       p_splash: own,
       p_pool_lane: crewLane,
       p_invite_all: false,
     });
     expect(joint.error?.message).toMatch(/others have written here/);
+    // Moved Home it keeps its placement in Crew (0056), so Cal's side stays where it hangs.
+    const home = await asUser(ana).rpc('splash_to_mine', {
+      p_splash: own,
+      p_my_lane: await lane(ana),
+    });
+    expect(home.error).toBeNull();
+    const placed = (
+      await asAdmin().from('splash_placements').select('pool_id, shared').eq('splash_id', own)
+    ).data;
+    expect(placed).toEqual([{ pool_id: crew, shared: true }]);
+    const side = (
+      await asAdmin().from('ripples').select('thread_pool_id').eq('note', 'Cal on the pool record')
+    ).data;
+    expect(side).toEqual([{ thread_pool_id: crew }]);
   });
 
   it('deleting my record returns each member’s side to them as a post of one', async () => {

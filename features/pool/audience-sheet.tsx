@@ -31,6 +31,7 @@ export function AudienceChip({
   preselect,
   onChange,
   onTogether,
+  locked = null,
 }: {
   /** Where the record is shared now: a pool lane per pool. */
   shared: AudiencePick[];
@@ -42,6 +43,8 @@ export function AudienceChip({
   onChange: (poolId: string, poolLaneId: string | null) => void;
   /** With, per pool that is on (0035); absent, no With line. */
   onTogether?: (poolId: string, together: PickTogether) => void;
+  /** A pool record's own pool (0056): always on, its lane still picked. */
+  locked?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const on = shared.filter((pick) => pools.some((p) => p.id === pick.poolId));
@@ -64,6 +67,7 @@ export function AudienceChip({
           preselect={preselect}
           onChange={onChange}
           onTogether={onTogether}
+          locked={locked}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -84,24 +88,6 @@ export function chipLabel(shared: AudiencePick[], pools: AudiencePool[]): string
 }
 
 /**
- * My pool record's audience (0033; once Just mine, 0014): always its pool, so a plain chip
- * naming it, with nothing to switch.
- */
-export function FixedAudienceChip({ poolName }: { poolName: string }) {
-  return (
-    <span
-      data-audience-chip
-      data-audience-fixed
-      aria-label={`Audience: ${poolName}, always`}
-      className="border-pool-200 text-ink inline-flex h-8 max-w-[12rem] shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm"
-    >
-      <Users aria-hidden size={14} className="text-pool-500 shrink-0" />
-      <span className="truncate">{poolName}</span>
-    </span>
-  );
-}
-
-/**
  * Where a record is shared (0033): a row per pool I am in, each with a
  * switch. Turned on, the row shows that pool's lane chips, and one must be
  * picked: the switch starts on the preselected chip, or waits for a pick
@@ -114,6 +100,7 @@ function AudienceSheet({
   preselect,
   onChange,
   onTogether,
+  locked,
   onClose,
 }: {
   pools: AudiencePool[];
@@ -121,6 +108,7 @@ function AudienceSheet({
   preselect: (poolId: string) => string | null;
   onChange: (poolId: string, poolLaneId: string | null) => void;
   onTogether?: (poolId: string, together: PickTogether) => void;
+  locked: string | null;
   onClose: () => void;
 }) {
   const { me } = usePeople();
@@ -147,9 +135,18 @@ function AudienceSheet({
                 className="border-pool-100 flex flex-col gap-3 border-b py-3"
               >
                 <span className="flex items-center justify-between gap-4">
-                  <span className="text-ink min-w-0 truncate">Shared to {pool.name}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-ink truncate">Shared to {pool.name}</span>
+                    {pool.id === locked ? (
+                      // Written there (0056): it cannot be turned off; its lane can change.
+                      <span data-audience-origin className="text-pool-500 text-xs">
+                        Written here, always shared
+                      </span>
+                    ) : null}
+                  </span>
                   <Switch
                     on={on}
+                    disabled={pool.id === locked}
                     label={`Shared to ${pool.name}`}
                     onChange={(next) => {
                       if (!next) {

@@ -304,8 +304,8 @@ describe('a joint splash back to mine', () => {
   });
 });
 
-describe('my pool record moved to Home (0033)', () => {
-  it('takes my lane and leaves its pool, Only me unless its Audience shares it', async () => {
+describe('my pool record moved to Home (0033, 0056)', () => {
+  it('takes my lane and keeps its pool placement (0056)', async () => {
     as.user = ana;
     const id = crypto.randomUUID();
     const made = await asUser(ana).rpc('create_own_pool_splash', {
@@ -328,8 +328,10 @@ describe('my pool record moved to Home (0033)', () => {
       own_pool_id: null,
       declared_lane_id: DAY,
     });
-    // Its Audience was left as Only me: no pool has it now.
-    expect(await placementsOf(id)).toEqual([]);
+    // It keeps every placement (0056): still in Sarang, where it was written.
+    expect(await placementsOf(id)).toEqual([
+      { pool_id: sarang, pool_lane_id: lane.Word, shared: true },
+    ]);
   });
 });
 

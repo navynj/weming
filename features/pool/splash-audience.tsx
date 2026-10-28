@@ -25,6 +25,7 @@ export function SplashAudience({
   shared,
   pools,
   links,
+  locked = null,
 }: {
   splashId: string;
   /** The record's lane: what a link's default and my last pick are kept by. */
@@ -32,6 +33,8 @@ export function SplashAudience({
   shared: AudiencePick[];
   pools: AudiencePool[];
   links: AudienceLink[];
+  /** A pool record's own pool (0056): always shared there. */
+  locked?: string | null;
 }) {
   const audience = useOptimisticAction(shared);
   return (
@@ -39,6 +42,7 @@ export function SplashAudience({
       <AudienceChip
         shared={audience.value}
         pools={pools}
+        locked={locked}
         preselect={(poolId) =>
           preselectLane(
             myLaneId,

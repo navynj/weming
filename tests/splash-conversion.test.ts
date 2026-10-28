@@ -144,10 +144,10 @@ describe('from Home: my lanes, and what leaves', () => {
     ]);
   });
 
-  it('moves a pool record to my lane, leaving its pool unless shared', () => {
+  it('moves a pool record to my lane, keeping every pool it is in (0056)', () => {
     expect(planFromHome(own, 'study')).toEqual({ op: 'to_mine', myLaneId: 'study', placeOn: null });
     expect(homeWarnings({ ...own, poolId: 'p-a' }, 'study', poolName)).toEqual([
-      'It leaves Sarang unless you share it there in Audience.',
+      'It stays in Sarang and every Pool it is shared to.',
     ]);
     expect(homeWarnings({ ...own, poolId: 'p-a' }, null, poolName)).toEqual([]);
   });

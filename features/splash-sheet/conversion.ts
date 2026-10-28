@@ -60,10 +60,10 @@ export function planFromPool(
 
 /**
  * From Home: one of my lanes. My Home record changes lane and moves no
- * placement (0033); my pool record moves to Home ("Move to Home…"), and a
- * joint record only I wrote in becomes mine ("Make it mine") — each with
- * its lane and Audience set anew: it leaves its pool unless Audience shares
- * it there.
+ * placement (0033); my pool record moves to Home ("Move to Home…"),
+ * keeping every pool it is in (0056); and a joint record only I wrote in
+ * becomes mine ("Make it mine"), its Audience set anew: it leaves its pool
+ * unless Audience shares it there.
  */
 export function planFromHome(current: Current, myLaneId: string | null): Conversion {
   if (!myLaneId) return { op: 'none' };
@@ -89,13 +89,12 @@ export function homeWarnings(
   const plan = planFromHome(current, myLaneId);
   if (plan.op === 'none' || current.kind === 'mine' || !current.poolId) return [];
   const pool = poolName(current.poolId);
-  const stays = `It leaves ${pool} unless you share it there in Audience.`;
-  return current.kind === 'joint'
-    ? [
-        `This is a joint splash in ${pool}. Moving it to your lane makes it yours alone; members can no longer add to it.`,
-        stays,
-      ]
-    : [stays];
+  // My pool record keeps every pool it is in (0056).
+  if (current.kind !== 'joint') return [`It stays in ${pool} and every Pool it is shared to.`];
+  return [
+    `This is a joint splash in ${pool}. Moving it to your lane makes it yours alone; members can no longer add to it.`,
+    `It leaves ${pool} unless you share it there in Audience.`,
+  ];
 }
 
 /** The pools a conversion in one pool takes the record out of: every other one it is shared to. */

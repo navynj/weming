@@ -49,6 +49,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/notifications-db.test.ts',
   'tests/push-dispatch-db.test.ts',
   'tests/response-threads-db.test.ts',
+  'tests/pool-record-sharing-db.test.ts',
 ];
 
 /**

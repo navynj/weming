@@ -570,18 +570,26 @@ describe('converting from the edit sheet (0022, 0033)', () => {
     });
   });
 
-  it('from Home: my pool record moves to the lane I pick, Only me unless shared', async () => {
+  it('from Home: my pool record moves to the lane I pick, keeping every pool it is in (0056)', async () => {
     const view = await sheet(
-      { ...MINE_SHARED, kind: 'own', poolId: 'p-ours', poolLaneId: 'l-media', sharedIn: [] },
+      {
+        ...MINE_SHARED,
+        kind: 'own',
+        poolId: 'p-ours',
+        poolLaneId: 'l-media',
+        // Always in its own pool.
+        sharedIn: [{ poolId: 'p-ours', poolLaneId: 'l-media' }],
+      },
       null,
     );
     expect(view.container.querySelector('[data-edit-just-mine]')!.textContent).toBe(
       'Yours · in Our Pool. Pick a lane to move it to Home.',
     );
     fireEvent.click(view.getByText('Day'));
-    expect(warnings(view)).toEqual(['It leaves Our Pool unless you share it there in Audience.']);
-    expect(view.container.querySelector('[data-audience-chip]')!.textContent).toBe('Only me');
+    expect(warnings(view)).toEqual(['It stays in Our Pool and every Pool it is shared to.']);
+    expect(view.container.querySelector('[data-audience-chip]')!.textContent).toContain('Our Pool');
     await save(view);
+    // Nothing switched off: it stays where it was.
     expect(saved[0]).toMatchObject({
       kind: 'own',
       conversion: { op: 'to_mine', myLaneId: 'c-day', placeOn: null },
