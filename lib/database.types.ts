@@ -1097,7 +1097,7 @@ export type Database = {
       }
       ripples: {
         Row: {
-          author_id: string
+          author_id: string | null
           created_at: string
           ended_at: string | null
           id: string
@@ -1115,7 +1115,7 @@ export type Database = {
           written_on: string
         }
         Insert: {
-          author_id: string
+          author_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
@@ -1133,7 +1133,7 @@ export type Database = {
           written_on?: string
         }
         Update: {
-          author_id?: string
+          author_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string

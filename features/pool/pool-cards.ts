@@ -82,8 +82,11 @@ export function poolCards(
       (writer && zoneOf.get(writer)) || timeZone,
       now,
     );
+    // Written by someone: a part removed by a hand-over (0061) draws no
+    // branch, face or line of its own on the board.
+    const authored = blocks.flatMap((r) => (r.author_id ? [{ ...r, author_id: r.author_id }] : []));
     // Its blocks with words or photos: the top card shows each one's photos under its words.
-    const thread = blocks
+    const thread = authored
       .filter((r) => r.note || r.media.length > 0)
       .map((r) => ({
         id: r.id,
@@ -103,7 +106,7 @@ export function poolCards(
       // is deleted only while every ripple on it is mine.
       const lane = splash.pool_lane_id ? laneOf.get(splash.pool_lane_id) : undefined;
       const card = placeCard(summary, bodyOf(thread), timeZone, thread);
-      const wrote = [...new Set(blocks.map((r) => r.author_id))];
+      const wrote = [...new Set(authored.map((r) => r.author_id))];
       cards.push({
         ...card,
         ...photo,
@@ -126,7 +129,7 @@ export function poolCards(
             : (splash.pool_lane_id ?? undefined),
         lane: lane ? { icon: lane.icon, name: lane.name } : null,
         origins: lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined,
-        branches: blocks.map((r) => ({
+        branches: authored.map((r) => ({
           id: r.id,
           column: kind === 'members' ? r.author_id : (splash.pool_lane_id ?? ''),
           initials: initialsOf.get(r.author_id) ?? '',
@@ -149,7 +152,7 @@ export function poolCards(
     // With, in this pool (0035): filled once Everyone or anyone is picked;
     // the slot waits for the invited who have not written here.
     const withHere = view.placementTogether?.[splash.id] ?? [];
-    const sides = [...new Set(blocks.map((r) => r.author_id))];
+    const sides = [...new Set(authored.map((r) => r.author_id))];
     const together = Boolean(placement?.inviteAll) || withHere.length > 0;
     cards.push({
       ...card,

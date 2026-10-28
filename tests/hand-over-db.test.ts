@@ -1,6 +1,17 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+
+// Signing photos runs as the viewer (lib/media.ts): the server client is
+// whoever `as.user` names.
+const as = vi.hoisted(() => ({ user: '' }));
+vi.mock('@/lib/supabase/server', async () => {
+  const { asUser: client } = await import('./as-user');
+  return { createClient: async () => client(as.user) };
+});
+
+import { signBoardPhotos, signRippleMedia } from '@/lib/media';
+import { MEDIA_BUCKET } from '@/lib/media-bucket';
 
 /**
  * A record others wrote in outlives its owner (0061, H46). Ana's record is
@@ -9,7 +20,10 @@ import { asAdmin, asUser } from './as-user';
  * deletes the record or deletes her account, each pool where others wrote
  * gets a joint record with the record's title, icon and days, carrying that
  * pool's thread and layout; Ana's own ripples never go with it. Leaving with
- * keep hands nothing over: the record stays in the pool.
+ * keep hands nothing over: the record stays in the pool. What members said
+ * in a pool to Ana's own ripples stays there on a placeholder ("This part
+ * was removed"). After leaving, Ana still reads, and sees the photos of,
+ * the thread as it stood.
  *
  * Needs the local stack; excluded from the CI config like every DB test.
  */
@@ -74,6 +88,8 @@ type World = {
   club: string;
   record: string;
   anaRipple: string;
+  /** When Ana's answered ripple was written: its placeholder keeps the moment. */
+  anaAt: string;
   benRipple: string;
   eveRipple: string;
 };
@@ -102,6 +118,8 @@ async function world(): Promise<World> {
   });
   if (made.error) throw made.error;
   const anaRipple = await write(ana, 'Ana wrote', record, null);
+  // Nobody answers this one: it leaves no placeholder.
+  await write(ana, 'Ana, unanswered', record, null);
   for (const [pool, poolLane, who] of [
     [crew, crewLane, [ben, cal]],
     [club, clubLane, [eve]],
@@ -124,13 +142,34 @@ async function world(): Promise<World> {
     .from('ripple_reactions')
     .insert({ ripple_id: benRipple, user_id: cal, emoji: '🔥' });
   if (reacted.error) throw reacted.error;
+  // Members answer Ana's own ripple, each in their pool; Ana reacts to it herself.
+  const replied = await asUser(cal).rpc('add_reply', {
+    p_ripple: anaRipple,
+    p_body: 'Cal on Ana',
+  });
+  if (replied.error) throw replied.error;
+  for (const [who, emoji, pool] of [
+    [cal, '👏', crew],
+    [eve, '🌊', club],
+  ] as const) {
+    const done = await asUser(who)
+      .from('ripple_reactions')
+      .insert({ ripple_id: anaRipple, user_id: who, emoji, thread_pool_id: pool });
+    if (done.error) throw done.error;
+  }
+  const own = await asUser(ana)
+    .from('ripple_reactions')
+    .insert({ ripple_id: anaRipple, user_id: ana, emoji: '❤️' });
+  if (own.error) throw own.error;
+  const anaAt = (await asAdmin().from('ripples').select('created_at').eq('id', anaRipple).single())
+    .data!.created_at;
   const laid = await asUser(ben).rpc('set_board_layout', {
     p_splash: record,
     p_pool: crew,
     p_patch: { label: { x: 0.2 } } as never,
   });
   if (laid.error) throw laid.error;
-  return { ana, ben, cal, eve, crew, club, record, anaRipple, benRipple, eveRipple };
+  return { ana, ben, cal, eve, crew, club, record, anaRipple, anaAt, benRipple, eveRipple };
 }
 
 /** The joint record a pool's thread went to, as a member there reads it. */
@@ -170,6 +209,35 @@ async function expectHandedOver(w: World, poolsHanded: ('crew' | 'club')[]): Pro
       await asUser(member).from('ripples').select('author_id').eq('splash_id', joint[0].id)
     ).data!;
     expect(onJoint.map((r) => r.author_id)).not.toContain(w.ana);
+
+    // What members said to Ana's ripple stays, on a placeholder in its place:
+    // one, for the one answered; none of Ana's own; in order (before Ben's).
+    const parts = (
+      await asUser(member)
+        .from('ripples')
+        .select('id, note, media, created_at')
+        .eq('splash_id', joint[0].id)
+        .is('author_id', null)
+    ).data!;
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({ note: null, media: [] });
+    expect(Date.parse(parts[0].created_at)).toBe(Date.parse(w.anaAt));
+    const order = (
+      await asUser(member)
+        .from('ripples')
+        .select('id')
+        .eq('splash_id', joint[0].id)
+        .order('created_at')
+    ).data!.map((r) => r.id);
+    expect(order[0]).toBe(parts[0].id);
+    const reactions = (
+      await asUser(member).from('ripple_reactions').select('emoji').eq('ripple_id', parts[0].id)
+    ).data!.map((r) => r.emoji);
+    expect(reactions).toEqual([which === 'crew' ? '👏' : '🌊']);
+    const replies = (
+      await asUser(member).rpc('ripple_replies_for', { p_ripples: [parts[0].id] })
+    ).data!.map((r) => r.body);
+    expect(replies).toEqual(which === 'crew' ? ['Cal on Ana'] : []);
   }
   if (poolsHanded.includes('crew')) {
     const joint = (await jointIn(w.ben, w.crew))[0];
@@ -316,5 +384,56 @@ describe('deleting the account', () => {
     expect((await asAdmin().from('ripples').select('id').eq('author_id', w.ana)).data).toHaveLength(
       0,
     );
+  });
+});
+
+describe('photos in the thread Ana handed over', () => {
+  it('still load for Ana up to when she left, and for Ben; not one written after', async () => {
+    const w = await world();
+    const path = `${w.ben}/${crypto.randomUUID()}.png`;
+    // A one-pixel PNG, stored as Ben's.
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const stored = await asAdmin()
+      .storage.from(MEDIA_BUCKET)
+      .upload(path, png, { contentType: 'image/png' });
+    expect(stored.error).toBeNull();
+    const photo = await asUser(w.ben)
+      .from('ripples')
+      .insert({
+        author_id: w.ben,
+        note: null,
+        media: [path],
+        splash_id: w.record,
+        thread_pool_id: w.crew,
+      })
+      .select('id')
+      .single();
+    expect(photo.error).toBeNull();
+
+    expect(
+      (await asUser(w.ana).rpc('leave_pool', { p_pool: w.crew, p_keep: false })).error,
+    ).toBeNull();
+    as.user = w.ana;
+    expect(await signRippleMedia(photo.data!.id)).toHaveLength(1);
+    // Home's cards sign through the same check, batched.
+    const board = await signBoardPhotos([{ rippleId: photo.data!.id, path }]);
+    expect(board[path]).toBeTruthy();
+    as.user = w.ben;
+    expect(await signRippleMedia(photo.data!.id)).toHaveLength(1);
+
+    // One written on the joint record after Ana left is not hers to see.
+    const joint = (await jointIn(w.ben, w.crew))[0];
+    const later = await asUser(w.ben)
+      .from('ripples')
+      .insert({ author_id: w.ben, note: null, media: [path], splash_id: joint.id })
+      .select('id')
+      .single();
+    expect(later.error).toBeNull();
+    as.user = w.ana;
+    expect(await signRippleMedia(later.data!.id)).toEqual([]);
+    await asAdmin().storage.from(MEDIA_BUCKET).remove([path]);
   });
 });
