@@ -117,20 +117,48 @@ describe('the Theme tab on Home (0059)', () => {
     expect(container.querySelector('[role="radiogroup"][aria-label="Mode"]')).not.toBeNull();
   });
 
-  it('asks whether a colour applies in every pool too, and saves the answer', async () => {
+  it('wears a tapped colour on Home at once, then offers it for every pool (review)', async () => {
     const { container } = picker();
-    fireEvent.click(container.querySelector('[data-theme-swatch="pink"]')!);
-    expect(container.querySelector('[data-theme-everywhere-ask]')!.textContent).toContain(
-      'Apply to all pools too? Only you will see it.',
-    );
-    fireEvent.click(container.querySelector('[data-theme-home-only]')!);
+    const swatch = (key: string) =>
+      container.querySelector<HTMLElement>(
+        `[data-theme-colors="home"] [data-theme-swatch="${key}"]`,
+      )!;
+    fireEvent.click(swatch('pink'));
+    // Home only, at once: worn, chosen and saved before any answer.
     expect(document.documentElement.dataset.theme).toBe('pink');
+    expect(swatch('pink').getAttribute('aria-checked')).toBe('true');
     await waitFor(() => expect(saved).toEqual([{ home: 'pink', mode: 'dark', everywhere: false }]));
-    fireEvent.click(container.querySelector('[data-theme-swatch="mint"]')!);
+    const ask = container.querySelector('[data-theme-everywhere-ask]')!;
+    expect(ask.textContent).toContain('Apply to all pools too? Only you will see it.');
+    expect(container.querySelector('[data-theme-everywhere]')!.textContent).toBe(
+      'Apply to all pools',
+    );
+    // With the offer up, another colour still takes (the bug: it did nothing).
+    fireEvent.click(swatch('mint'));
+    expect(document.documentElement.dataset.theme).toBe('mint');
+    expect(swatch('mint').getAttribute('aria-checked')).toBe('true');
+    expect(swatch('pink').getAttribute('aria-checked')).toBe('false');
+    await waitFor(() =>
+      expect(saved.at(-1)).toEqual({ home: 'mint', mode: 'dark', everywhere: false }),
+    );
+    // Only someone who wants it says every pool, for the colour now chosen.
     fireEvent.click(container.querySelector('[data-theme-everywhere]')!);
     await waitFor(() =>
       expect(saved.at(-1)).toEqual({ home: 'mint', mode: 'dark', everywhere: true }),
     );
+    expect(container.querySelector('[data-theme-everywhere-ask]')).toBeNull();
+  });
+
+  it('closes the offer on "Not now", Home only kept, nothing more saved', async () => {
+    const { container } = picker();
+    fireEvent.click(
+      container.querySelector('[data-theme-colors="home"] [data-theme-swatch="sky"]')!,
+    );
+    await waitFor(() => expect(saved).toHaveLength(1));
+    fireEvent.click(container.querySelector('[data-theme-home-only]')!);
+    expect(container.querySelector('[data-theme-everywhere-ask]')).toBeNull();
+    expect(document.documentElement.dataset.theme).toBe('sky');
+    expect(saved).toEqual([{ home: 'sky', mode: 'dark', everywhere: false }]);
   });
 
   it('wears a mode on <html> at once, says "Theme saved", no Save button', async () => {
@@ -153,9 +181,8 @@ describe('the Theme tab on Home (0059)', () => {
   it('takes a refused choice back and says why', async () => {
     outcome.next = { ok: false, message: 'Sign in again to save your theme.' };
     const { container, findByRole } = picker();
-    fireEvent.click(container.querySelector('[data-theme-swatch="green"]')!);
     await act(async () => {
-      fireEvent.click(container.querySelector('[data-theme-home-only]')!);
+      fireEvent.click(container.querySelector('[data-theme-swatch="green"]')!);
     });
     expect((await findByRole('alert')).textContent).toBe('Sign in again to save your theme.');
     expect(document.documentElement.dataset.theme).toBe('blue');

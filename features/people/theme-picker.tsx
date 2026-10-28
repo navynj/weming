@@ -17,9 +17,9 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 ];
 
 /**
- * The Theme tab (0032, 0036; 0059). On Home: my colour, and on choosing
- * one, whether it applies in every pool too — "Home only" or "Home and all
- * pools" — seen by me alone. In a pool: the pool's colour, shared by its
+ * The Theme tab (0032, 0036; 0059). On Home: my colour, worn and saved for
+ * Home alone the moment it is tapped, then offered for every pool too —
+ * "Apply to all pools" or "Not now" — seen by me alone (review). In a pool: the pool's colour, shared by its
  * members and any member's to set or clear, and my colour there, over
  * everything for me, behind "Use my color" (H43): off, the pool's colour
  * (or the usual fallback) and the swatches muted with none chosen; a
@@ -40,8 +40,8 @@ export function ThemePicker() {
   // else the one worn now.
   const hereMode = place?.colors.mine ? (place.colors.mineMode ?? mine.mode) : theme.mode;
   const [message, setMessage] = useState<string | null>(null);
-  // A Home colour picked, waiting on where it applies.
-  const [asking, setAsking] = useState<ThemeColor | null>(null);
+  // A Home colour just picked, worn on Home at once; offered for every pool too.
+  const [offering, setOffering] = useState<ThemeColor | null>(null);
   // The pool's default, folded until asked for (review).
   const [poolOpen, setPoolOpen] = useState(false);
   const toast = useToast();
@@ -148,9 +148,15 @@ export function ThemePicker() {
             value={mine.home}
             mode={theme.mode}
             data="home"
-            onPick={(color) => color && setAsking(color)}
+            // Worn and saved at once, Home only (review: waiting on the
+            // question left the swatches dead); every pool is asked after.
+            onPick={(color) => {
+              if (!color) return;
+              setOffering(color);
+              void done(chooseHome(color, false));
+            }}
           />
-          {asking ? (
+          {offering ? (
             <div
               role="dialog"
               aria-label="Apply to all pools"
@@ -161,25 +167,22 @@ export function ThemePicker() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  data-theme-home-only
-                  onClick={() => {
-                    setAsking(null);
-                    void done(chooseHome(asking, false));
-                  }}
-                  className="border-pool-200 text-ink rounded-full border px-4 py-2 text-sm font-medium"
-                >
-                  Home only
-                </button>
-                <button
-                  type="button"
                   data-theme-everywhere
                   onClick={() => {
-                    setAsking(null);
-                    void done(chooseHome(asking, true));
+                    setOffering(null);
+                    void done(chooseHome(offering, true));
                   }}
                   className="bg-main-900 rounded-full px-4 py-2 text-sm font-semibold text-white"
                 >
-                  Home and all pools
+                  Apply to all pools
+                </button>
+                <button
+                  type="button"
+                  data-theme-home-only
+                  onClick={() => setOffering(null)}
+                  className="border-pool-200 text-ink rounded-full border px-4 py-2 text-sm font-medium"
+                >
+                  Not now
                 </button>
               </div>
             </div>
