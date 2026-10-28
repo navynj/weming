@@ -448,7 +448,11 @@ export async function HomeScreen({
   // What readers left (H25), only where someone besides me can see the post.
   const sharedIds = await sharedSplashIds(supabase, profile.id, mine, joints);
   const [answered, respondedAt] = await Promise.all([
-    withResponded(supabase, cards, sharedIds),
+    withResponded(supabase, cards, sharedIds, {
+      me: profile.id,
+      ids: mineIds,
+      poolNames: poolName,
+    }),
     getResponsesOnMine(
       supabase,
       profile.id,

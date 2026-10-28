@@ -33,6 +33,8 @@ export async function withResponded(
   supabase: DuringClient,
   cards: Card[],
   shared: Set<string>,
+  /** My own records' cards, which keep every thread, each labelled with its pool (0053). */
+  mine?: { me: string; ids: Set<string>; poolNames: Map<string, string> },
 ): Promise<Card[]> {
   const answerable = cards.flatMap((c) =>
     shared.has(c.splash.id) ? c.ripples.map((r) => r.id) : [],
@@ -52,6 +54,9 @@ export async function withResponded(
           replies: responded.replies.filter((r) => ids.has(r.ripple_id)),
         },
         locked,
+        ...(mine?.ids.has(card.splash.id)
+          ? { labels: { owner: mine.me, pools: Object.fromEntries(mine.poolNames) } }
+          : {}),
       },
     };
   });

@@ -51,6 +51,40 @@ export function inThread(value: RippleResponsesValue, pool: string | null): Ripp
   return { reactions: value.reactions.filter(ours), replies: value.replies.filter(ours) };
 }
 
+/** On the owner's own Home card: whose record it is, and each pool's name. */
+export type ThreadLabels = { owner: string; pools: Record<string, string> };
+
+export type ThreadGroup = { key: string; label: string | null; value: RippleResponsesValue };
+
+/**
+ * The owner's Home card (0053, review): every thread, each said where it
+ * came from — mine from no pool first, unlabelled; then each pool's, "in
+ * Church"; then any whose pool was deleted (0054: only the owner's and a
+ * writer's from no pool can be pool-less, so anyone else's is closed).
+ */
+export function byThread(value: RippleResponsesValue, labels: ThreadLabels): ThreadGroup[] {
+  const keyOf = (pool: string | null, writer: string): string =>
+    pool ?? (writer === labels.owner ? '' : 'closed');
+  const groups = new Map<string, ThreadGroup>([
+    ['', { key: '', label: null, value: { reactions: [], replies: [] } }],
+  ]);
+  const group = (key: string): ThreadGroup => {
+    let found = groups.get(key);
+    if (!found) {
+      const label = key === 'closed' ? 'in a deleted Pool' : `in ${labels.pools[key] ?? 'a Pool'}`;
+      found = { key, label, value: { reactions: [], replies: [] } };
+      groups.set(key, found);
+    }
+    return found;
+  };
+  for (const row of value.reactions)
+    group(keyOf(row.thread_pool_id, row.user_id)).value.reactions.push(row);
+  for (const row of value.replies)
+    group(keyOf(row.thread_pool_id, row.author_id)).value.replies.push(row);
+  const all = [...groups.values()];
+  return [...all.filter((g) => g.key !== 'closed'), ...all.filter((g) => g.key === 'closed')];
+}
+
 /** One reaction chip: an emoji, how many, whether one is mine, and who (oldest first). */
 export type ReactionChip = { emoji: string; count: number; mine: boolean; who: string[] };
 

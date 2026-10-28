@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  byThread,
   inThread,
   chipsOf,
   isOneEmoji,
@@ -129,5 +130,33 @@ describe('one pool’s thread (0053)', () => {
     expect(a.reactions.map((r) => r.user_id)).toEqual(['u-a', ME]);
     expect(a.replies.map((r) => r.id)).toEqual(['in-a', 'owner']);
     expect(inThread(value, null)).toBe(value);
+  });
+});
+
+describe('every thread on the owner’s Home card, each said where it came from (0053)', () => {
+  it('groups mine first, unlabelled, then each pool by name, then a deleted pool’s', () => {
+    const groups = byThread(
+      {
+        reactions: [
+          { ...reaction('r1', 'u-a', '❤️', '01'), thread_pool_id: 'p-church' },
+          reaction('r1', ME, '👏', '02'),
+        ],
+        replies: [
+          reply('gone', 'r1', 'u-c', '03'),
+          reply('in-b', 'r1', 'u-b', '04', { thread_pool_id: 'p-book' }),
+          reply('in-a', 'r1', 'u-a', '05', { thread_pool_id: 'p-church' }),
+        ],
+      },
+      { owner: ME, pools: { 'p-church': 'Church', 'p-book': 'Book club' } },
+    );
+    expect(groups.map((g) => g.label)).toEqual([
+      null,
+      'in Church',
+      'in Book club',
+      'in a deleted Pool',
+    ]);
+    expect(groups[0].value.reactions.map((r) => r.user_id)).toEqual([ME]);
+    expect(groups[1].value.replies.map((r) => r.id)).toEqual(['in-a']);
+    expect(groups[3].value.replies.map((r) => r.id)).toEqual(['gone']);
   });
 });

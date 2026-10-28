@@ -1,6 +1,6 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
 import type { BoardLayoutJson, LayoutSource } from '@/features/month-board/board-layout';
-import type { RippleResponsesValue } from '@/features/responses/model';
+import type { RippleResponsesValue, ThreadLabels } from '@/features/responses/model';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -118,7 +118,13 @@ export type Card = {
    * locked and so take nothing. The calendar board shows none of it.
    */
   /** `pool`: the pool the card is shown in, whose thread these are and new ones go to (0053). */
-  responded?: { value: RippleResponsesValue; locked: string[]; pool?: string | null };
+  responded?: {
+    value: RippleResponsesValue;
+    locked: string[];
+    pool?: string | null;
+    /** On my own record's Home card: where each thread came from (0053). */
+    labels?: ThreadLabels;
+  };
   /** The newest reaction or reply someone else left on each ripple of mine on it: the unseen dot (H25). */
   respondedAt?: Record<string, string>;
 };

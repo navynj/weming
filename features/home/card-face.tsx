@@ -249,6 +249,7 @@ export function CardFace({
                       canReact={!respond.locked.includes(ripple.id)}
                       href={target}
                       onReact={(emoji) => answered.react(ripple.id, emoji)}
+                      labels={respond.labels}
                     />
                   ) : null}
                 </span>
