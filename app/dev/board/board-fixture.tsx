@@ -153,8 +153,9 @@ function captionCards(saved: Record<string, BoardLayoutJson>): Card[] {
 }
 
 /**
- * The phone's toolbar at its fullest (review): one post with three photos
- * and its wave on — five part chips, Label, Photo 1–3 and Wave — on today.
+ * The toolbar at its fullest (review): one post with three photos and its
+ * wave on — six tabs, Label, Icon, Photo 1–3 and Wave — and one whose icon
+ * is a sticker, for Icon inline, both on today.
  */
 function toolbarCards(saved: Record<string, BoardLayoutJson>): Card[] {
   return [
@@ -164,6 +165,10 @@ function toolbarCards(saved: Record<string, BoardLayoutJson>): Card[] {
         path,
       })),
       layout: saved.full ?? { wave: { on: true } },
+    }),
+    // Its icon apart as a sticker, for Icon inline (review).
+    fixture('sticker', 'A sticker', TODAY, {
+      layout: saved.sticker ?? { icon: { inline: false } },
     }),
   ];
 }

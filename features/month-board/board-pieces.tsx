@@ -640,6 +640,16 @@ export function BoardPieceView({
   // Being edited by hand (review): its handles and toolbar, its parts over every other piece.
   const active = editing !== null && editing.activeId === piece.id;
   const selected = active ? pieceSelected(editing.part, piece, saved, icon !== null) : null;
+  // A hidden part selected (review): outlined dashed where it would be, no handles.
+  const selectedHidden =
+    selected !== null &&
+    (selected.kind === 'label'
+      ? labelHidden(saved)
+      : selected.kind === 'icon'
+        ? iconHidden(saved)
+        : selected.kind === 'photo'
+          ? saved.photos?.[selected.path]?.hidden === true
+          : saved.wave?.on !== true);
 
   // A part's box as the engine lays it out, before its own move and turn, on
   // the board: the piece's own place counts, as a bigger sticker hanging
@@ -820,36 +830,27 @@ export function BoardPieceView({
     />
   ) : null;
   const toolbar = toolbarAt(piece, nudge(layout.label, layout.piece), metrics, line);
-  // The toolbar's part chips (review), in the panel's order; the photos newest first.
-  // A hidden part (0055) keeps its chip, crossed out: a tap shows it again.
-  // The board's photos come without the hidden ones (boardPhotos), so those
-  // are read off the layout.
-  const hiddenPhotos = Object.entries(layout.photos ?? {})
-    .filter(([, set]) => set.hidden === true)
-    .map(([path]) => path);
+  // The toolbar's tabs (review), in the panel's order: Label, Icon (inline
+  // or a sticker), each photo and video by the order they were added, Wave.
+  // A hidden part keeps its tab under its own name, struck through (0055); a
+  // wave switched off is a hidden one.
+  const media = (card.allPhotos ?? card.photos ?? []).filter(
+    (m) => layout.photos?.[m.path]?.hidden === true || piece.fan.some((f) => f.path === m.path),
+  );
+  let photoAt = 0;
+  let videoAt = 0;
   const parts: PartChip[] = active
     ? [
-        ...(labelHidden(layout)
-          ? [{ part: LABEL_PART, name: 'Label', unhide: { label: { hidden: false } } }]
-          : hideLabel
-            ? []
-            : [{ part: LABEL_PART, name: 'Label' }]),
-        ...(hideIcon && icon
-          ? [{ part: { kind: 'icon' } as const, name: 'Icon', unhide: { icon: { hidden: false } } }]
-          : sticker
-            ? [{ part: { kind: 'icon' } as const, name: 'Icon' }]
-            : []),
-        // In the order they were uploaded: the fan is drawn back to front.
-        ...[...piece.fan].reverse().map((photo, at) => ({
-          part: { kind: 'photo', path: photo.path } as const,
-          name: `Photo ${at + 1}`,
+        ...(piece.compact && piece.captionLines === 0 && !labelHidden(layout)
+          ? []
+          : [{ part: LABEL_PART, name: 'Label', hidden: labelHidden(layout) }]),
+        ...(icon ? [{ part: { kind: 'icon' } as const, name: 'Icon', hidden: hideIcon }] : []),
+        ...media.map((m) => ({
+          part: { kind: 'photo', path: m.path } as const,
+          name: m.video ? `Video ${++videoAt}` : `Photo ${++photoAt}`,
+          hidden: layout.photos?.[m.path]?.hidden === true,
         })),
-        ...hiddenPhotos.map((path, at) => ({
-          part: { kind: 'photo', path } as const,
-          name: `Hidden photo ${at + 1}`,
-          unhide: { photos: { [path]: { hidden: false } } },
-        })),
-        ...(layout.wave?.on ? [{ part: { kind: 'wave' } as const, name: 'Wave' }] : []),
+        { part: { kind: 'wave' } as const, name: 'Wave', hidden: layout.wave?.on !== true },
       ]
     : [];
   // Its part chips too, for More on a phone when the toolbar's row is out of sight.
@@ -858,7 +859,40 @@ export function BoardPieceView({
   // the part, so its outline and handles are never covered, while the part
   // itself keeps its place in the order.
   const overlay = (): ReactNode => {
-    if (!selected || selected.kind === 'wave') return null;
+    if (!selected) return null;
+    if (selectedHidden) {
+      // Where it would be: its own box where it still has one, else the piece's.
+      const whole = { x: 0, y: 0, w: piece.w, h: piece.h };
+      const ghost =
+        selected.kind === 'label'
+          ? label.h > 0
+            ? label
+            : whole
+          : selected.kind === 'icon'
+            ? (piece.stickerBox ?? {
+                x: label.x + piece.pad.left,
+                y: label.y + piece.pad.top,
+                w: line,
+                h: line,
+              })
+            : selected.kind === 'photo'
+              ? (piece.photoBox ?? whole)
+              : { x: label.x, y: label.y + label.h, w: label.w, h: Math.max(8, line / 2) };
+      return (
+        <span
+          aria-hidden
+          data-edit-ghost={selected.kind}
+          className="pointer-events-none absolute rounded-sm outline-2 outline-offset-1 outline-white/80 outline-dashed"
+          style={{
+            ...placed(ghost),
+            transform: moveOf(layout.piece, metrics.column, line),
+            zIndex: frameZ,
+          }}
+        />
+      );
+    }
+    // The wave's frame is its own; an inline icon is outlined in the label, no handles.
+    if (selected.kind === 'wave' || (selected.kind === 'icon' && !piece.stickerBox)) return null;
     const local =
       selected.kind === 'label'
         ? label
@@ -1032,9 +1066,20 @@ export function BoardPieceView({
                   data-board-icon
                   className={`mr-1 inline-block h-[var(--line)] align-top leading-[var(--line)] ${NO_INDENT}`}
                   // Inline it only turns, in its place on the line (review: icon tilt).
-                  style={
-                    layout.icon?.tilt ? { transform: `rotate(${layout.icon.tilt}deg)` } : undefined
+                  data-edit-inline-icon={
+                    selected?.kind === 'icon' && !selectedHidden ? '' : undefined
                   }
+                  style={{
+                    ...(layout.icon?.tilt ? { transform: `rotate(${layout.icon.tilt}deg)` } : {}),
+                    // The Icon tab on an inline icon (review): outlined where it stands.
+                    ...(selected?.kind === 'icon' && !selectedHidden
+                      ? {
+                          outline: '2px solid var(--color-white)',
+                          outlineOffset: 1,
+                          borderRadius: 2,
+                        }
+                      : {}),
+                  }}
                 >
                   {icon}
                 </span>
@@ -1131,11 +1176,21 @@ export function BoardPieceView({
       {active ? (
         <EditToolbar
           editing={editing!}
-          fontSize={selected?.kind === 'label' ? piece.type.size : null}
+          // Row 2 is the selected part's own (review): a hidden part's eye alone.
+          fontSize={selected?.kind === 'label' && !selectedHidden ? piece.type.size : null}
           labelStyle={
-            selected?.kind === 'label' ? { set: layout.label?.style, drawn: piece.label } : null
+            selected?.kind === 'label' && !selectedHidden
+              ? { set: layout.label?.style, drawn: piece.label }
+              : null
           }
           eye={eyeOf(selected, layout, card.photos?.length ?? 0, editing!)}
+          // Icon inline, the Icon tab's (review): on, the icon before the
+          // title; off, a sticker. As drawn; a photo's caption keeps it inline.
+          iconInline={
+            selected?.kind === 'icon' && !selectedHidden && !piece.compact && piece.recipe !== 'C'
+              ? { on: piece.inlineIcon }
+              : null
+          }
           layers={layers}
           parts={parts}
           phone={phone}
@@ -1341,9 +1396,15 @@ function pieceSelected(
   hasIcon: boolean,
 ): BoardPart {
   const sticker = piece.stickerBox && hasIcon && !iconHidden(layout);
-  if (part.kind === 'icon' && sticker) return part;
+  // A hidden part stays selected (review): its tab, its dashed place, its eye.
+  if (part.kind === 'label' && labelHidden(layout)) return part;
+  if (part.kind === 'icon' && hasIcon && iconHidden(layout)) return part;
+  if (part.kind === 'photo' && layout.photos?.[part.path]?.hidden === true) return part;
+  // A wave, on or switched off (off is hidden).
+  if (part.kind === 'wave') return part;
+  // The icon, a sticker or inline in the label (its outline, no handles).
+  if (part.kind === 'icon' && (sticker || (hasIcon && piece.inlineIcon))) return part;
   if (part.kind === 'photo' && piece.fan.some((p) => p.path === part.path)) return part;
-  if (part.kind === 'wave' && layout.wave?.on) return part;
   // What is hidden is never selected (0055): the label, else the icon, else the top photo.
   if (!labelHidden(layout) && !(piece.compact && piece.captionLines === 0)) return LABEL_PART;
   if (sticker) return { kind: 'icon' };
@@ -1365,23 +1426,32 @@ function eyeOf(
   if (!selected) return null;
   const shown = photosShown + (iconHidden(layout) ? 0 : 1) + (labelHidden(layout) ? 0 : 1);
   const last = shown <= 1;
+  const eye = (
+    name: string,
+    hidden: boolean,
+    set: (hidden: boolean) => BoardLayoutJson,
+    keeps = true,
+  ) => ({
+    name,
+    hidden,
+    // Showing is always allowed; hiding the last of photos, icon and label is not.
+    disabled: !hidden && keeps && last,
+    toggle: () => editing.edit(set(!hidden)),
+  });
   switch (selected.kind) {
     case 'label':
-      return {
-        name: 'Label',
-        disabled: last,
-        hide: () => editing.edit({ label: { hidden: true } }),
-      };
+      return eye('Label', labelHidden(layout), (hidden) => ({ label: { hidden } }));
     case 'icon':
-      return { name: 'Icon', disabled: last, hide: () => editing.edit({ icon: { hidden: true } }) };
+      return eye('Icon', iconHidden(layout), (hidden) => ({ icon: { hidden } }));
     case 'photo':
-      return {
-        name: selected.path.startsWith('yt:') ? 'Video' : 'Photo',
-        disabled: last,
-        hide: () => editing.edit({ photos: { [selected.path]: { hidden: true } } }),
-      };
+      return eye(
+        selected.path.startsWith('yt:') ? 'Video' : 'Photo',
+        layout.photos?.[selected.path]?.hidden === true,
+        (hidden) => ({ photos: { [selected.path]: { hidden } } }),
+      );
     case 'wave':
-      return { name: 'Wave', disabled: false, hide: () => editing.edit({ wave: { on: false } }) };
+      // A wave switched off is a hidden one: on and off, the eye.
+      return eye('Wave', layout.wave?.on !== true, (hidden) => ({ wave: { on: !hidden } }), false);
   }
 }
 

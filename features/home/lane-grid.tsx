@@ -351,7 +351,9 @@ export const LaneGrid = forwardRef<
     }
     // A photo hidden from the board (0044) is not on it.
     const drawn = cards.map((card) =>
-      card.photos?.length ? { ...card, photos: boardPhotos(card.photos, card.layout) } : card,
+      card.photos?.length
+        ? { ...card, photos: boardPhotos(card.photos, card.layout), allPhotos: card.photos }
+        : card,
     );
     return layoutLaneBoard(drawn, pieceRows, columnIds, {
       width: columnPx * Math.max(columns, 1),

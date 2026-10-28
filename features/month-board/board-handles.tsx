@@ -15,7 +15,7 @@ import {
   BringToFront,
   Check,
   Eye,
-  Loader2,
+  EyeOff,
   MoreHorizontal,
   SendToBack,
   Type,
@@ -610,8 +610,8 @@ export function PartFrame({
 
 /** The label's style on the toolbar (0058): as set by hand, or unset (Auto), and as drawn. */
 export type ToolbarStyle = { set: LabelChoice | undefined; drawn: LabelStyle };
-/** The selected part's eye (0055, 0058): hide it, unless it is the last one shown. */
-export type ToolbarEye = { name: string; disabled: boolean; hide: () => void };
+/** The selected part's eye (0055, 0058): hide it, unless it is the last one shown; or show it again. */
+export type ToolbarEye = { name: string; hidden: boolean; disabled: boolean; toggle: () => void };
 /**
  * Where a toolbar starts or ends (`x`, by `align`) in its container's
  * pixels, kept between `min` and `max`: the board's edges there.
@@ -628,12 +628,15 @@ export function EditToolbar({
   style,
   labelStyle = null,
   eye = null,
+  iconInline = null,
 }: {
   editing: BoardEditing;
   /** While the label is selected: its style, for the swatch. */
   labelStyle?: ToolbarStyle | null;
   /** While a part is selected: its eye. */
   eye?: ToolbarEye | null;
+  /** While the label or the icon is selected, on a post with an icon to set apart. */
+  iconInline?: { on: boolean } | null;
   /** A phone's board (under 600px): two rows, 44px taps, the layer buttons in More. */
   phone?: boolean;
   /** The piece's parts, as chips that select one (review): shown when there is more than one. */
@@ -687,26 +690,26 @@ export function EditToolbar({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [hasLayers]);
-  // A phone's taps are a finger's: 44px every one (review).
-  const button = `flex ${phone ? 'h-11 min-w-11' : 'h-8 min-w-8'} items-center justify-center rounded-full px-1.5`;
-  const chips =
+  // A finger's taps on a phone, 44px; a pointer's on a desktop, 36px (review).
+  const button = `flex ${phone ? 'h-11 min-w-11' : 'h-9 min-w-9'} items-center justify-center rounded-full px-1.5`;
+  // Every row keeps its height whatever the part, so the bar never jumps.
+  const row = `flex items-center ${phone ? 'h-11' : 'h-9'}`;
+  // The parts as tabs (review): only for a piece of more than one part.
+  const tabs =
     parts.length > 1 ? (
       <div
         data-edit-parts
-        role="group"
+        role="tablist"
         aria-label="Part"
-        // On a phone a row of its own, scrolling sideways when it does not fit.
-        className={`flex items-center ${phone ? 'no-scrollbar min-w-0 overflow-x-auto' : ''}`}
+        className="no-scrollbar border-ink/10 flex min-w-0 items-end overflow-x-auto border-b"
       >
-        <PartChips parts={parts} editing={editing} tall={phone} muted="text-pool-500" />
-        {phone ? null : <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />}
+        <PartChips parts={parts} editing={editing} tall={phone} muted="text-pool-500" tabs />
       </div>
     ) : null;
   const stepper =
     fontSize !== null ? (
       <div data-edit-text-size className="flex items-center" role="group" aria-label="Text size">
         <Type aria-hidden size={14} className={phone ? 'mx-1' : 'mx-1.5'} />
-        <span aria-hidden className="bg-ink/20 h-4 w-px" />
         <button
           type="button"
           aria-label="Smaller text"
@@ -730,8 +733,6 @@ export function EditToolbar({
         >
           +
         </button>
-        {/* A phone's row is full (0058): the swatch follows with no rule between. */}
-        {phone ? null : <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />}
       </div>
     ) : null;
   const swatch = labelStyle ? (
@@ -741,18 +742,47 @@ export function EditToolbar({
     <button
       type="button"
       aria-label={
-        eye.disabled ? `${eye.name}: keep at least one` : `Hide ${eye.name.toLowerCase()}`
+        eye.disabled
+          ? `${eye.name}: keep at least one`
+          : `${eye.hidden ? 'Show' : 'Hide'} ${eye.name.toLowerCase()}`
       }
-      title={eye.disabled ? 'Keep at least one' : `Hide ${eye.name.toLowerCase()}`}
-      data-edit-eye
+      aria-pressed={!eye.hidden}
+      title={
+        eye.disabled
+          ? 'Keep at least one'
+          : `${eye.hidden ? 'Show' : 'Hide'} ${eye.name.toLowerCase()}`
+      }
+      data-edit-eye={eye.hidden ? 'off' : 'on'}
       disabled={eye.disabled}
-      onClick={eye.hide}
+      onClick={eye.toggle}
       className={`${button} disabled:opacity-20`}
     >
-      <Eye aria-hidden size={16} />
+      {eye.hidden ? <EyeOff aria-hidden size={16} /> : <Eye aria-hidden size={16} />}
     </button>
   ) : null;
-  // On a phone the layer buttons are More's (review); the shortcuts stay here.
+  // Icon inline (review): the icon before the title, or apart as a sticker;
+  // the panel's Inline, the same field, undoable.
+  const inlineToggle = iconInline ? (
+    <button
+      type="button"
+      aria-pressed={iconInline.on}
+      data-edit-icon-inline={iconInline.on ? 'on' : 'off'}
+      onClick={() => editing.edit({ icon: { inline: !iconInline.on } })}
+      className={`${button} gap-1.5 px-2.5`}
+    >
+      {/* Selection is ink (H20f). */}
+      <span
+        aria-hidden
+        className={`flex h-4 w-7 items-center rounded-full p-0.5 ${
+          iconInline.on ? 'bg-ink justify-end' : 'bg-pool-200 justify-start'
+        }`}
+      >
+        <span className="h-3 w-3 rounded-full bg-white" />
+      </span>
+      Icon inline
+    </button>
+  ) : null;
+  // The four layer moves, a desktop's; a phone's are More's (review).
   const layerGroup =
     layers && !phone ? (
       <div data-edit-layers className="flex items-center" role="group" aria-label="Layer">
@@ -760,63 +790,6 @@ export function EditToolbar({
         <span aria-hidden className="bg-ink/20 mx-0.5 h-4 w-px" />
       </div>
     ) : null;
-  const actions = (
-    <>
-      <button
-        type="button"
-        aria-label="Undo"
-        data-edit-undo
-        disabled={!editing.canUndo}
-        onClick={editing.undo}
-        className={`${button} disabled:opacity-20`}
-      >
-        <Undo2 aria-hidden size={16} />
-      </button>
-      <button
-        type="button"
-        aria-label="More"
-        data-edit-more
-        onClick={editing.more}
-        className={button}
-      >
-        <MoreHorizontal aria-hidden size={16} />
-      </button>
-      <button
-        type="button"
-        data-edit-done
-        onClick={editing.deactivate}
-        className={`${button} text-main-900 relative gap-1 px-2.5 font-semibold`}
-      >
-        {/* The word alone on a phone, so its row keeps every control (0058). */}
-        {phone ? null : <Check aria-hidden size={14} />}
-        Done
-        {phone && editing.status ? (
-          // A phone's status (0058): an icon on Done's corner, taking no room in the row.
-          <span
-            aria-hidden
-            data-edit-status={editing.status}
-            className="text-pool-500 absolute top-1 right-0.5 flex"
-          >
-            {editing.status === 'saving' ? (
-              <Loader2 aria-hidden size={10} className="animate-spin motion-reduce:animate-none" />
-            ) : (
-              <Check aria-hidden size={10} />
-            )}
-          </span>
-        ) : null}
-      </button>
-      {phone && editing.status ? (
-        <span role="status" className="sr-only">
-          {editing.status === 'saving' ? 'Saving' : 'Saved'}
-        </span>
-      ) : null}
-      {editing.status && !phone ? (
-        <span data-edit-status={editing.status} className="text-pool-500 pr-2 pl-1 text-[10px]">
-          {editing.status === 'saving' ? 'Saving…' : 'Saved'}
-        </span>
-      ) : null}
-    </>
-  );
   return (
     <div
       ref={bar}
@@ -826,31 +799,59 @@ export function EditToolbar({
       aria-label="Layout"
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
-      // A white bar on the ground stays white with ink (0032). On a phone two
-      // rows, the parts over the rest, the board's own width.
-      className={`surface text-ink pointer-events-auto absolute rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md ${phone ? 'flex flex-col' : 'flex w-max flex-wrap items-center gap-0.5'}`}
+      // A white bar on the ground stays white with ink (0032). Three rows, on
+      // every width: the parts, the selected part's own controls, the actions.
+      className={`surface text-ink pointer-events-auto absolute flex flex-col rounded-[20px] bg-white px-1 text-xs font-medium whitespace-nowrap shadow-md ${phone ? '' : 'w-max'}`}
       style={left === undefined ? style : { ...style, left }}
     >
-      {phone ? (
-        <>
-          {chips}
-          <div data-edit-actions className="flex items-center">
-            {stepper}
-            {swatch}
-            {eyeButton}
-            {actions}
-          </div>
-        </>
-      ) : (
-        <>
-          {chips}
-          {stepper}
-          {swatch}
-          {eyeButton}
-          {layerGroup}
-          {actions}
-        </>
-      )}
+      {tabs}
+      {/* What applies to the selected part, nothing greyed in its place. */}
+      <div data-edit-part-row className={row}>
+        {eyeButton}
+        {stepper}
+        {swatch}
+        {inlineToggle}
+      </div>
+      <div data-edit-actions className={row}>
+        {layerGroup}
+        <button
+          type="button"
+          aria-label="Undo"
+          data-edit-undo
+          disabled={!editing.canUndo}
+          onClick={editing.undo}
+          className={`${button} disabled:opacity-20`}
+        >
+          <Undo2 aria-hidden size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="More"
+          data-edit-more
+          onClick={editing.more}
+          className={button}
+        >
+          <MoreHorizontal aria-hidden size={16} />
+        </button>
+        <button
+          type="button"
+          data-edit-done
+          onClick={editing.deactivate}
+          className={`${button} text-main-900 gap-1 px-2.5 font-semibold`}
+        >
+          <Check aria-hidden size={14} />
+          Done
+        </button>
+        {editing.status ? (
+          <span
+            role="status"
+            data-edit-status={editing.status}
+            className="text-pool-500 pr-2 pl-1 text-[10px]"
+          >
+            {editing.status === 'saving' ? 'Saving…' : 'Saved'}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -942,36 +943,59 @@ export function PartChips({
   editing,
   tall,
   muted,
+  tabs = false,
 }: {
   parts: PartChip[];
   editing: Pick<BoardEditing, 'part' | 'activeId' | 'tap' | 'edit'>;
   tall: boolean;
   /** The unselected chips' text: muted on the white bar, on the water. */
   muted: string;
+  /** The toolbar's (review): underlined tabs, the chosen one in ink; More keeps pills. */
+  tabs?: boolean;
 }) {
   return (
     <>
-      {parts.map(({ part, name, unhide }) => {
-        const on = !unhide && samePart(part, editing.part);
+      {parts.map(({ part, name, hidden }) => {
+        const on = samePart(part, editing.part);
         return (
           <button
             key={name}
             type="button"
-            aria-pressed={on}
-            aria-label={unhide ? `Show ${name.toLowerCase()} on the board` : undefined}
+            aria-pressed={tabs ? undefined : on}
+            aria-label={hidden ? `${name}, hidden` : undefined}
             data-edit-part-chip={name}
-            data-edit-part-hidden={unhide ? '' : undefined}
-            // Hidden from the board (0055): a tap shows it again, it is not selected.
-            onClick={() => (unhide ? editing.edit(unhide) : editing.tap(editing.activeId!, part))}
-            className={`flex shrink-0 items-center ${tall ? 'h-11' : 'h-8'}`}
+            data-edit-part-hidden={hidden ? '' : undefined}
+            // A hidden part is selected as any other (review): its eye shows it again.
+            onClick={() => editing.tap(editing.activeId!, part)}
+            role={tabs ? 'tab' : undefined}
+            aria-selected={tabs ? on : undefined}
+            className={
+              tabs
+                ? `relative flex shrink-0 items-center px-2.5 ${tall ? 'h-11' : 'h-9'} ${
+                    on ? 'text-ink' : muted
+                  } ${hidden ? 'line-through' : ''}`
+                : `flex shrink-0 items-center ${tall ? 'h-11' : 'h-8'}`
+            }
           >
-            <span
-              className={`flex h-7 items-center rounded-full px-2 ${
-                on ? 'bg-ink text-white' : `${muted} ${unhide ? 'line-through opacity-60' : ''}`
-              }`}
-            >
-              {name}
-            </span>
+            {tabs ? (
+              <>
+                {name}
+                {on ? (
+                  <span
+                    aria-hidden
+                    className="bg-ink absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                  />
+                ) : null}
+              </>
+            ) : (
+              <span
+                className={`flex h-7 items-center rounded-full px-2 ${
+                  on ? 'bg-ink text-white' : muted
+                } ${hidden ? 'line-through' : ''}`}
+              >
+                {name}
+              </span>
+            )}
           </button>
         );
       })}

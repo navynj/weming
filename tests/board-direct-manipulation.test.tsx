@@ -693,7 +693,7 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
     return side ? PROBES[side] : null;
   };
 
-  it('chips a part hidden from the board crossed out; a tap shows it again (0055)', () => {
+  it('keeps a hidden part’s tab, struck through; selected, it is outlined dashed and its eye shows it (review)', () => {
     const hidden = busy();
     hidden[0] = {
       ...hidden[0],
@@ -705,55 +705,85 @@ describe('the rotate handle keeps off the piece’s other parts (review)', () =>
       [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')].map(
         (c) => c.textContent,
       );
-    expect(names()).toEqual(['Label', 'Photo 1', 'Hidden photo 1', 'Wave']);
-    const chip = q(container, '[data-edit-part-chip="Hidden photo 1"]');
-    expect(chip.hasAttribute('data-edit-part-hidden')).toBe(true);
-    expect(chip.getAttribute('aria-pressed')).toBe('false');
-    fireEvent.click(chip);
-    // Shown at once: a photo again, no hidden chip.
-    expect(names()).toEqual(['Label', 'Photo 1', 'Photo 2', 'Wave']);
+    // Its own name, in the order it was added; the icon inline in the caption has a tab too.
+    expect(names()).toEqual(['Label', 'Icon', 'Photo 1', 'Photo 2', 'Wave']);
+    const tab = q(container, '[data-edit-part-chip="Photo 2"]');
+    expect(tab.hasAttribute('data-edit-part-hidden')).toBe(true);
+    expect(tab.className).toContain('line-through');
+    fireEvent.click(tab);
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    // Where it would be, dashed; no handles; row 2 its eye alone, off.
+    expect(q(container, '[data-edit-ghost="photo"]').className).toContain('outline-dashed');
+    expect(container.querySelector('[data-board-piece="s2"] [data-edit-frame]')).toBeNull();
+    const row = q(container, '[data-edit-part-row]');
+    expect([...row.querySelectorAll('button')].map((b) => b.getAttribute('data-edit-eye'))).toEqual(
+      ['off'],
+    );
+    fireEvent.click(q(row, '[data-edit-eye]'));
+    // Shown at once: no longer struck, outlined as itself.
+    expect(
+      q(container, '[data-edit-part-chip="Photo 2"]').hasAttribute('data-edit-part-hidden'),
+    ).toBe(false);
+    expect(container.querySelector('[data-edit-ghost]')).toBeNull();
   });
 
-  it('chips each part on the toolbar, the selected one in ink, and a chip selects its part', () => {
+  it('tabs each part, the selected one in ink and underlined, and a tab selects its part (review)', () => {
     const { container } = home(busy());
     fireEvent.click(label(container, 's2'));
-    const chips = [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')];
-    // Photos carry the icon inline in their caption: no Icon chip.
-    expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Photo 1', 'Photo 2', 'Wave']);
-    // The ink is on the chip's pill; the button around it is the 44px tap on a phone.
-    const chip = (name: string) => q(container, `[data-edit-part-chip="${name}"] span`);
-    expect(chip('Label').className).toContain('bg-ink');
-    expect(q(container, '[data-edit-part-chip="Label"]').getAttribute('aria-pressed')).toBe('true');
-    expect(chip('Photo 1').className).not.toContain('bg-ink');
-    expect(chip('Photo 1').className).toContain('text-pool-500');
-    fireEvent.click(chip('Photo 2'));
+    const tab = (name: string) => q(container, `[data-edit-part-chip="${name}"]`);
+    expect(tab('Label').getAttribute('role')).toBe('tab');
+    expect(tab('Label').getAttribute('aria-selected')).toBe('true');
+    expect(tab('Label').className).toContain('text-ink');
+    expect(tab('Label').querySelector('.bg-ink')).not.toBeNull();
+    expect(tab('Photo 1').className).toContain('text-pool-500');
+    expect(tab('Photo 1').querySelector('.bg-ink')).toBeNull();
+    // No pills: the row is underlined tabs over a hairline.
+    expect(q(container, '[data-edit-parts]').className).toContain('border-b');
+    fireEvent.click(tab('Photo 2'));
     expect(q(container, `[data-board-piece="s2"] [data-edit-overlay="photo"]`).style.width).toBe(
       q(container, `[data-board-photo-card="${P1}"]`).style.width,
     );
-    expect(chip('Photo 2').className).toContain('bg-ink');
-    expect(chip('Label').className).not.toContain('bg-ink');
-    fireEvent.click(chip('Wave'));
+    expect(tab('Photo 2').getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(tab('Wave'));
     expect(q(container, '[data-edit-frame="wave"]')).not.toBeNull();
     expect(saved).toHaveLength(0);
   });
 
-  it('chips a sticker set apart from the words as Icon', () => {
+  it('turns the icon inline and back from the Icon tab, which stays selected (review)', async () => {
+    vi.useFakeTimers();
     const { container } = home([
       card('s2', 'Lynn Canyon', '2026-10-22', { layout: { icon: { inline: false } } }),
       card('s1', 'Grand Austria Hotel', '2026-10-21'),
     ]);
     fireEvent.click(label(container, 's2'));
-    const chips = [...container.querySelectorAll<HTMLElement>('[data-edit-part-chip]')];
-    expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Icon']);
+    // The Label tab has no Icon inline.
+    expect(container.querySelector('[data-edit-icon-inline]')).toBeNull();
     fireEvent.click(q(container, '[data-edit-part-chip="Icon"]'));
     expect(q(container, '[data-edit-frame="icon"]')).not.toBeNull();
+    const toggle = () => q(container, '[data-edit-icon-inline]');
+    expect(toggle().getAttribute('data-edit-icon-inline')).toBe('off');
+    fireEvent.click(toggle());
+    // Inline: outlined in the label, no handles; the Icon tab still selected.
+    expect(toggle().getAttribute('data-edit-icon-inline')).toBe('on');
+    expect(q(container, '[data-board-piece="s2"] [data-edit-inline-icon]')).not.toBeNull();
+    expect(container.querySelector('[data-edit-frame="icon"]')).toBeNull();
+    expect(q(container, '[data-edit-part-chip="Icon"]').getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(toggle());
+    expect(q(container, '[data-edit-frame="icon"]')).not.toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(LAYOUT_SAVE_MS);
+      await Promise.resolve();
+    });
+    expect(saved.at(-1)!.patch).toEqual({ icon: { inline: false } });
+    vi.useRealTimers();
   });
 
-  it('shows no chips on a piece with one part', () => {
+  it('keeps a wave that is off as a hidden tab', () => {
     const { container } = home();
     fireEvent.click(label(container, 's2'));
-    expect(container.querySelector('[data-edit-toolbar]')).not.toBeNull();
-    expect(container.querySelector('[data-edit-parts]')).toBeNull();
+    expect(q(container, '[data-edit-part-chip="Wave"]').hasAttribute('data-edit-part-hidden')).toBe(
+      true,
+    );
   });
 
   it('stands above the part, else right, below, left: the first spot clear of its siblings and its own handles', () => {
@@ -830,7 +860,7 @@ describe('the toolbar on a phone (review)', () => {
   }
   const PATH = 'a1/s2-0.webp';
 
-  it('splits into the part chips over the rest, the board wide, with no layer buttons', () => {
+  it('is three rows, the board wide: the tabs, the part’s own, the actions; no layer buttons', () => {
     const restore = phoneWidth();
     try {
       const { container } = home([
@@ -844,19 +874,25 @@ describe('the toolbar on a phone (review)', () => {
       const rows = [...bar.children].map((row) =>
         row.hasAttribute('data-edit-parts')
           ? 'parts'
-          : row.hasAttribute('data-edit-actions')
-            ? 'actions'
-            : '?',
+          : row.hasAttribute('data-edit-part-row')
+            ? 'part'
+            : row.hasAttribute('data-edit-actions')
+              ? 'actions'
+              : '?',
       );
-      expect(rows).toEqual(['parts', 'actions']);
+      expect(rows).toEqual(['parts', 'part', 'actions']);
       expect(q(bar, '[data-edit-parts]').className).toContain('overflow-x-auto');
+      const part = q(bar, '[data-edit-part-row]');
+      expect(part.querySelector('[data-edit-eye]')).not.toBeNull();
+      expect(part.querySelector('[data-edit-text-size]')).not.toBeNull();
+      expect(part.querySelector('[data-edit-style]')).not.toBeNull();
       const actions = q(bar, '[data-edit-actions]');
-      expect(actions.querySelector('[data-edit-text-size]')).not.toBeNull();
       expect(actions.querySelector('[data-edit-undo]')).not.toBeNull();
       expect(actions.querySelector('[data-edit-more]')).not.toBeNull();
       expect(actions.querySelector('[data-edit-done]')).not.toBeNull();
       expect(bar.querySelector('[data-edit-layer]')).toBeNull();
-      // A finger's taps, 44px.
+      // Every row keeps its height, a finger's 44px.
+      for (const row of [part, actions]) expect(row.className).toMatch(/\bh-11\b/);
       for (const button of bar.querySelectorAll('button'))
         expect(button.className).toMatch(/\bh-11\b/);
     } finally {
@@ -875,7 +911,9 @@ describe('the toolbar on a phone (review)', () => {
       fireEvent.click(q(container, '[data-edit-more]'));
       const sheet = q(container, '[data-layout-sheet]');
       const body = q(sheet, '[data-layout-body]');
-      expect(body.firstElementChild!.hasAttribute('data-layout-layers')).toBe(true);
+      // At the top, after the part tabs More shows while the toolbar's row is out of sight.
+      const top = [...body.children].filter((el) => !el.hasAttribute('data-layout-parts'));
+      expect(top[0].hasAttribute('data-layout-layers')).toBe(true);
       expect(q(sheet, '[data-layout-layers] h3').textContent).toBe('Layer');
       const layer = (how: string) => q(sheet, `[data-edit-layer="${how}"]`);
       expect(sheet.querySelectorAll('[data-edit-layer]')).toHaveLength(4);
@@ -985,9 +1023,9 @@ describe('More on a phone: Undo and Done in its header, the chips when out of si
       const body = q(container, '[data-layout-body]');
       expect(body.firstElementChild!.hasAttribute('data-layout-parts')).toBe(true);
       const chips = [...body.querySelectorAll('[data-layout-parts] [data-edit-part-chip]')];
-      expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Photo 1']);
+      expect(chips.map((c) => c.textContent)).toEqual(['Label', 'Icon', 'Photo 1', 'Wave']);
       expect(chips[0].className).toContain('h-11');
-      fireEvent.click(chips[1]);
+      fireEvent.click(chips[2]);
       expect(q(container, '[data-edit-frame="photo"]')).not.toBeNull();
       expect(q(body, '[data-edit-part-chip="Photo 1"]').getAttribute('aria-pressed')).toBe('true');
     } finally {

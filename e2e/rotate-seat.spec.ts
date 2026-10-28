@@ -39,8 +39,9 @@ test('a small photo above its label is a tap away, its centre clear of the handl
   // A person's tap, on the photo's centre.
   await page.mouse.click(p.x + p.width / 2, p.y + p.height / 2);
   await expect(page.locator('[data-edit-frame="photo"]')).toBeVisible();
-  await expect(page.locator('[data-edit-part-chip="Photo 1"]')).toHaveAttribute(
-    'aria-pressed',
+  // Its tab, selected (review: the parts are tabs).
+  await expect(page.locator('[data-edit-toolbar] [data-edit-part-chip="Photo 1"]')).toHaveAttribute(
+    'aria-selected',
     'true',
   );
 });

@@ -56,10 +56,11 @@ export type LayoutHistory = ReturnType<typeof useLayoutHistory>;
 
 /** A part of the active piece as the toolbar's chip names it. */
 /**
- * A part chip; `unhide` for a part hidden from the board (0055): shown
- * crossed out, a tap putting it back instead of selecting it.
+ * A part's tab (review): `hidden` for a part off the board (0055) — its name
+ * struck through; selected, it is outlined dashed where it would be, and
+ * the eye turns it back on.
  */
-export type PartChip = { part: BoardPart; name: string; unhide?: BoardLayoutJson };
+export type PartChip = { part: BoardPart; name: string; hidden?: boolean };
 
 /** What the board's pieces are told while one of them is being edited by hand. */
 export type BoardEditing = {

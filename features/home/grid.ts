@@ -109,6 +109,8 @@ export type Card = {
   editable?: boolean;
   /** Every image across its ripples, oldest first, for the Board view: each with the ripple it is on. */
   photos?: CardPhoto[];
+  /** On the board: every photo and video, hidden ones too, for the toolbar's tabs (their names stay). */
+  allPhotos?: CardPhoto[];
   /** A joint splash (Board view): who has written on it, once each, in the order they first wrote. */
   writers?: CardFace[];
   /** A joint splash (Board view): the current members who have not written on it yet. */

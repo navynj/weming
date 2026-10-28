@@ -164,7 +164,9 @@ export function MonthBoard({
   const drawn = useMemo(
     () =>
       cards.map((card) =>
-        card.photos?.length ? { ...card, photos: boardPhotos(card.photos, card.layout) } : card,
+        card.photos?.length
+          ? { ...card, photos: boardPhotos(card.photos, card.layout), allPhotos: card.photos }
+          : card,
       ),
     [cards],
   );
