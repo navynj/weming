@@ -284,8 +284,8 @@ function Faces({ card, ring }: { card: Card; ring: string }) {
 /**
  * "Add your side" hanging from a band (review: Members): the slot's own
  * look — dashed white note, tilted down about its corner — under the tape in
- * my column, there only while I am one it waits for. It opens the splash to
- * write my ripple.
+ * my column, there only while it waits for my side (H42e). It opens the
+ * splash to write my ripple.
  */
 export function TapeSlot({
   card,
@@ -300,8 +300,7 @@ export function TapeSlot({
   narrow: boolean;
   onWrite: (card: Card) => void;
 }) {
-  const { me } = usePeople();
-  if (me === null || !(card.awaiting ?? []).some((face) => face.authorId === me)) return null;
+  if (!card.waitsForMe) return null;
   return (
     <button
       type="button"
@@ -317,14 +316,13 @@ export function TapeSlot({
 }
 
 /**
- * An open joint splash's slot (review): a note stuck on the label after the
- * fact — a small rounded rectangle, dashed 1.5px white outline, no fill,
- * white at 80% — holding the faded faces of the current members who have
- * not written and "Add your side" ("Add" on a phone). It hangs from the
- * label's bottom-right corner (bottom-left where the next lane is taken),
- * tilted down about that corner, never over any words. When I am one of
- * the missing it opens the splash to write my ripple; for anyone else it
- * is only a mark.
+ * A together record's slot (review, H42e): a note stuck on the label after
+ * the fact — a small rectangle, dashed 1.5px white outline, no fill, white at
+ * 80% — reading "Add your side" ("Add" on a phone). Drawn only for me, only
+ * while the record waits for my side; it opens the splash to write it. It
+ * hangs from the label's bottom-right corner (bottom-left where the next lane
+ * is taken), tilted down about that corner, never over any words. Nobody's
+ * pending side but mine is ever shown.
  */
 function OpenSlot({
   piece,
@@ -346,39 +344,19 @@ function OpenSlot({
   /** The piece's bob or plunge, played on each part (motionOf). */
   moving?: string;
 }) {
-  const { me } = usePeople();
-  const awaiting = piece.card.awaiting ?? [];
-  const mine = me !== null && awaiting.some((face) => face.authorId === me);
-  const body = (
-    <>
-      {/* Faces first, 16px, overlapping by 4; then the words, never under a face. */}
-      <span data-board-slot-faces className="flex shrink-0 items-center opacity-50">
-        {awaiting.slice(0, narrow ? 2 : 4).map((face, at) => (
-          <Avatar
-            key={face.authorId}
-            id={face.authorId}
-            initials={face.initials}
-            className={`text-main-900/60 ring-main-900 bg-joint-face flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] leading-none ring-1 ${at > 0 ? '-ml-1' : ''}`}
-          />
-        ))}
-      </span>
-      <span data-board-slot-words className="whitespace-nowrap">
-        {narrow ? 'Add' : 'Add your side'}
-      </span>
-    </>
-  );
+  if (!piece.card.waitsForMe) return null;
   const box = piece.slotBox!;
   // Its content's own width: placed at its corner, as tall as its row.
   const style: CSSProperties = {
     left: box.x,
     top: box.y,
+    height: box.h,
     transform: `${shift ? `${shift} ` : ''}rotate(${piece.slotRotate}deg)`,
     transformOrigin: piece.slotAt === 'right' ? 'top left' : 'top right',
     ...(z !== undefined ? { zIndex: z } : {}),
   };
   // Under every label where they meet (review): the labels' z is 1.
-  const className = `absolute z-0 flex items-center gap-1 border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80 ${muted ? 'opacity-50' : ''} ${moving}`;
-  return mine ? (
+  return (
     <button
       type="button"
       data-board-slot={piece.id}
@@ -386,20 +364,13 @@ function OpenSlot({
       data-slot-at={piece.slotAt}
       aria-label={`Add your side to ${captionOf(piece.card)}`}
       onClick={() => onWrite(piece.card)}
-      className={`pointer-events-auto ${className}`}
+      className={`pointer-events-auto absolute z-0 flex items-center border-[1.5px] border-dashed border-white/80 px-[6px] py-[3px] text-[10px] leading-none text-white/80 ${muted ? 'opacity-50' : ''} ${moving}`}
       style={style}
     >
-      {body}
+      <span data-board-slot-words className="whitespace-nowrap">
+        {narrow ? 'Add' : 'Add your side'}
+      </span>
     </button>
-  ) : (
-    <span
-      data-board-slot={piece.id}
-      data-slot-at={piece.slotAt}
-      className={className}
-      style={style}
-    >
-      {body}
-    </span>
   );
 }
 

@@ -109,15 +109,11 @@ export function poolCards(
           splash.joint_invite_all ||
           (view.together?.[splash.id] ?? []).some((id) => id !== splash.created_by),
         writers: wrote.map((id) => ({ authorId: id, initials: initialsOf.get(id) ?? '' })),
-        // Together's open slots (0033): who it is with, less those who wrote.
-        awaiting: view.members
-          .filter(
-            (m) =>
-              !m.former &&
-              !wrote.includes(m.userId) &&
-              (view.together?.[splash.id] ?? []).includes(m.userId),
-          )
-          .map((m) => ({ authorId: m.userId, initials: m.initials })),
+        // Together's slot (0033, H42e): mine alone, while I am with it and have not written.
+        waitsForMe:
+          !wrote.includes(me) &&
+          (view.together?.[splash.id] ?? []).includes(me) &&
+          view.members.some((m) => m.userId === me && !m.former),
         // In Members, picked: its maker's column (review); else its pool lane.
         column:
           kind === 'members'
@@ -159,9 +155,11 @@ export function poolCards(
         ? {
             together: true,
             writers: sides.map((id) => ({ authorId: id, initials: initialsOf.get(id) ?? '' })),
-            awaiting: view.members
-              .filter((m) => !m.former && withHere.includes(m.userId) && !sides.includes(m.userId))
-              .map((m) => ({ authorId: m.userId, initials: m.initials })),
+            // Mine alone (H42e), while I am with it here and have not written.
+            waitsForMe:
+              withHere.includes(me) &&
+              !sides.includes(me) &&
+              view.members.some((m) => m.userId === me && !m.former),
           }
         : {}),
       column: kind === 'members' ? splash.owner_id : placement?.poolLaneId,

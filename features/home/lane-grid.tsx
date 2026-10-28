@@ -691,9 +691,7 @@ export const LaneGrid = forwardRef<
                       // when it waits for me, "Add your side" hangs from it in my column.
                       const size = laneBoard.metrics.caption.size;
                       const myColumn = me ? columnIds.indexOf(me) : -1;
-                      const waitsForMe =
-                        myColumn >= 0 &&
-                        (segment.card.awaiting ?? []).some((face) => face.authorId === me);
+                      const waitsForMe = myColumn >= 0 && segment.card.waitsForMe === true;
                       const tapeY = waitsForMe ? 6 : (ROW_PX - TAPE_PX) / 2;
                       return (
                         <DayRow

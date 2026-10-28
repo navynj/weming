@@ -30,7 +30,7 @@ vi.mock('@/features/pool/actions', () => ({
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolActivityProvider } from '@/features/pool/activity';
-import type { PoolViewKind } from '@/features/pool/pool-cards';
+import { poolCards, type PoolViewKind } from '@/features/pool/pool-cards';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { PoolIndex } from '@/features/pool/pool-index';
 import { lastPool, rememberVisit } from '@/features/pool/remembered';
@@ -295,6 +295,25 @@ describe('a joint splash on the grid (H23)', () => {
     cleanup();
     // Written already: no note.
     expect(ground(A).container.querySelector('[data-tape-slot]')).toBeNull();
+  });
+  it('never shows anyone else’s pending side: only mine, only while I have not written (H42e)', () => {
+    // I wrote; Mina is picked and has not.
+    const theirs: PoolView = {
+      ...A,
+      ripples: A.ripples.filter((r) => r.id !== 'r-j1'),
+      together: { 's-joint': [MINA, ME] },
+    };
+    for (const kind of ['members', 'lane', 'board'] as const) {
+      setView(kind);
+      const { container } = ground(theirs);
+      expect(container.querySelector('[data-tape-slot], [data-board-slot]'), kind).toBeNull();
+      expect(container.textContent, kind).not.toMatch(/Add your side/);
+      cleanup();
+    }
+    const card = poolCards(theirs, 'members', ME, TZ).find((c) => c.splash.id === 's-joint')!;
+    expect(card.waitsForMe).toBe(false);
+    expect(card.together).toBe(true);
+    expect(Object.keys(card)).not.toContain('awaiting');
   });
   it('shows who wrote on it on its band, each once, with no branches', () => {
     setView('members');

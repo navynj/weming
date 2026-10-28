@@ -916,7 +916,7 @@ describe('fills: what is the pool’s own (review)', () => {
       together: true,
       href: '/pool/p-a/splash/test',
       writers: [{ authorId: 'u-mk', initials: 'MK' }],
-      awaiting: [{ authorId: ME, initials: 'YL' }],
+      waitsForMe: true,
     };
     expect(lone.splash.count).toBe(1);
     const { container } = board([lone]);
@@ -1197,31 +1197,25 @@ describe('a tap, and the post the stack is heading to (review)', () => {
 });
 
 describe('an open joint splash (meaning is shape)', () => {
-  const joint = (awaiting: { authorId: string; initials: string }[]): Card => ({
+  const joint = (waitsForMe: boolean): Card => ({
     ...card('jam', 'Jam session', '2026-10-21'),
     joint: true,
     together: true,
     href: '/pool/p-a/splash/jam',
     writers: [{ authorId: 'u-mk', initials: 'MK' }],
-    awaiting,
+    waitsForMe,
   });
 
   it('sticks a dashed note on the label’s corner, outside its words, the label no taller for it', () => {
-    const { container } = board([joint([{ authorId: 'u-jo', initials: 'JO' }])]);
+    const { container } = board([joint(true)]);
     const slot = container.querySelector<HTMLElement>('[data-board-slot="jam"]')!;
     expect(slot.className).toContain('border-dashed');
     expect(slot.className).toContain('border-[1.5px]');
     expect(slot.className).not.toMatch(/rounded/);
-    expect(slot.textContent).toBe('JOAdd your side');
-    expect(slot.querySelector('[data-board-slot-faces]')!.className).toContain('opacity-50');
-    // Someone else's to fill: a mark, not a button.
-    expect(slot.tagName).toBe('SPAN');
     expect(slot.closest('[data-board-label]')).toBeNull();
     expect(slot.style.transform).toMatch(/rotate\((-?[3-6](\.\d+)?)deg\)/);
-    const open = layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, {
-      width: 980,
-    }).pieces[0];
-    const closed = layoutWeekBoard([joint([])], TODAY, { width: 980 }).pieces[0];
+    const open = layoutWeekBoard([joint(true)], TODAY, { width: 980 }).pieces[0];
+    const closed = layoutWeekBoard([joint(false)], TODAY, { width: 980 }).pieces[0];
     expect(open.labelBox.h).toBe(closed.labelBox.h);
     for (const words of open.textBoxes) expect(intersects(words, open.slotBounds!)).toBe(false);
     // Up onto the label by its bottom padding (review): over its edge, never its words.
@@ -1233,72 +1227,48 @@ describe('an open joint splash (meaning is shape)', () => {
     const NEXT_DOOR = ['n1', 'n2', 'n3'].map((id) =>
       card(id, 'Next door, all afternoon', '2026-10-22'),
     );
-    const beside = layoutWeekBoard(
-      [joint([{ authorId: 'u-jo', initials: 'JO' }]), ...NEXT_DOOR],
-      TODAY,
-      { width: 358 },
-    ).pieces.find((p) => p.id === 'jam')!;
+    const beside = layoutWeekBoard([joint(true), ...NEXT_DOOR], TODAY, { width: 358 }).pieces.find(
+      (p) => p.id === 'jam',
+    )!;
     expect(beside.slotAt).toBe('left');
-    readable(
-      layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }]), ...NEXT_DOOR], TODAY, {
-        width: 358,
-      }),
-    );
+    readable(layoutWeekBoard([joint(true), ...NEXT_DOOR], TODAY, { width: 358 }));
   });
 
-  it('lays the note out as a row: faces first, 16px overlapping by 4, a 4px gap, then the words, 6px at the sides and 3 above and below', () => {
-    const { container } = board([
-      joint([
-        { authorId: 'u-jo', initials: 'JO' },
-        { authorId: 'u-ak', initials: 'AK' },
-      ]),
-    ]);
+  it('lays the note out as its words alone, 6px at the sides and 3 above and below: no faces (H42e)', () => {
+    const { container } = board([joint(true)]);
     const slot = container.querySelector<HTMLElement>('[data-board-slot="jam"]')!;
     expect(slot.className).toMatch(/\bflex\b/);
-    expect(slot.className).toContain('gap-1');
     expect(slot.className).toContain('px-[6px]');
     expect(slot.className).toContain('py-[3px]');
     // Its content's own width: nothing fixes it.
     expect(slot.style.width).toBe('');
-    const [faces, words] = [...slot.children];
-    expect(faces.hasAttribute('data-board-slot-faces')).toBe(true);
-    expect(words.hasAttribute('data-board-slot-words')).toBe(true);
-    expect(words.textContent).toBe('Add your side');
-    const avatars = [...faces.children];
-    expect(avatars).toHaveLength(2);
-    for (const a of avatars) expect(a.className).toMatch(/\bh-4\b.*\bw-4\b|\bw-4\b.*\bh-4\b/);
-    expect(avatars[1].className).toContain('-ml-1');
-    // The layout's room for it holds the whole row: border, padding, faces, gap, words.
-    const laid = layoutWeekBoard(
-      [
-        joint([
-          { authorId: 'u-jo', initials: 'JO' },
-          { authorId: 'u-ak', initials: 'AK' },
-        ]),
-      ],
-      TODAY,
-      { width: 980 },
-    ).pieces[0];
-    const content = 1.5 * 2 + 6 * 2 + 16 + 12 + 4 + 'Add your side'.length * 10 * 0.55;
+    expect(slot.querySelector('[data-board-slot-faces], [data-avatar-photo]')).toBeNull();
+    expect([...slot.children].map((c) => c.hasAttribute('data-board-slot-words'))).toEqual([true]);
+    expect(slot.textContent).toBe('Add your side');
+    // The layout's room for it holds the whole row: border, padding, words.
+    const laid = layoutWeekBoard([joint(true)], TODAY, { width: 980 }).pieces[0];
+    const content = 1.5 * 2 + 6 * 2 + 'Add your side'.length * 10 * 0.55;
     expect(laid.slotBox!.w).toBeGreaterThanOrEqual(content);
     expect(laid.slotBox!.h).toBe(16 + 3 * 2 + 1.5 * 2);
-    readable(
-      layoutWeekBoard([joint([{ authorId: 'u-jo', initials: 'JO' }])], TODAY, { width: 980 }),
-    );
+    readable(layoutWeekBoard([joint(true)], TODAY, { width: 980 }));
   });
 
-  it('reads "Add your side" when I am missing, and opens the splash to write', () => {
-    const { container } = board([joint([{ authorId: ME, initials: 'YL' }])]);
+  it('reads "Add your side" while it waits for me, and opens the splash to write', () => {
+    const { container } = board([joint(true)]);
     const slot = container.querySelector('[data-board-slot="jam"]')!;
+    expect(slot.tagName).toBe('BUTTON');
     expect(slot.getAttribute('aria-label')).toBe('Add your side to Jam session');
     fireEvent.click(slot);
     expect(pushed).toEqual(['/pool/p-a/splash/jam?write=1']);
   });
 
-  it('is gone once every current member has written, the faces staying', () => {
-    const { container } = board([joint([])]);
+  it('shows no slot when it waits only on others, or once I have written; the tape and faces stay (H42e)', () => {
+    const { container } = board([joint(false)]);
     expect(container.querySelector('[data-board-slot]')).toBeNull();
-    expect(container.querySelector('[data-board-piece="jam"] [data-board-faces]')).not.toBeNull();
+    const piece = container.querySelector('[data-board-piece="jam"]')!;
+    expect(piece.querySelector('[data-board-faces]')).not.toBeNull();
+    // Still together: its label keeps the joint fill.
+    expect(piece.querySelector('[data-board-label]')!.className).toMatch(/bg-(white|ink)/);
   });
 });
 
@@ -1532,13 +1502,13 @@ describe('a month fitted to the screen (review)', () => {
 });
 
 describe('the stacking order (review)', () => {
-  const joint = (awaiting: { authorId: string; initials: string }[]): Card => ({
+  const joint = (waitsForMe: boolean): Card => ({
     ...card('jam', 'Jam session', '2026-10-21'),
     joint: true,
     together: true,
     href: '/pool/p-a/splash/jam',
     writers: [{ authorId: 'u-mk', initials: 'MK' }],
-    awaiting,
+    waitsForMe,
   });
   const z = (el: Element): number => {
     const m = /(?:^|\s)z-(?:\[(\d+)\]|(\d+))(?=\s|$)/.exec(el.className.toString());
@@ -1547,7 +1517,7 @@ describe('the stacking order (review)', () => {
 
   it('draws the slot under every label, labels and photos over it, stickers over all; a piece makes no layer of its own', () => {
     const { container } = board([
-      joint([{ authorId: 'u-jo', initials: 'JO' }]),
+      joint(true),
       card('below', 'Right under it', '2026-10-21'),
       ...WEEK,
     ]);

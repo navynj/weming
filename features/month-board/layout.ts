@@ -84,19 +84,17 @@ const FLOOR_PX = 10;
 /** About how wide one 10px Poppins character is, for the line estimate: generous, so words never outgrow their box. */
 const CHAR_EM = 0.62;
 /**
- * An open joint splash's slot, a row (review): 6px at the sides and 3 above
- * and below inside a 1.5px dashed outline, the faces first — 16px, overlapping by 4 — then a 4px gap, then
- * "Add your side" ("Add" on a phone) at 10px. Drawn at its content's own
- * width; the layout places it by a generous estimate of that width, which
- * the drawn note never exceeds.
+ * A together record's slot, mine (review, H42e): 6px at the sides and 3
+ * above and below inside a 1.5px dashed outline, "Add your side" ("Add" on
+ * a phone) at 10px, a row as tall as the 16px faces it once held. Drawn at
+ * its content's own width; the layout places it by a generous estimate of
+ * that width, which the drawn note never exceeds.
  */
-export const SLOT_FACE_PX = 16;
-const SLOT_FACE_OVERLAP = 4;
-const SLOT_GAP_PX = 4;
+const SLOT_ROW_PX = 16;
 export const SLOT_PAD_PX = 6;
 export const SLOT_PAD_Y_PX = 3;
 const SLOT_BORDER_PX = 1.5;
-export const SLOT_PX = SLOT_FACE_PX + SLOT_PAD_Y_PX * 2 + SLOT_BORDER_PX * 2;
+export const SLOT_PX = SLOT_ROW_PX + SLOT_PAD_Y_PX * 2 + SLOT_BORDER_PX * 2;
 const SLOT_TILT_MIN = 3;
 const SLOT_TILT_MAX = 6;
 /** The words' width, estimated generously (0.62em a character at 10px). */
@@ -326,9 +324,9 @@ function draw(id: string, salt: string, buckets: number): number {
   return seedOf(`${salt}:${id}`) % buckets;
 }
 
-/** A joint splash still waiting on a current member: its label carries the open slot (meaning is shape). */
+/** A together record waiting for my side: its label carries my slot (meaning is shape; H42e). */
 export function isOpenJoint(card: Card): boolean {
-  return (card.joint === true || card.together === true) && (card.awaiting?.length ?? 0) > 0;
+  return (card.joint === true || card.together === true) && card.waitsForMe === true;
 }
 
 export function captionOf(card: Card): string {
@@ -761,16 +759,8 @@ function tilted(box: Box, deg: number, pivot: 'left' | 'right'): Box {
 function withSlot(shape: Shape, card: Card, ctx: Context): Shape {
   if (!shape.slot) return shape;
   const { m } = ctx;
-  const faces = Math.min(card.awaiting!.length, m.narrow ? 2 : 4);
   const words = (m.narrow ? SLOT_WORDS.narrow : SLOT_WORDS.wide).length * m.caption.size * CHAR_EM;
-  const w = Math.ceil(
-    SLOT_BORDER_PX * 2 +
-      SLOT_PAD_PX * 2 +
-      SLOT_FACE_PX +
-      (faces - 1) * (SLOT_FACE_PX - SLOT_FACE_OVERLAP) +
-      SLOT_GAP_PX +
-      words,
-  );
+  const w = Math.ceil(SLOT_BORDER_PX * 2 + SLOT_PAD_PX * 2 + words);
   const label = shape.labelBox;
   // Up onto the label (review), by all of its bottom padding: over its edge, never its words.
   const y = label.y + label.h - shape.pad.bottom;

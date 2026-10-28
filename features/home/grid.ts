@@ -113,8 +113,12 @@ export type Card = {
   allPhotos?: CardPhoto[];
   /** A joint splash (Board view): who has written on it, once each, in the order they first wrote. */
   writers?: CardFace[];
-  /** A joint splash (Board view): the current members who have not written on it yet. */
-  awaiting?: CardFace[];
+  /**
+   * A together record waits for my side (H42e): I am invited and have not
+   * written on it yet. Only mine, never anyone else's pending side: the
+   * slot is the one asked, and nobody sees who else is yet to write.
+   */
+  waitsForMe?: boolean;
   /**
    * What readers left on its ripples, for the top card (H25): present only
    * where someone besides me can see the post, with my ripples that are

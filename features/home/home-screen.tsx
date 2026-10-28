@@ -226,7 +226,7 @@ export async function HomeScreen({
   // anyone else's ripples nor its members: only my own face, no slot.
   const jointFaces = new Map<
     string,
-    { together: boolean; writers: CardFace[]; awaiting: CardFace[] }
+    { together: boolean; writers: CardFace[]; waitsForMe: boolean }
   >();
   if (joints.length > 0) {
     const [{ data: wrote }, { data: members }, together] = await jointReads!;
@@ -243,10 +243,11 @@ export async function HomeScreen({
         // Filled with Everyone on, or once anyone besides its maker is picked (0033).
         together: j.joint_invite_all || (together[j.id] ?? []).some((id) => id !== j.created_by),
         writers: writers.map(face),
-        // Together's slots (0033): who it is with now, less those who wrote.
-        awaiting: (together[j.id] ?? [])
-          .filter((id) => current.includes(id) && !writers.includes(id))
-          .map(face),
+        // Together's slot (0033, H42e): mine alone, while I am with it and have not written.
+        waitsForMe:
+          (together[j.id] ?? []).includes(profile.id) &&
+          current.includes(profile.id) &&
+          !writers.includes(profile.id),
       });
     }
   }
