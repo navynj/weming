@@ -1,5 +1,7 @@
 # Sharing model v2 (design, 2026-10-26)
 
+**Superseded in part (2026-10-28, H45, H46):** advanced links, their defaults and the home lane are retired; where a record shows on my Home is `home_filing` (0060), per record and private; conversions are retired; a pool record's origin can be turned off. See DECISIONS H45 and H46.
+
 Status: **approved 2026-10-26** (§6 answered; the mapping changed so no migrated link shares by default). 0033 and the app switch are in progress on `feat/sharing-v2`. This replaces the first v2 draft and its amendment. Every number below was read on 2026-10-26, with ids as their first eight characters and no content.
 
 ## 0. The model in one page
