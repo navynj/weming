@@ -17,13 +17,14 @@ import { NotifyCard } from '@/features/notifications/notify-card';
 import { HomeGround } from '@/features/home/home-ground';
 import { homeViewParam, scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { homeLaneFor } from '@/features/pool/links';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import {
   getJointSplashes,
   getMyJointShells,
+  getMyFilings,
+  getHandedRipples,
+  getMyHandedThreads,
   getMyLeftPoolRipples,
-  getMyLinks,
   getMyOriginTags,
   getJointTogether,
   getMyPlacements,
@@ -84,14 +85,15 @@ export async function HomeScreen({
   // Every read below that needs only who I am, in one wave (review: a
   // place switch was ~16 sequential round trips); each later one starts as
   // soon as what it needs is known and is awaited only where it is used.
-  const [ripples, categories, mine, pools, originTags, links, made, myThreads, leftPool, placed] =
+  const [ripples, categories, mine, pools, originTags, filings, made, myThreads, leftPool, placed] =
     await Promise.all([
       getMyTrail(supabase, profile.id),
       getMyCategories(supabase),
       getMySplashes(supabase, profile.id),
       getMyPoolNames(supabase, profile.id),
       getMyOriginTags(supabase, profile.id),
-      getMyLinks(supabase, profile.id),
+      // Where I filed records not in my lanes (H45).
+      getMyFilings(supabase),
       // One I made with no ripple of mine yet sits in its pool's column (review).
       getMyJointShells(supabase, profile.id),
       // Friends' records I added my side to (0035).
@@ -111,39 +113,48 @@ export async function HomeScreen({
   const threadOf = new Map(myThreads.map((t) => [t.splashId, t]));
   const friendIds = [...threadOf.keys()];
   // The second wave: what the first named.
-  const [written, { data: friendRows }, { data: theirRows }, withByPool] = await Promise.all([
-    getJointSplashes(supabase, [
-      ...new Set(
-        ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
+  const [written, { data: friendRows }, { data: theirRows }, withByPool, handed] =
+    await Promise.all([
+      getJointSplashes(supabase, [
+        ...new Set(
+          ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
+        ),
+      ]),
+      friendIds.length
+        ? supabase.from('splashes').select('*').in('id', friendIds)
+        : Promise.resolve({ data: [] as Splash[] }),
+      // Every ripple I can read on my records and theirs (0035): Home shows a
+      // record with exactly those. On a friend's, only the pool I wrote in.
+      mine.length + friendIds.length > 0
+        ? supabase
+            .from('ripples')
+            .select(WITH_SPLASH)
+            .in('splash_id', [...mine.map((s) => s.id), ...friendIds])
+            .neq('author_id', profile.id)
+            .is('parent_ripple_id', null)
+            .returns<RippleWithSplash[]>()
+        : Promise.resolve({ data: [] as RippleWithSplash[] }),
+      // With, per pool, on my records (0035): filled on Home once any pool has
+      // someone with it.
+      getPlacementTogether(
+        supabase,
+        mine.map((s) => s.id),
       ),
-    ]),
-    friendIds.length
-      ? supabase.from('splashes').select('*').in('id', friendIds)
-      : Promise.resolve({ data: [] as Splash[] }),
-    // Every ripple I can read on my records and theirs (0035): Home shows a
-    // record with exactly those. On a friend's, only the pool I wrote in.
-    mine.length + friendIds.length > 0
-      ? supabase
-          .from('ripples')
-          .select(WITH_SPLASH)
-          .in('splash_id', [...mine.map((s) => s.id), ...friendIds])
-          .neq('author_id', profile.id)
-          .is('parent_ripple_id', null)
-          .returns<RippleWithSplash[]>()
-      : Promise.resolve({ data: [] as RippleWithSplash[] }),
-    // With, per pool, on my records (0035): filled on Home once any pool has
-    // someone with it.
-    getPlacementTogether(
-      supabase,
-      mine.map((s) => s.id),
-    ),
-  ]);
+      // Threads my records handed to a pool I left with remove (0061).
+      getMyHandedThreads(
+        supabase,
+        mine.map((s) => s.id),
+      ),
+    ]);
+  // A handed thread reads as it stood when I left, on my record, under the
+  // pool I left (0061).
+  const handedRows = await getHandedRipples(supabase, handed);
   const joints = [...written, ...made.filter((shell) => !written.some((j) => j.id === shell.id))];
   const friends: Splash[] = friendIds.map(
     (id) => (friendRows ?? []).find((row) => row.id === id) ?? fromThread(threadOf.get(id)!),
   );
   const friendIdSet = new Set(friendIds);
-  const theirs = (theirRows ?? []).filter((r) => {
+  const theirs = [...(theirRows ?? []), ...handedRows].filter((r) => {
     const friend = r.splash_id ? threadOf.get(r.splash_id) : undefined;
     return !friend || !r.thread_pool_id || r.thread_pool_id === friend.poolId;
   });
@@ -199,10 +210,11 @@ export async function HomeScreen({
   const summaries = summarizeSplashes(boards, [...ripples, ...theirs], profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
-  // A joint entry sits in my home lane for its pool lane, else in its pool's
-  // column (H24, 0033): derived from my marker, never a ripple.
-  const linkedLane = new Map(joints.map((j) => [j.id, homeLaneFor(j.pool_lane_id, links)]));
-  // My pool records too (0033): the home lane for the pool lane they are on.
+  // A joint entry sits in the lane of mine I filed it in, else in its pool's
+  // column (H45): my filing, never the record.
+  const linkedLane = new Map(joints.map((j) => [j.id, filings[j.id] ?? null]));
+  // My pool records too: filed, else the column of the first pool it is
+  // shared to — its origin, unless that is off (H45).
   const myPlacements = mine.length > 0 ? placed : [];
   const filledMine = new Set(
     mine
@@ -213,14 +225,21 @@ export async function HomeScreen({
       )
       .map((s) => s.id),
   );
-  const ownLane = new Map(
+  const ownAt = new Map(
     mine.flatMap((s) => {
-      const at = myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
-      return s.own_pool_id && at ? [[s.id, at.poolLaneId] as const] : [];
+      if (!s.own_pool_id) return [];
+      const at =
+        myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id && p.shared) ??
+        myPlacements.find((p) => p.splashId === s.id && p.shared) ??
+        myPlacements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
+      return at ? [[s.id, at] as const] : [];
     }),
   );
+  const ownLane = new Map([...ownAt].map(([id, at]) => [id, at.poolLaneId] as const));
+  const ownShownIn = (s: { id: string; own_pool_id: string | null }): string | null =>
+    ownAt.get(s.id)?.poolId ?? s.own_pool_id;
   const ownHome = new Map(
-    [...ownLane].map(([id, poolLaneId]) => [id, homeLaneFor(poolLaneId, links)] as const),
+    mine.flatMap((s) => (s.own_pool_id ? [[s.id, filings[s.id] ?? null] as const] : [])),
   );
   // Who has written on each joint splash and which invitees have not (0033),
   // for its faces and its open slot on the Board. A pool I left shows neither
@@ -267,15 +286,15 @@ export async function HomeScreen({
   // My pool records and joint records (0014, 0033): a column per pool after
   // my lanes, headed by the pool's monogram and name — "A pool you left" with
   // a neutral tile once I cannot read it — each mark showing its pool lane's
-  // emoji while I can; one whose pool lane has a home lane of mine sits there.
+  // emoji while I can; one I filed in a lane of mine sits there (H45).
   const ownPools = [
     ...new Set([
       ...mine.flatMap((s) =>
-        s.own_pool_id && (ownHome.get(s.id) ?? null) === null ? [s.own_pool_id] : [],
+        s.own_pool_id && (ownHome.get(s.id) ?? null) === null ? [ownShownIn(s)!] : [],
       ),
       ...joints.flatMap((j) => ((linkedLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
-      // A friend's record sits in the pool's column, or my home lane (0035).
-      ...myThreads.flatMap((t) => (homeLaneFor(t.poolLaneId, links) === null ? [t.poolId] : [])),
+      // A friend's record sits in the pool's column, or where I filed it (0035, H45).
+      ...myThreads.flatMap((t) => (filings[t.splashId] ? [] : [t.poolId])),
       ...leftPool.values(),
     ]),
   ];
@@ -357,7 +376,7 @@ export async function HomeScreen({
   for (const r of theirs) {
     if (!r.splash_id || !r.thread_pool_id || !mineIds.has(r.splash_id)) continue;
     const list = sidesOf.get(r.splash_id) ?? [];
-    const label = poolName.get(r.thread_pool_id) ?? 'A pool';
+    const label = poolName.get(r.thread_pool_id) ?? 'A pool you left';
     const at = list.find((x) => x.label === label);
     if (at) at.count += 1;
     else list.push({ label, count: 1 });
@@ -407,7 +426,7 @@ export async function HomeScreen({
       if (friend) {
         // Someone's record I wrote on in one pool (0035): that pool's, read as
         // it reads it, opening there while shared; never mine to pin or edit.
-        const home = homeLaneFor(friend.poolLaneId, links);
+        const home = filings[friend.splashId] ?? null;
         const name = friend.poolName ?? 'A pool you left';
         return {
           ...card,
@@ -418,6 +437,8 @@ export async function HomeScreen({
           href: friend.shared ? poolSplashHref(friend.poolId, friend.splashId) : undefined,
           menu: { pin: false, delete: false },
           editable: false,
+          // Filed on my Home from its pencil, while I can read its pool (H45).
+          fileable: friend.poolName !== null,
           ...(home || !friend.poolLane ? {} : { lane: { icon: friend.poolLane.icon, name } }),
           origins: [
             ...(friend.poolLane
@@ -430,12 +451,13 @@ export async function HomeScreen({
       if (summary.ownPoolId) {
         // No badge: the column header says where it lives.
         const home = ownHome.get(summary.id) ?? null;
+        const shownIn = ownAt.get(summary.id)?.poolId ?? summary.ownPoolId;
         return {
           ...card,
-          ...(home ? { column: home } : {}),
+          column: home ?? ownPoolColumn(shownIn),
           lane: {
             icon: ownLaneIcon.get(summary.id) ?? null,
-            name: poolName.get(summary.ownPoolId) ?? 'A pool you left',
+            name: poolName.get(shownIn) ?? 'A pool you left',
           },
         };
       }

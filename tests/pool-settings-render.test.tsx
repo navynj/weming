@@ -102,7 +102,6 @@ const view = (ownerId: string, inviteAllByDefault = false): PoolView => ({
   pool: { id: 'p-a', name: 'Our Pool', ownerId, inviteAllByDefault },
   members: [],
   lanes: [],
-  myLinks: [],
   placements: [],
   splashes: [],
   ripples: [],

@@ -11,14 +11,13 @@ import {
 } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
 import { declaredRange, orderBlocks } from '@/features/splash/block-day';
-import { homeLaneFor } from '@/features/pool/links';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { sharedSplashIds, withResponded } from '@/features/home/responded';
 import {
   getJointSplashes,
   getJointTogether,
-  getMyLinks,
+  getMyFilings,
   getMyPlacements,
   getMyPoolNames,
   getPlacementTogether,
@@ -40,17 +39,17 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
 
   const { id } = await params;
   const top = (await searchParams).top;
-  const [ripples, categories, mine, links, pools] = await Promise.all([
+  const [ripples, categories, mine, filings, pools] = await Promise.all([
     getMyTrail(supabase, profile.id),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
-    getMyLinks(supabase, profile.id),
+    getMyFilings(supabase),
     getMyPoolNames(supabase, profile.id),
   ]);
   const lane = categories.find((c) => c.id === id);
   if (!lane) notFound();
-  // Joint splashes I wrote on are posts here too, when this lane is the home
-  // lane for their pool lane (H24, 0033) — as on Home, never by a ripple's own lane.
+  // Joint splashes I wrote on are posts here too, when I filed them in this
+  // lane (H45) — as on Home, never by a ripple's own lane.
   const mineIds = new Set(mine.map((s) => s.id));
   const joints = await getJointSplashes(supabase, [
     ...new Set(
@@ -62,7 +61,7 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     supabase,
     joints.map((j) => j.id),
   );
-  // My pool records whose pool lane has this lane as its home lane (0033).
+  // My pool records I filed in this lane (H45).
   const placements = mine.length > 0 ? await getMyPlacements(supabase, profile.id) : [];
   // Filled once any pool has someone with it (0035), as on Home.
   const withByPool = await getPlacementTogether(
@@ -77,12 +76,6 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
           Object.values(withByPool[s.id] ?? {}).some((ids) => ids.length > 0),
       )
       .map((s) => s.id),
-  );
-  const ownHome = new Map(
-    mine.flatMap((s) => {
-      const at = placements.find((p) => p.splashId === s.id && p.poolId === s.own_pool_id);
-      return s.own_pool_id && at ? [[s.id, homeLaneFor(at.poolLaneId, links)] as const] : [];
-    }),
   );
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
 
@@ -114,8 +107,8 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
       const joint = jointOf.get(summary.id);
       // A pool switched off my Home (0039) stays off its lanes too.
       const off = new Set(pools.filter((p) => !p.onHome).map((p) => p.id));
-      if (joint) return !off.has(joint.pool_id!) && homeLaneFor(joint.pool_lane_id, links) === id;
-      if (summary.ownPoolId) return !off.has(summary.ownPoolId) && ownHome.get(summary.id) === id;
+      if (joint) return !off.has(joint.pool_id!) && filings[joint.id] === id;
+      if (summary.ownPoolId) return !off.has(summary.ownPoolId) && filings[summary.id] === id;
       return cardLane(summary) === id;
     })
     .map((summary) => {

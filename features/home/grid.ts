@@ -107,6 +107,11 @@ export type Card = {
    * a pool I am in. Absent: no pencil.
    */
   editable?: boolean;
+  /**
+   * On Home, someone's record I wrote on (H45): the pencil opens only where
+   * it shows on my Home — its pool's column or a lane of mine.
+   */
+  fileable?: boolean;
   /** Every image across its ripples, oldest first, for the Board view: each with the ripple it is on. */
   photos?: CardPhoto[];
   /** On the board: every photo and video, hidden ones too, for the toolbar's tabs (their names stay). */
@@ -364,8 +369,11 @@ export function withEdits(
       declaredLaneId?: string | null;
       poolLane?: { id: string; icon: string | null; name: string };
       kind?: 'mine' | 'own' | 'joint';
+      homeColumn?: { column: string; lane: { icon: string | null; name: string } | null };
     }
   >,
+  /** Home's own (H45): a filing moves a mark there, never in a pool. */
+  { home = true }: { home?: boolean } = {},
 ): Card[] {
   if (Object.keys(edits).length === 0) return cards;
   return cards.map((card) => {
@@ -385,8 +393,12 @@ export function withEdits(
       ...(edit.poolLane && card.lane && cardColumn(card)?.startsWith('pool:')
         ? { lane: { ...card.lane, icon: edit.poolLane.icon } }
         : {}),
-      // Made mine (0022): on Home it leaves its pool's column and badge for
-      // the lane it now declares.
+      // Filed on Home (H45): its mark moves at once, the record unchanged.
+      ...(edit.homeColumn && home
+        ? { column: edit.homeColumn.column, lane: edit.homeColumn.lane ?? undefined }
+        : {}),
+      // Kept in my lane (H45): on Home it leaves its pool's column and badge
+      // for the lane it now declares.
       ...(edit.kind === 'mine' && !card.branches
         ? {
             column: undefined,

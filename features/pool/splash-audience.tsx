@@ -2,15 +2,10 @@
 
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
-import { setPlacement, setPlacementTogether } from './actions';
-import {
-  preselectLane,
-  withPick,
-  withTogether,
-  type AudienceLink,
-  type AudiencePick,
-} from './audience';
+import { keepInLane, setPlacement, setPlacementTogether } from './actions';
+import { preselectLane, withPick, withTogether, type AudiencePick } from './audience';
 import { AudienceChip, type AudiencePool } from './audience-sheet';
+import type { KeepIn } from './keep-in-lane';
 import { lastPicked, rememberPick } from './last-pick';
 
 /**
@@ -18,23 +13,25 @@ import { lastPicked, rememberPick } from './last-pick';
  * shared to, each on a pool lane, switched in place. Each change shows at
  * once and the placement follows behind it; a refusal takes it back and
  * says why. A pick is remembered on this device for my lane and that pool.
+ * My pool record's last pool asks for a lane of mine first (H45).
  */
 export function SplashAudience({
   splashId,
   myLaneId,
   shared,
   pools,
-  links,
-  locked = null,
+  keepIn = null,
+  onKept,
 }: {
   splashId: string;
-  /** The record's lane: what a link's default and my last pick are kept by. */
+  /** The record's lane: what my last pick is kept by. */
   myLaneId: string | null;
   shared: AudiencePick[];
   pools: AudiencePool[];
-  links: AudienceLink[];
-  /** A pool record's own pool (0056): always shared there. */
-  locked?: string | null;
+  /** My pool record (H45): my lanes, and where I filed it. */
+  keepIn?: Omit<KeepIn, 'onKeep'> | null;
+  /** Kept in my lane: the record is mine now, so a sheet holding it closes. */
+  onKept?: () => void;
 }) {
   const audience = useOptimisticAction(shared);
   return (
@@ -42,12 +39,23 @@ export function SplashAudience({
       <AudienceChip
         shared={audience.value}
         pools={pools}
-        locked={locked}
+        keepIn={
+          keepIn
+            ? {
+                ...keepIn,
+                onKeep: (laneId) => {
+                  audience.run(
+                    () => [],
+                    () => keepInLane(splashId, laneId),
+                    'Kept in your lane',
+                  );
+                  onKept?.();
+                },
+              }
+            : null
+        }
         preselect={(poolId) =>
           preselectLane(
-            myLaneId,
-            poolId,
-            links,
             lastPicked(myLaneId, poolId),
             pools.find((p) => p.id === poolId)?.lanes.map((l) => l.id) ?? [],
           )

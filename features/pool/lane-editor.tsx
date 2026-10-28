@@ -4,17 +4,20 @@ import { useState } from 'react';
 
 import { EmojiInput } from '@/features/lanes/emoji-input';
 
-import type { MatchLane } from './match';
-
 /** A pool lane before the pool exists: keyed in the browser. */
-export type DraftLane = MatchLane;
+export type DraftLane = {
+  key: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+};
 
 /**
  * The pool's lanes on the create screen (1c): each a quiet chip with its
  * emoji and name — tap to edit or remove — and a dashed `+ Add lane`.
  * Editing opens one inline row: the emoji (one grapheme, as everywhere), the
  * name, and an optional line of description (80 characters at most) shown
- * under the lane when members match it.
+ * under the lane in the pool.
  */
 export function LaneEditor({
   lanes,

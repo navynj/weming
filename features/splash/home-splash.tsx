@@ -9,8 +9,10 @@ import { signOwnMedia, signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { audienceFor } from '@/features/pool/audience-for';
 import {
-  getMyLinks,
+  getHandedRipples,
+  getMyHandedThreads,
   getMyOriginTags,
+  getMyFilings,
   getMyPlacements,
   getPlacementPicks,
   getMyPoolNames,
@@ -35,13 +37,13 @@ export async function HomeSplash({ id }: { id: string }) {
   const now = new Date();
   const today = todayIn(profile.timezone);
 
-  const [ripples, categories, boards, links, pools, placements, tags] = await Promise.all([
+  const [ripples, categories, boards, pools, placements, filings, tags] = await Promise.all([
     getMyTrail(supabase, profile.id),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
-    getMyLinks(supabase, profile.id),
     getMyPoolNames(supabase, profile.id),
     getMyPlacements(supabase, profile.id),
+    getMyFilings(supabase),
     getMyOriginTags(supabase, profile.id),
   ]);
 
@@ -67,7 +69,11 @@ export async function HomeSplash({ id }: { id: string }) {
         .is('parent_ripple_id', null)
         .returns<RippleWithSplash[]>()
     : { data: [] as RippleWithSplash[] };
-  const others = theirs ?? [];
+  // A thread handed to a pool I left with remove (0061): still on my
+  // record, under that pool, as it stood when I left.
+  const handedThreads = board ? await getMyHandedThreads(supabase, [board.id]) : [];
+  const handed = await getHandedRipples(supabase, handedThreads);
+  const others = [...(theirs ?? []), ...handed];
   const { data: names } = others.length
     ? await supabase
         .from('profiles')
@@ -119,7 +125,13 @@ export async function HomeSplash({ id }: { id: string }) {
 
   // A tab per pool once anyone has written a side (0035): the pools it is
   // shared to, and one switched off that still holds a side, muted.
-  const placed = board ? placements.filter((p) => p.splashId === board.id) : [];
+  const placed = [
+    ...(board ? placements.filter((p) => p.splashId === board.id) : []),
+    // A pool I left with remove, its thread handed over (0061).
+    ...handedThreads
+      .filter((h) => !placements.some((p) => p.splashId === h.splashId && p.poolId === h.poolId))
+      .map((h) => ({ splashId: h.splashId, poolId: h.poolId, poolLaneId: '', shared: false })),
+  ];
   // Or once anyone has responded in a pool (0053): another pool's replies
   // and reactions read only in that pool's tab.
   const responded = (pid: string): boolean =>
@@ -135,7 +147,7 @@ export async function HomeSplash({ id }: { id: string }) {
           )
           .map((p) => ({
             poolId: p.poolId,
-            label: pools.find((x) => x.id === p.poolId)?.name ?? 'A pool',
+            label: pools.find((x) => x.id === p.poolId)?.name ?? 'A pool you left',
             count: others.filter((r) => r.thread_pool_id === p.poolId).length,
             off: !p.shared,
           }));
@@ -159,7 +171,8 @@ export async function HomeSplash({ id }: { id: string }) {
         board,
         summary,
         me: profile.id,
-        links,
+        categories,
+        filed: filings[id] ?? null,
         pools,
         placements,
         picks,

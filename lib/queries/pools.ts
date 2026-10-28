@@ -1,12 +1,12 @@
 import { cache } from 'react';
 import { initialsOf } from '@/features/home/grid';
-import type { LinkMarkers } from '@/features/pool/links';
 import { originTag } from '@/features/pool/origin-tag';
 import type { Splash } from '@/features/splash/summary';
 import type { Database } from '@/lib/database.types';
 import type { BoardLayoutJson } from '@/features/month-board/board-layout';
 import { getPoolLayouts } from '@/lib/queries/layouts';
 import type { DuringClient } from '@/lib/queries/profile';
+import type { RippleWithSplash } from '@/lib/queries/ripples';
 import type { RippleResponsesValue } from '@/features/responses/model';
 import {
   getLockedIds,
@@ -81,8 +81,6 @@ export type PoolView = {
   /** Current members, me first then join order (D7), then former members who kept theirs. */
   members: PoolMember[];
   lanes: PoolLane[];
-  /** My links only: a member never reads another's (RLS); advanced (0033). */
-  myLinks: ({ poolLaneId: string; myCategoryId: string } & LinkMarkers)[];
   placements: (Placement & { ownerId: string })[];
   /** Placed posts and joint splashes, as RLS lets me see them. */
   splashes: Splash[];
@@ -237,7 +235,7 @@ export async function getPoolView(
   // One round trip for everything keyed by the pool alone (review: a place
   // switch was ~16 sequential calls); a pool I cannot read returns nothing
   // from any of them, and is not found.
-  const [poolRow, members, lanes, links, placements, joints, invites, myRow] = await Promise.all([
+  const [poolRow, members, lanes, placements, joints, invites, myRow] = await Promise.all([
     supabase
       .from('pools')
       .select('id, name, owner_id, photo_version, invite_all_by_default')
@@ -245,12 +243,6 @@ export async function getPoolView(
       .maybeSingle(),
     membersOf(supabase, [poolId]),
     supabase.from('pool_lanes').select('*').eq('pool_id', poolId).order('position'),
-    supabase
-      .from('lane_mappings')
-      .select('pool_lane_id, my_category_id, is_default, share_by_default, is_home')
-      .eq('pool_id', poolId)
-      .eq('user_id', me)
-      .order('created_at'),
     supabase
       .from('splash_placements')
       .select('splash_id, pool_id, pool_lane_id, shared, invite_all, splash:splashes(*)')
@@ -281,7 +273,7 @@ export async function getPoolView(
       .eq('user_id', me)
       .maybeSingle(),
   ]);
-  for (const result of [poolRow, lanes, links, placements, joints, invites]) {
+  for (const result of [poolRow, lanes, placements, joints, invites]) {
     if (result.error) throw result.error;
   }
   const pool = poolRow.data;
@@ -361,13 +353,6 @@ export async function getPoolView(
     },
     members: orderMembers(members.map(toMember), me),
     lanes: lanes.data ?? [],
-    myLinks: (links.data ?? []).map((l) => ({
-      poolLaneId: l.pool_lane_id,
-      myCategoryId: l.my_category_id,
-      isDefault: l.is_default,
-      shareByDefault: l.share_by_default === true,
-      isHome: l.is_home,
-    })),
     placements: shown.map((p) => ({
       splashId: p.splash_id,
       poolId: p.pool_id,
@@ -393,43 +378,13 @@ export async function getPoolView(
 }
 
 /**
- * Every link of mine across my pools, with the pool's name (advanced, 0033):
- * what Audience preselects from (a lane's default pool lane, shared only
- * when that default says so) and where Home shows a pool lane's records
- * (its home lane).
+ * Where records not in one of my lanes show on my Home (0060, H45): my
+ * filing, by record. Mine alone; no filing, its pool's column.
  */
-export type MyLink = {
-  myCategoryId: string;
-  poolId: string;
-  poolName: string;
-  poolLaneId: string;
-} & LinkMarkers;
-
-async function readMyLinks(supabase: DuringClient, me: string): Promise<MyLink[]> {
-  // Two reads: lane_mappings reaches pools only through pool_lanes' composite
-  // key, which PostgREST cannot embed by name.
-  const [{ data: links, error }, pools] = await Promise.all([
-    supabase
-      .from('lane_mappings')
-      .select('my_category_id, pool_id, pool_lane_id, is_default, share_by_default, is_home')
-      .eq('user_id', me)
-      .order('created_at'),
-    getMyPoolNames(supabase, me),
-  ]);
+async function readMyFilings(supabase: DuringClient): Promise<Record<string, string>> {
+  const { data, error } = await supabase.from('home_filing').select('splash_id, my_lane_id');
   if (error) throw error;
-  const nameOf = new Map(pools.map((p) => [p.id, p.name]));
-  // A pool I have left is not in my pools, so its links drop out here.
-  return links
-    .filter((row) => nameOf.has(row.pool_id))
-    .map((row) => ({
-      myCategoryId: row.my_category_id,
-      poolId: row.pool_id,
-      poolName: nameOf.get(row.pool_id)!,
-      poolLaneId: row.pool_lane_id,
-      isDefault: row.is_default,
-      shareByDefault: row.share_by_default === true,
-      isHome: row.is_home,
-    }));
+  return Object.fromEntries(data.map((row) => [row.splash_id, row.my_lane_id]));
 }
 
 /** A pool's lane as Audience offers it: emoji and name (0033). */
@@ -624,6 +579,9 @@ export async function getMyPlacements(supabase: DuringClient, me: string): Promi
       'splash_id, pool_id, pool_lane_id, shared, invite_all, splash:splashes!inner(owner_id), pool:pools(id)',
     )
     .eq('splash.owner_id', me)
+    // Earliest shared first: a pool record whose origin is off shows in the
+    // column of the first pool still on (H45).
+    .order('created_at')
     .returns<
       {
         splash_id: string;
@@ -644,6 +602,54 @@ export async function getMyPlacements(supabase: DuringClient, me: string): Promi
       shared: row.shared,
       inviteAll: row.invite_all,
     }));
+}
+
+/**
+ * The threads my records handed to their pools when I left them with
+ * remove (0061): each placement's pool and the joint record that holds its
+ * thread now, read as it stood when I left.
+ */
+export async function getMyHandedThreads(
+  supabase: DuringClient,
+  splashIds: string[],
+): Promise<{ splashId: string; poolId: string; jointId: string }[]> {
+  if (splashIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('splash_placements')
+    .select('splash_id, pool_id, handed_to')
+    .in('splash_id', splashIds)
+    .not('handed_to', 'is', null);
+  if (error) throw error;
+  return data.map((row) => ({
+    splashId: row.splash_id,
+    poolId: row.pool_id,
+    jointId: row.handed_to!,
+  }));
+}
+
+/**
+ * A handed thread's ripples (0061), as my record reads them: on my record,
+ * in the pool I left, up to when I left (RLS keeps the rest from me).
+ */
+export async function getHandedRipples(
+  supabase: DuringClient,
+  handed: { splashId: string; poolId: string; jointId: string }[],
+): Promise<RippleWithSplash[]> {
+  if (handed.length === 0) return [];
+  const { data, error } = await supabase
+    .from('ripples')
+    .select('*')
+    .in(
+      'splash_id',
+      handed.map((h) => h.jointId),
+    )
+    .is('parent_ripple_id', null);
+  if (error) throw error;
+  const of = new Map(handed.map((h) => [h.jointId, h]));
+  return data.map((r) => {
+    const h = of.get(r.splash_id!)!;
+    return { ...r, splash_id: h.splashId, thread_pool_id: h.poolId, splash: null };
+  });
 }
 
 /** Joint splashes I have written in, for Home (H23): my ripples on them show there. */
@@ -725,5 +731,5 @@ export async function getMyOriginTags(
 }
 
 /** Read once per request and client: the shell and Home both ask (review: round trips). */
-export const getMyLinks = cache(readMyLinks);
+export const getMyFilings = cache(readMyFilings);
 export const getMyPoolNames = cache(readMyPoolNames);

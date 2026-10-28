@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { placeCard, withEdits } from '@/features/home/grid';
 import { withPoolBadge } from '@/features/pool/home-badge';
-import { homeLaneFor } from '@/features/pool/links';
 import type { SplashSummary } from '@/features/splash/summary';
 
 function summary(id: string): SplashSummary {
@@ -26,7 +25,7 @@ function summary(id: string): SplashSummary {
 }
 
 describe('the pool badge on Home (H23, H24)', () => {
-  it('puts a joint entry whose pool lane no link of mine brings in in its pool’s column, with the badge and tag', () => {
+  it('puts a joint entry I have not filed in its pool’s column, with the badge and tag', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
@@ -60,7 +59,7 @@ describe('the pool badge on Home (H23, H24)', () => {
     expect(card.lane).toEqual({ icon: '🎲', name: 'Our Pool' });
   });
 
-  it('keeps a joint entry whose pool lane is brought into my lane in that lane’s column', () => {
+  it('keeps a joint entry I filed in my lane in that lane’s column (H45)', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
       poolName: 'Our Pool',
@@ -81,7 +80,7 @@ describe('the pool badge on Home (H23, H24)', () => {
   });
 });
 
-describe('a joint splash made mine, on Home (0022)', () => {
+describe('my pool record kept in my lane, on Home (H45)', () => {
   it('leaves its pool’s column and badge for the lane it now declares, at once', () => {
     const joint = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
@@ -99,25 +98,40 @@ describe('a joint splash made mine, on Home (0022)', () => {
   });
 });
 
-describe('where a joint splash shows on my Home, derived from my Home marker (H24, 0033)', () => {
-  const links = (isHome: boolean) => [{ myCategoryId: 'my-games', poolLaneId: 'l-games', isHome }];
+describe('filing a record on Home (H45)', () => {
+  const joint = () =>
+    withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
+      poolId: 'p-ours',
+      poolName: 'Our Pool',
+      linkedLane: null,
+      poolLane: { name: 'Games', icon: '🎲' },
+    });
 
-  it('a link marked Home brings the pool lane into my lane', () => {
-    expect(homeLaneFor('l-games', links(true))).toBe('my-games');
+  it('moves its mark to my lane at once, keeping its badge', () => {
+    const [filed] = withEdits([joint()], {
+      's-joint': {
+        title: 's-joint',
+        icon: null,
+        homeColumn: { column: 'my-games', lane: { icon: '🎮', name: 'Games' } },
+      },
+    });
+    expect(filed.column).toBe('my-games');
+    expect(filed.lane).toEqual({ icon: '🎮', name: 'Games' });
+    expect(filed.pools).toEqual(['Our Pool']);
   });
 
-  it('a link not marked Home, or no link, leaves it in the pool’s column', () => {
-    expect(homeLaneFor('l-games', links(false))).toBeNull();
-    expect(homeLaneFor('l-games', [])).toBeNull();
-    expect(homeLaneFor('l-other', links(true))).toBeNull();
-  });
-
-  it('takes the one marked Home when several of my lanes link one pool lane', () => {
-    expect(
-      homeLaneFor('l-games', [
-        { myCategoryId: 'my-a', poolLaneId: 'l-games', isHome: false },
-        { myCategoryId: 'my-b', poolLaneId: 'l-games', isHome: true },
-      ]),
-    ).toBe('my-b');
+  it('never moves a mark in a pool: a filing is Home’s alone', () => {
+    const [inPool] = withEdits(
+      [joint()],
+      {
+        's-joint': {
+          title: 's-joint',
+          icon: null,
+          homeColumn: { column: 'my-games', lane: null },
+        },
+      },
+      { home: false },
+    );
+    expect(inPool.column).toBe(joint().column);
   });
 });

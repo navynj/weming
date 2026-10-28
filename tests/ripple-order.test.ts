@@ -101,7 +101,6 @@ function view(of: Splash): PoolView {
       },
     ],
     lanes: [{ id: 'l', pool_id: 'p', name: 'Days', icon: '🌙', description: null, position: 0 }],
-    myLinks: [],
     placements: [],
     splashes: [of],
     ripples: ROWS,

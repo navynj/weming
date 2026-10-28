@@ -118,7 +118,7 @@ export function SplashEditSheet({
 }
 
 type Edit = {
-  kind: Loaded['kind'];
+  kind: Exclude<Loaded['kind'], 'theirs'>;
   title: string;
   icon: string | null;
   declaredStart: string | null;
@@ -155,14 +155,6 @@ function pendingFor(conversion: Conversion, loaded: Loaded): Partial<PendingEdit
   switch (conversion.op) {
     case 'move_pool':
       return { poolLane: poolLane(conversion.poolLaneId) };
-    case 'to_joint':
-      return { kind: 'joint', poolLane: poolLane(conversion.poolLaneId) };
-    case 'to_mine':
-      return {
-        kind: 'mine',
-        declaredLaneId: conversion.myLaneId,
-        poolLane: poolLane(conversion.placeOn),
-      };
     case 'set_lane':
       return { declaredLaneId: conversion.myLaneId, poolLane: poolLane(conversion.placeOn) };
     default:
@@ -199,8 +191,7 @@ function EditForm({
   onSave: (edit: Edit) => void;
 }) {
   const { pools, today } = context;
-  const lanes = useEditLanes(initial, context, pool);
-  const [confirming, setConfirming] = useState(false);
+  const lanes = useEditLanes(initial, context, pool, onCancel);
   const [title, setTitle] = useState(initial.title);
   const [icon, setIcon] = useState(initial.icon ?? '');
   // Its description (0037): a field once asked for, or once it has one.
@@ -234,6 +225,26 @@ function EditForm({
       declaredStart: a.date,
       declaredEnd: a.endDate && a.endDate !== a.date ? a.endDate : null,
     };
+  }
+
+  if (initial.kind === 'theirs') {
+    // Someone's record I wrote on (H45): only where it shows on my Home.
+    return (
+      <div data-edit-form="theirs" className="flex flex-col gap-5">
+        <p className="text-main-900 text-3xl/snug font-semibold">
+          {initial.icon ? `${initial.icon} ` : ''}
+          {initial.title || 'Untitled'}
+        </p>
+        {lanes.node}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="border-pool-200 text-ink rounded-full border py-2.5 text-base font-medium"
+        >
+          Done
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -305,50 +316,17 @@ function EditForm({
           type="button"
           data-edit-save
           disabled={!changed || !rangeOk}
-          onClick={() => (lanes.confirm && !confirming ? setConfirming(true) : save())}
+          onClick={save}
           className="bg-main-900 flex-1 rounded-full py-2.5 text-base font-semibold text-white disabled:opacity-40"
         >
           Save
         </button>
       </div>
-      {confirming && lanes.confirm ? (
-        <div
-          data-joint-confirm
-          role="alertdialog"
-          className="bg-pool-100 flex flex-col gap-3 rounded-2xl p-4"
-        >
-          <p className="text-ink text-sm">
-            Make this a joint splash in {lanes.confirm.pool}? Everyone in {lanes.confirm.pool} can
-            add to it and edit its title. You keep your ripples.
-          </p>
-          {lanes.confirm.removed.length > 0 ? (
-            <p data-joint-removed className="text-ink text-sm">
-              It will be removed from {lanes.confirm.removed.join(', ')}.
-            </p>
-          ) : null}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="border-pool-200 text-ink flex-1 rounded-full border bg-white py-2 text-sm font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              data-joint-confirm-go
-              onClick={save}
-              className="bg-main-900 flex-1 rounded-full py-2 text-sm font-semibold text-white"
-            >
-              Make it joint
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 
   function save(): void {
+    if (initial.kind === 'theirs') return;
     onSave({
       kind: initial.kind,
       title: title.trim(),
@@ -357,31 +335,29 @@ function EditForm({
       ...dates(),
       declaredLaneId: mine ? laneId : null,
       // Only the pools that changed: on, moved to another pool lane, or off.
-      // Made mine from Home, every pool its new Audience names.
-      share:
-        mine || lanes.conversion.op === 'to_mine'
-          ? [
-              ...shared
-                .filter(
-                  (pick) =>
-                    !initial.sharedIn.some(
-                      (was) =>
-                        was.poolId === pick.poolId &&
-                        was.poolLaneId === pick.poolLaneId &&
-                        sameTogether(was.together, pick.together),
-                    ),
-                )
-                .map((pick) => ({
-                  poolId: pick.poolId,
-                  on: true,
-                  poolLaneId: pick.poolLaneId,
-                  ...(pick.together ? { together: pick.together } : {}),
-                })),
-              ...initial.sharedIn
-                .filter((was) => !shared.some((pick) => pick.poolId === was.poolId))
-                .map((was) => ({ poolId: was.poolId, on: false, poolLaneId: null })),
-            ]
-          : [],
+      share: mine
+        ? [
+            ...shared
+              .filter(
+                (pick) =>
+                  !initial.sharedIn.some(
+                    (was) =>
+                      was.poolId === pick.poolId &&
+                      was.poolLaneId === pick.poolLaneId &&
+                      sameTogether(was.together, pick.together),
+                  ),
+              )
+              .map((pick) => ({
+                poolId: pick.poolId,
+                on: true,
+                poolLaneId: pick.poolLaneId,
+                ...(pick.together ? { together: pick.together } : {}),
+              })),
+            ...initial.sharedIn
+              .filter((was) => !shared.some((pick) => pick.poolId === was.poolId))
+              .map((was) => ({ poolId: was.poolId, on: false, poolLaneId: null })),
+          ]
+        : [],
       invite: lanes.invite,
       ownTogether: lanes.ownTogether ?? null,
       jointTogether: lanes.jointTogether ?? null,

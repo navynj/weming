@@ -54,7 +54,6 @@ const VIEW: PoolView = {
     },
   ],
   lanes: [{ id: 'l', pool_id: 'p', name: 'Food', icon: '🍽️', description: null, position: 0 }],
-  myLinks: [],
   placements: [],
   splashes: [],
   ripples: [],

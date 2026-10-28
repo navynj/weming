@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react';
 
 import { representativeLane, type Splash, type SplashSummary } from '@/features/splash/summary';
-import type { MyLink, Placement } from '@/lib/queries/pools';
+import type { Placement } from '@/lib/queries/pools';
+import type { MyCategory } from '@/lib/queries/profile';
 
 import type { AudiencePool } from './audience-sheet';
 import { SplashAudience } from './splash-audience';
 
 /**
- * A record page's Audience chip (H23, 0033), one rule for Home's page and
- * the pool's: my Home record gets a row per pool I am in, each on a pool
- * lane; my pool record the same, its own pool always on (0056); anything
- * else has none.
+ * A record page's Audience chip (H23, 0033, H45), one rule for Home's page
+ * and the pool's: my Home record and my pool record get a row per pool I am
+ * in, each on a pool lane, any of them switched off; switching off a pool
+ * record's last pool asks which of my lanes keeps it. Anything else has none.
  */
 export function audienceFor({
   board,
   summary,
   me,
-  links,
+  categories,
+  filed = null,
   pools,
   placements,
   picks = {},
@@ -24,7 +26,10 @@ export function audienceFor({
   board: Splash | null;
   summary: SplashSummary;
   me: string;
-  links: MyLink[];
+  /** My lanes, for "Keep it in which of your lanes?". */
+  categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
+  /** Where I filed it on Home (H45), if anywhere. */
+  filed?: string | null;
   pools: AudiencePool[];
   placements: Placement[];
   /** The faces I picked on it, by pool (0035). */
@@ -44,8 +49,7 @@ export function audienceFor({
           together: { everyone: Boolean(p.inviteAll), picked: picks[p.poolId] ?? [] },
         }))}
       pools={pools}
-      links={links}
-      locked={board.own_pool_id}
+      keepIn={board.own_pool_id ? { lanes: categories, filed } : null}
     />
   );
 }

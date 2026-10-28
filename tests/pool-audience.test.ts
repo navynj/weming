@@ -1,37 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { audienceLabel, defaultAudience, type AudienceLink } from '@/features/pool/audience';
+import { audienceLabel } from '@/features/pool/audience';
 import { chipLabel, type AudiencePool } from '@/features/pool/audience-sheet';
 
-const links: AudienceLink[] = [
-  {
-    myCategoryId: 'place',
-    poolLaneId: 'l-trips',
-    poolId: 'p1',
-    poolName: 'Our Pool',
-    isDefault: true,
-    shareByDefault: true,
-    isHome: false,
-  },
-  {
-    myCategoryId: 'place',
-    poolLaneId: 'l-crew',
-    poolId: 'p2',
-    poolName: 'Crew',
-    isDefault: true,
-    shareByDefault: false,
-    isHome: true,
-  },
-  {
-    myCategoryId: 'food',
-    poolLaneId: 'l-food',
-    poolId: 'p1',
-    poolName: 'Our Pool',
-    isDefault: true,
-    shareByDefault: true,
-    isHome: false,
-  },
-];
 const pools: AudiencePool[] = [
   {
     id: 'p1',
@@ -50,13 +21,6 @@ describe('the Audience chip (H23, 0033)', () => {
     expect(audienceLabel([])).toBe('Only me');
     expect(audienceLabel(['Our Pool'])).toBe('Our Pool');
     expect(audienceLabel(['Our Pool', 'Crew'])).toBe('2 pools');
-  });
-
-  it('defaults only to pools whose default link shares by default', () => {
-    expect(defaultAudience('place', links)).toEqual([{ poolId: 'p1', poolLaneId: 'l-trips' }]);
-    expect(defaultAudience('food', links)).toEqual([{ poolId: 'p1', poolLaneId: 'l-food' }]);
-    expect(defaultAudience('day', links)).toEqual([]);
-    expect(defaultAudience(null, links)).toEqual([]);
   });
 
   it('names one pool with its lane, emoji first when it has one', () => {
