@@ -161,17 +161,17 @@ describe('inviting everyone to new posts by default (0033)', () => {
   });
 });
 
-describe('Connect your lanes, under Advanced (0033)', () => {
-  it('stays folded until Advanced is opened', () => {
-    const { container } = settings(view('u-me'), 'advanced');
-    const advanced = container.querySelector<HTMLButtonElement>('[data-settings-advanced-toggle]')!;
-    expect(advanced.getAttribute('aria-expanded')).toBe('false');
-    expect(container.querySelector('[data-lane-match]')).toBeNull();
-    fireEvent.click(advanced);
-    expect(advanced.getAttribute('aria-expanded')).toBe('true');
-    expect(container.querySelector('[data-lane-match]')!.textContent).toContain(
-      'Connect your lanes',
-    );
+describe('Connect your lanes, hidden from Advanced (H44)', () => {
+  it('is not offered, for the creator or a member; Advanced keeps its switches and Leave', () => {
+    for (const owner of ['u-me', 'u-other']) {
+      const { container, unmount } = settings(view(owner), 'advanced');
+      expect(container.querySelector('[data-settings-advanced-toggle]')).toBeNull();
+      expect(container.querySelector('[data-settings-advanced], [data-lane-match]')).toBeNull();
+      expect(container.textContent).not.toContain('Connect your lanes');
+      expect(container.querySelector('[data-settings-on-home]')).not.toBeNull();
+      expect(container.querySelector('[data-settings-invite-all]')).not.toBeNull();
+      unmount();
+    }
   });
 });
 
@@ -308,7 +308,8 @@ describe('the pool settings sheet’s shape (review)', () => {
           ? 'invite-all'
           : 'connect',
     );
-    expect(order).toEqual(['on-home', 'invite-all', 'connect']);
+    // Connect your lanes is hidden for now (H44).
+    expect(order).toEqual(['on-home', 'invite-all']);
   });
 });
 
