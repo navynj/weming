@@ -28,6 +28,8 @@ export function RippleThread({
     authorId?: string;
     /** New reactions or replies from someone else on my ripple since I last opened it (H25). */
     dot?: boolean;
+    /** A part removed by a hand-over (0061): nobody's, so no face — only the thread's place. */
+    removed?: boolean;
   }[];
   initials: string;
   /** Whose face the entries without their own author show (0018): mine, on my own pages. */
@@ -47,12 +49,23 @@ export function RippleThread({
           >
             <span className="relative flex flex-col items-center">
               <span data-thread-avatar className="relative flex shrink-0">
-                <Avatar
-                  id={entry.authorId ?? (entry.initials === undefined ? authorId : undefined)}
-                  initials={entry.initials ?? initials}
-                  className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
-                  style={{ width: AVATAR_PX, height: AVATAR_PX }}
-                />
+                {entry.removed ? (
+                  <span
+                    aria-hidden
+                    data-thread-removed
+                    className="flex shrink-0 items-center justify-center"
+                    style={{ width: AVATAR_PX, height: AVATAR_PX }}
+                  >
+                    <span className="bg-pool-200 h-1.5 w-1.5 rounded-full" />
+                  </span>
+                ) : (
+                  <Avatar
+                    id={entry.authorId ?? (entry.initials === undefined ? authorId : undefined)}
+                    initials={entry.initials ?? initials}
+                    className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
+                    style={{ width: AVATAR_PX, height: AVATAR_PX }}
+                  />
+                )}
                 {entry.dot ? (
                   <span
                     aria-label="New reactions or replies"

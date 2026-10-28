@@ -143,3 +143,24 @@ describe('one order for a post’s ripples, across zones (H42g)', () => {
     expect(orderBlocks([...tied].reverse(), null).map((r) => r.id)).toEqual(['a', 'b']);
   });
 });
+
+describe('a part removed by a hand-over, on the pool’s board (0061, H46)', () => {
+  it('is nobody’s: no face, no branch, no line on the card, never a side', () => {
+    const removed = {
+      ...ripple('gone', MINA, '2026-10-21T23:00:00-07:00', VAN, '2026-10-21'),
+      author_id: null,
+      note: null,
+    };
+    const of = splash({ id: 'joint' });
+    const card = poolCards({ ...view(of), ripples: [removed, ...ROWS] }, 'lane', MINA, VAN).find(
+      (c) => c.splash.id === 'joint',
+    )!;
+    expect(card.writers?.map((w) => w.authorId).sort()).toEqual([JUN, MINA]);
+    expect(card.branches?.map((b) => b.id)).not.toContain('gone');
+    expect(card.ripples.map((r) => r.id)).not.toContain('gone');
+    // Members' columns are people: none for nobody.
+    const members = poolCards({ ...view(of), ripples: [removed, ...ROWS] }, 'members', MINA, VAN);
+    const branches = members.flatMap((c) => c.branches ?? []);
+    expect(branches.every((b) => b.column === MINA || b.column === JUN)).toBe(true);
+  });
+});

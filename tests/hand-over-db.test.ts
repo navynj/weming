@@ -372,6 +372,38 @@ describe('deleting the record', () => {
         .data,
     ).toHaveLength(0);
   });
+
+  it('a placeholder is nobody’s: no new response on it, and it keeps the joint record from a member’s delete', async () => {
+    const w = await world();
+    await asUser(w.ana).from('splashes').delete().eq('id', w.record);
+    const joint = (await jointIn(w.ben, w.crew))[0];
+    const part = (
+      await asAdmin().from('ripples').select('id').eq('splash_id', joint.id).is('author_id', null)
+    ).data![0].id;
+    const reply = await asUser(w.ben).rpc('add_reply', { p_ripple: part, p_body: 'hello?' });
+    expect(reply.error?.message).toMatch(/This part was removed/);
+    const reaction = await asUser(w.ben)
+      .from('ripple_reactions')
+      .insert({ ripple_id: part, user_id: w.ben, emoji: '👀' });
+    expect(reaction.error).not.toBeNull();
+    // Ben wrote the only authored ripple there, but Cal's words hang on the placeholder.
+    const removed = await asUser(w.ben).rpc('delete_joint_splash', { p_splash: joint.id });
+    expect(removed.error?.message).toMatch(/by other members/);
+  });
+
+  it('deleting the pool afterwards returns Ben’s ripple to him; the placeholder goes with the pool', async () => {
+    const w = await world();
+    await asUser(w.ana).from('splashes').delete().eq('id', w.record);
+    const done = await asUser(w.ana).rpc('delete_pool', { p_pool: w.crew });
+    expect(done.error).toBeNull();
+    const bens = (
+      await asAdmin().from('ripples').select('splash_id').eq('id', w.benRipple).single()
+    ).data!;
+    const post = (
+      await asAdmin().from('splashes').select('owner_id').eq('id', bens.splash_id!).single()
+    ).data!;
+    expect(post.owner_id).toBe(w.ben);
+  });
 });
 
 describe('deleting the account', () => {
@@ -384,6 +416,61 @@ describe('deleting the account', () => {
     expect((await asAdmin().from('ripples').select('id').eq('author_id', w.ana)).data).toHaveLength(
       0,
     );
+  });
+});
+
+describe('deleting the account of a joint record’s opener', () => {
+  async function opened(w: World, othersWrite: boolean): Promise<{ joint: string; mine: string }> {
+    const joint = crypto.randomUUID();
+    const lane = (
+      await asUser(w.ana).from('pool_lanes').select('id').eq('pool_id', w.crew).single()
+    ).data!.id;
+    const made = await asUser(w.ana).rpc('create_together_splash', {
+      p_id: joint,
+      p_pool: w.crew,
+      p_pool_lane: lane,
+      p_title: 'Board night',
+      p_icon: '🎲',
+      p_declared_start: null as unknown as string,
+      p_invite_all: true,
+    });
+    expect(made.error).toBeNull();
+    const mine = await write(w.ana, 'Ana opened it', joint, null);
+    if (othersWrite) {
+      await write(w.ben, 'Ben joined in', joint, null);
+      const reacted = await asUser(w.cal)
+        .from('ripple_reactions')
+        .insert({ ripple_id: mine, user_id: w.cal, emoji: '🎉' });
+      expect(reacted.error).toBeNull();
+    }
+    return { joint, mine };
+  }
+
+  it('one others wrote in stays, opened by no one; Ana’s ripple leaves a placeholder holding Cal’s reaction', async () => {
+    const w = await world();
+    const { joint, mine } = await opened(w, true);
+    const gone = await asAdmin().auth.admin.deleteUser(w.ana);
+    expect(gone.error).toBeNull();
+    const row = (await asUser(w.ben).from('splashes').select('created_by, title').eq('id', joint))
+      .data!;
+    expect(row).toEqual([{ created_by: null, title: 'Board night' }]);
+    const left = (
+      await asUser(w.ben).from('ripples').select('id, author_id').eq('splash_id', joint)
+    ).data!;
+    expect(left.map((r) => r.author_id).sort()).toEqual([w.ben, null].sort());
+    expect((await asAdmin().from('ripples').select('id').eq('id', mine)).data).toHaveLength(0);
+    const part = left.find((r) => r.author_id === null)!.id;
+    expect(
+      (await asUser(w.cal).from('ripple_reactions').select('emoji').eq('ripple_id', part)).data,
+    ).toEqual([{ emoji: '🎉' }]);
+  });
+
+  it('one nobody else wrote in goes with the account', async () => {
+    const w = await world();
+    const { joint } = await opened(w, false);
+    const gone = await asAdmin().auth.admin.deleteUser(w.ana);
+    expect(gone.error).toBeNull();
+    expect((await asAdmin().from('splashes').select('id').eq('id', joint)).data).toHaveLength(0);
   });
 });
 
