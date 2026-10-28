@@ -12,7 +12,6 @@ import { PoolEditScope } from '@/features/pool/edit-scope';
 import { signPoolPhotos } from '@/lib/avatars';
 import { PhotoRetryToast } from '@/features/pool/photo-retry';
 import { NotifyCard } from '@/features/notifications/notify-card';
-import { getPoolNotificationPrefs } from '@/lib/queries/notifications';
 
 /**
  * A pool's home (H23). RLS decides whether it exists for this viewer at all:
@@ -53,9 +52,6 @@ export async function PoolScreen({
       }
     : null;
   if (!view) notFound();
-  const notify = welcome
-    ? await getPoolNotificationPrefs(supabase, view.pool.id, profile.id)
-    : null;
 
   return (
     <main className="water-ground flex h-dvh min-h-0 flex-col">
@@ -74,9 +70,7 @@ export async function PoolScreen({
       </PoolEditScope>
       {/* A new pool's photo that did not upload, offered again (review). */}
       <PhotoRetryToast poolId={view.pool.id} />
-      {notify ? (
-        <NotifyCard pool={{ id: view.pool.id, name: view.pool.name, prefs: notify }} />
-      ) : null}
+      {welcome ? <NotifyCard /> : null}
       {/* A server render runs once per request: the stamp is when this copy was read. */}
       {/* eslint-disable-next-line react-hooks/purity */}
       <FreshOnArrival renderedAt={Date.now()} />
