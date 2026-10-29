@@ -361,16 +361,8 @@ describe('a label’s width and style in the panel (review)', () => {
     const { container } = home([{ ...ONE[0], together: true }], { color: 'pink', mode: 'light' });
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
     expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Pink');
-    // Drawn white, edged in the colour, on the light ground, as pastel draws it.
-    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Outline');
-  });
-
-  it('keeps black’s two styles apart in light mode: Black, and Outline', () => {
-    media(true);
-    const { container } = home([{ ...ONE[0], together: true }], { color: 'black', mode: 'light' });
-    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
-    expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Black');
-    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Outline');
+    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Black');
+    expect(container.querySelector('[data-layout-choice="outline"]')!.textContent).toBe('Outline');
   });
 
   it('names the fills after what they show in pastel mode: the pastel and Pale (0036)', () => {
@@ -381,7 +373,7 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Pale');
   });
 
-  it('offers Style on any record, with the four styles and Auto (0058)', () => {
+  it('offers Style on any record, with the five styles in order and Auto (0058, H55)', () => {
     media(true);
     for (const cards of [ONE, [{ ...ONE[0], joint: true, together: false }]]) {
       const view = home(cards);
@@ -391,7 +383,7 @@ describe('a label’s width and style in the panel (review)', () => {
         [...style.querySelectorAll('[data-layout-choice]')].map((b) =>
           b.getAttribute('data-layout-choice'),
         ),
-      ).toEqual(['none', 'white', 'ink', 'glass']);
+      ).toEqual(['white', 'ink', 'outline', 'glass', 'none']);
       expect(style.querySelector('button')!.textContent).toBe('Auto');
       view.unmount();
     }
@@ -582,16 +574,17 @@ describe('hand-set layouts on the calendar (review)', () => {
   });
 
   it('draws every style set by hand on joint and other records alike; unset, the rule (0058)', () => {
-    for (const style of ['none', 'white', 'ink', 'glass'] as const) {
+    for (const style of ['none', 'white', 'ink', 'outline', 'glass'] as const) {
       const joint = { ...ONE[0], joint: true, together: true, layout: { label: { style } } };
       const plain = { ...ONE[0], layout: { label: { style } } };
       expect(layoutWeekBoard([joint], TODAY, { width: 980 }).pieces[0].label).toBe(style);
       expect(layoutWeekBoard([plain], TODAY, { width: 980 }).pieces[0].label).toBe(style);
     }
-    // Auto: a plain record has no fill; a joint one white or ink by the rule.
+    // Auto: a plain record has no fill; a joint one the theme colour or the
+    // second fill by the rule (H55).
     expect(layoutWeekBoard([ONE[0]], TODAY, { width: 980 }).pieces[0].label).toBe('none');
     const joint = { ...ONE[0], joint: true, together: true };
-    expect(['white', 'ink']).toContain(
+    expect(['white', 'second']).toContain(
       layoutWeekBoard([joint], TODAY, { width: 980 }).pieces[0].label,
     );
   });

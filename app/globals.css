@@ -454,14 +454,25 @@ body {
   --color-white: #ffffff;
 }
 /*
- * A label in the ink style on the light ground is drawn as pastel draws it
- * (Yoonji, in the session): white, its edge and words in the theme colour —
- * never a black block, and never the black theme's first style twice.
+ * The rule's second fill for a together record (H55): Black on the dark
+ * ground, Outline on the light ones — white, edged and lettered in the
+ * colour (in pastel mode, edged in the pastel and lettered in its tone, as
+ * Outline itself draws there).
  */
-[data-mode='light'] .water-ground .label-ink {
+[data-mode='light'] .water-ground .label-ink.label-second {
   background-color: #ffffff;
   box-shadow: inset 0 0 0 1px var(--theme-900);
   color: var(--theme-900);
+}
+[data-mode='pastel'] .water-ground .label-ink.label-second {
+  background-color: #ffffff;
+  box-shadow: inset 0 0 0 1px var(--theme-pastel);
+  color: var(--pastel-tone);
+}
+/* Its faces' ring is the white beneath them there. */
+[data-mode='light'] .water-ground .label-second .ring-ink,
+[data-mode='pastel'] .water-ground .label-second .ring-ink {
+  --tw-ring-color: #ffffff;
 }
 /* Black is the one theme its ink matches: on the black ground a label in
    the ink style keeps a white edge. */

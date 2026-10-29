@@ -886,7 +886,7 @@ describe('fills: what is the pool’s own (review)', () => {
     expect(layout.pieces.find((p) => p.id === 'mine')!.label).toBe('none');
     expect(layout.pieces.find((p) => p.id === 'soup')!.label).toBe('none');
     const joint = layout.pieces.filter((p) => p.card.joint);
-    for (const p of joint) expect(['white', 'ink']).toContain(p.label);
+    for (const p of joint) expect(['white', 'second']).toContain(p.label);
     for (let at = 1; at < joint.length; at += 1)
       expect(joint[at].label).not.toBe(joint[at - 1].label);
     const { container } = board([MINE, ...JOINTS]);
@@ -921,7 +921,7 @@ describe('fills: what is the pool’s own (review)', () => {
     expect(lone.splash.count).toBe(1);
     const { container } = board([lone]);
     const piece = container.querySelector('[data-board-piece="test"]')!;
-    expect(['white', 'ink']).toContain(piece.getAttribute('data-label'));
+    expect(['white', 'second']).toContain(piece.getAttribute('data-label'));
     expect(piece.querySelector('[data-board-label]')!.className).toMatch(/bg-(white|ink)/);
     expect(piece.querySelector('[data-board-slot]')).not.toBeNull();
   });

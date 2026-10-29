@@ -15,6 +15,8 @@ const SAMPLE: Record<LabelStyle, string> = {
   none: 'text-white',
   white: 'label-fill bg-white text-main-900',
   ink: 'label-ink bg-ink text-white',
+  outline: 'bg-main-900 text-white ring-1 ring-inset ring-white',
+  second: 'label-ink label-second bg-ink text-white',
   pale: 'bg-white/20 text-white',
   glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
 };
@@ -23,8 +25,8 @@ const SAMPLE: Record<LabelStyle, string> = {
  * The styles as they look (Yoonji, in the session): `white` is white on the
  * dark ground, but in light mode the ground's white is my theme colour, so
  * it is named after it ("Pink"), as in pastel mode, its pastel; `ink` is
- * "Black", in light mode, white edged in the colour, "Outline", and in pastel
- * mode, nearly white, "Pale". The toolbar's swatch,
+ * "Black", and in pastel mode, nearly white, "Pale"; Outline is Outline
+ * everywhere (H55). The toolbar's swatch,
  * the panel and More all say them so.
  */
 export function useLabelStyleNames(): Record<LabelChoice, string> {
@@ -35,8 +37,8 @@ export function useLabelStyleNames(): Record<LabelChoice, string> {
       theme.mode === 'dark'
         ? 'White'
         : (THEMES.find((t) => t.key === theme.color)?.name ?? 'White'),
-    // Light mode draws it white, edged and lettered in the theme colour (globals.css).
-    ink: theme.mode === 'pastel' ? 'Pale' : theme.mode === 'light' ? 'Outline' : 'Black',
+    ink: theme.mode === 'pastel' ? 'Pale' : 'Black',
+    outline: 'Outline',
     glass: 'Glass',
   };
 }

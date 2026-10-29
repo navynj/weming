@@ -34,7 +34,7 @@ export const LabelLayout = z
     // A share of the lane, like X: narrower than it, or across up to four (0027, 0050).
     width: z.number().min(0.3).max(4),
     // Its style, any record's to choose (0058): none, white, ink or glass; unset, the rule's.
-    style: z.enum(['none', 'white', 'ink', 'glass']),
+    style: z.enum(['none', 'white', 'ink', 'outline', 'glass']),
     hidden: z.boolean(),
   })
   .partial()

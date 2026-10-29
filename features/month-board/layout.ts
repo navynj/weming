@@ -116,10 +116,19 @@ const FACES_CHARS = 4;
  * none, a pool set), however many ripples or authors it has — white or
  * ink, alternating within a day, wherever it is drawn.
  */
-/** `pale`: my side on someone else's record (review), a period band's fill; never chosen. */
-export type LabelStyle = 'none' | 'white' | 'ink' | 'pale' | 'glass';
-/** The styles a person can choose (0058); `pale` is a side's, never chosen. */
-export const LABEL_STYLES = ['none', 'white', 'ink', 'glass'] as const;
+/**
+ * `pale`: my side on someone else's record (review), a period band's fill;
+ * `second`: the rule's second fill for a together record, Black on the dark
+ * ground and Outline on the light and pastel ones (H55, globals.css). Never
+ * chosen, either.
+ */
+export type LabelStyle = 'none' | 'white' | 'ink' | 'outline' | 'pale' | 'glass' | 'second';
+/**
+ * The styles a person can choose (0058, H55), in Yoonji's order: the theme
+ * colour (`white`), White or Black (`ink`), Outline, translucent (`glass`),
+ * no fill.
+ */
+export const LABEL_STYLES = ['white', 'ink', 'outline', 'glass', 'none'] as const;
 
 /** The sizes that follow the board's width. */
 export type BoardMetrics = {
@@ -487,9 +496,10 @@ type Plan = { recipe: Recipe; label: LabelStyle; size: StickerSize | null };
  * an A turned, which can sit by no B, A never following A. B's stickers
  * take a size by the id, never the size of the day's B before, big at
  * most once and only in a day of two or more. A record with invitees
- * (together, 0033) alternates white and ink with the day's other such ones;
- * everything else takes no fill. Its fill set by hand, white or ink, is the
- * person's; a label with no fill stays so.
+ * (together, 0033) alternates the theme colour and the second fill with the
+ * day's other such ones (H55: White and Black on the dark ground, the theme
+ * colour and Outline on the light ones); everything else takes no fill. Its
+ * fill set by hand is the person's; a label with no fill stays so.
  */
 function planDay(cards: Card[]): Plan[] {
   let fill: LabelStyle | null = null;
@@ -528,16 +538,11 @@ function planDay(cards: Card[]): Plan[] {
     // My side on someone's record (review): pale, as a period band.
     if (card.side) label = 'pale';
     else if (card.together) {
-      const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'ink';
+      const drawnFill: LabelStyle = draw(card.splash.id, 'label', 2) === 0 ? 'white' : 'second';
       // A fill set by hand (0027) is drawn as set; the next joint one alternates from it.
-      fill =
-        set === 'white' || set === 'ink'
-          ? set
-          : drawnFill === fill
-            ? fill === 'white'
-              ? 'ink'
-              : 'white'
-            : drawnFill;
+      const setFill: LabelStyle | null =
+        set === 'white' ? 'white' : set === 'ink' || set === 'outline' ? 'second' : null;
+      fill = setFill ?? (drawnFill === fill ? (fill === 'white' ? 'second' : 'white') : drawnFill);
       label = fill;
     }
     // Any record's style set by hand (0058) is drawn as set; unset, the rule's above.

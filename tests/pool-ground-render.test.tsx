@@ -883,7 +883,7 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
     setView('lane');
     const { container } = ground(A);
     const joint = container.querySelector('[data-lane-piece="s-joint"] [data-board-piece]')!;
-    expect(['white', 'ink']).toContain(joint.getAttribute('data-label'));
+    expect(['white', 'second']).toContain(joint.getAttribute('data-label'));
     const mine = container.querySelector('[data-lane-piece="s-mine"] [data-board-piece]')!;
     expect(mine.getAttribute('data-label')).toBe('none');
   });

@@ -432,12 +432,14 @@ describe('hidden icon and label, the order within a post, videos (0055)', () => 
 });
 
 describe('a label’s style, any record’s to choose (0058)', () => {
-  it('takes none, white, ink and glass, and refuses anything else', async () => {
-    for (const style of ['none', 'white', 'ink', 'glass']) {
+  it('takes none, white, ink, outline (0066) and glass, and refuses anything else', async () => {
+    for (const style of ['none', 'white', 'ink', 'outline', 'glass']) {
       expect((await set(ana, { label: { style } })).error).toBeNull();
       expect(((await read(ana, 'pool'))[0].layout.label as { style?: string }).style).toBe(style);
     }
     expect((await set(ana, { label: { style: 'pale' } })).error).not.toBeNull();
+    // The rule's second fill is drawn, never stored.
+    expect((await set(ana, { label: { style: 'second' } })).error).not.toBeNull();
     await set(ana, {}, { clear: ['label.style'] });
   });
 });
