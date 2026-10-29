@@ -469,8 +469,13 @@ body {
 [data-mode='pastel'] .water-ground .label-glass {
   --tw-ring-color: transparent;
 }
+/* Pastel's tint is already pale: at 20% over white it was lost ("너무 흐려서
+   잘 안보임"), so its Glass takes half. */
+[data-mode='pastel'] .water-ground .label-glass {
+  background-color: color-mix(in srgb, var(--theme-pastel) 50%, transparent);
+}
 [data-mode='pastel'] .water-ground .label-ink.label-second {
-  background-color: color-mix(in srgb, var(--theme-pastel) 20%, transparent);
+  background-color: color-mix(in srgb, var(--theme-pastel) 50%, transparent);
   box-shadow: none;
   color: var(--pastel-ink);
 }
