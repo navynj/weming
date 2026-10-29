@@ -1,8 +1,18 @@
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
+import { canonicalPath } from '@/lib/routes';
 import { updateSession } from '@/lib/supabase/proxy';
 
 export default async function proxy(request: NextRequest) {
+  // An old link with a uuid in it moves to its short-id spelling (H62),
+  // whether or not the record exists: the redirect says nothing about it.
+  const short = request.method === 'GET' ? canonicalPath(request.nextUrl.pathname) : null;
+  if (short) {
+    const url = request.nextUrl.clone();
+    url.pathname = short;
+    // Temporary (307), so a browser keeps no redirect it would hold past a revert.
+    return NextResponse.redirect(url);
+  }
   return updateSession(request);
 }
 

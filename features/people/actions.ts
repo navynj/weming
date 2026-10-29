@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 import { THEME_COLORS, THEME_MODES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
 import { displayName } from './name';
+import { poolPath } from '@/lib/routes';
 
 const input = z.object({
   name: displayName,
@@ -152,7 +153,7 @@ export async function setPoolTheme(
         error.code === '42501' ? 'Only someone in this Pool can change its colour.' : error.message,
     };
   }
-  revalidatePath(`/pool/${parsed.data.poolId}`);
+  revalidatePath(poolPath(parsed.data.poolId));
   return { ok: true };
 }
 

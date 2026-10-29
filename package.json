@@ -23,6 +23,7 @@
     "backup": "./scripts/backup.sh",
     "db:push": "./scripts/db-push.sh",
     "verify:prod": "node scripts/verify-prod-rls.mjs",
+    "id": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/id.ts",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {

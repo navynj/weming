@@ -25,6 +25,7 @@ import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { saveLane } from './actions';
 import { EmojiInput } from './emoji-input';
+import { lanePath, poolLanePath, poolPath, splashPath } from '@/lib/routes';
 
 /**
  * A lane's page (round 3, review): a breadcrumb, Home / the lane; the lane's
@@ -95,7 +96,7 @@ export function LanePage({
     topParam && ids.includes(topParam) ? topParam : (ids[0] ?? null),
   );
   const flip = useFlip(ids, initialTop, -1);
-  const here = pool ? `/pool/${pool.poolId}/lane/${lane.id}` : `/lane/${lane.id}`;
+  const here = pool ? poolLanePath(pool.poolId, lane.id) : lanePath(lane.id);
 
   function start(): void {
     setName(saved.value.name);
@@ -149,7 +150,7 @@ export function LanePage({
             the ground's header, so they do not move between the two. */}
         <header data-lane-tabs className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
           <Link
-            href={pool ? `/pool/${pool.poolId}` : '/?settings=home'}
+            href={pool ? poolPath(pool.poolId) : '/?settings=home'}
             aria-label={pool ? 'Pool lanes' : 'Lanes'}
             className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
           >
@@ -160,13 +161,13 @@ export function LanePage({
               view="lane"
               options={pool ? POOL_VIEWS : HOME_VIEWS}
               onChange={(view) =>
-                router.push(pool ? `/pool/${pool.poolId}?view=${view}` : `/?view=${view}`)
+                router.push(pool ? `${poolPath(pool.poolId)}?view=${view}` : `/?view=${view}`)
               }
             />
           </div>
           {pool ? (
             <Link
-              href={`/pool/${pool.poolId}?settings=pool`}
+              href={`${poolPath(pool.poolId)}?settings=pool`}
               aria-label="Pool settings"
               className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
             >
@@ -182,7 +183,7 @@ export function LanePage({
           data-breadcrumb
           className="flex items-center gap-1 px-6 text-sm"
         >
-          <Link href={pool ? `/pool/${pool.poolId}` : '/'} className="font-medium text-white">
+          <Link href={pool ? poolPath(pool.poolId) : '/'} className="font-medium text-white">
             {pool ? pool.poolName : 'Home'}
           </Link>
           <ChevronRight aria-hidden size={14} className="text-white/50" />
@@ -320,7 +321,7 @@ export function LanePage({
             )
           }
           hrefFor={(id) =>
-            pool ? (shown.find((card) => card.splash.id === id)?.href ?? here) : `/splash/${id}`
+            pool ? (shown.find((card) => card.splash.id === id)?.href ?? here) : splashPath(id)
           }
         />
       </div>
@@ -332,7 +333,7 @@ export function LanePage({
         poolId={pool?.poolId ?? null}
         homeLabel="Home"
         onHome={() => router.push('/')}
-        onPool={pool ? () => router.push(`/pool/${pool.poolId}`) : undefined}
+        onPool={pool ? () => router.push(poolPath(pool.poolId)) : undefined}
         onCompose={() => openSheet(pool ?? null)}
       />
     </div>

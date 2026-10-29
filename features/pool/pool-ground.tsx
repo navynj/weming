@@ -44,6 +44,7 @@ function nextView(view: PoolViewKind): PoolViewKind {
 }
 
 import { POOL_VIEWS as VIEWS } from './pool-views';
+import { poolPath } from '@/lib/routes';
 
 /** What a view is called, for the foot's label. */
 function viewName(view: PoolViewKind): string {
@@ -369,7 +370,7 @@ export function PoolGround({
             onDelete={remove}
             low={boardView}
             collapsed={editing.activeId !== null}
-            hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
+            hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? poolPath(poolId)}
           />
           {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
           {/* The Calendar, the Lane view and Members, each its own layouts. */}

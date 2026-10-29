@@ -13,6 +13,7 @@ import {
   storedLayout,
   type BoardLayoutJson,
 } from './board-layout';
+import { poolPath } from '@/lib/routes';
 
 export type LayoutResult = { ok: true; layout: BoardLayoutJson } | { ok: false; message: string };
 
@@ -32,7 +33,7 @@ const Write = z.object({
 
 function revalidate(poolId: string | null): void {
   revalidatePath('/');
-  if (poolId) revalidatePath(`/pool/${poolId}`);
+  if (poolId) revalidatePath(poolPath(poolId));
 }
 
 /**

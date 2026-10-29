@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database.types';
+import { splashPath } from '@/lib/routes';
 
 config({ path: '.env.local', quiet: true });
 
@@ -76,7 +77,7 @@ test('pinning a post asks the server once: the action, no second render', async 
 }) => {
   test.setTimeout(120_000);
   await signIn(page, baseURL!);
-  await page.goto(`/splash/${splash}`);
+  await page.goto(splashPath(splash));
   // The post's own header, in its sheet over Home (Home's top card has a
   // menu of its own, under the sheet).
   const header = page.locator('[data-splash-sheet] [data-splash-header]');
@@ -89,7 +90,7 @@ test('pinning a post asks the server once: the action, no second render', async 
   const asked: string[] = [];
   page.on('request', (request) => {
     const headers = request.headers();
-    if (new URL(request.url()).pathname !== `/splash/${splash}`) return;
+    if (new URL(request.url()).pathname !== splashPath(splash)) return;
     if (headers['next-action']) asked.push('action');
     else if (headers.rsc && !headers['next-router-prefetch']) asked.push('render');
   });

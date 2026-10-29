@@ -1,5 +1,6 @@
 import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
+import { splashPath } from '@/lib/routes';
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -34,7 +35,7 @@ export function monthHref(month: string): string {
  * which stays as it was beneath (review), so it carries no way back.
  */
 export function splashHref(id: string): string {
-  return `/splash/${id}`;
+  return splashPath(id);
 }
 
 /** `September`, from `2026-09`. */

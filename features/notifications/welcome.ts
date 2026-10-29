@@ -1,3 +1,5 @@
+import { poolPath } from '@/lib/routes';
+
 /**
  * The notifications card (review), shown once: on the first screen after
  * joining or opening a pool, and on Home after a first sign-in with no
@@ -8,5 +10,5 @@ export const WELCOME = 'welcome';
 export const WELCOME_HOME = `/?${WELCOME}=1`;
 
 export function welcomePool(id: string): string {
-  return `/pool/${id}?${WELCOME}=1`;
+  return `${poolPath(id)}?${WELCOME}=1`;
 }

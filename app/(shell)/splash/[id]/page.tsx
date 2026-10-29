@@ -1,6 +1,7 @@
 import { HomeScreen } from '@/features/home/home-screen';
 import { HomeSplash } from '@/features/splash/home-splash';
 import { SplashModal } from '@/features/splash/splash-modal';
+import { idFromUrl } from '@/lib/routes';
 
 /**
  * A splash's own URL, visited directly (a shared link, a reload): its sheet
@@ -9,7 +10,7 @@ import { SplashModal } from '@/features/splash/splash-modal';
  * instead (@modal/(.)splash).
  */
 export default async function SplashRoute({ params }: PageProps<'/splash/[id]'>) {
-  const { id } = await params;
+  const id = idFromUrl((await params).id);
   return (
     <>
       <HomeScreen top={id} />

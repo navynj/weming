@@ -8,6 +8,7 @@ import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
 import { MediaMetaInput, mediaMetaFor, mediaMetaOf } from '@/lib/ripple-media';
+import { splashPath } from '@/lib/routes';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^\d{2}:\d{2}$/;
@@ -100,7 +101,7 @@ async function updateRippleWork(input: Edit): Promise<CommitResult> {
 
   revalidatePath('/');
   for (const splashId of [before.splash_id, edit.splashId]) {
-    if (splashId) revalidatePath(`/splash/${splashId}`);
+    if (splashId) revalidatePath(splashPath(splashId));
   }
   return { ok: true, rippleId: edit.id };
 }
@@ -154,6 +155,6 @@ export async function deleteRipple(rippleId: string): Promise<CommitResult> {
   await removeRippleMedia(paths);
 
   revalidatePath('/');
-  if (splashId) revalidatePath(`/splash/${splashId}`);
+  if (splashId) revalidatePath(splashPath(splashId));
   return { ok: true, rippleId };
 }

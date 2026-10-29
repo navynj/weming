@@ -13,6 +13,7 @@ import { writeRefusal } from '@/lib/supabase/fetch';
 import { reportFailure, reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
 import { displayName } from '@/features/people/name';
+import { poolPath, splashPath } from '@/lib/routes';
 
 export type Done = { ok: true } | { ok: false; message: string };
 export type Made = { ok: true; id: string } | { ok: false; message: string };
@@ -24,7 +25,7 @@ const DESCRIPTION = z.string().trim().max(80).nullable();
 function revalidatePool(poolId: string | null = null): void {
   revalidatePath('/');
   revalidatePath('/pool');
-  if (poolId) revalidatePath(`/pool/${poolId}`);
+  if (poolId) revalidatePath(poolPath(poolId));
 }
 
 /** What a dead invite link says, here and on the join page (0059). */
@@ -425,7 +426,7 @@ export async function setPlacement(
       : { error: null };
   if (error) return { ok: false, message: said(error) };
   revalidatePool(poolId);
-  revalidatePath(`/splash/${splashId}`);
+  revalidatePath(splashPath(splashId));
   return { ok: true };
 }
 
@@ -454,7 +455,7 @@ export async function setPlacementTogether(
   });
   if (error) return { ok: false, message: said(error) };
   revalidatePool(poolId);
-  revalidatePath(`/splash/${splashId}`);
+  revalidatePath(splashPath(splashId));
   return { ok: true };
 }
 
@@ -785,6 +786,6 @@ export async function moveToHome(splashId: string, laneId: string): Promise<Done
   });
   if (error) return { ok: false, message: said(error) };
   revalidatePool();
-  revalidatePath(`/splash/${splashId}`);
+  revalidatePath(splashPath(splashId));
   return { ok: true };
 }

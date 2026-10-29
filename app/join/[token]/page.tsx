@@ -6,6 +6,7 @@ import { PeopleProvider } from '@/features/people/people-provider';
 import { JoinFlow } from '@/features/pool/join-flow';
 import { getMyProfile } from '@/lib/queries/profile';
 import { signAvatars, signInviteMembers, signInvitePhoto } from '@/lib/avatars';
+import { poolPath } from '@/lib/routes';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -29,7 +30,7 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
     .select('pool_id')
     .eq('token', token)
     .maybeSingle();
-  if (mine) redirect(`/pool/${mine.pool_id}`);
+  if (mine) redirect(poolPath(mine.pool_id));
 
   // The preview, and the pool's photo signed for ten minutes when the token
   // is valid, unexpired and unrevoked (0024, invite_photo; server only).

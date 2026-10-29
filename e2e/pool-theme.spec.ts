@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { expect, test, type Page } from '@playwright/test';
 
 import { asAdmin, asUser } from '../tests/as-user';
+import { poolPath } from '@/lib/routes';
 
 config({ path: '.env.local', quiet: true });
 
@@ -92,14 +93,14 @@ for (const mode of ['light', 'pastel'] as const) {
     // The first paint, before any script of the app's has run (the dev
     // server's styles come with those scripts, so only <html> is read here).
     await page.route('**/_next/static/chunks/**', (route) => route.abort());
-    await page.goto(`/pool/${pool}`);
+    await page.goto(poolPath(pool));
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'pink');
     await expect(page.locator('html')).toHaveAttribute('data-mode', mode);
     await page.unroute('**/_next/static/chunks/**');
 
     // Hydrated: the ground draws in the colour; then one picked in the
     // Theme tab is worn at once.
-    await page.goto(`/pool/${pool}?settings=theme`);
+    await page.goto(`${poolPath(pool)}?settings=theme`);
     await expect.poll(() => ink(page), { timeout: 60_000 }).toBe(WORDS[mode].pink);
     const sky = page.locator('[data-theme-colors="mine"] [data-theme-swatch="sky"]');
     await expect(async () => {

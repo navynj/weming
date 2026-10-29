@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database.types';
+import { poolPath } from '@/lib/routes';
 
 config({ path: '.env.local', quiet: true });
 
@@ -95,7 +96,7 @@ test('a pool visited before comes back without a round trip', async ({ page, bas
   // hold every such request, so only the browser's copy can draw it.
   // Prefetches pass; the refresh behind the switch is held too.
   const held: string[] = [];
-  await page.route(`**/pool/${pool}**`, (route) => {
+  await page.route(`**${poolPath(pool)}**`, (route) => {
     const headers = route.request().headers();
     if (headers.rsc && !headers['next-router-prefetch']) {
       held.push(route.request().url());
@@ -168,7 +169,7 @@ test('one header on Home and in a pool, at a phone’s width and a desktop’s; 
     expect(await headerOrder(page)).toEqual(['bell', 'face', 'gear']);
     await everyHeaderControlOnScreen(page, `Home at ${size.width}`);
 
-    await page.goto(`/pool/${pool}`);
+    await page.goto(poolPath(pool));
     await expect(page.locator(`[data-pool-ground="${pool}"]`)).toBeVisible({ timeout: 60_000 });
     expect(await headerOrder(page)).toEqual(['bell', 'face', 'invite', 'gear']);
     await everyHeaderControlOnScreen(page, `the pool at ${size.width}`);

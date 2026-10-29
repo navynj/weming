@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { X } from 'lucide-react';
 
 import { savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
+import { poolPath } from '@/lib/routes';
 
 /**
  * A new pool's photo that did not upload (review): the pool was made, so the
@@ -75,7 +76,7 @@ export function PhotoRetryToast({ poolId }: { poolId: string }) {
       <p className="text-ink min-w-0 flex-1 text-sm">{PHOTO_FAILED}</p>
       {state === 'again' ? (
         <Link
-          href={`/pool/${poolId}?settings=pool`}
+          href={`${poolPath(poolId)}?settings=pool`}
           data-photo-toast-settings
           onClick={() => set(null)}
           className="text-main-900 shrink-0 text-sm font-semibold"

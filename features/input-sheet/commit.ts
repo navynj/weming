@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
 import { MediaMetaInput, mediaMetaFor } from '@/lib/ripple-media';
+import { splashPath } from '@/lib/routes';
 
 /**
  * What the sheet can tell the author when a write is refused. The collision
@@ -86,7 +87,7 @@ async function commitRippleWork(input: Draft): Promise<CommitResult> {
   if (error) return { ok: false, reason: 'error', message: error.message };
 
   revalidatePath('/');
-  if (draft.splashId) revalidatePath(`/splash/${draft.splashId}`);
+  if (draft.splashId) revalidatePath(splashPath(draft.splashId));
   return { ok: true, rippleId: data.id };
 }
 

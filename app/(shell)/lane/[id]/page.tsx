@@ -25,6 +25,7 @@ import {
 import { getResponsesOnMine } from '@/lib/queries/responses';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
+import { idFromUrl } from '@/lib/routes';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -37,7 +38,7 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
 
-  const { id } = await params;
+  const id = idFromUrl((await params).id);
   const top = (await searchParams).top;
   const [ripples, categories, mine, filings, pools] = await Promise.all([
     getMyTrail(supabase, profile.id),

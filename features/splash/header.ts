@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isCutOff, UNCONFIRMED } from '@/lib/supabase/fetch';
 
 import type { Splash } from './summary';
+import { splashPath } from '@/lib/routes';
 
 /**
  * A post's header write, shared by the post's page and the edit sheet. Not a
@@ -22,7 +23,7 @@ export function revalidateSplash(id: string | null = null): void {
   revalidatePath('/');
   revalidatePath('/locker');
   revalidatePath('/lanes');
-  if (id) revalidatePath(`/splash/${id}`);
+  if (id) revalidatePath(splashPath(id));
 }
 
 export const Header = z.object({

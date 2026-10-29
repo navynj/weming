@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database.types';
+import { splashPath } from '@/lib/routes';
 
 config({ path: '.env.local', quiet: true });
 
@@ -77,7 +78,7 @@ test('a picked photo goes up ready, with its display copy and size, and holds it
   test.setTimeout(120_000);
   const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split('.')[0];
   await page.context().addCookies([{ name: `sb-${ref}-auth-token`, value: cookie, url: baseURL! }]);
-  await page.goto(`/splash/${splash}`);
+  await page.goto(splashPath(splash));
 
   // A 3000×2000 JPEG, made in the page so it is a real one.
   const jpeg = await page.evaluate(async () => {

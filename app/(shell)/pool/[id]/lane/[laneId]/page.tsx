@@ -5,6 +5,7 @@ import { poolScopeOf } from '@/features/pool/compose-scope';
 import { poolCards } from '@/features/pool/pool-cards';
 import { getMyProfile } from '@/lib/queries/profile';
 import { getPoolView } from '@/lib/queries/pools';
+import { idFromUrl } from '@/lib/routes';
 import { createClient } from '@/lib/supabase/server';
 import { PoolEditScope } from '@/features/pool/edit-scope';
 
@@ -22,7 +23,9 @@ export default async function PoolLaneRoute({
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
 
-  const { id, laneId } = await params;
+  const { id: poolParam, laneId: laneParam } = await params;
+  const id = idFromUrl(poolParam);
+  const laneId = idFromUrl(laneParam);
   const top = (await searchParams).top;
   const view = await getPoolView(supabase, id, profile.id);
   const lane = view?.lanes.find((l) => l.id === laneId);

@@ -1,3 +1,5 @@
+import { poolPath, poolSplashPath } from '@/lib/routes';
+
 /**
  * Notifications (H32), the parts the browser and the server share: the
  * types and their values, the effective value, the words and the URL.
@@ -116,8 +118,8 @@ export function notificationPath(target: {
   rippleId: string | null;
   replyId: string | null;
 }): string {
-  if (!target.splashId) return `/pool/${target.poolId}`;
-  const base = `/pool/${target.poolId}/splash/${target.splashId}`;
+  if (!target.splashId) return poolPath(target.poolId);
+  const base = poolSplashPath(target.poolId, target.splashId);
   if (target.replyId) return `${base}#reply-${target.replyId}`;
   if (target.rippleId) return `${base}#block-${target.rippleId}`;
   return base;

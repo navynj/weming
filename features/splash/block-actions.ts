@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { CommitResult } from '@/features/input-sheet/commit';
 import { MediaMetaInput, mediaMetaFor, mediaMetaOf } from '@/lib/ripple-media';
 import { createClient } from '@/lib/supabase/server';
+import { splashPath } from '@/lib/routes';
 
 const Block = z.object({
   /** Minted in the browser, so the block shown at once is the real one (CLAUDE.md, the principle). */
@@ -72,7 +73,7 @@ export async function addBlock(input: z.input<typeof NewBlock>): Promise<CommitR
   if (error) return { ok: false, reason: 'error', message: said(error.message) };
 
   revalidatePath('/');
-  revalidatePath(`/splash/${block.splashId}`);
+  revalidatePath(splashPath(block.splashId));
   return { ok: true, rippleId: block.id };
 }
 
@@ -109,6 +110,6 @@ export async function editBlock(input: z.infer<typeof Block>): Promise<CommitRes
   if (!data) return { ok: false, reason: 'error', message: 'That record is gone.' };
 
   revalidatePath('/');
-  if (data.splash_id) revalidatePath(`/splash/${data.splash_id}`);
+  if (data.splash_id) revalidatePath(splashPath(data.splash_id));
   return { ok: true, rippleId: block.id };
 }

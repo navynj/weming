@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { expect, test, type Page } from '@playwright/test';
 
 import { asAdmin, asUser } from '../tests/as-user';
+import { poolPath, poolSplashPath, urlId } from '@/lib/routes';
 
 config({ path: '.env.local', quiet: true });
 
@@ -217,7 +218,7 @@ for (const from of ['Home', 'the pool'] as const) {
     await signIn(page, baseURL!);
     for (const c of cases) {
       const id = await notificationFor(c);
-      await page.goto(from === 'Home' ? '/' : `/pool/${pool}`);
+      await page.goto(from === 'Home' ? '/' : poolPath(pool));
       const bell = page.locator('[data-notifications-bell]:visible').first();
       await expect(bell).toBeVisible({ timeout: 90_000 });
       await bell.click();
@@ -227,7 +228,7 @@ for (const from of ['Home', 'the pool'] as const) {
       await expect(sheet, `${c.name} from ${from}`).toBeVisible({ timeout: 60_000 });
       await expect(sheet).toContainText(c.title);
       expect(await page.locator('[data-splash-gone]').count(), c.name).toBe(0);
-      expect(new URL(page.url()).pathname, c.name).toContain(c.splash);
+      expect(new URL(page.url()).pathname, c.name).toContain(urlId(c.splash));
       if (c.anchor) {
         await expect(page.locator(`[id="${c.anchor}"]`), `${c.name} at its anchor`).toBeVisible();
         await expect(page.locator(`[id="${c.anchor}"]`)).toBeInViewport();
@@ -264,7 +265,7 @@ test('a notification opens its sheet at once, and its page lands in place at the
   // The record's page, prefetch and navigation alike, held back.
   const DELAY_MS = 3_000;
   await page.route(
-    (url) => url.pathname === `/pool/${pool}/splash/${c.splash}`,
+    (url) => url.pathname === poolSplashPath(pool, c.splash),
     async (route) => {
       await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
       await route.continue();

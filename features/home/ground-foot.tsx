@@ -14,6 +14,7 @@ import { UnseenDot, useStripPools } from '@/features/pool/activity';
 
 import { PendingPlace } from './ground-skeleton';
 import { placesToWarm, recentPlaces, rememberPlace } from './recent-places';
+import { poolPath } from '@/lib/routes';
 
 type Router = ReturnType<typeof useRouter>;
 type PrefetchKind = NonNullable<Parameters<Router['prefetch']>[1]>['kind'];
@@ -91,8 +92,8 @@ export function GroundFoot({
   // prefetched when the hand reaches for it (Place). One slot is enough;
   // the other is the same places.
   const router = useRouter();
-  const place = atHome ? '/' : poolId ? `/pool/${poolId}` : null;
-  const hrefs = ['/', ...pools.map((pool) => `/pool/${pool.id}`)].join(' ');
+  const place = atHome ? '/' : poolId ? poolPath(poolId) : null;
+  const hrefs = ['/', ...pools.map((pool) => poolPath(pool.id))].join(' ');
   useEffect(() => {
     if (wide) return;
     if (place) rememberPlace(place);
@@ -154,7 +155,7 @@ export function GroundFoot({
               key={pool.id}
               current={current}
               label={current ? (poolLabel ?? pool.name) : pool.name}
-              href={`/pool/${pool.id}`}
+              href={poolPath(pool.id)}
               onTap={current ? onPool : undefined}
               onReach={reach}
               dot={pool.fresh && !current}

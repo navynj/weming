@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { GroundFoot } from '@/features/home/ground-foot';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { poolPath } from '@/lib/routes';
 
 import { lastPool } from './remembered';
 
@@ -20,7 +21,7 @@ export function PoolIndex({ poolIds }: { poolIds: string[] }) {
   useEffect(() => {
     if (poolIds.length === 0) return;
     const remembered = lastPool();
-    router.replace(`/pool/${remembered && poolIds.includes(remembered) ? remembered : poolIds[0]}`);
+    router.replace(poolPath(remembered && poolIds.includes(remembered) ? remembered : poolIds[0]));
   }, [poolIds, router]);
 
   return (

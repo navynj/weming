@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isCutOff, writeRefusal } from '@/lib/supabase/fetch';
 import { reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
+import { poolPath, poolSplashPath, splashPath } from '@/lib/routes';
 
 /** What the edit sheet opens with, read fresh so the Audience is exact wherever it opened. */
 export type SplashEditState =
@@ -364,8 +365,8 @@ async function saveSplashEditWork(
     if (moved) return moved;
     revalidatePath('/');
     if (edit.poolId) {
-      revalidatePath(`/pool/${edit.poolId}`);
-      revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
+      revalidatePath(poolPath(edit.poolId));
+      revalidatePath(poolSplashPath(edit.poolId, edit.id));
     }
     return { ok: true };
   }
@@ -409,14 +410,14 @@ async function saveSplashEditWork(
     if (!withDone.ok) return { ok: false, message: `Saved, but not with: ${withDone.message}` };
   }
   revalidatePath('/');
-  revalidatePath(`/splash/${edit.id}`);
-  if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
+  revalidatePath(splashPath(edit.id));
+  if (edit.poolId) revalidatePath(poolSplashPath(edit.poolId, edit.id));
   // Hand-made sharing applies to my Home record.
   if (edit.kind === 'mine') {
     const shared = await applyShare(edit.id, edit.share);
     if (shared) return shared;
   }
-  if (edit.poolId) revalidatePath(`/pool/${edit.poolId}`);
+  if (edit.poolId) revalidatePath(poolPath(edit.poolId));
   return { ok: true };
 }
 

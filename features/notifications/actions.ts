@@ -16,6 +16,7 @@ import {
 } from '@/lib/queries/notifications';
 import { createClient } from '@/lib/supabase/server';
 import { getMyPoolNames } from '@/lib/queries/pools';
+import { poolPath } from '@/lib/routes';
 
 /**
  * Notifications (H32). The database decides who may change what (0052:
@@ -72,7 +73,7 @@ export async function setMyNotificationPref(input: z.input<typeof Pref>): Promis
           .from('member_notification_prefs')
           .upsert({ pool_id: poolId, user_id: user.id, type, value });
   if (error) return refused(error.code === '42501' ? 'You’re not in this Pool.' : error.message);
-  revalidatePath(`/pool/${poolId}`);
+  revalidatePath(poolPath(poolId));
   return { ok: true };
 }
 
@@ -94,7 +95,7 @@ export async function setPoolNotificationDefault(
       error.code === '42501' ? 'Only the Pool’s creator sets its defaults.' : error.message,
     );
   }
-  revalidatePath(`/pool/${poolId}`);
+  revalidatePath(poolPath(poolId));
   return { ok: true };
 }
 

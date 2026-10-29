@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { GroundFoot } from './ground-foot';
 import { LOW_CARD_PX, LOW_STACK_PX } from './stair-board';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { idFromUrl } from '@/lib/routes';
 
 /**
  * A place not yet loaded (review): the ground's own frame — header, toggle,
@@ -24,7 +25,7 @@ export function GroundSkeleton({
   poolId?: string | null;
 }) {
   const params = useParams<{ id?: string }>();
-  const poolId = here === 'pool' ? (target ?? params.id ?? null) : null;
+  const poolId = here === 'pool' ? (target ?? (params.id ? idFromUrl(params.id) : null)) : null;
   const { openSheet } = useInputSheet();
   // A pool's composer needs its lanes, which have not arrived; Home's needs nothing more.
   const compose = (): void => {

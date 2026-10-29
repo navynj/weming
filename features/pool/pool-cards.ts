@@ -5,13 +5,14 @@ import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { PoolRipple, PoolView } from '@/lib/queries/pools';
 
 import { originTag } from './origin-tag';
+import { poolLanePath, poolSplashPath } from '@/lib/routes';
 
 /** A pool's views (H23). Lane, Date and Board as on Home; Members by member. */
 export type PoolViewKind = 'lane' | 'date' | 'members' | 'board';
 
 /** Where a post of a pool opens: its page in the pool, coming back to this pool. */
 export function poolSplashHref(poolId: string, splashId: string): string {
-  return `/pool/${poolId}/splash/${splashId}`;
+  return poolSplashPath(poolId, splashId);
 }
 
 /**
@@ -30,7 +31,7 @@ export function poolColumns(view: PoolView, kind: PoolViewKind): GridColumn[] {
     id: lane.id,
     name: lane.name,
     icon: lane.icon,
-    href: `/pool/${view.pool.id}/lane/${lane.id}`,
+    href: poolLanePath(view.pool.id, lane.id),
   }));
 }
 

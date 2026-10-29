@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
+import { poolSplashPath } from '@/lib/routes';
 
 /**
  * The push path (H32) against the real schema: what a write leaves, the
@@ -132,7 +133,7 @@ describe('dispatching', () => {
       title: 'Weming',
       body: 'Ana invited you to add your side in Crew',
       // In its pool (H42d): Home's reader reads only my own records.
-      url: `/pool/${pool}/splash/${record}`,
+      url: poolSplashPath(pool, record),
     });
     expect(sent[0].body).not.toContain('Secret trip');
     expect(payload.unread).toBeGreaterThanOrEqual(1);

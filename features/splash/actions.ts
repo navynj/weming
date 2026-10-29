@@ -16,6 +16,7 @@ import {
   saveHeader,
   type SplashResult,
 } from './header';
+import { splashPath } from '@/lib/routes';
 
 export type { Header, SplashResult } from './header';
 export type Done = { ok: true } | { ok: false; message: string };
@@ -142,7 +143,7 @@ async function setSplashDescriptionWork(id: string, text: string): Promise<Done>
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: 'That splash is not yours to describe.' };
   revalidatePath('/');
-  revalidatePath(`/splash/${id}`);
+  revalidatePath(splashPath(id));
   return { ok: true };
 }
 

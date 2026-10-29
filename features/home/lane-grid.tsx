@@ -60,6 +60,7 @@ import {
 import { DAY_RAIL_PX, DateDay } from './date-day';
 import { JointBand, JointFaces } from './joint-band';
 import { PostRow } from './post-row';
+import { lanePath } from '@/lib/routes';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
 /** The date rail's width; shared with the day list. */
@@ -871,7 +872,7 @@ export const LaneGrid = forwardRef<
  * Home (review); a member's column opens nothing.
  */
 function ColumnHeader({ column }: { column: GridColumn }) {
-  const href = column.href === undefined ? `/lane/${column.id}` : column.href;
+  const href = column.href === undefined ? lanePath(column.id) : column.href;
   const body = (
     <>
       {column.monogram !== undefined ? (
