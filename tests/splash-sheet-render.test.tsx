@@ -154,11 +154,14 @@ describe('the composer’s top line and the description (review)', () => {
     described.length = 0;
   });
 
-  it('shows `…` at the right and no face of mine; no description field unasked', () => {
+  it('shows `…` at the end of the title’s row, nothing above it, and no face of mine; no description field unasked', () => {
     const view = sheet();
-    const top = view.container.querySelector('[data-compose-top]')!;
+    const titleRow = view.container.querySelector('[data-sheet-title]')!.parentElement!;
     expect(view.container.querySelector('[data-compose-author]')).toBeNull();
-    expect(top.lastElementChild!.querySelector('[data-compose-more]')).not.toBeNull();
+    expect(titleRow.lastElementChild!.querySelector('[data-compose-more]')).not.toBeNull();
+    // The sheet opens on the title: no line of its own above it.
+    const composer = view.container.querySelector('[data-splash-composer]')!;
+    expect(composer.firstElementChild).toBe(titleRow);
     expect(view.container.querySelector('[data-compose-description-field]')).toBeNull();
     expect(view.container.textContent).not.toContain('Add splash description');
   });

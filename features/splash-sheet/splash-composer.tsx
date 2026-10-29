@@ -365,7 +365,6 @@ export function SplashComposer({
 
   return (
     <div data-splash-composer className="flex flex-col gap-5">
-      <ComposeTop describing={describing} onDescribing={setDescribing} />
       {/* The title, large and bold; Enter moves on to the body, so the
           first line is still the title and the rest still follows it.
           Not while an IME is composing (Korean, say): that Enter commits
@@ -397,6 +396,9 @@ export function SplashComposer({
           data-sheet-title
           className="text-main-900 placeholder:text-main-900 min-w-0 flex-1 resize-none text-3xl/snug font-semibold outline-none placeholder:opacity-20"
         />
+        {/* `…` beside the title, not on a line of its own above it, so the
+            sheet does not open on an empty top (Yoonji, in the session). */}
+        <ComposeTop describing={describing} onDescribing={setDescribing} />
       </div>
       {/* The description, only once asked for (review): under the title,
           small, its placeholder faint, so it is not taken for the body. */}

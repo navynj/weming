@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 
 /**
- * The composer's top line (review): a quiet `…` at the right — no face of
+ * The composer's `…` (review), at the end of the title's row — no face of
  * mine, the writer always being me (Yoonji, in the session) — whose one item asks for the
  * splash's description, or takes the asked-for field away again. The field
  * is never shown unasked, so it is not taken for the body.
@@ -18,7 +18,8 @@ export function ComposeTop({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div data-compose-top className="flex items-center justify-end gap-3">
+    // Centred on the title's first line (text-3xl/snug), not its whole box.
+    <div data-compose-top className="flex shrink-0 items-center pt-1">
       <div className="relative shrink-0">
         <button
           type="button"
