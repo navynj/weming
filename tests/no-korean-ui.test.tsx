@@ -13,6 +13,7 @@ vi.mock('@/features/pool/actions', () => ({}));
 vi.mock('@/features/lanes/actions', () => ({}));
 
 import { CreateFlow } from '@/features/pool/create-flow';
+import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { JoinFlow } from '@/features/pool/join-flow';
 
 /**
@@ -48,15 +49,17 @@ describe('no Korean in the UI (H23)', () => {
     expect(create.container.querySelector('[data-pool-kind]')).toBeNull();
     cleanup();
     const join = render(
-      <JoinFlow
-        token="t"
-        poolName="Our Pool"
-        members={[
-          { name: 'Yoonji Lee', photo: 'https://x/y.jpg' },
-          { name: 'Mina', photo: null },
-        ]}
-        myName="Yoonji"
-      />,
+      <InputSheetProvider>
+        <JoinFlow
+          token="t"
+          poolName="Our Pool"
+          members={[
+            { name: 'Yoonji Lee', photo: 'https://x/y.jpg' },
+            { name: 'Mina', photo: null },
+          ]}
+          myName="Yoonji"
+        />
+      </InputSheetProvider>,
     );
     expect(join.container.textContent).not.toMatch(HANGUL);
   });

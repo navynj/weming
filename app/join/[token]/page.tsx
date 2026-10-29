@@ -1,16 +1,20 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { PeopleProvider } from '@/features/people/people-provider';
 import { JoinFlow } from '@/features/pool/join-flow';
 import { getMyProfile } from '@/lib/queries/profile';
-import { signInviteMembers, signInvitePhoto } from '@/lib/avatars';
+import { signAvatars, signInviteMembers, signInvitePhoto } from '@/lib/avatars';
 import { createClient } from '@/lib/supabase/server';
 
 /**
  * `/join/[token]` (H23). Signed out, the proxy sends the visitor to sign in
  * and back here. A current member goes straight to the pool. An expired or
- * revoked link opens nothing and says so. Joining asks my name and nothing
- * else (hotfix 2026-10-26): connecting lanes lives in the pool's settings.
+ * revoked link opens nothing and says so. Joining asks nothing (hotfix
+ * 2026-10-26; H60): it shows the name and face I join as, which are my
+ * profile's in every pool, and asks a name only of a profile with none.
+ * Connecting lanes lives in the pool's settings.
  */
 export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
   const { token } = await params;
@@ -29,10 +33,12 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
 
   // The preview, and the pool's photo signed for ten minutes when the token
   // is valid, unexpired and unrevoked (0024, invite_photo; server only).
-  const [{ data: preview }, photo, members] = await Promise.all([
+  const [{ data: preview }, photo, members, myFace] = await Promise.all([
     supabase.rpc('invite_preview', { p_token: token }),
     signInvitePhoto(token),
     signInviteMembers(token),
+    // My own face, as the members will see it.
+    signAvatars(supabase, [{ id: profile.id, version: profile.avatar_version }]),
   ]);
   const pool = preview?.[0];
   if (!pool) {
@@ -48,13 +54,20 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
     );
   }
 
+  // The profile sheet opens over this screen ("Change in Settings"), so it
+  // gets the two providers it reads, with my face alone.
+  const me = { name: profile.display_name, photo: myFace[profile.id] ?? null };
   return (
-    <JoinFlow
-      token={token}
-      poolName={pool.pool_name}
-      photo={photo}
-      members={members}
-      myName={profile.display_name}
-    />
+    <PeopleProvider me={profile.id} people={{ [profile.id]: me }}>
+      <InputSheetProvider>
+        <JoinFlow
+          token={token}
+          poolName={pool.pool_name}
+          photo={photo}
+          members={members}
+          myName={profile.display_name}
+        />
+      </InputSheetProvider>
+    </PeopleProvider>
   );
 }

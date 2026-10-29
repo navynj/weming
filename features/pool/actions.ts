@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { writeRefusal } from '@/lib/supabase/fetch';
 import { reportFailure, reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
+import { displayName } from '@/features/people/name';
 
 export type Done = { ok: true } | { ok: false; message: string };
 export type Made = { ok: true; id: string } | { ok: false; message: string };
@@ -95,11 +96,21 @@ export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> 
   return { ok: true, id: data };
 }
 
-const Join = z.object({ token: z.string().min(1).max(64) });
+const Join = z.object({
+  token: z.string().min(1).max(64),
+  /** Only for a profile with no name yet; never renames one that has a name. */
+  name: displayName.optional(),
+});
+
+/** Asked of a profile with no usable name, on the join screen only. */
+const NAME_NEEDED = 'Add your name to join.';
 
 /**
  * Joining from `/join/[token]`: the token is checked again in the database.
  * Nothing about lanes (2026-10-26, 0033): every pool lane starts unconnected.
+ * A name is global, one per person across every pool (H60), so joining
+ * writes it only when the profile has none: a name sent for a profile that
+ * has one is ignored, never written.
  */
 export async function joinPool(input: z.infer<typeof Join>): Promise<Made> {
   return reported('join', () => joinPoolWork(input));
@@ -107,8 +118,29 @@ export async function joinPool(input: z.infer<typeof Join>): Promise<Made> {
 
 async function joinPoolWork(input: z.infer<typeof Join>): Promise<Made> {
   const parsed = Join.safeParse(input);
-  if (!parsed.success) return { ok: false, message: DEAD_LINK };
+  if (!parsed.success) {
+    const nameIssue = parsed.error.issues.find((issue) => issue.path[0] === 'name');
+    return { ok: false, message: nameIssue?.message ?? DEAD_LINK };
+  }
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Sign in again to join.' };
+  const { data: profile, error: readError } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .single();
+  if (readError) return { ok: false, message: said(readError) };
+  if (!profile.display_name.trim()) {
+    if (!parsed.data.name) return { ok: false, message: NAME_NEEDED };
+    const { error: nameError } = await supabase
+      .from('profiles')
+      .update({ display_name: parsed.data.name })
+      .eq('id', user.id);
+    if (nameError) return { ok: false, message: said(nameError) };
+  }
   const { data, error } = await supabase.rpc('join_pool', {
     p_token: parsed.data.token,
     p_links: [],

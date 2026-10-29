@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { bootstrapProfile } from '@/features/auth/bootstrap-profile';
+import { signInName } from '@/features/auth/sign-in-name';
 import { safeNext } from '@/lib/next-path';
 import { isTimeZone } from '@/lib/time';
 import { NEXT_COOKIE, siteUrl, TIMEZONE_COOKIE } from '@/lib/site';
@@ -34,8 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // earlier attempt died after the exchange, and this is where it recovers.
   const first = await bootstrapProfile(supabase, {
     userId: user.id,
-    displayName:
-      user.user_metadata.full_name ?? user.user_metadata.name ?? user.email?.split('@')[0] ?? 'You',
+    displayName: signInName(user.user_metadata, user.email),
     avatarUrl: user.user_metadata.avatar_url ?? null,
     timezone: timezone ? decodeURIComponent(timezone) : 'UTC',
   });

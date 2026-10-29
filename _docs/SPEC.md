@@ -52,6 +52,7 @@ Retired vocabulary (do not reuse): Stream, Deck, Pan, Table, Event, Moment, Log,
 - Two visibility paths for a Ripple:
   1. **Link path:** my rail appears in my friends' Home (subject to List routing).
   2. **Pool path:** only what is mapped/leaked into that pool, visible to all members including non-friends.
+- **Joining a pool** (`/join/<token>`, H23; H60): one screen — the pool's name and photo, its members as faces and names, the name and face I join as (read-only, with *Change in Settings* opening my profile), and Join. A name is global, the same in every pool: there are no per-pool nicknames, so the join screen never edits it. Only a profile with no usable name (blank, which a Google sign-up never is) is asked for one, as *Your name (shown in all your pools)*, required.
 - A non-friend pool member's profile is a dead end: only their in-pool Ripples + a Link request button. Never a gateway to their full timeline.
 - Lists are the answer to "send to friend-group A and B at once". Routing asymmetry (I show you more than you show me) is acceptable and undetectable by design (no view lists, no membership visibility).
 
