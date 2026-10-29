@@ -46,7 +46,7 @@ import {
 } from './layout';
 import type { BoardEditing } from './use-board-editing';
 import { useBoardPhotos } from './use-board-photos';
-import { usePhotoAspects, withAspects } from './photo-aspects';
+import { storedAspects, usePhotoAspects, withAspects } from './photo-aspects';
 
 /** A sideways swipe this long turns the page, once its axis is decided (the first 8px). */
 const SWIPE_PX = 48;
@@ -176,13 +176,13 @@ export function MonthBoard({
       span === 'week'
         ? layoutWeekBoard(drawn, week, {
             width: room ?? 980,
-            measured: withAspects(measured, aspects),
+            measured: withAspects(measured, { ...storedAspects(drawn), ...aspects }),
             half: phone,
           })
         : layoutMonthBoard(drawn, month, {
             width: room ?? 980,
             fill: tall ?? undefined,
-            measured: withAspects(measured, aspects),
+            measured: withAspects(measured, { ...storedAspects(drawn), ...aspects }),
             compact: phone,
           }),
     [drawn, span, week, month, room, tall, measured, aspects, phone],

@@ -9,6 +9,7 @@ import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { deleteRipple, setRippleLock } from '@/features/ripple-sheet/actions';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { RippleWithSplash } from '@/lib/queries/ripples';
+import { mediaMetaOf } from '@/lib/ripple-media';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
@@ -273,6 +274,7 @@ export function SplashPage({
       ...base,
       note: draft.note.trim().length > 0 ? draft.note : null,
       media: draft.media,
+      media_meta: { ...mediaMetaOf(base.media_meta), ...draft.mediaMeta },
       ...(draft.occurredOn ? { occurred_on: draft.occurredOn } : {}),
       ...(draft.videoPreviews !== undefined ? { video_previews: draft.videoPreviews } : {}),
     };
@@ -293,6 +295,7 @@ export function SplashPage({
               id: block.id,
               note: draft.note,
               media: draft.media,
+              mediaMeta: draft.mediaMeta,
               ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
               ...(draft.videoPreviews !== undefined ? { videoPreviews: draft.videoPreviews } : {}),
             }),
@@ -318,6 +321,7 @@ export function SplashPage({
         parent_ripple_id: null,
         thread_pool_id: sidePool,
         video_previews: true,
+        media_meta: {},
         splash_id: target.splashId,
         splash: {
           declared_start: page.splash.declaredRange?.start ?? null,
@@ -338,6 +342,7 @@ export function SplashPage({
             id: draft.id,
             note: draft.note,
             media: draft.media,
+            mediaMeta: draft.mediaMeta,
             splashId: target.splashId,
             ...(sidePool ? { threadPoolId: sidePool } : {}),
             ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),

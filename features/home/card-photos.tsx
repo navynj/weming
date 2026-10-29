@@ -36,7 +36,7 @@ export function CardPhotos({
     <span data-card-photos className="grid grid-cols-3 items-start gap-1 pt-1.5">
       {shown.map((photo, index) => {
         const url = signed[photo.path];
-        const known = aspects[photo.path];
+        const known = aspects[photo.path] ?? photo.aspect;
         return (
           <span
             key={photo.path}

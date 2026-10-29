@@ -5,9 +5,12 @@ import { z } from 'zod';
 
 import type { Database } from '@/lib/database.types';
 import { removeRippleMedia } from '@/lib/media';
+import { POOL_PHOTO_BUCKET } from '@/lib/pool-photo-bucket';
+import { MediaMetaInput, mediaMetaFor } from '@/lib/ripple-media';
+import { storage, type SignedUpload } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
 import { writeRefusal } from '@/lib/supabase/fetch';
-import { reported } from '@/lib/report-failure';
+import { reportFailure, reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
 
 export type Done = { ok: true } | { ok: false; message: string };
@@ -150,6 +153,54 @@ export async function setPoolPhoto(poolId: string, on: boolean): Promise<Done> {
   }
   revalidatePool(poolId);
   revalidatePath('/');
+  return { ok: true };
+}
+
+/**
+ * Where a pool's new photo goes (0024, H38): a signed PUT for the pool's own
+ * path, issued only to a current member — the same test the bucket's policy
+ * makes (`is_pool_member_object`, 0059), asked here, through my session,
+ * before any URL exists. `setPoolPhoto` names it once the bytes are there.
+ */
+export async function requestPoolPhotoUpload(
+  poolId: string,
+  contentType: string,
+): Promise<{ ok: true; upload: SignedUpload } | { ok: false; message: string }> {
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
+  if (!z.enum(['image/webp', 'image/jpeg', 'image/png']).safeParse(contentType).success) {
+    return { ok: false, message: 'That photo’s type isn’t one we keep.' };
+  }
+  const supabase = await createClient();
+  const { data: member, error } = await supabase.rpc('is_pool_member_object', {
+    object_name: poolId,
+  });
+  if (error) return { ok: false, message: error.message };
+  if (!member) return { ok: false, message: 'Only someone in this Pool can change its photo.' };
+  try {
+    const upload = await storage().signedUploadUrl(POOL_PHOTO_BUCKET, poolId, {
+      contentType,
+      cacheControl: 86400,
+      upsert: true,
+    });
+    return { ok: true, upload };
+  } catch (failure) {
+    return { ok: false, message: failure instanceof Error ? failure.message : String(failure) };
+  }
+}
+
+/**
+ * "Remove photo" (0024, H38): the row stops naming it, which only a current
+ * member may do (`set_pool_photo` checks), and then its bytes go — a hard
+ * delete, storage included. Run again after a failure, it finishes.
+ */
+export async function removePoolPhoto(poolId: string): Promise<Done> {
+  const unset = await setPoolPhoto(poolId, false);
+  if (!unset.ok) return unset;
+  try {
+    await storage().remove(POOL_PHOTO_BUCKET, [poolId]);
+  } catch (failure) {
+    return { ok: false, message: failure instanceof Error ? failure.message : String(failure) };
+  }
   return { ok: true };
 }
 
@@ -547,6 +598,8 @@ const OwnDrop = z.object({
   icon: ICON,
   body: z.string().trim().max(8000),
   media: z.array(z.string()).max(8),
+  /** Each photo's size (0070), so a layout reserves its space. */
+  mediaMeta: MediaMetaInput,
   /** The splash's range, which every ripple on it takes (H24). */
   declaredStart: z.string().regex(ISO_DAY),
   declaredEnd: z.string().regex(ISO_DAY).nullable(),
@@ -597,6 +650,7 @@ async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Ma
       author_id: user.id,
       note: drop.body || null,
       media: drop.media,
+      media_meta: mediaMetaFor(drop.media, drop.mediaMeta ?? {}),
       splash_id: drop.id,
       ...(drop.blockDay && drop.declaredEnd ? { occurred_on: drop.blockDay } : {}),
     });
@@ -620,9 +674,24 @@ async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Ma
 export async function deletePool(poolId: string): Promise<Done> {
   if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'That Pool is gone.' };
   const supabase = await createClient();
+  // Its photo, read while the row still says so: the teardown takes the row.
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('photo_path')
+    .eq('id', poolId)
+    .maybeSingle();
   const { error } = await supabase.rpc('delete_pool', { p_pool: poolId });
   if (error) return { ok: false, message: said(error) };
   revalidatePool(poolId);
+  // A hard delete includes storage (CLAUDE.md): before this, a deleted
+  // pool's photo stayed in the bucket with nothing naming it (2026-10-28).
+  if (pool?.photo_path) {
+    try {
+      await storage().remove(POOL_PHOTO_BUCKET, [pool.photo_path]);
+    } catch (failure) {
+      reportFailure('pool', failure);
+    }
+  }
   return { ok: true };
 }
 

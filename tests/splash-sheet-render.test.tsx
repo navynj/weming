@@ -41,9 +41,10 @@ vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
-vi.mock('@/lib/downscale', async (actual) => ({
-  ...(await actual<typeof import('@/lib/downscale')>()),
-  downscale: (file: File) => Promise.resolve(file),
+vi.mock('@/lib/compress-image', async (actual) => ({
+  ...(await actual<typeof import('@/lib/compress-image')>()),
+  compressImage: (file: File) =>
+    Promise.resolve({ full: { blob: file, size: { w: 4, h: 3 } }, display: null }),
 }));
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({

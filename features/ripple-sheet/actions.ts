@@ -7,6 +7,7 @@ import type { CommitResult } from '@/features/input-sheet/commit';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
+import { MediaMetaInput, mediaMetaFor, mediaMetaOf } from '@/lib/ripple-media';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^\d{2}:\d{2}$/;
@@ -16,6 +17,8 @@ const Edit = z.object({
   categoryId: z.uuid().nullable(),
   note: z.string().trim().max(2000).optional(),
   media: z.array(z.string()).max(8),
+  /** Sizes of photos added in this edit (0070); the row's own entries stay for the rest. */
+  mediaMeta: MediaMetaInput,
   /** The annotation after this edit, or none: a plain posted fragment (H20c). */
   occurredOn: z.string().regex(ISO_DATE).nullable(),
   occurredTime: z.string().regex(CLOCK).nullable(),
@@ -71,7 +74,7 @@ async function updateRippleWork(input: Edit): Promise<CommitResult> {
 
   const { data: before } = await supabase
     .from('ripples')
-    .select('splash_id')
+    .select('splash_id, media_meta')
     .eq('id', edit.id)
     .single();
   if (!before) return { ok: false, reason: 'error', message: 'That record is gone.' };
@@ -85,6 +88,7 @@ async function updateRippleWork(input: Edit): Promise<CommitResult> {
     .update({
       note: edit.note?.length ? edit.note : null,
       media: edit.media,
+      media_meta: mediaMetaFor(edit.media, mediaMetaOf(before.media_meta), edit.mediaMeta ?? {}),
       occurred_on: edit.occurredOn,
       occurred_time: edit.occurredTime,
       ended_at: endedAt,

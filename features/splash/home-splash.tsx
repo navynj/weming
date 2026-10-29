@@ -7,6 +7,7 @@ import { SplashPage } from '@/features/splash/splash-page';
 import { declaredRange, orderBlocks } from '@/features/splash/block-day';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { signOwnMedia, signRippleMedia } from '@/lib/media';
+import { mediaMetaOf } from '@/lib/ripple-media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { audienceFor } from '@/features/pool/audience-for';
 import {
@@ -111,9 +112,16 @@ export async function HomeSplash({ id }: { id: string }) {
 
   // A photo that could not be signed is a placeholder, never a failed page.
   // Mine by path; someone else's through the ripple, where the check lives.
-  const signed = await signOwnMedia(blocks.flatMap((r) => r.media));
+  // The page draws each photo's display copy (2026-10-28).
+  const signed = await signOwnMedia(
+    blocks.flatMap((r) => r.media),
+    Object.assign({}, ...blocks.map((r) => mediaMetaOf(r.media_meta))),
+    'display',
+  );
   const theirPhotos = await Promise.all(
-    others.filter((r) => r.media.length > 0).map(async (r) => [r.id, await signRippleMedia(r.id)]),
+    others
+      .filter((r) => r.media.length > 0)
+      .map(async (r) => [r.id, await signRippleMedia(r.id, 'display')]),
   );
   const photos = {
     ...Object.fromEntries(

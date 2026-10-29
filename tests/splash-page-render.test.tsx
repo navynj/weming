@@ -31,9 +31,10 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
   deleteRipple: record('deleteRipple', { ok: true, rippleId: 'r' }),
   setRippleLock: record('setRippleLock', { ok: true, rippleId: 'r' }),
 }));
-vi.mock('@/lib/downscale', async (actual) => ({
-  ...(await actual<typeof import('@/lib/downscale')>()),
-  downscale: (file: File) => Promise.resolve(file),
+vi.mock('@/lib/compress-image', async (actual) => ({
+  ...(await actual<typeof import('@/lib/compress-image')>()),
+  compressImage: (file: File) =>
+    Promise.resolve({ full: { blob: file, size: { w: 4, h: 3 } }, display: null }),
 }));
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -74,6 +75,7 @@ function block(over: Partial<RippleWithSplash> & { id: string }): RippleWithSpla
     author_id: 'a1',
     thread_pool_id: null,
     video_previews: true,
+    media_meta: {},
     note: 'fixture',
     media: [],
     occurred_on: null,
@@ -289,6 +291,7 @@ describe('writing on the page, in place', () => {
       id: 'first',
       note: 'sea to sky, fog',
       media: [],
+      mediaMeta: {},
       occurredOn: '2026-08-19',
     });
     // editBlock revalidates: the page comes back in its response, not read twice.

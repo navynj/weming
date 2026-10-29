@@ -8,15 +8,21 @@
 // recorded. Objects already in the bucket are left alone unless --overwrite.
 // Before writing anything it names the target project and waits for its ref
 // to be typed: a restore aimed at the wrong project is the mistake to stop.
-import { createClient } from '@supabase/supabase-js';
+//
+// Writes through the storage adapter (lib/storage), as the backup reads, so a
+// change of backend changes neither script. Run with
+// --no-warnings=MODULE_TYPELESS_PACKAGE_JSON (DEPLOY.md, Restoring storage).
 import { readFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
+import { createStorage } from '../lib/storage/backend.ts';
+import { BUCKETS } from '../lib/storage/types.ts';
+
 const [dirArg, bucket] = process.argv.slice(2);
 const overwrite = process.argv.includes('--overwrite');
-if (!dirArg || !bucket) {
-  console.error('usage: restore-storage.mjs <backup>/storage <bucket> [--overwrite]');
+if (!dirArg || !BUCKETS.includes(bucket)) {
+  console.error(`usage: restore-storage.mjs <backup>/storage <${BUCKETS.join('|')}> [--overwrite]`);
   process.exit(2);
 }
 const url = process.env.SUPABASE_URL;
@@ -41,7 +47,7 @@ if (typed !== ref) {
   process.exit(1);
 }
 
-const storage = createClient(url, key, { auth: { persistSession: false } }).storage;
+const storage = createStorage({ supabaseUrl: url, serviceRoleKey: key });
 const base = resolve(dir, bucket);
 let uploaded = 0;
 let kept = 0;
@@ -50,15 +56,18 @@ for (const item of items) {
   const file = resolve(base, item.path);
   if (!file.startsWith(base + sep)) throw new Error('an object path escapes its bucket folder');
   const body = await readFile(file);
-  const { error } = await storage.from(bucket).upload(item.path, body, {
-    contentType: item.contentType ?? undefined,
-    upsert: overwrite,
-  });
-  if (!error) uploaded += 1;
-  else if (!overwrite && /exists|duplicate/i.test(error.message)) kept += 1;
-  else {
-    failed += 1;
-    console.error(`✖ ${item.path}: ${error.message}`);
+  try {
+    await storage.put(bucket, item.path, body, {
+      contentType: item.contentType ?? 'application/octet-stream',
+      upsert: overwrite,
+    });
+    uploaded += 1;
+  } catch (error) {
+    if (!overwrite && /exists|duplicate/i.test(error.message)) kept += 1;
+    else {
+      failed += 1;
+      console.error(`✖ ${item.path}: ${error.message}`);
+    }
   }
 }
 console.log(`✓ ${uploaded} uploaded, ${kept} already there, ${failed} failed`);

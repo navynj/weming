@@ -10,6 +10,7 @@ import { MEDIA_BUCKET } from '@/lib/media-bucket';
 import { POOL_PHOTO_BUCKET } from '@/lib/pool-photo-bucket';
 import { signedInRecently } from '@/lib/recent-sign-in';
 import { reportFailure } from '@/lib/report-failure';
+import { listAll, storage } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
 
 /** Each pool I own, and who it goes to; no heir means it is deleted with me. */
@@ -94,34 +95,6 @@ function serviceClient() {
   });
 }
 
-/** Every object under `prefix/` in a bucket, a page at a time. */
-async function objectsUnder(
-  service: ReturnType<typeof serviceClient>,
-  bucket: string,
-  prefix: string,
-): Promise<string[]> {
-  const paths: string[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await service.storage
-      .from(bucket)
-      .list(prefix, { limit: 1000, offset });
-    if (error) throw error;
-    paths.push(...(data ?? []).map((object) => `${prefix}/${object.name}`));
-    if (!data || data.length < 1000) return paths;
-  }
-}
-
-async function removeAll(
-  service: ReturnType<typeof serviceClient>,
-  bucket: string,
-  paths: string[],
-): Promise<void> {
-  for (let i = 0; i < paths.length; i += 1000) {
-    const { error } = await service.storage.from(bucket).remove(paths.slice(i, i + 1000));
-    if (error) throw error;
-  }
-}
-
 /**
  * Deletes my account (H53): the rows in one transaction (delete_my_account,
  * 0065), then my photos, my profile photo and the photos of pools deleted
@@ -156,13 +129,18 @@ export async function deleteMyAccount(
   }
 
   try {
-    const service = serviceClient();
-    await removeAll(service, MEDIA_BUCKET, await objectsUnder(service, MEDIA_BUCKET, uid));
-    await removeAll(service, AVATAR_BUCKET, [avatarPath(uid)]);
+    // Every object under my folder, display copies included, all pages.
+    const backend = storage();
+    const mine = await listAll(backend, MEDIA_BUCKET, `${uid}/`);
+    await backend.remove(
+      MEDIA_BUCKET,
+      mine.map((object) => object.path),
+    );
+    await backend.remove(AVATAR_BUCKET, [avatarPath(uid)]);
     if (done.data.pool_photos.length > 0) {
-      await removeAll(service, POOL_PHOTO_BUCKET, done.data.pool_photos);
+      await backend.remove(POOL_PHOTO_BUCKET, done.data.pool_photos);
     }
-    const gone = await service.auth.admin.deleteUser(uid);
+    const gone = await serviceClient().auth.admin.deleteUser(uid);
     if (gone.error) throw gone.error;
   } catch (failure) {
     reportFailure('account', failure);

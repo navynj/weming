@@ -45,7 +45,7 @@ describe('signOwnMedia never throws', () => {
       ],
       error: null,
     });
-    await expect(signOwnMedia(MINE)).resolves.toEqual({
+    await expect(signOwnMedia(MINE, {}, 'display')).resolves.toEqual({
       'u1/a.jpg': 'https://signed/a',
       'u1/b.jpg': null,
     });
@@ -53,18 +53,27 @@ describe('signOwnMedia never throws', () => {
 
   it('returns placeholders, not a throw, when signing itself throws', async () => {
     sign.mockRejectedValue(new Error('storage is down'));
-    await expect(signOwnMedia(MINE)).resolves.toEqual({ 'u1/a.jpg': null, 'u1/b.jpg': null });
+    await expect(signOwnMedia(MINE, {}, 'display')).resolves.toEqual({
+      'u1/a.jpg': null,
+      'u1/b.jpg': null,
+    });
     expect(reported).toHaveBeenCalledWith(expect.stringContaining('storage is down'));
   });
 
   it('returns placeholders when the batch fails', async () => {
     sign.mockResolvedValue({ data: null, error: { message: 'refused' } });
-    await expect(signOwnMedia(MINE)).resolves.toEqual({ 'u1/a.jpg': null, 'u1/b.jpg': null });
+    await expect(signOwnMedia(MINE, {}, 'display')).resolves.toEqual({
+      'u1/a.jpg': null,
+      'u1/b.jpg': null,
+    });
   });
 
   it('names the missing service key in the log and still renders placeholders', async () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    await expect(signOwnMedia(MINE)).resolves.toEqual({ 'u1/a.jpg': null, 'u1/b.jpg': null });
+    await expect(signOwnMedia(MINE, {}, 'display')).resolves.toEqual({
+      'u1/a.jpg': null,
+      'u1/b.jpg': null,
+    });
     expect(reported).toHaveBeenCalledWith(
       expect.stringContaining('Missing SUPABASE_SERVICE_ROLE_KEY'),
     );
@@ -76,7 +85,7 @@ describe('signOwnMedia never throws', () => {
       data: [{ path: 'u1/a.jpg', signedUrl: 'https://signed/a', error: null }],
       error: null,
     });
-    await expect(signOwnMedia(['u1/a.jpg', 'u2/theirs.jpg'])).resolves.toEqual({
+    await expect(signOwnMedia(['u1/a.jpg', 'u2/theirs.jpg'], {}, 'display')).resolves.toEqual({
       'u1/a.jpg': 'https://signed/a',
       'u2/theirs.jpg': null,
     });
@@ -84,7 +93,7 @@ describe('signOwnMedia never throws', () => {
   });
 
   it('asks nothing of storage for no paths', async () => {
-    await expect(signOwnMedia([])).resolves.toEqual({});
+    await expect(signOwnMedia([], {}, 'display')).resolves.toEqual({});
     expect(sign).not.toHaveBeenCalled();
   });
 });
@@ -97,7 +106,7 @@ describe('an app asset (H58) is the app’s, not the account’s', () => {
       data: [{ path: 'u1/a.jpg', signedUrl: 'https://signed/a', error: null }],
       error: null,
     });
-    await expect(signOwnMedia([SHELL, 'u1/a.jpg'])).resolves.toEqual({
+    await expect(signOwnMedia([SHELL, 'u1/a.jpg'], {}, 'display')).resolves.toEqual({
       [SHELL]: '/welcome/shell.png',
       'u1/a.jpg': 'https://signed/a',
     });
@@ -106,13 +115,48 @@ describe('an app asset (H58) is the app’s, not the account’s', () => {
 
   it('keeps its URL when storage is down', async () => {
     sign.mockRejectedValue(new Error('storage is down'));
-    await expect(signOwnMedia([SHELL])).resolves.toEqual({ [SHELL]: '/welcome/shell.png' });
+    await expect(signOwnMedia([SHELL], {}, 'display')).resolves.toEqual({
+      [SHELL]: '/welcome/shell.png',
+    });
   });
 
   it('is never removed with the record that carried it', async () => {
+    remove.mockResolvedValue({ data: [], error: null });
     await removeRippleMedia([SHELL]);
     expect(remove).not.toHaveBeenCalled();
     await removeRippleMedia([SHELL, 'u1/a.jpg']);
-    expect(remove).toHaveBeenCalledWith(['u1/a.jpg']);
+    // The display copy's path is derived (0070), so it goes too.
+    expect(remove).toHaveBeenCalledWith(['u1/a.jpg', 'u1/a.d.jpg']);
+  });
+});
+
+describe('the display copy (0070)', () => {
+  it('signs the display copy where the row says there is one, keyed by the photo', async () => {
+    sign.mockResolvedValue({
+      data: [
+        { path: 'u1/a.d.webp', signedUrl: 'https://signed/a-display', error: null },
+        { path: 'u1/b.jpg', signedUrl: 'https://signed/b', error: null },
+      ],
+      error: null,
+    });
+    const meta = { 'u1/a.webp': { w: 2048, h: 1536, d: { w: 1024, h: 768 } } };
+    await expect(signOwnMedia(['u1/a.webp', 'u1/b.jpg'], meta, 'display')).resolves.toEqual({
+      'u1/a.webp': 'https://signed/a-display',
+      'u1/b.jpg': 'https://signed/b',
+    });
+    // An older photo (no entry) is its own display image.
+    expect(sign).toHaveBeenCalledWith(['u1/a.d.webp', 'u1/b.jpg'], expect.any(Number));
+  });
+
+  it('signs the full photo when asked for it', async () => {
+    sign.mockResolvedValue({
+      data: [{ path: 'u1/a.webp', signedUrl: 'https://signed/a', error: null }],
+      error: null,
+    });
+    const meta = { 'u1/a.webp': { w: 2048, h: 1536, d: { w: 1024, h: 768 } } };
+    await expect(signOwnMedia(['u1/a.webp'], meta, 'full')).resolves.toEqual({
+      'u1/a.webp': 'https://signed/a',
+    });
+    expect(sign).toHaveBeenCalledWith(['u1/a.webp'], expect.any(Number));
   });
 });

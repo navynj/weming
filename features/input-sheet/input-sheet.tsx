@@ -111,6 +111,7 @@ export function InputSheet({
           categoryId,
           note: draft.note,
           media: draft.media,
+          mediaMeta: media.meta,
           occurredOn: a?.date ?? null,
           occurredTime: a?.time ?? null,
           startInstant,
@@ -128,6 +129,7 @@ export function InputSheet({
         categoryId: draft.categoryId,
         note: draft.note,
         media: draft.media,
+        mediaMeta: media.meta,
         occurredOn: a?.date ?? null,
         occurredTime: a?.time ?? null,
         startInstant,
@@ -190,7 +192,12 @@ export function InputSheet({
               today={today}
               onChange={(annotation) => setDraft((d) => ({ ...d, annotation }))}
             />
-            <AddImageAffordance attach={media.attach} busy={media.busy} input={media.input} />
+            <AddImageAffordance
+              attach={media.attach}
+              busy={media.busy}
+              input={media.input}
+              progress={media.progress}
+            />
           </div>
 
           {result && !result.ok ? (

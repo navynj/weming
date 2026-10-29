@@ -11,10 +11,9 @@ import {
   type CropView,
 } from '@/features/people/crop';
 import { CropFrame, FRAME_PX } from '@/features/people/crop-frame';
-import { POOL_PHOTO_BUCKET } from '@/lib/pool-photo-bucket';
-import { createClient } from '@/lib/supabase/client';
+import { putSigned } from '@/lib/storage/upload';
 
-import { setPoolPhoto } from './actions';
+import { removePoolPhoto, requestPoolPhotoUpload, setPoolPhoto } from './actions';
 
 /** What the field holds: the photo as it is, gone, or a new one being cropped. */
 export type PoolPhotoChange =
@@ -135,21 +134,17 @@ async function uploadPoolPhoto(
   poolId: string,
   change: Exclude<PoolPhotoChange, { kind: 'keep' }>,
 ): Promise<string | null> {
-  const storage = createClient().storage.from(POOL_PHOTO_BUCKET);
   if (change.kind === 'remove') {
-    const { error } = await storage.remove([poolId]);
-    if (error) return error.message;
-    const done = await setPoolPhoto(poolId, false);
+    const done = await removePoolPhoto(poolId);
     return done.ok ? null : done.message;
   }
   const size = { width: change.image.naturalWidth, height: change.image.naturalHeight };
   const blob = await encodeAvatar(change.image, sourceRect(change.view, size, FRAME_PX));
-  const { error } = await storage.upload(poolId, blob, {
-    contentType: blob.type,
-    upsert: true,
-    cacheControl: '86400',
-  });
-  if (error) return error.message;
+  // Any current member's to change (H38): the server checks, then signs.
+  const asked = await requestPoolPhotoUpload(poolId, blob.type);
+  if (!asked.ok) return asked.message;
+  const refused = await putSigned(asked.upload, blob);
+  if (refused) return refused.message;
   const done = await setPoolPhoto(poolId, true);
   return done.ok ? null : done.message;
 }

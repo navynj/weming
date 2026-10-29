@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { removeRippleMedia } from '@/lib/media';
+import { MediaMetaInput, mediaMetaFor } from '@/lib/ripple-media';
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
 
@@ -25,6 +26,8 @@ const Drop = Header.extend({
   /** The first block's body; empty makes a titled post with nothing in it yet. */
   body: z.string().trim().max(8000),
   media: z.array(z.string()).max(8),
+  /** Each photo's size (0070), so a layout reserves its space. */
+  mediaMeta: MediaMetaInput,
   /** Today in the author's zone: the post's date when none is given (H24). */
   today: z.string().regex(ISO_DATE),
   /** The first block's own day, when the post has a range (0031). */
@@ -87,6 +90,7 @@ async function dropSplashWork(input: Drop): Promise<SplashResult> {
       author_id: user.id,
       note: drop.body.length > 0 ? drop.body : null,
       media: drop.media,
+      media_meta: mediaMetaFor(drop.media, drop.mediaMeta ?? {}),
       splash_id: splash.id,
       // Its own day inside the post's range (0031); the database checks it.
       ...(drop.blockDay && drop.declaredEnd ? { occurred_on: drop.blockDay } : {}),

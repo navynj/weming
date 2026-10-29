@@ -13,6 +13,12 @@ vi.mock('@/features/people/actions', () => ({
     saves.push(input);
     return Promise.resolve({ ok: true });
   },
+  // The server signs a PUT for my own path, my id (0018).
+  requestAvatarUpload: (contentType: string) =>
+    Promise.resolve({
+      ok: true,
+      upload: { url: 'u-me', headers: { 'content-type': contentType } },
+    }),
 }));
 const uploads: { path: string; blob: Blob; contentType?: string }[] = [];
 // The sheet's notifications section (H32) reads and saves its own settings.
@@ -22,17 +28,11 @@ vi.mock('@/features/notifications/actions', () => ({
   savePushSubscription: () => Promise.resolve({ ok: true }),
   removePushSubscription: () => Promise.resolve({ ok: true }),
 }));
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    storage: {
-      from: () => ({
-        upload: (path: string, blob: Blob, options: { contentType?: string }) => {
-          uploads.push({ path, blob, contentType: options.contentType });
-          return Promise.resolve({ error: null });
-        },
-      }),
-    },
-  }),
+vi.mock('@/lib/storage/upload', () => ({
+  putSigned: (upload: { url: string; headers: Record<string, string> }, blob: Blob) => {
+    uploads.push({ path: upload.url, blob, contentType: upload.headers['content-type'] });
+    return Promise.resolve(null);
+  },
 }));
 
 import { HomeGround } from '@/features/home/home-ground';

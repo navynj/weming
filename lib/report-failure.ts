@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { scrubText } from './observability';
 
 /** What failed, as Sentry tags it: the operation, never what it carried. */
-export type FailedOp = 'upload' | 'compose' | 'edit' | 'join' | 'push' | 'account';
+export type FailedOp = 'upload' | 'compose' | 'edit' | 'join' | 'push' | 'account' | 'pool';
 
 /**
  * A failure someone ran into, sent to Sentry tagged with its operation. Only

@@ -73,7 +73,7 @@ export async function PoolSplash({
   const summary = summarizeSplash(board, blocks, zone, new Date());
 
   const [photoLists, { data: lockRows }, responses] = await Promise.all([
-    Promise.all(blocks.map((r) => (r.media.length > 0 ? signRippleMedia(r.id) : []))),
+    Promise.all(blocks.map((r) => (r.media.length > 0 ? signRippleMedia(r.id, 'display') : []))),
     supabase
       .from('ripple_audience')
       .select('ripple_id')

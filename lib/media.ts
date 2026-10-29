@@ -1,13 +1,19 @@
 'use server';
 
-import { createClient as createServiceClient } from '@supabase/supabase-js';
-
-import type { Database } from '@/lib/database.types';
-import { supabaseServiceRoleKey, supabaseUrl } from '@/lib/env';
 import { getAuthUser } from '@/lib/queries/profile';
 import { createClient } from '@/lib/supabase/server';
 import { MEDIA_BUCKET } from '@/lib/media-bucket';
-import { appAssetUrl, isAppAsset, isStoragePath } from '@/lib/ripple-media';
+import {
+  appAssetUrl,
+  displayPathOf,
+  isAppAsset,
+  isStoragePath,
+  mediaMetaOf,
+  variantPath,
+  type MediaMeta,
+  type MediaVariant,
+} from '@/lib/ripple-media';
+import { storage } from '@/lib/storage';
 
 /** Long enough to load a sheet, short enough that a leaked URL rots fast. */
 const SIGNED_URL_TTL_SECONDS = 300;
@@ -20,14 +26,26 @@ const SIGNED_URL_TTL_SECONDS = 300;
 export type SignedMedia = Record<string, string | null>;
 
 /**
- * The service role signs and removes objects. Made here, inside the call
- * that needs it, so a missing key fails as `Missing SUPABASE_SERVICE_ROLE_KEY`
- * at that call and nowhere earlier.
+ * Signs each path's chosen copy, keyed by the path the record names. Storage
+ * (lib/storage) signs only after the caller's visibility check has run.
  */
-function serviceClient() {
-  return createServiceClient<Database>(supabaseUrl(), supabaseServiceRoleKey(), {
-    auth: { persistSession: false },
-  });
+async function signVariants(
+  paths: string[],
+  meta: MediaMeta,
+  variant: MediaVariant,
+): Promise<Map<string, string>> {
+  const objectOf = new Map(paths.map((path) => [path, variantPath(path, meta, variant)]));
+  const signed = await storage().signedReadUrls(
+    MEDIA_BUCKET,
+    [...new Set(objectOf.values())],
+    SIGNED_URL_TTL_SECONDS,
+  );
+  const out = new Map<string, string>();
+  for (const [path, object] of objectOf) {
+    const url = signed.get(object);
+    if (url) out.set(path, url);
+  }
+  return out;
 }
 
 /** Every path, before signing: `null`, except an app asset (H58), already its URL. */
@@ -56,14 +74,14 @@ function reportSigningFailure(error: unknown): void {
  *
  * Fallible per item and never throwing: what could not be signed is left out.
  */
-export async function signRippleMedia(rippleId: string): Promise<string[]> {
+export async function signRippleMedia(rippleId: string, variant: MediaVariant): Promise<string[]> {
   try {
     const supabase = await createClient();
 
     // RLS decides. A Ripple the viewer may not see simply is not returned.
     const { data: ripple } = await supabase
       .from('ripples')
-      .select('media')
+      .select('media, media_meta')
       .eq('id', rippleId)
       .maybeSingle();
 
@@ -71,19 +89,10 @@ export async function signRippleMedia(rippleId: string): Promise<string[]> {
 
     // An app asset (H58) needs no signing; the rest keep their order around it.
     const stored = ripple.media.filter(isStoragePath);
-    const signed = new Map<string, string>();
-    if (stored.length > 0) {
-      const { data, error } = await serviceClient()
-        .storage.from(MEDIA_BUCKET)
-        .createSignedUrls(stored, SIGNED_URL_TTL_SECONDS);
-      if (error) {
-        reportSigningFailure(error);
-        return [];
-      }
-      for (const entry of data) {
-        if (entry.signedUrl && entry.path) signed.set(entry.path, entry.signedUrl);
-      }
-    }
+    const signed =
+      stored.length > 0
+        ? await signVariants(stored, mediaMetaOf(ripple.media_meta), variant)
+        : new Map<string, string>();
     return ripple.media.flatMap((path) => {
       if (isAppAsset(path)) return [appAssetUrl(path)];
       const url = signed.get(path);
@@ -96,7 +105,8 @@ export async function signRippleMedia(rippleId: string): Promise<string[]> {
 }
 
 /**
- * Removes objects for a Ripple and everything inside it.
+ * Removes objects for a Ripple and everything inside it, each photo's
+ * display copy with it.
  *
  * Deletes are hard and include storage (CLAUDE.md): a row that is gone while
  * its photograph survives is not a delete, it is a broken reference with a
@@ -107,7 +117,9 @@ export async function removeRippleMedia(paths: string[]): Promise<void> {
   // An app asset (H58) is every account's one copy: never the record's to remove.
   const stored = paths.filter(isStoragePath);
   if (stored.length === 0) return;
-  await serviceClient().storage.from(MEDIA_BUCKET).remove(stored);
+  // The display copy's path is derived, so it goes whether or not the row
+  // said it had one; removing a path that is not there is no error.
+  await storage().remove(MEDIA_BUCKET, [...stored, ...stored.map(displayPathOf)]);
 }
 
 /**
@@ -123,7 +135,11 @@ export async function removeRippleMedia(paths: string[]): Promise<void> {
  * client that could not be made. The failure is logged once, named, and the
  * page draws placeholders; it does not fall over.
  */
-export async function signOwnMedia(paths: string[]): Promise<SignedMedia> {
+export async function signOwnMedia(
+  paths: string[],
+  meta: MediaMeta,
+  variant: MediaVariant,
+): Promise<SignedMedia> {
   const unsigned = unsignedMedia(paths);
   if (paths.length === 0) return unsigned;
 
@@ -135,24 +151,9 @@ export async function signOwnMedia(paths: string[]): Promise<SignedMedia> {
     const own = paths.filter((path) => path.startsWith(`${user.id}/`));
     if (own.length === 0) return unsigned;
 
-    const { data, error } = await serviceClient()
-      .storage.from(MEDIA_BUCKET)
-      .createSignedUrls(own, SIGNED_URL_TTL_SECONDS);
-    if (error) {
-      reportSigningFailure(error);
-      return unsigned;
-    }
-
     // Per item: an entry storage could not sign is one placeholder, not a
-    // failed page.
-    return {
-      ...unsigned,
-      ...Object.fromEntries(
-        data.flatMap((entry) =>
-          entry.signedUrl && entry.path ? [[entry.path, entry.signedUrl]] : [],
-        ),
-      ),
-    };
+    // failed page. The display copy sits in the same folder, so it is mine too.
+    return { ...unsigned, ...Object.fromEntries(await signVariants(own, meta, variant)) };
   } catch (error) {
     reportSigningFailure(error);
     return unsigned;
@@ -178,9 +179,14 @@ export async function signBoardPhotos(
     const supabase = await createClient();
     const { data: rows } = await supabase
       .from('ripples')
-      .select('id, media')
+      .select('id, media, media_meta')
       .in('id', [...new Set(photos.map((p) => p.rippleId))]);
     const mediaOf = new Map((rows ?? []).map((row) => [row.id, row.media]));
+    // Which copy exists is read from the rows, never from the browser's ask.
+    const meta: MediaMeta = Object.assign(
+      {},
+      ...(rows ?? []).map((r) => mediaMetaOf(r.media_meta)),
+    );
     const visible = [
       ...new Set(
         photos.flatMap((p) =>
@@ -190,21 +196,8 @@ export async function signBoardPhotos(
     ];
     if (visible.length === 0) return unsigned;
 
-    const { data, error } = await serviceClient()
-      .storage.from(MEDIA_BUCKET)
-      .createSignedUrls(visible, SIGNED_URL_TTL_SECONDS);
-    if (error) {
-      reportSigningFailure(error);
-      return unsigned;
-    }
-    return {
-      ...unsigned,
-      ...Object.fromEntries(
-        data.flatMap((entry) =>
-          entry.signedUrl && entry.path ? [[entry.path, entry.signedUrl]] : [],
-        ),
-      ),
-    };
+    // Thumbnails: the display copy where there is one.
+    return { ...unsigned, ...Object.fromEntries(await signVariants(visible, meta, 'display')) };
   } catch (error) {
     reportSigningFailure(error);
     return unsigned;

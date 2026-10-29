@@ -143,6 +143,8 @@ for (const [fn, args] of FUNCTIONS) {
 
 // The bucket is private, so an unsigned read of a path that exists must fail
 // too. A 400/404 is fine: what matters is that it is not 200 with bytes.
+// Outside the adapter on purpose: this asks the bucket as a stranger would.
+// storage-boundary: allow
 const object = await fetch(`${url}/storage/v1/object/ripple-media/probe.jpg`, {
   headers: { apikey: key, Authorization: `Bearer ${key}` },
 });

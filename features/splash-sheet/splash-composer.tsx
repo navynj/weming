@@ -176,6 +176,7 @@ export function SplashComposer({
       title,
       body,
       media: mediaPaths,
+      mediaMeta: media.meta,
       declaredStart,
       declaredEnd,
       declaredLaneId: laneId,
@@ -318,6 +319,7 @@ export function SplashComposer({
                 icon: icon || null,
                 body,
                 media: mediaPaths,
+                mediaMeta: media.meta,
                 declaredStart,
                 declaredEnd,
                 blockDay,
@@ -453,7 +455,12 @@ export function SplashComposer({
         {firstDay && isRange(draftRange) ? (
           <DayChip range={draftRange} value={firstDay} onChange={setChosenDay} />
         ) : null}
-        <AddImageAffordance attach={media.attach} busy={media.busy} input={media.input} />
+        <AddImageAffordance
+          attach={media.attach}
+          busy={media.busy}
+          input={media.input}
+          progress={media.progress}
+        />
       </div>
       <MediaPreviews
         paths={mediaPaths}

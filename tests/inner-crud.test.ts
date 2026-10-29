@@ -13,6 +13,7 @@ function session(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
     author_id: 'a1',
     thread_pool_id: null,
     video_previews: true,
+    media_meta: {},
     note: 'long afternoon',
     media: [],
     occurred_on: '2027-07-08',

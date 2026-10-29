@@ -32,6 +32,7 @@ if [ ${#code[@]} -gt 0 ]; then pnpm -s exec eslint --no-warn-ignored "${code[@]}
 # The token and origin guards read the whole tree; they are greps, and fast.
 ./scripts/check-tokens.sh
 ./scripts/check-origin.sh
+./scripts/check-storage.sh
 
 out="$(mktemp)"
 trap 'rm -f "$out"' EXIT

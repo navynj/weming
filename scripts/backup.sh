@@ -2,7 +2,7 @@
 # A backup of the production project, because the free tier keeps none.
 #
 #   backups/<stamp>.sql                  schema then data
-#   backups/<stamp>/storage/<bucket>/…   every object in ripple-media and avatars
+#   backups/<stamp>/storage/<bucket>/…   every object in ripple-media, avatars, pool-photos
 #   backups/<stamp>/storage/manifest.json  object count, bytes, one row per object
 #
 # All gitignored. Locally it uses the linked project and, for storage, the
@@ -86,7 +86,7 @@ echo "→ downloading storage"
 # A plain folder from an earlier backup lends its unchanged objects; locally
 # none stays plain, so this reuses only in a run that kept one.
 previous="$(ls -d "${out}"/*/storage 2>/dev/null | grep -v "/${stamp}/" | sort | tail -1 || true)"
-node scripts/backup-storage.mjs "${out}/${stamp}/storage" ${previous:+--previous "$previous"}
+node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/backup-storage.mjs "${out}/${stamp}/storage" ${previous:+--previous "$previous"}
 
 # CI packs and encrypts in its own steps (backup-run.yml), outside the repo.
 [ -n "${BACKUP_OUT:-}" ] && exit 0

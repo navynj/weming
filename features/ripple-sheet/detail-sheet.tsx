@@ -55,8 +55,9 @@ export function DetailSheet({
   useEffect(() => {
     let live = true;
     // Signed on open, not stored: `ripples.media` holds paths, and a signed
-    // URL is a short-lived credential rather than part of the record.
-    signRippleMedia(ripple.id)
+    // URL is a short-lived credential rather than part of the record. Up
+    // close, the full photo; boards and pages draw the display copy.
+    signRippleMedia(ripple.id, 'full')
       .then((urls) => {
         if (live) setMedia(urls);
       })

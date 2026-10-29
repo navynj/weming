@@ -14,12 +14,17 @@
 //
 // Any object that cannot be downloaded fails the run: a partial backup is
 // never reported as done.
-import { createClient } from '@supabase/supabase-js';
+//
+// Every bucket the app keeps (lib/storage/types.ts), through the storage
+// adapter, so whichever backend holds the bytes, this reads them. Run with
+// --no-warnings=MODULE_TYPELESS_PACKAGE_JSON: Node loads the adapter's
+// TypeScript itself and says so once per file otherwise.
 import { copyFile, link, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 
-const BUCKETS = ['ripple-media', 'avatars'];
-const PAGE = 1000;
+import { createStorage, listAll } from '../lib/storage/backend.ts';
+import { BUCKETS } from '../lib/storage/types.ts';
+
 const PARALLEL = 4;
 
 const args = process.argv.slice(2);
@@ -39,26 +44,7 @@ if (!url || !key) {
   process.exit(2);
 }
 
-const storage = createClient(url, key, { auth: { persistSession: false } }).storage;
-
-/** Every object under a prefix, folders walked, pages followed. */
-async function walk(bucket, prefix = '') {
-  const found = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await storage
-      .from(bucket)
-      .list(prefix, { limit: PAGE, offset, sortBy: { column: 'name', order: 'asc' } });
-    if (error) throw new Error(`listing ${bucket} failed: ${error.message}`);
-    for (const entry of data) {
-      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-      // A folder has no id and no metadata; an object has both.
-      if (entry.id === null) found.push(...(await walk(bucket, path)));
-      else found.push({ bucket, path, entry });
-    }
-    if (data.length < PAGE) break;
-  }
-  return found;
-}
+const storage = createStorage({ supabaseUrl: url, serviceRoleKey: key });
 
 /** The file an object lands in, never outside its bucket's folder. */
 function target(root, bucket, path) {
@@ -80,14 +66,14 @@ async function earlier() {
 
 const before = await earlier();
 const objects = [];
-for (const bucket of BUCKETS) objects.push(...(await walk(bucket)));
+for (const bucket of BUCKETS) {
+  for (const info of await listAll(storage, bucket)) objects.push({ bucket, info });
+}
 
 const items = [];
 let failed = 0;
-async function take({ bucket, path, entry }) {
-  const meta = entry.metadata ?? {};
-  const etag = meta.eTag ?? null;
-  const size = Number(meta.size ?? meta.contentLength ?? 0);
+async function take({ bucket, info }) {
+  const { path, etag, size, contentType } = info;
   const file = target(out, bucket, path);
   await mkdir(dirname(file), { recursive: true });
   const prior = before.get(`${bucket}/${path}`);
@@ -107,14 +93,14 @@ async function take({ bucket, path, entry }) {
     }
   }
   if (!reused) {
-    const { data, error } = await storage.from(bucket).download(path);
-    if (error || !data) {
+    try {
+      await writeFile(file, await storage.get(bucket, path));
+    } catch {
       failed += 1;
       return;
     }
-    await writeFile(file, Buffer.from(await data.arrayBuffer()));
   }
-  items.push({ bucket, path, size, etag, contentType: meta.mimetype ?? null, reused });
+  items.push({ bucket, path, size, etag, contentType, reused });
 }
 
 for (let i = 0; i < objects.length; i += PARALLEL) {

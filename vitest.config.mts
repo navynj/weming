@@ -23,6 +23,7 @@ Object.assign(process.env, { NODE_ENV: 'test' });
  * a build machine has no stack to point them at, so CI runs the rest.
  */
 export const NEEDS_LOCAL_STACK = [
+  'tests/storage-adapter-db.test.ts',
   'tests/rls.test.ts',
   'tests/edit-delete.test.ts',
   'tests/timeline-exclusivity.test.ts',

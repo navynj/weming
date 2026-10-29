@@ -3,21 +3,25 @@
 import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
-import { downscale, isHeic } from '@/lib/downscale';
+import { compressImage, type Compressed } from '@/lib/compress-image';
+import type { MediaType } from '@/lib/media-bucket';
 import { reportFailure } from '@/lib/report-failure';
-import { MEDIA_BUCKET } from '@/lib/media-bucket';
-import { createClient } from '@/lib/supabase/client';
+import type { MediaMeta, MediaMetaEntry } from '@/lib/ripple-media';
+import { putSigned } from '@/lib/storage/upload';
 
 import { QuietAffordance } from './annotation-control';
+import { requestMediaUploads } from './upload-actions';
 
 /**
- * Photos on a Ripple. Uploaded straight from the browser into the author's
- * own folder — the storage policy keys on that prefix, so a path is the only
- * thing that needs to be right.
+ * Photos on a Ripple. Each is made ready on the phone first (lib/compress-
+ * image: at most 2048px, WebP, no metadata, a 1024px display copy), then
+ * sent with a PUT to URLs the server issued for a path it minted in my own
+ * folder (`requestMediaUploads`) — the browser never names where its bytes go.
  *
  * `ripples.media` holds **paths, never URLs**: a URL is a credential with an
  * expiry baked in, and storing one would mean the row rots. The detail sheet
- * signs them on demand instead.
+ * signs them on demand instead. Each new photo's size rides along in `meta`
+ * (0070), for the action to store beside the path.
  *
  * Two pieces, because the mockup puts them apart: the `+ Add Image` pill sits
  * under the note field and the thumbnails preview above the commit row.
@@ -26,9 +30,12 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  // What is going up now, by its size once made ready ("412 KB").
+  const [progress, setProgress] = useState<string | null>(null);
   // Local previews for what was just picked; a path from an edit has none
   // and shows as a tile until the detail sheet signs it.
   const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [meta, setMeta] = useState<MediaMeta>({});
 
   async function attach(files: FileList | null): Promise<void> {
     if (!files?.length) return;
@@ -36,41 +43,32 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
     setFailed(null);
 
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setFailed('You are signed out. Sign in again to attach a photo.');
-        return;
-      }
-
       const added: string[] = [];
       const seen: Record<string, string> = {};
+      const sized: MediaMeta = {};
       const refused: string[] = [];
       // Each photo on its own: one that fails says why and the rest still go.
       for (const file of Array.from(files)) {
-        const shrunk = await downscale(file);
-        if (isHeic(shrunk)) {
-          reportFailure('upload', 'a HEIC the decoder could not read');
-          refused.push(`${file.name}: ${HEIC_UNREADABLE}`);
+        const ready = await compressImage(file);
+        if ('refused' in ready) {
+          reportFailure('upload', ready.refused);
+          refused.push(`${file.name}: ${ready.refused}`);
           continue;
         }
-        const path = mediaKey(user.id, shrunk.type);
-        const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, shrunk, {
-          contentType: shrunk.type,
-          upsert: false,
-        });
-        if (error) {
+        setProgress(`Adding… ${formatBytes(bytesOf(ready))}`);
+        const sent = await send(ready);
+        if ('error' in sent) {
           // Storage's own words, scrubbed of paths and names: never the photo.
-          reportFailure('upload', error);
-          refused.push(`${file.name}: ${uploadFailure(error)}`);
+          reportFailure('upload', sent.error);
+          refused.push(`${file.name}: ${uploadFailure(sent.error)}`);
           continue;
         }
-        added.push(path);
-        seen[path] = URL.createObjectURL(shrunk);
+        added.push(sent.path);
+        sized[sent.path] = sent.entry;
+        seen[sent.path] = URL.createObjectURL(ready.full.blob);
       }
       setPreviews((current) => ({ ...current, ...seen }));
+      setMeta((current) => ({ ...current, ...sized }));
       if (added.length > 0) onChange([...paths, ...added]);
       if (refused.length > 0) setFailed(refused.join('\n'));
     } catch (thrown) {
@@ -80,33 +78,46 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
       );
     } finally {
       setBusy(false);
+      setProgress(null);
       if (input.current) input.current.value = '';
     }
   }
 
-  return { input, busy, failed, previews, attach };
+  return { input, busy, failed, previews, attach, meta, progress };
 }
 
-// Only when even the decoder could not read it (lib/heic.ts): a rare HEIC variant.
-const HEIC_UNREADABLE = 'this HEIC photo could not be read. Save it as a JPEG and try again.';
+type UploadError = { message?: string; statusCode?: string | number };
 
-/** The type's extension, for a key that is never the file's own name. */
-const EXTENSIONS: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-  'image/avif': 'avif',
-};
+/** One photo up: its URLs asked for, its bytes sent, its display copy beside it. */
+async function send(
+  ready: Compressed,
+): Promise<{ path: string; entry: MediaMetaEntry } | { error: UploadError }> {
+  const asked = await requestMediaUploads([
+    { type: ready.full.blob.type as MediaType, display: ready.display !== null },
+  ]);
+  if (!asked.ok) return { error: { message: asked.message } };
+  const [issued] = asked.uploads;
+  const refused = await putSigned(issued.upload, ready.full.blob);
+  if (refused) return { error: refused };
+  const entry: MediaMetaEntry = { ...ready.full.size };
+  // A display copy that would not go up is not a failed photo: without one,
+  // the photo is its own display image, as an older photo is.
+  if (ready.display && issued.display) {
+    const displayRefused = await putSigned(issued.display, ready.display.blob);
+    if (!displayRefused) entry.d = ready.display.size;
+    else reportFailure('upload', displayRefused);
+  }
+  return { path: issued.path, entry };
+}
 
-/**
- * Where a photo is stored: my folder, a fresh id, the type's extension. Never
- * the file's own name: Storage refuses a key with characters outside its
- * set, so a Korean file name (a KakaoTalk save, a screenshot) failed with
- * "Invalid key" (review: a friend could not attach a photo).
- */
-export function mediaKey(userId: string, type: string): string {
-  return `${userId}/${crypto.randomUUID()}.${EXTENSIONS[type] ?? 'img'}`;
+function bytesOf(ready: Compressed): number {
+  return ready.full.blob.size + (ready.display?.blob.size ?? 0);
+}
+
+/** A size as the composer says it: KB below a megabyte, MB with one decimal above. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Why an upload failed, in words a person can act on; never silent. */
@@ -129,12 +140,16 @@ export function AddImageAffordance({
   attach,
   busy,
   input,
-}: Pick<ReturnType<typeof useMediaAttach>, 'attach' | 'busy' | 'input'>) {
+  progress,
+}: Pick<ReturnType<typeof useMediaAttach>, 'attach' | 'busy' | 'input'> & {
+  /** The size going up now, once the photo is made ready. */
+  progress?: string | null;
+}) {
   return (
     <>
       <QuietAffordance
         onClick={() => input.current?.click()}
-        label={busy ? 'Adding…' : '+ Add Image'}
+        label={busy ? (progress ?? 'Adding…') : '+ Add Image'}
         disabled={busy}
       />
       {/* Camera or gallery: the phone offers both for an image input. */}

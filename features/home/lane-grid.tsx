@@ -29,7 +29,7 @@ import {
   type Recipe,
 } from '@/features/month-board/layout';
 import { useBoardPhotos } from '@/features/month-board/use-board-photos';
-import { usePhotoAspects, withAspects } from '@/features/month-board/photo-aspects';
+import { storedAspects, usePhotoAspects, withAspects } from '@/features/month-board/photo-aspects';
 
 import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { CommitRing } from '@/components/ui/waves';
@@ -367,7 +367,7 @@ export const LaneGrid = forwardRef<
     );
     return layoutLaneBoard(drawn, pieceRows, columnIds, {
       width: columnPx * Math.max(columns, 1),
-      measured: withAspects(measured, aspects),
+      measured: withAspects(measured, { ...storedAspects(drawn), ...aspects }),
       columnOf: (card) => (isOrphanCard(card, categories) ? '' : cardColumn(card)),
       rowOf: (card) => rowOfId.get(card.splash.id) ?? null,
     });

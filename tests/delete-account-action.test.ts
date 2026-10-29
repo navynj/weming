@@ -43,9 +43,21 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     storage: {
       from: (bucket: string) => ({
-        list: async (prefix: string) => {
+        // Flat, with full paths and a cursor (lib/storage, list-v2).
+        listV2: async ({ prefix }: { prefix: string }) => {
           calls.push(`list:${bucket}:${prefix}`);
-          return { data: state.listed.map((name) => ({ name })), error: null };
+          return {
+            data: {
+              objects: state.listed.map((name) => ({
+                name: `${prefix}${name}`,
+                metadata: {},
+                updated_at: null,
+              })),
+              folders: [],
+              hasNext: false,
+            },
+            error: null,
+          };
         },
         remove: async (paths: string[]) => {
           calls.push(`remove:${bucket}:${paths.join(',')}`);
@@ -116,7 +128,7 @@ describe('deleteMyAccount', () => {
     expect(await deleteMyAccount(' Delete ')).toEqual({ ok: true });
     expect(calls).toEqual([
       'rpc:delete_my_account',
-      'list:ripple-media:u-ana',
+      'list:ripple-media:u-ana/',
       'remove:ripple-media:u-ana/a.webp,u-ana/b.jpg',
       'remove:avatars:u-ana',
       'remove:pool-photos:p-solo',

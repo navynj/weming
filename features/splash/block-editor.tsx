@@ -9,6 +9,7 @@ import {
   MediaPreviews,
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
+import type { MediaMeta } from '@/lib/ripple-media';
 import type { RippleWithSplash } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 
@@ -24,6 +25,8 @@ export type BlockDraft = {
   id: string;
   note: string;
   media: string[];
+  /** Sizes of the photos added in this edit (0070). */
+  mediaMeta: MediaMeta;
   /** Its own day, on a range splash only (0031); absent elsewhere. */
   occurredOn?: IsoDate;
   /** Its YouTube links drawn as videos (part 5); absent when it links none. */
@@ -92,6 +95,7 @@ export function BlockEditor({
       id: editing?.id ?? crypto.randomUUID(),
       note,
       media,
+      mediaMeta: attach.meta,
       ...(day ? { occurredOn: day } : {}),
       ...(linksVideos ? { videoPreviews: previews } : {}),
     });
@@ -113,7 +117,12 @@ export function BlockEditor({
 
       <div className="flex flex-wrap items-center gap-2">
         {day && isRange(range) ? <DayChip range={range} value={day} onChange={setDay} /> : null}
-        <AddImageAffordance attach={attach.attach} busy={attach.busy} input={attach.input} />
+        <AddImageAffordance
+          attach={attach.attach}
+          busy={attach.busy}
+          input={attach.input}
+          progress={attach.progress}
+        />
       </div>
 
       <MediaPreviews

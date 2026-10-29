@@ -12,9 +12,10 @@ vi.mock('@/features/splash/actions', () => ({}));
 vi.mock('@/features/input-sheet/commit', () => ({}));
 vi.mock('@/features/ripple-sheet/actions', () => ({}));
 vi.mock('@/features/pool/actions', () => ({}));
-vi.mock('@/lib/downscale', async (actual) => ({
-  ...(await actual<typeof import('@/lib/downscale')>()),
-  downscale: (file: File) => Promise.resolve(file),
+vi.mock('@/lib/compress-image', async (actual) => ({
+  ...(await actual<typeof import('@/lib/compress-image')>()),
+  compressImage: (file: File) =>
+    Promise.resolve({ full: { blob: file, size: { w: 4, h: 3 } }, display: null }),
 }));
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 
@@ -78,6 +79,7 @@ function ripple(
     author_id: author,
     thread_pool_id: null,
     video_previews: true,
+    media_meta: {},
     note,
     media: [],
     occurred_on: null,

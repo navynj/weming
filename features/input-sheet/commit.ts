@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
 import { reported } from '@/lib/report-failure';
+import { MediaMetaInput, mediaMetaFor } from '@/lib/ripple-media';
 
 /**
  * What the sheet can tell the author when a write is refused. The collision
@@ -27,6 +28,8 @@ const Draft = z.object({
   categoryId: z.uuid().nullable(),
   note: z.string().trim().max(2000).optional(),
   media: z.array(z.string()).max(8),
+  /** Each new photo's size (0070), so a layout reserves its space. */
+  mediaMeta: MediaMetaInput,
   /** The annotation (H20c), or nothing: a plain posted fragment. */
   occurredOn: z.string().regex(ISO_DATE).nullable(),
   occurredTime: z.string().regex(CLOCK).nullable(),
@@ -71,6 +74,7 @@ async function commitRippleWork(input: Draft): Promise<CommitResult> {
       author_id: user.id,
       note: draft.note?.length ? draft.note : null,
       media: draft.media,
+      media_meta: mediaMetaFor(draft.media, draft.mediaMeta ?? {}),
       occurred_on: draft.occurredOn,
       occurred_time: draft.occurredTime,
       ended_at: endedAt,

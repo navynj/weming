@@ -21,16 +21,26 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
     return Promise.resolve({ ok: true, rippleId: 'r' });
   },
 }));
-vi.mock('@/lib/downscale', async (actual) => ({
-  ...(await actual<typeof import('@/lib/downscale')>()),
-  downscale: (file: File) => Promise.resolve(file),
+vi.mock('@/lib/compress-image', async (actual) => ({
+  ...(await actual<typeof import('@/lib/compress-image')>()),
+  compressImage: (file: File) =>
+    Promise.resolve({ full: { blob: file, size: { w: 4, h: 3 } }, display: null }),
 }));
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: { getUser: () => Promise.resolve({ data: { user: { id: 'a1' } } }) },
-    storage: { from: () => ({ upload: () => Promise.resolve({ error: null }) }) },
-  }),
-}));
+// The server mints the path in my folder and signs a PUT for it (2026-10-28).
+vi.mock('@/features/input-sheet/upload-actions', async () => {
+  const { mediaKey } = await import('@/lib/media-bucket');
+  return {
+    requestMediaUploads: async (asked: { type: string }[]) => ({
+      ok: true,
+      uploads: asked.map((a) => ({
+        path: mediaKey('a1', a.type),
+        upload: { url: 'https://storage/put', headers: {} },
+        display: null,
+      })),
+    }),
+  };
+});
+globalThis.fetch = (async () => new Response('{}', { status: 200 })) as typeof fetch;
 
 import { InputSheet, type SheetContext } from '@/features/input-sheet/input-sheet';
 import { LANE_SEARCH_THRESHOLD } from '@/features/input-sheet/lane-chips';

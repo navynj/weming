@@ -19,6 +19,7 @@ export const READ_RPCS: ReadonlySet<string> = new Set([
   'invite_members',
   'invite_photo',
   'invite_preview',
+  'is_pool_member_object',
   'joint_together',
   'my_left_pool_ripples',
   'my_thread_ripples',

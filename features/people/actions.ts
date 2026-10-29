@@ -4,6 +4,7 @@ import { refresh, revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
+import { storage, type SignedUpload } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
 import { THEME_COLORS, THEME_MODES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
@@ -17,6 +18,34 @@ const input = z.object({
 
 export type ProfileSave = z.input<typeof input>;
 export type ProfileSaved = { ok: true } | { ok: false; message: string };
+
+/**
+ * Where my new photo's bytes go (0018, 2026-10-28): a signed PUT for my own
+ * path, which is my id and nothing the browser names. Replaces what is
+ * there; the version `saveProfile` moves is what makes the URL new.
+ */
+export async function requestAvatarUpload(
+  contentType: string,
+): Promise<{ ok: true; upload: SignedUpload } | { ok: false; message: string }> {
+  if (!z.enum(['image/webp', 'image/jpeg', 'image/png']).safeParse(contentType).success) {
+    return { ok: false, message: 'That photo’s type isn’t one we keep.' };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Sign in again to save your profile.' };
+  try {
+    const upload = await storage().signedUploadUrl(AVATAR_BUCKET, avatarPath(user.id), {
+      contentType,
+      cacheControl: 86400,
+      upsert: true,
+    });
+    return { ok: true, upload };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 /** Saves my name and photo state (0018). The photo's bytes went up from the browser first. */
 export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
@@ -40,8 +69,11 @@ export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
   if (photo === 'remove') {
     // A hard delete, storage included (CLAUDE.md): the row stops naming it
     // and the bytes go with it.
-    const { error } = await supabase.storage.from(AVATAR_BUCKET).remove([avatarPath(user.id)]);
-    if (error) return { ok: false, message: error.message };
+    try {
+      await storage().remove(AVATAR_BUCKET, [avatarPath(user.id)]);
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   const { error } = await supabase

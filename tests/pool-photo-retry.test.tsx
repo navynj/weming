@@ -28,21 +28,17 @@ vi.mock('@/features/pool/actions', () => ({
     calls.set.push([id, on]);
     return Promise.resolve({ ok: true });
   },
+  requestPoolPhotoUpload: (id: string) =>
+    Promise.resolve({ ok: true, upload: { url: id, headers: {} } }),
+  removePoolPhoto: () => Promise.resolve({ ok: true }),
 }));
 vi.mock('@/features/lanes/actions', () => ({ saveLane: () => Promise.resolve({ ok: true }) }));
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    storage: {
-      from: () => ({
-        upload: (_path: string, blob: unknown) => {
-          calls.uploads.push(blob);
-          const message = calls.answers.shift() ?? null;
-          return Promise.resolve({ error: message ? { message } : null });
-        },
-        remove: () => Promise.resolve({ error: null }),
-      }),
-    },
-  }),
+vi.mock('@/lib/storage/upload', () => ({
+  putSigned: (_upload: unknown, blob: unknown) => {
+    calls.uploads.push(blob);
+    const message = calls.answers.shift() ?? null;
+    return Promise.resolve(message ? { message, statusCode: 500 } : null);
+  },
 }));
 
 import { CreateFlow } from '@/features/pool/create-flow';

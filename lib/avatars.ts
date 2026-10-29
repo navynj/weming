@@ -5,6 +5,7 @@ import { POOL_PHOTO_BUCKET } from '@/lib/pool-photo-bucket';
 import type { Database } from '@/lib/database.types';
 import { supabaseServiceRoleKey, supabaseUrl } from '@/lib/env';
 import type { DuringClient } from '@/lib/queries/profile';
+import { storage, type Bucket } from '@/lib/storage';
 
 /**
  * A day: a face is drawn on every screen, and a URL that changes each render
@@ -15,7 +16,11 @@ export const AVATAR_TTL_SECONDS = 24 * 60 * 60;
 /** Reissued once less than this is left, so no page is handed a URL about to rot. */
 const REISSUE_BEFORE_MS = 60 * 60 * 1000;
 
-/** Per (bucket, id, version) on this server: the same version is the same URL across renders. */
+/**
+ * Per (backend, bucket, id, version) on this server: the same version is the
+ * same URL across renders, and a URL one backend issued is never handed out
+ * once another serves the bytes.
+ */
 const signed = new Map<string, { url: string; expires: number }>();
 
 export function clearAvatarCache(): void {
@@ -27,7 +32,7 @@ export type AvatarRef = { id: string; version: number | null };
 
 /** The bucket a photo lives in, how its object is named, and who may see it (0018, 0024). */
 type PhotoKind = {
-  bucket: string;
+  bucket: Bucket;
   path: (id: string) => string;
   /** The ids the viewer may see, answered through the viewer's own session (RLS-side). */
   visible: (supabase: DuringClient, ids: string[]) => Promise<string[]>;
@@ -59,7 +64,8 @@ async function signPhotos(
       ),
     );
     const now = Date.now();
-    const key = (r: AvatarRef) => `${kind.bucket}:${r.id}:${r.version}`;
+    const backend = storage();
+    const key = (r: AvatarRef) => `${backend.name}:${kind.bucket}:${r.id}:${r.version}`;
     const missing: AvatarRef[] = [];
     for (const ref of withPhoto) {
       if (!allowed.has(ref.id)) continue;
@@ -69,20 +75,17 @@ async function signPhotos(
     }
     if (missing.length === 0) return out;
 
-    const service = createServiceClient<Database>(supabaseUrl(), supabaseServiceRoleKey(), {
-      auth: { persistSession: false },
-    });
-    const { data, error } = await service.storage.from(kind.bucket).createSignedUrls(
+    const urls = await backend.signedReadUrls(
+      kind.bucket,
       missing.map((r) => kind.path(r.id)),
       AVATAR_TTL_SECONDS,
     );
-    if (error) throw error;
 
     for (const ref of missing) {
-      const entry = data.find((d) => d.path === kind.path(ref.id));
-      if (!entry?.signedUrl) continue;
-      signed.set(key(ref), { url: entry.signedUrl, expires: now + AVATAR_TTL_SECONDS * 1000 });
-      out[ref.id] = entry.signedUrl;
+      const url = urls.get(kind.path(ref.id));
+      if (!url) continue;
+      signed.set(key(ref), { url, expires: now + AVATAR_TTL_SECONDS * 1000 });
+      out[ref.id] = url;
     }
     return out;
   } catch (error) {
@@ -145,11 +148,12 @@ export async function signInvitePhoto(token: string): Promise<string | null> {
     if (error) throw error;
     const row = data?.[0];
     if (!row?.photo_path) return null;
-    const { data: url, error: signError } = await service.storage
-      .from(POOL_PHOTO_BUCKET)
-      .createSignedUrl(row.photo_path, INVITE_PHOTO_TTL_SECONDS);
-    if (signError) throw signError;
-    return url.signedUrl;
+    const urls = await storage().signedReadUrls(
+      POOL_PHOTO_BUCKET,
+      [row.photo_path],
+      INVITE_PHOTO_TTL_SECONDS,
+    );
+    return urls.get(row.photo_path) ?? null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[during] invite photo signing failed: ${message}`);
@@ -179,16 +183,7 @@ export async function signInviteMembers(token: string): Promise<InviteMember[]> 
     if (error) throw error;
     const rows = data ?? [];
     const paths = rows.flatMap((r) => (r.avatar_path ? [r.avatar_path] : []));
-    const urls = new Map<string, string>();
-    if (paths.length > 0) {
-      const { data: signedUrls, error: signError } = await service.storage
-        .from(AVATAR_BUCKET)
-        .createSignedUrls(paths, INVITE_PHOTO_TTL_SECONDS);
-      if (signError) throw signError;
-      for (const entry of signedUrls) {
-        if (entry.path && entry.signedUrl) urls.set(entry.path, entry.signedUrl);
-      }
-    }
+    const urls = await storage().signedReadUrls(AVATAR_BUCKET, paths, INVITE_PHOTO_TTL_SECONDS);
     return rows.map((r) => ({
       name: r.display_name,
       photo: r.avatar_path ? (urls.get(r.avatar_path) ?? null) : null,

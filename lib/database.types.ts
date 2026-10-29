@@ -1154,6 +1154,7 @@ export type Database = {
           ended_at: string | null
           id: string
           media: string[]
+          media_meta: Json
           note: string | null
           occurred_on: string | null
           occurred_time: string | null
@@ -1172,6 +1173,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           media?: string[]
+          media_meta?: Json
           note?: string | null
           occurred_on?: string | null
           occurred_time?: string | null
@@ -1190,6 +1192,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           media?: string[]
+          media_meta?: Json
           note?: string | null
           occurred_on?: string | null
           occurred_time?: string | null

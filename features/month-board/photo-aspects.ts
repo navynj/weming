@@ -5,10 +5,11 @@ import { useSyncExternalStore } from 'react';
 import { aspectKey, type Measured } from './layout';
 
 /**
- * Photos are never cropped (review, 2026-10-27): nothing stores a photo's
- * size, so its ratio is learned from the image once it loads
- * (`notePhotoAspect`) and kept here for the page's life, by path; until
- * then a photo holds the layout's 4:3 placeholder (`photoBox`).
+ * Photos are never cropped (review, 2026-10-27). A photo uploaded since
+ * 0070 carries its size on its row, so its box is right before it loads
+ * (`storedAspects`); an older one's ratio is learned from the image once it
+ * loads (`notePhotoAspect`) and kept here for the page's life, by path;
+ * until then it holds the layout's 4:3 placeholder (`photoBox`).
  */
 let aspects: Record<string, number> = {};
 const listeners = new Set<() => void>();
@@ -35,6 +36,17 @@ export function usePhotoAspects(): Record<string, number> {
     () => aspects,
     () => EMPTY,
   );
+}
+
+/** The ratios the rows already know (0070), by path, from the cards' photos. */
+export function storedAspects(
+  cards: { photos?: { path: string; aspect?: number }[] }[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const card of cards) {
+    for (const photo of card.photos ?? []) if (photo.aspect) out[photo.path] = photo.aspect;
+  }
+  return out;
 }
 
 /** The layout's measurements with the photos' ratios beside the words' lines. */

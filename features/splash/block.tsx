@@ -7,6 +7,7 @@ import { annotationLabel, draftFrom } from '@/features/input-sheet/draft';
 import { dayOf } from '@/lib/flow-key';
 import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { rippleDurationMinutes, rippleKind } from '@/lib/ripple-kind';
+import { mediaMetaOf } from '@/lib/ripple-media';
 import type { IsoDate } from '@/lib/time';
 
 import { blockDay, isRange } from './block-day';
@@ -46,6 +47,10 @@ export function BlockView({
 }) {
   const kind = rippleKind(block, timeZone);
   const annotation = draftFrom(block, timeZone).annotation;
+  // The photos line up with its paths only when every one came back signed.
+  const meta = mediaMetaOf(block.media_meta);
+  const sizeAt = (index: number) =>
+    photos.length === block.media.length ? meta[block.media[index]] : undefined;
   // Inside a range, its day and nothing else (0031); elsewhere what an older
   // block carries, frozen (H24), read back as it was.
   const label = isRange(range)
@@ -77,19 +82,30 @@ export function BlockView({
         </p>
       ) : null}
 
-      {photos.map((url, index) =>
-        url ? (
+      {photos.map((url, index) => {
+        const size = sizeAt(index);
+        return url ? (
+          // Its stored size (0070) holds its place before it loads.
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={url} src={url} alt="" data-photo className="w-full rounded-xl object-contain" />
+          <img
+            key={url}
+            src={url}
+            alt=""
+            data-photo
+            width={size?.w}
+            height={size?.h}
+            className="h-auto w-full rounded-xl object-contain"
+          />
         ) : (
           <span
             key={index}
             aria-hidden
             data-photo-placeholder
             className="bg-pool-100 block aspect-[4/3] w-full rounded-xl"
+            style={size ? { aspectRatio: `${size.w} / ${size.h}` } : undefined}
           />
-        ),
-      )}
+        );
+      })}
     </>
   );
   // Its YouTube links as players (part 5), after its photos; outside the

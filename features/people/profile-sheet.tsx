@@ -6,10 +6,9 @@ import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 import { initialsOf } from '@/features/home/grid';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { SHEET_MAX_HEIGHT } from '@/features/splash-sheet/splash-sheet';
-import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
-import { createClient } from '@/lib/supabase/client';
+import { putSigned } from '@/lib/storage/upload';
 
-import { saveProfile } from './actions';
+import { requestAvatarUpload, saveProfile } from './actions';
 import { AVATAR_ACCEPT, decodePhoto, encodeAvatar, sourceRect, type CropView } from './crop';
 import { CropFrame, FRAME_PX } from './crop-frame';
 import { displayName, NAME_MAX } from './name';
@@ -85,14 +84,10 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
       dropFailed(reason);
     };
     if (blob) {
-      const { error } = await createClient()
-        .storage.from(AVATAR_BUCKET)
-        .upload(avatarPath(me), blob, {
-          contentType: blob.type,
-          upsert: true,
-          cacheControl: '86400',
-        });
-      if (error) return fail(error.message);
+      const asked = await requestAvatarUpload(blob.type);
+      if (!asked.ok) return fail(asked.message);
+      const refused = await putSigned(asked.upload, blob);
+      if (refused) return fail(refused.message);
     }
     const done = await saveProfile({
       name: trimmed,

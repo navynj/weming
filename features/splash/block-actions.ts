@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import type { CommitResult } from '@/features/input-sheet/commit';
+import { MediaMetaInput, mediaMetaFor, mediaMetaOf } from '@/lib/ripple-media';
 import { createClient } from '@/lib/supabase/server';
 
 const Block = z.object({
@@ -11,6 +12,8 @@ const Block = z.object({
   id: z.uuid(),
   note: z.string().trim().max(2000),
   media: z.array(z.string()).max(8),
+  /** Each new photo's size (0070); on an edit the row's own entries stay for the rest. */
+  mediaMeta: MediaMetaInput,
   /**
    * Its own day, on a range splash only (0031): inside the range, checked
    * again by the database. Absent: the day is not this edit's to touch.
@@ -60,6 +63,7 @@ export async function addBlock(input: z.input<typeof NewBlock>): Promise<CommitR
     author_id: user.id,
     note: block.note.length > 0 ? block.note : null,
     media: block.media,
+    media_meta: mediaMetaFor(block.media, block.mediaMeta ?? {}),
     splash_id: block.splashId,
     ...(block.threadPoolId ? { thread_pool_id: block.threadPoolId } : {}),
     ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
@@ -83,11 +87,18 @@ export async function editBlock(input: z.infer<typeof Block>): Promise<CommitRes
   const block = parsed.data;
 
   const supabase = await createClient();
+  // The sizes it already has: a kept photo keeps its entry (0070).
+  const { data: before } = await supabase
+    .from('ripples')
+    .select('media_meta')
+    .eq('id', block.id)
+    .maybeSingle();
   const { data, error } = await supabase
     .from('ripples')
     .update({
       note: block.note.length > 0 ? block.note : null,
       media: block.media,
+      media_meta: mediaMetaFor(block.media, mediaMetaOf(before?.media_meta), block.mediaMeta ?? {}),
       ...(block.occurredOn ? { occurred_on: block.occurredOn } : {}),
       ...(block.videoPreviews !== undefined ? { video_previews: block.videoPreviews } : {}),
     })

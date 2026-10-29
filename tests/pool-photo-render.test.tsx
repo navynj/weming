@@ -14,20 +14,17 @@ vi.mock('@/features/pool/actions', () => ({
     calls.set.push([id, on]);
     return Promise.resolve({ ok: true });
   },
+  // The server checks membership and signs a PUT for the pool's own path (H38).
+  requestPoolPhotoUpload: (id: string) =>
+    Promise.resolve({ ok: true, upload: { url: id, headers: {} } }),
+  removePoolPhoto: () => Promise.resolve({ ok: true }),
 }));
 vi.mock('@/features/lanes/actions', () => ({ saveLane: () => Promise.resolve({ ok: true }) }));
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    storage: {
-      from: () => ({
-        upload: (path: string) => {
-          calls.uploads.push(path);
-          return Promise.resolve({ error: null });
-        },
-        remove: () => Promise.resolve({ error: null }),
-      }),
-    },
-  }),
+vi.mock('@/lib/storage/upload', () => ({
+  putSigned: (upload: { url: string }) => {
+    calls.uploads.push(upload.url);
+    return Promise.resolve(null);
+  },
 }));
 
 import { Monogram } from '@/components/ui/monogram';
