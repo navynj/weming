@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { CategoryChip } from '@/components/ui/chips/category-chip';
@@ -44,7 +43,6 @@ export function FilingChips({
   filing: HomeFiling;
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
 }) {
-  const router = useRouter();
   const { markEdited, clearEdited, dropFailed } = useInputSheet();
   const [filed, setFiled] = useState(filing.filed);
 
@@ -72,7 +70,7 @@ export function FilingChips({
           dropFailed(done.message);
           return;
         }
-        router.refresh();
+        // fileOnHome revalidates: the page came back with its answer.
         window.setTimeout(() => clearEdited(splashId), SETTLE_MS);
       })
       .catch(() => {

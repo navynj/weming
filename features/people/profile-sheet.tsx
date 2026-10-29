@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 import { initialsOf } from '@/features/home/grid';
@@ -32,7 +31,6 @@ type Photo =
  * takes it back and says why. The timezone is not shown here.
  */
 export function ProfileSheet({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
   const { me, people, markMe, clearMe } = usePeople();
   const { dropFailed } = useInputSheet();
   const current = me ? people[me] : undefined;
@@ -101,7 +99,7 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
       photo: blob ? 'uploaded' : photo.kind === 'remove' ? 'remove' : 'keep',
     });
     if (!done.ok) return fail(done.message);
-    router.refresh();
+    // saveProfile calls refresh(): the page came back with its answer.
     window.setTimeout(clearMe, SETTLE_MS);
   }
 

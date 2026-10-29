@@ -291,7 +291,8 @@ describe('writing on the page, in place', () => {
       media: [],
       occurredOn: '2026-08-19',
     });
-    expect(router.refresh).toHaveBeenCalled();
+    // editBlock revalidates: the page comes back in its response, not read twice.
+    expect(router.refresh).not.toHaveBeenCalled();
   });
 
   it('opens with the next block’s editor up when opened to write (Board: "Add your side")', () => {

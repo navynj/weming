@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { Monogram } from '@/components/ui/monogram';
 
@@ -83,7 +82,6 @@ export function PoolGround({
   /** The view a visit opens on: the Calendar, always, outside a test. */
   initialView?: PoolViewKind;
 }) {
-  const router = useRouter();
   const poolId = view.pool.id;
   // Every visit opens on the Calendar, not Members (review); a view chosen
   // here holds while I stay.
@@ -165,11 +163,8 @@ export function PoolGround({
     );
   const remove = (card: Card): void => {
     markDeleted(card.splash.id);
-    void (
-      card.branches ? deleteJointSplash(poolId, card.splash.id) : deleteSplash(card.splash.id)
-    ).then((result) => {
-      if (result.ok) router.refresh();
-    });
+    // The rows follow in the action's own response (revalidatePath): no second read.
+    void (card.branches ? deleteJointSplash(poolId, card.splash.id) : deleteSplash(card.splash.id));
   };
 
   const ids = useMemo(() => shown.map((c) => c.splash.id), [shown]);

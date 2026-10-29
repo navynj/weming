@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useOptimistic, useState, useTransition } from 'react';
 
 import { useToast } from '@/components/ui/toast';
@@ -10,10 +9,14 @@ export type ActionOutcome = { ok: true } | { ok: false; message: string };
 /**
  * Every edit, add and delete is an optimistic update (CLAUDE.md, the
  * principle): the screen shows the result the moment the hand commits it,
- * the server action runs behind it, and the page re-reads inside the same
- * transition so the optimistic state holds until the real rows land. If
- * the action refuses, the optimistic state falls away with the transition
- * and the refusal is shown.
+ * the server action runs behind it, and the optimistic state holds until
+ * the real rows land. They land in the action's own response: a write
+ * revalidates (or, if it changes nothing a path names, calls `refresh()`)
+ * and Next re-renders the page into that response, inside this
+ * transition — one write, one render (2026-10-28: a router.refresh() here
+ * rendered every page a second time). If the action refuses, the
+ * optimistic state falls away with the transition and the refusal is
+ * shown.
  *
  * `run(updater, work, saved?)`: `updater` is the change as the screen
  * should show it, `work` is the action that makes it true; `saved`, for a
@@ -25,7 +28,6 @@ export function useOptimisticAction<T>(value: T): {
   pending: boolean;
   message: string | null;
 } {
-  const router = useRouter();
   const [optimistic, apply] = useOptimistic<T, (current: T) => T>(value, (current, updater) =>
     updater(current),
   );
@@ -44,12 +46,9 @@ export function useOptimisticAction<T>(value: T): {
           return;
         }
         if (saved) toast.show(saved);
-        // Joins this transition, so the optimistic value holds until the
-        // re-read lands rather than flashing back to the old rows.
-        router.refresh();
       });
     },
-    [apply, router, toast],
+    [apply, toast],
   );
 
   return { value: optimistic, run, pending, message };

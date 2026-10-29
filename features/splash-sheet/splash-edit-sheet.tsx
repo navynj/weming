@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { AnnotationControl } from '@/features/input-sheet/annotation-control';
 import { annotationVerdict, type Annotation } from '@/features/input-sheet/draft';
@@ -42,7 +41,6 @@ export function SplashEditSheet({
   pool?: PoolScope | null;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const { markEdited, clearEdited, dropFailed } = useInputSheet();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -93,7 +91,7 @@ export function SplashEditSheet({
                 dropFailed(done.message);
                 return;
               }
-              router.refresh();
+              // saveSplashEdit revalidates: the page came back with its answer.
               window.setTimeout(() => clearEdited(splashId), SETTLE_MS);
             });
           }}

@@ -11,6 +11,8 @@ import { asAdmin, asUser } from './as-user';
  * Needs the local stack; excluded from the CI config like every DB test.
  */
 const as = vi.hoisted(() => ({ user: '' }));
+// An action called outside Next: what it asks of the router is a no-op here.
+vi.mock('next/cache', () => ({ refresh: () => {}, revalidatePath: () => {} }));
 vi.mock('@/lib/supabase/server', async () => {
   const { asUser: client } = await import('./as-user');
   return {

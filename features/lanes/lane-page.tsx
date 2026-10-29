@@ -313,7 +313,6 @@ export function LanePage({
                     : card.splash.orphan
                       ? await deleteRipple(card.splash.id)
                       : await deleteSplash(card.splash.id);
-                if (result.ok) router.refresh();
                 return result.ok
                   ? { ok: true }
                   : { ok: false, message: 'That could not be deleted.' };

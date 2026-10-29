@@ -32,9 +32,9 @@ function useDrop(): (drop: DropHandoff) => void {
     });
     // Dropped from a pool, the pool seats it where we are (H23); else Home.
     if (!drop.pool && !pathname.startsWith('/pool/') && pathname !== '/') router.push('/');
+    // The commit revalidates: the page comes back with its answer.
     void drop.commit().then((result) => {
       if (!result.ok) dropFailed(result.message);
-      else router.refresh();
     });
   };
 }

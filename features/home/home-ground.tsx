@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -120,7 +119,6 @@ export function HomeGround({
     markDeleted,
     pendingEdits,
   } = useInputSheet();
-  const router = useRouter();
   const lanes = useOptimisticAction(categories);
   // Pinned from the card's menu shows at once (CLAUDE.md, the principle).
   const pins = useOptimisticAction(pinned);
@@ -136,11 +134,8 @@ export function HomeGround({
   // Gone the moment it is asked for, from every surface; a lone block is its own post.
   const remove = (card: Card): void => {
     markDeleted(card.splash.id);
-    void (card.splash.orphan ? deleteRipple(card.splash.id) : deleteSplash(card.splash.id)).then(
-      (result) => {
-        if (result.ok) router.refresh();
-      },
-    );
+    // The rows follow in the action's own response (revalidatePath): no second read.
+    void (card.splash.orphan ? deleteRipple(card.splash.id) : deleteSplash(card.splash.id));
   };
   const grid = useRef<GridHandle>(null);
 

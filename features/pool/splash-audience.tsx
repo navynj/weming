@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useOptimistic, useState, useTransition } from 'react';
 
 import { useToast } from '@/components/ui/toast';
@@ -42,7 +41,6 @@ export function SplashAudience({
   onMoved?: () => void;
 }) {
   const audience = useOptimisticAction(shared);
-  const router = useRouter();
   const toast = useToast();
   const [message, setMessage] = useState<string | null>(null);
   // Moved to Home (H45): the origin unlocks at once; every pool stays as it is.
@@ -67,7 +65,6 @@ export function SplashAudience({
                       return;
                     }
                     toast.show('Moved to Home');
-                    router.refresh();
                     onMoved?.();
                   }),
               }

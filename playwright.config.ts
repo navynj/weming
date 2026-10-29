@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 /** The specs that measure a production build. */
-const PROD = /place-switch\.spec\.ts/;
+const PROD = /(place-switch|one-write)\.spec\.ts/;
 const PROD_URL = 'http://127.0.0.1:3200';
 
 /**

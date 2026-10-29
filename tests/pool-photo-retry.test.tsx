@@ -124,7 +124,8 @@ describe('a new pool’s photo that did not upload (review)', () => {
     expect(calls.draws[1][0]).toBe(calls.draws[0][0]);
     expect(calls.draws[1]).toEqual(calls.draws[0]);
     expect(container.querySelector('[data-photo-toast]')).toBeNull();
-    expect(calls.refreshed).toBe(1);
+    // setPoolPhoto revalidates: the page comes back with it, not read twice.
+    expect(calls.refreshed).toBe(0);
   });
 
   it('points to settings when the retry fails too', async () => {

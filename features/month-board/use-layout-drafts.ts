@@ -9,7 +9,6 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { useToast } from '@/components/ui/toast';
 import type { Card } from '@/features/home/grid';
@@ -92,7 +91,6 @@ export function useLayoutDrafts(
   /** Where a layout is saved: the database's set_board_layout, unless a fixture says otherwise. */
   save: typeof setBoardLayout = setBoardLayout,
 ) {
-  const router = useRouter();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [message, setMessage] = useState<string | null>(null);
   // Saves out, by splash, and those answered yes since their last edit.
@@ -203,7 +201,6 @@ export function useLayoutDrafts(
             setSaved((all) => ({ ...all, [id]: true }));
             if (!draft.untracked)
               told.current?.({ id, before: draft.base, paths: pathsOf(draft.patch, draft.clear) });
-            router.refresh();
           } else {
             setMessage(result.message);
             // A refusal is the one thing a toast says (review).
@@ -215,7 +212,7 @@ export function useLayoutDrafts(
       }
     }, wait);
     return () => window.clearTimeout(timer);
-  }, [drafts, hold, poolId, router, save, source, toast, view]);
+  }, [drafts, hold, poolId, save, source, toast, view]);
 
   /** "Use pool layout": my Home layout gone; the pool's is drawn again at once. */
   const revertToPool = useCallback(
@@ -237,14 +234,13 @@ export function useLayoutDrafts(
         if (result.ok) {
           // Undone by writing my Home layout back, whole.
           told.current?.({ id, before, paths: ['piece', 'icon', 'label', 'photos', 'wave'] });
-          router.refresh();
         } else {
           setMessage(result.message);
           toast.show(result.message);
         }
       });
     },
-    [byId, hold, router, shown, toast, view],
+    [byId, hold, shown, toast, view],
   );
 
   /** What the toolbar says of a splash's layout: on its way, saved, or nothing. */

@@ -436,13 +436,12 @@ export function SplashPage({
             markDeleted(page.splash.id);
             if (closeSheet) closeSheet();
             else router.push('/');
-            const result =
-              scope === 'joint'
-                ? await deleteJointSplash(pool!.poolId, page.splash.id)
-                : orphan
-                  ? await deleteRipple(page.splash.id)
-                  : await deleteSplash(page.splash.id);
-            if (result.ok) router.refresh();
+            // The rows follow in the action's own response (revalidatePath).
+            await (scope === 'joint'
+              ? deleteJointSplash(pool!.poolId, page.splash.id)
+              : orphan
+                ? deleteRipple(page.splash.id)
+                : deleteSplash(page.splash.id));
           }}
         />
 

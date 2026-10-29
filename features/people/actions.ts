@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { refresh, revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
@@ -56,6 +56,9 @@ export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
     })
     .eq('id', user.id);
   if (error) return { ok: false, message: error.message };
+  // A name and a face show on every page, which no one path names: the page
+  // I am on comes back in this response, the one render of this write.
+  refresh();
   return { ok: true };
 }
 

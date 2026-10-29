@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { ThemePicker } from '@/features/people/theme-picker';
 import { SettingsSheet } from '@/features/settings/settings-sheet';
@@ -39,7 +38,6 @@ export function PoolSettingsSheet({ view, me }: { view: PoolView; me: string }) 
 }
 
 function PoolTab({ view }: { view: PoolView }) {
-  const router = useRouter();
   const poolId = view.pool.id;
   // The name shows at once; a refusal takes it back and says why.
   const name = useOptimisticAction(view.pool.name);
@@ -69,7 +67,6 @@ function PoolTab({ view }: { view: PoolView }) {
               async () => {
                 const failed = await savePoolPhoto(poolId, change);
                 if (failed) return { ok: false, message: failed };
-                router.refresh();
                 return { ok: true };
               },
             );

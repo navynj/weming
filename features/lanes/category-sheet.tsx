@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import type { MyCategory } from '@/lib/queries/profile';
@@ -35,15 +34,14 @@ export function CategorySheet({
   apply?: ReturnType<typeof useOptimisticAction<MyCategory[]>>['run'];
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [name, setName] = useState(category?.name ?? '');
   const [icon, setIcon] = useState(category?.icon ?? '');
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // The lane actions revalidate: the page comes back with their answer.
   function done(): void {
     onClose();
-    router.refresh();
   }
 
   return (

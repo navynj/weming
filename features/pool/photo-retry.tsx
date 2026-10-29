@@ -2,7 +2,6 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 
 import { savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
@@ -46,7 +45,6 @@ export const PHOTO_FAILED = 'The pool was created, but the photo didn’t upload
  * leaves the way it can still be done: the pool's settings.
  */
 export function PhotoRetryToast({ poolId }: { poolId: string }) {
-  const router = useRouter();
   const mine = useSyncExternalStore(
     subscribe,
     () => (held?.poolId === poolId ? held : null),
@@ -63,8 +61,8 @@ export function PhotoRetryToast({ poolId }: { poolId: string }) {
       setState('again');
       return;
     }
+    // setPoolPhoto revalidates: the page came back with its answer.
     set(null);
-    router.refresh();
   }
 
   return (

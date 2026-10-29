@@ -3,7 +3,6 @@
 // DORMANT (H21): hosts the retired detail sheet for the dormant day rows.
 // No page mounts it. Do not wire it back in; do not delete it.
 
-import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { InputSheet, type SheetContext } from '@/features/input-sheet/input-sheet';
@@ -39,7 +38,6 @@ export function RippleSheetHost({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const router = useRouter();
 
   const openRipple = useCallback((id: string) => {
     setOpenId(id);
@@ -80,10 +78,8 @@ export function RippleSheetHost({
           prefill={{}}
           editing={{ ripple }}
           onClose={close}
-          onCommitted={() => {
-            close();
-            router.refresh();
-          }}
+          // commitRipple revalidates: the page comes back with its answer.
+          onCommitted={close}
         />
       ) : null}
     </Context.Provider>

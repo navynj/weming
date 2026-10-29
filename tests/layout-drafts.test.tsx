@@ -96,7 +96,9 @@ describe('the Layout panel’s drafts (review)', () => {
     expect(sent[0].patch).toEqual({ label: { x: 0.3 } });
   });
 
-  it('drops a draft once its save is confirmed, re-reading the page', async () => {
+  // The save revalidates and the page comes back in its own response: one
+  // write, one render, no second read from here (2026-10-28).
+  it('drops a draft once its save is confirmed, without reading the page again', async () => {
     const api = mount([SAVED], 'p1');
     act(() => api().edit('s1', { label: { tilt: 5 } }));
     await rest();
@@ -104,7 +106,7 @@ describe('the Layout panel’s drafts (review)', () => {
       await Promise.resolve();
     });
     expect(api().unsaved).toEqual([]);
-    expect(refreshed).toHaveBeenCalled();
+    expect(refreshed).not.toHaveBeenCalled();
   });
 
   it('drops a draft once its save is refused, falling back to what was saved and saying why', async () => {
