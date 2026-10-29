@@ -1181,7 +1181,8 @@ export function BoardTapeView({
           aria-label={caption}
           data-board-pick={tape.id}
           data-board-band
-          className="absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
+          // label-pale (H55): solid on the dark ground, Outline on the light ones.
+          className="label-pale absolute inset-0 flex items-center gap-1 bg-white/20 px-2 text-left font-medium text-white"
           style={{
             fontSize: size,
             transform: moveOf(label, tape.w, line),

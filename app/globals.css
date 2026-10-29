@@ -459,8 +459,14 @@ body {
  * itself draws there; where it draws a translucent band (my side on
  * someone's record, `label-pale`), they draw Outline.
  */
+/* Glass and the bands are solid, the colour they read as, so what hangs
+   behind them (Add your side) never shows through (Yoonji, in the session). */
+.water-ground .label-glass,
+.water-ground .label-pale {
+  background-color: color-mix(in srgb, #ffffff 20%, var(--theme-900));
+}
 [data-mode='light'] .water-ground .label-ink.label-second {
-  background-color: color-mix(in srgb, var(--theme-900) 20%, transparent);
+  background-color: color-mix(in srgb, var(--theme-900) 20%, #ffffff);
   box-shadow: none;
   color: var(--theme-900);
 }
@@ -469,13 +475,16 @@ body {
 [data-mode='pastel'] .water-ground .label-glass {
   --tw-ring-color: transparent;
 }
+[data-mode='light'] .water-ground .label-glass {
+  background-color: color-mix(in srgb, var(--theme-900) 20%, #ffffff);
+}
 /* Pastel's tint is already pale: at 20% over white it was lost ("너무 흐려서
    잘 안보임"), so its Glass takes half. */
 [data-mode='pastel'] .water-ground .label-glass {
-  background-color: color-mix(in srgb, var(--theme-pastel) 50%, transparent);
+  background-color: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
 }
 [data-mode='pastel'] .water-ground .label-ink.label-second {
-  background-color: color-mix(in srgb, var(--theme-pastel) 50%, transparent);
+  background-color: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
   box-shadow: none;
   color: var(--pastel-ink);
 }
