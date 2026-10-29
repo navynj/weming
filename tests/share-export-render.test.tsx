@@ -226,6 +226,20 @@ describe('the share sheet (H63)', () => {
     }
   });
 
+  it('shows the page’s outline, breathing, until the image is drawn', async () => {
+    sheet(null);
+    const preview = (): Element => document.querySelector('[data-share-preview]')!;
+    expect(preview().getAttribute('data-share-preview')).toBe('drawing');
+    const skeleton = preview().querySelector('[data-share-skeleton="week"]');
+    expect(skeleton?.getAttribute('role')).toBe('status');
+    // Still under reduced motion: the pulse is motion-safe only.
+    expect(skeleton?.className).toContain('motion-safe:animate-pulse');
+    await waitFor(() => expect(preview().getAttribute('data-share-preview')).toBe('ready'), {
+      timeout: 3000,
+    });
+    expect(preview().querySelector('[data-share-skeleton]')).toBeNull();
+  });
+
   it('offers no switch on Home', () => {
     sheet(null);
     expect(document.querySelector('[role="switch"]')).toBeNull();

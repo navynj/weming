@@ -11,6 +11,7 @@ import type { IsoDate } from '@/lib/time';
 
 import { shareFile } from './capture';
 import { ExportBoard } from './export-board';
+import { PreviewSkeleton } from './preview-skeleton';
 import type { ShareSpan } from './range';
 import { useShareImage } from './use-share-image';
 
@@ -107,10 +108,10 @@ export function ShareSheet({
           // The PNG itself: what is shared is what is shown.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image.url} alt={`The Calendar, ${range.title}`} className="h-full w-full" />
+        ) : image.state === 'failed' ? (
+          <span className="text-pool-500 text-sm">Could not draw the image.</span>
         ) : (
-          <span className="text-pool-500 text-sm">
-            {image.state === 'failed' ? 'Could not draw the image.' : 'Drawing…'}
-          </span>
+          <PreviewSkeleton span={span} />
         )}
       </div>
       {failedShare ? (
