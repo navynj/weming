@@ -1,0 +1,98 @@
+diff --git a/dist/client/components/segment-cache/bfcache.js b/dist/client/components/segment-cache/bfcache.js
+index c8f26e052e09f2a1c2f901c8d0e8d6053aa03460..bf736b323fc85583e824194515e5aeae027e4bc7 100644
+--- a/dist/client/components/segment-cache/bfcache.js
++++ b/dist/client/components/segment-cache/bfcache.js
+@@ -108,17 +108,17 @@ function readFromBFCache(varyPath) {
+         return null;
+     }
+     const isRevalidation = false;
+-    return (0, _cachemap.getFromCacheMap)(// During a back/forward navigation, it doesn't matter how stale the data
++    return withData((0, _cachemap.getFromCacheMap)(// During a back/forward navigation, it doesn't matter how stale the data
+     // might be. Pass -1 instead of the actual current time to bypass
+     // staleness checks.
+-    -1, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false);
++    -1, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false));
+ }
+ function readFromBFCacheDuringRegularNavigation(now, varyPath) {
+     if (typeof window === 'undefined') {
+         return null;
+     }
+     const isRevalidation = false;
+-    return (0, _cachemap.getFromCacheMap)(now, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false);
++    return withData((0, _cachemap.getFromCacheMap)(now, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false));
+ }
+ 
+ if ((typeof exports.default === 'function' || (typeof exports.default === 'object' && exports.default !== null)) && typeof exports.default.__esModule === 'undefined') {
+@@ -127,4 +127,25 @@ if ((typeof exports.default === 'function' || (typeof exports.default === 'objec
+   module.exports = exports.default;
+ }
+ 
++// Patched (weming, 2026-10-29): a navigation's segment is written here as a
++// promise when the navigation starts. If that navigation is superseded, the
++// promise may settle to null ("missing"), and a segment rendered from null
++// suspends forever, waiting on a retry that only its own navigation would
++// send. Read back here — by a later navigation within staleTimes, or copied
++// into the prefetch cache by a full prefetch as complete data for five
++// minutes — it drew a blank page until a reload. A missing or failed
++// segment is a miss, fetched again. (A pending one is still reused: treating
++// it as a miss refetched on every tap of a fast switch.)
++function withData(entry) {
++    if (entry === null) return null;
++    // Test-only (e2e/fast-switch.spec.ts): Next as it ships, to force a blank page.
++    if (globalThis.__nextBfcacheKeepMissing === true) return entry;
++    const rsc = entry.rsc;
++    if (rsc !== null && typeof rsc === 'object' && (rsc.status === 'rejected' || rsc.status === 'fulfilled' && rsc.value === null)) {
++        globalThis.__nextBfcacheDropped = (globalThis.__nextBfcacheDropped || 0) + 1;
++        return null;
++    }
++    return entry;
++}
++
+ //# sourceMappingURL=bfcache.js.map
+\ No newline at end of file
+diff --git a/dist/esm/client/components/segment-cache/bfcache.js b/dist/esm/client/components/segment-cache/bfcache.js
+index 131faaa9090ccfca4a42f4ffd06b36f0a3eddce2..80eebd53e73fac7dc69efe9a5d7306e512f54064 100644
+--- a/dist/esm/client/components/segment-cache/bfcache.js
++++ b/dist/esm/client/components/segment-cache/bfcache.js
+@@ -74,17 +74,38 @@ export function readFromBFCache(varyPath) {
+         return null;
+     }
+     const isRevalidation = false;
+-    return getFromCacheMap(// During a back/forward navigation, it doesn't matter how stale the data
++    return withData(getFromCacheMap(// During a back/forward navigation, it doesn't matter how stale the data
+     // might be. Pass -1 instead of the actual current time to bypass
+     // staleness checks.
+-    -1, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false);
++    -1, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false));
+ }
+ export function readFromBFCacheDuringRegularNavigation(now, varyPath) {
+     if (typeof window === 'undefined') {
+         return null;
+     }
+     const isRevalidation = false;
+-    return getFromCacheMap(now, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false);
++    return withData(getFromCacheMap(now, currentBfCacheVersion, bfcacheMap, varyPath, isRevalidation, false));
++}
++
++// Patched (weming, 2026-10-29): a navigation's segment is written here as a
++// promise when the navigation starts. If that navigation is superseded, the
++// promise may settle to null ("missing"), and a segment rendered from null
++// suspends forever, waiting on a retry that only its own navigation would
++// send. Read back here — by a later navigation within staleTimes, or copied
++// into the prefetch cache by a full prefetch as complete data for five
++// minutes — it drew a blank page until a reload. A missing or failed
++// segment is a miss, fetched again. (A pending one is still reused: treating
++// it as a miss refetched on every tap of a fast switch.)
++function withData(entry) {
++    if (entry === null) return null;
++    // Test-only (e2e/fast-switch.spec.ts): Next as it ships, to force a blank page.
++    if (globalThis.__nextBfcacheKeepMissing === true) return entry;
++    const rsc = entry.rsc;
++    if (rsc !== null && typeof rsc === 'object' && (rsc.status === 'rejected' || rsc.status === 'fulfilled' && rsc.value === null)) {
++        globalThis.__nextBfcacheDropped = (globalThis.__nextBfcacheDropped || 0) + 1;
++        return null;
++    }
++    return entry;
+ }
+ 
+ //# sourceMappingURL=bfcache.js.map

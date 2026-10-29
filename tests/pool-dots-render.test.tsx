@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prefetched = vi.hoisted(() => [] as { href: string; kind?: string }[]);
@@ -122,14 +122,19 @@ describe('switching places', () => {
     ]);
   });
 
-  it('prefetches another place in full when the hand reaches for it', () => {
+  // A prefetch at the press raced the tap's own navigation, and a fast
+  // switch left a place that rendered nothing (2026-10-29, e2e/fast-switch).
+  it('prefetches nothing when the hand reaches for another place', () => {
     window.localStorage.setItem('weming.recent-places', JSON.stringify(['/pool/p-c', '/']));
     const { container } = strip();
     prefetched.length = 0;
     const b = container.querySelector('[data-home-foot] [data-strip-pool="p-b"]')!;
     act(() => {
-      b.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      fireEvent.pointerDown(b);
+      fireEvent.touchStart(b, { touches: [{ clientX: 0, clientY: 0 }] });
+      fireEvent.mouseEnter(b);
+      fireEvent.mouseOver(b);
     });
-    expect(prefetched).toEqual([{ href: '/pool/p-b', kind: 'full' }]);
+    expect(prefetched).toEqual([]);
   });
 });

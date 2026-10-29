@@ -3,6 +3,7 @@ import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { ShellDataProvider } from '@/features/home/shell-data';
 import { TimezoneSync } from '@/features/auth/timezone-sync';
 import { SentryUser } from '@/features/auth/sentry-user';
+import { PageSlot } from '@/features/auth/page-slot';
 import { initialsOf } from '@/features/home/grid';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolActivityProvider } from '@/features/pool/activity';
@@ -81,7 +82,8 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
             <InputSheetProvider>
               <ShellDataProvider value={{ categories }}>
                 <div className="flex min-h-dvh flex-col">
-                  <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+                  {/* Watched: a page that draws nothing is reported and recovered. */}
+                  <PageSlot>{children}</PageSlot>
                 </div>
                 {/* A splash opened from inside the app: a sheet over the screen (review). */}
                 {modal}

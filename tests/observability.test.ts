@@ -213,3 +213,31 @@ describe('a failure someone ran into, reported by its operation', () => {
     expect(captured[0].error.message).toBe('upload failed: Invalid key: <path>');
   });
 });
+
+describe('the watchdog’s reports (lib/watchdog.ts)', () => {
+  it('keep their route patterns and times, and nothing written into them leaves as a path', () => {
+    const event = scrubEvent({
+      message: 'Page rendered nothing for 3s',
+      tags: { watchdog: 'blank', route: '/pool/P3TxKv9YLYpbrwUwiJ9ydE', title: 'my diary' },
+      contexts: {
+        watchdog: {
+          blank_ms: 3_004,
+          recovery: 'refresh',
+          route: '/pool/P3TxKv9YLYpbrwUwiJ9ydE',
+          navigated_from: '/splash/8a8046d5-5b9c-4598-9550-ffff4fd9cdd5?x=1',
+          navigated_ms_before: 412,
+        },
+      },
+    } as never) as unknown as { tags: unknown; contexts: unknown };
+    expect(event.tags).toEqual({ watchdog: 'blank', route: '/pool/[id]' });
+    expect(event.contexts).toEqual({
+      watchdog: {
+        blank_ms: 3_004,
+        recovery: 'refresh',
+        route: '/pool/[id]',
+        navigated_from: '/splash/[id]',
+        navigated_ms_before: 412,
+      },
+    });
+  });
+});
