@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 
 import type { Database } from '@/lib/database.types';
 import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
+import { recordStep } from '@/lib/action-timing';
 import { fetchWithDeadline } from '@/lib/supabase/fetch';
 import { tagUserOnRead } from '@/lib/sentry-user';
 
@@ -21,7 +22,7 @@ export const createClient = cache(async function createClient() {
   // Named reads (lib/env.ts): a missing variable fails as `Missing <NAME>`.
   const client = createServerClient<Database>(supabaseUrl(), supabaseAnonKey(), {
     // Reads stay bounded for the render; writes may be slow but must land.
-    global: { fetch: fetchWithDeadline(5_000, 30_000) },
+    global: { fetch: fetchWithDeadline(5_000, 30_000, recordStep) },
     cookies: {
       getAll() {
         return cookieStore.getAll();

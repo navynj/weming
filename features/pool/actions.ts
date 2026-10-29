@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Database } from '@/lib/database.types';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
+import { writeRefusal } from '@/lib/supabase/fetch';
 import { reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
 
@@ -45,7 +46,7 @@ function said(error: { message: string; code?: string } | null): string {
     return error.message;
   }
   if (error.code === '42501') return 'You’re not in this Pool anymore.';
-  return error.message;
+  return writeRefusal(error);
 }
 
 const NewPool = z.object({

@@ -5,43 +5,19 @@ import { z } from 'zod';
 
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
-
-import type { Splash } from './summary';
 import { reported } from '@/lib/report-failure';
 
-export type SplashResult = { ok: true; splash: Splash } | { ok: false; message: string };
+import {
+  Header,
+  ISO_DATE,
+  refuseRange,
+  revalidateSplash,
+  saveHeader,
+  type SplashResult,
+} from './header';
+
+export type { Header, SplashResult } from './header';
 export type Done = { ok: true } | { ok: false; message: string };
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Every path a post touches. The post pages and the ground re-read. */
-function revalidateSplash(id: string | null = null): void {
-  revalidatePath('/');
-  revalidatePath('/locker');
-  revalidatePath('/lanes');
-  if (id) revalidatePath(`/splash/${id}`);
-}
-
-const Header = z.object({
-  title: z.string().trim().max(120),
-  /** The post's range, which every block takes (H24). Null leaves it as it is. */
-  declaredStart: z.string().regex(ISO_DATE).nullable(),
-  declaredEnd: z.string().regex(ISO_DATE).nullable(),
-  /** The post's lane, which every block takes (H24); none on joint and Just mine. */
-  declaredLaneId: z.uuid().nullable(),
-  /** The post's own icon, one glyph, else its lane's emoji stands for it (0008). */
-  icon: z.string().trim().max(16).nullable(),
-});
-
-export type Header = z.infer<typeof Header>;
-
-function refuseRange(header: Pick<Header, 'declaredStart' | 'declaredEnd'>): string | null {
-  if (header.declaredEnd && !header.declaredStart) return 'An end date needs a start date.';
-  if (header.declaredEnd && header.declaredStart && header.declaredEnd < header.declaredStart) {
-    return 'That end is before the start.';
-  }
-  return null;
-}
 
 const Drop = Header.extend({
   /** The post's id, minted in the browser so the pill on the ground is the real one from the start. */
@@ -167,35 +143,7 @@ async function setSplashDescriptionWork(id: string, text: string): Promise<Done>
 }
 
 export async function updateSplashHeader(id: string, input: Header): Promise<SplashResult> {
-  return reported('edit', () => updateSplashHeaderWork(id, input));
-}
-
-async function updateSplashHeaderWork(id: string, input: Header): Promise<SplashResult> {
-  const parsed = Header.safeParse(input);
-  if (!parsed.success) return { ok: false, message: 'That header is incomplete.' };
-  const header = parsed.data;
-  const refused = refuseRange(header);
-  if (refused) return { ok: false, message: refused };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('splashes')
-    .update({
-      title: header.title,
-      // A post always has a date (H24): none sent leaves its range as it is.
-      ...(header.declaredStart
-        ? { declared_start: header.declaredStart, declared_end: header.declaredEnd }
-        : {}),
-      declared_lane_id: header.declaredLaneId,
-      icon: header.icon || null,
-    })
-    .eq('id', id)
-    .select('*')
-    .single();
-
-  if (error) return { ok: false, message: error.message };
-  revalidateSplash(id);
-  return { ok: true, splash: data };
+  return reported('edit', () => saveHeader(id, input));
 }
 
 /** Pins or unpins a post (H21g). */

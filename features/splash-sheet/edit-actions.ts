@@ -8,8 +8,9 @@ import type { Annotation } from '@/features/input-sheet/draft';
 import { signPoolPhotos } from '@/lib/avatars';
 import { setPlacement, setPlacementTogether } from '@/features/pool/actions';
 import { getJointInvitees, getPlacementPicks } from '@/lib/queries/pools';
-import { updateSplashHeader } from '@/features/splash/actions';
+import { saveHeader } from '@/features/splash/header';
 import { createClient } from '@/lib/supabase/server';
+import { isCutOff, writeRefusal } from '@/lib/supabase/fetch';
 import { reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
 
@@ -259,7 +260,7 @@ function refused(error: { message: string }): { ok: false; message: string } {
     ok: false,
     message: /others have written here/.test(error.message)
       ? 'Others have written here.'
-      : error.message,
+      : writeRefusal(error),
   };
 }
 
@@ -341,7 +342,7 @@ async function saveSplashEditWork(
         ...(edit.description !== undefined ? { description: edit.description || null } : {}),
       })
       .eq('id', edit.id);
-    if (error) return { ok: false, message: error.message };
+    if (error) return { ok: false, message: writeRefusal(error) };
     if (edit.jointTogether) {
       const { error: setError } = await supabase.rpc('set_joint_together', {
         p_splash: edit.id,
@@ -369,7 +370,7 @@ async function saveSplashEditWork(
     return { ok: true };
   }
 
-  const header = await updateSplashHeader(edit.id, {
+  const header = await saveHeader(edit.id, {
     title: edit.title,
     icon: edit.icon,
     declaredStart: edit.declaredStart,
@@ -384,7 +385,12 @@ async function saveSplashEditWork(
       .from('splashes')
       .update({ description: edit.description || null })
       .eq('id', edit.id);
-    if (describeError) return { ok: false, message: describeError.message };
+    if (describeError) {
+      // Cut off: it may have landed anyway; the row says.
+      const landed =
+        isCutOff(describeError) && (await descriptionLanded(supabase, edit.id, edit.description));
+      if (!landed) return { ok: false, message: writeRefusal(describeError) };
+    }
   }
   if (edit.conversion) {
     const converted = await convert(supabase, edit.id, edit.conversion);
@@ -446,5 +452,19 @@ async function movePoolSplash(
     p_splash: id,
     p_pool_lane: poolLaneId,
   });
-  return error ? { ok: false, message: error.message } : null;
+  return error ? { ok: false, message: writeRefusal(error) } : null;
+}
+
+/** True when the splash already holds this description (empty is none). */
+async function descriptionLanded(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  description: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('splashes')
+    .select('description')
+    .eq('id', id)
+    .maybeSingle();
+  return !error && !!data && (data.description ?? '') === (description || '');
 }

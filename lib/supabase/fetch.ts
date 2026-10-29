@@ -15,21 +15,53 @@ const DEFAULT_TIMEOUT_MS = 3_000;
  * pool's page). Past this a write is reported as failed; until then a slow
  * one is waited for.
  */
+/** One request as it finished: its status, or how it was cut off. */
+export type StepOutcome = number | 'timeout' | 'network';
+export type OnStep = (url: string, method: string, ms: number, outcome: StepOutcome) => void;
+
 export function fetchWithDeadline(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   writeTimeoutMs: number = timeoutMs,
+  onStep?: OnStep,
 ): typeof fetch {
-  return (input, init) => {
+  return async (input, init) => {
     const caller = init?.signal;
     const method = (init?.method ?? 'GET').toUpperCase();
     const isRead = method === 'GET' || method === 'HEAD';
     const deadline = AbortSignal.timeout(isRead ? timeoutMs : writeTimeoutMs);
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const started = performance.now();
 
-    return fetch(input, {
-      ...init,
-      signal: caller ? AbortSignal.any([caller, deadline]) : deadline,
-    });
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: caller ? AbortSignal.any([caller, deadline]) : deadline,
+      });
+      onStep?.(url, method, performance.now() - started, response.status);
+      return response;
+    } catch (error) {
+      onStep?.(url, method, performance.now() - started, deadline.aborted ? 'timeout' : 'network');
+      throw error;
+    }
   };
+}
+
+/** What the author reads when a write was cut off and its outcome is unknown. */
+export const UNCONFIRMED = "Couldn't confirm it saved. Check your connection and try again.";
+
+/**
+ * True when a Supabase error means the request never got an answer: the
+ * deadline above, or the network. supabase-js hands a failed fetch back as
+ * an error whose message is the thrown one's name and message.
+ */
+export function isCutOff(error: { message?: string } | null | undefined): boolean {
+  const message = error?.message ?? '';
+  return /^(TimeoutError|AbortError)\b/.test(message) || message.includes('fetch failed');
+}
+
+/** A refusal's words: the database's own, never a raw network error. */
+export function writeRefusal(error: { message: string }): string {
+  return isCutOff(error) ? UNCONFIRMED : error.message;
 }
 
 /** True when an error means "could not reach the server", not "denied". */

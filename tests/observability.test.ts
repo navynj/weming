@@ -7,7 +7,7 @@ vi.mock('@sentry/nextjs', () => ({
   },
 }));
 
-import { scrubEvent, scrubName, scrubText, sentryOptions } from '@/lib/observability';
+import { scrubEvent, scrubLog, scrubName, scrubText, sentryOptions } from '@/lib/observability';
 import { reported, reportFailure } from '@/lib/report-failure';
 
 beforeEach(() => {
@@ -149,6 +149,38 @@ describe('what reaches Sentry (privacy first)', () => {
     expect(sentryOptions('production', 'abc')).not.toHaveProperty('beforeSendTransaction');
     expect(sentryOptions('production', 'abc')).not.toHaveProperty('ignoreTransactions');
     expect(sentryOptions('production', 'abc')).not.toHaveProperty('traceLifecycle');
+  });
+});
+
+describe('a server action’s timing (lib/action-timing.ts)', () => {
+  it('leaves as its step names and numbers, with nothing else the SDK attached', () => {
+    const log = scrubLog({
+      level: 'warn',
+      message: 'server action timing',
+      attributes: {
+        'action.steps': 'GET auth/user 92ms 200 · PATCH splashes 5003ms timeout',
+        'action.duration_ms': 5095,
+        'sentry.release': 'abc',
+        'user.id': USER,
+        'user.email': 'someone@example.com',
+        'server.address': 'ip-10-0-0-1',
+      },
+    });
+    expect(log.attributes).toEqual({
+      'action.steps': 'GET auth/user 92ms 200 · PATCH splashes 5003ms timeout',
+      'action.duration_ms': 5095,
+      'sentry.release': 'abc',
+      'user.id': USER,
+    });
+    expect(sentryOptions('production', 'abc').beforeSendLog).toBe(scrubLog);
+  });
+
+  it('rides on an error as its `action` context', () => {
+    const event = scrubEvent({
+      type: undefined,
+      contexts: { action: { steps: 'PATCH splashes 5003ms timeout' }, secret: { a: 1 } },
+    });
+    expect(event.contexts).toEqual({ action: { steps: 'PATCH splashes 5003ms timeout' } });
   });
 });
 

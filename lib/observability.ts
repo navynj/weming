@@ -3,6 +3,7 @@ import type { BrowserOptions, getClient } from '@sentry/nextjs';
 /** What the SDK hands to beforeSend and beforeSendSpan. */
 type ErrorEvent = Parameters<NonNullable<BrowserOptions['beforeSend']>>[0];
 type StreamedSpan = Parameters<NonNullable<BrowserOptions['beforeSendSpan']>>[0];
+type Log = Parameters<NonNullable<BrowserOptions['beforeSendLog']>>[0];
 type Client = ReturnType<typeof getClient>;
 
 /**
@@ -154,7 +155,17 @@ export function scrubSpan(span: StreamedSpan): StreamedSpan {
 }
 
 /** The contexts Sentry keeps: the runtime and the trace, which hold no one's words. */
-const KEPT_CONTEXTS = new Set(['os', 'browser', 'runtime', 'device', 'trace', 'app', 'culture']);
+// `action` is a server action's steps (lib/action-timing.ts): names and times, built here.
+const KEPT_CONTEXTS = new Set([
+  'os',
+  'browser',
+  'runtime',
+  'device',
+  'trace',
+  'app',
+  'culture',
+  'action',
+]);
 /** The tags kept: the operation that failed (captureFailure), and Sentry's own. */
 const KEPT_TAGS = new Set(['op', 'runtime', 'transaction', 'url']);
 
@@ -197,6 +208,22 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
   return event;
 }
 
+/**
+ * Every log, before it leaves (beforeSendLog): the app sends one kind, a
+ * server action's timing (lib/action-timing.ts), whose `action.*` attributes
+ * are step names and numbers built from no one's words. Anything else the
+ * SDK adds goes through the span allowlist; any other attribute is dropped.
+ */
+export function scrubLog(log: Log): Log {
+  const kept: SpanAttributes = {};
+  for (const [key, value] of Object.entries(log.attributes ?? {})) {
+    if (key.startsWith('action.')) kept[key] = value;
+  }
+  log.attributes = { ...scrubAttributes(log.attributes), ...kept };
+  if (typeof log.message === 'string') log.message = scrubText(log.message);
+  return log;
+}
+
 /** What every runtime's init shares. */
 export function sentryOptions(vercelEnv: string | undefined, release: string | undefined) {
   const environment = sentryEnvironment(vercelEnv);
@@ -230,6 +257,7 @@ export function sentryOptions(vercelEnv: string | undefined, release: string | u
     // Spans stream (the default lifecycle): beforeSendTransaction and
     // ignoreTransactions would never run, so neither is set.
     beforeSendSpan: scrubSpan,
+    beforeSendLog: scrubLog,
   };
 }
 
