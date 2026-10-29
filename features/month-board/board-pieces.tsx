@@ -143,14 +143,14 @@ function placed(box: Box): CSSProperties {
 
 /** The words' colour and the fill beneath them: none, unless the splash is joint (review). */
 const LABEL_CLASS: Record<LabelStyle, string> = {
-  none: 'text-white',
+  none: 'label-none text-white',
   // label-fill: the colour's pastel in pastel mode (0036, globals.css).
   white: 'label-fill bg-white text-main-900',
   // label-ink: a pale fill in pastel mode (0036, globals.css).
   ink: 'label-ink bg-ink text-white',
   // Outline (H55): the ground's colour, edged and lettered white; the light
   // grounds' swap makes it white, edged and lettered in the colour.
-  outline: 'bg-main-900 text-white ring-1 ring-inset ring-white',
+  outline: 'label-outline bg-main-900 text-white ring-1 ring-inset ring-white',
   // The rule's second fill (H55): ink on the dark ground, Glass on the
   // light and pastel ones (label-second, globals.css).
   second: 'label-ink label-second bg-ink text-white',
@@ -158,7 +158,7 @@ const LABEL_CLASS: Record<LabelStyle, string> = {
   // Outline on the light and pastel grounds (label-pale, globals.css).
   pale: 'label-pale bg-white/20 text-white',
   // Glass (0058): a band's fill, its edge a hairline of white drawn inside.
-  glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
+  glass: 'label-glass bg-white/20 text-white ring-1 ring-inset ring-white/30',
 };
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {

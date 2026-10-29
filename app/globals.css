@@ -467,7 +467,7 @@ body {
 [data-mode='pastel'] .water-ground .label-ink.label-second {
   background-color: color-mix(in srgb, var(--theme-pastel) 20%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-pastel) 30%, transparent);
-  color: var(--pastel-tone);
+  color: var(--pastel-ink);
 }
 /* Its faces part on nothing there, as on Glass. */
 [data-mode='light'] .water-ground .label-second .ring-ink,
@@ -482,7 +482,15 @@ body {
 [data-mode='pastel'] .water-ground .label-pale {
   background-color: #ffffff;
   box-shadow: inset 0 0 0 1px var(--theme-pastel);
-  color: var(--pastel-tone);
+}
+/* Pastel's Glass, Outline and no fill (Yoonji, in the session): dark grey
+   words, as on its fills, not the soft tone the ground's words take. As
+   heavy as that rule and later, so this one holds. */
+[data-mode='pastel']
+  .water-ground
+  [class*='text-white']:is(.label-glass, .label-outline, .label-none, .label-pale):not(.surface *),
+[data-mode='pastel'] .water-ground .label-ink.label-second {
+  color: var(--pastel-ink);
 }
 /* Black is the one theme its ink matches: on the black ground a label in
    the ink style keeps a white edge. */

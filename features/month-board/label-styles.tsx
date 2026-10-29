@@ -12,13 +12,13 @@ export type LabelChoice = (typeof LABEL_STYLES)[number];
 
 /** A label drawn in each style, as the board draws it (board-pieces' LABEL_CLASS). */
 const SAMPLE: Record<LabelStyle, string> = {
-  none: 'text-white',
+  none: 'label-none text-white',
   white: 'label-fill bg-white text-main-900',
   ink: 'label-ink bg-ink text-white',
-  outline: 'bg-main-900 text-white ring-1 ring-inset ring-white',
+  outline: 'label-outline bg-main-900 text-white ring-1 ring-inset ring-white',
   second: 'label-ink label-second bg-ink text-white',
   pale: 'label-pale bg-white/20 text-white',
-  glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
+  glass: 'label-glass bg-white/20 text-white ring-1 ring-inset ring-white/30',
 };
 
 /**
