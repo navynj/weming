@@ -20,6 +20,7 @@ import {
   type ThemeColor,
   type ThemeMode,
 } from '@/lib/theme';
+import { faviconHref } from '@/lib/favicon';
 
 import { saveTheme, setMyPoolTheme, setPoolTheme } from './actions';
 
@@ -137,7 +138,14 @@ export function ThemeProvider({ initial, children }: { initial: MyTheme; childre
     }),
     [theme, mine, place, saveMine, savePlace],
   );
-  return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={api}>
+      {/* The tab's icon wears the place's colour (2026-10-29); React hoists it to <head>.
+          Never the pastel: white waves need the full colour behind them. */}
+      <link rel="icon" type="image/svg+xml" href={faviconHref(themeHex(theme.color))} />
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme(): ThemeApi {
