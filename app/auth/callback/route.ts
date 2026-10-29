@@ -6,7 +6,7 @@ import { safeNext } from '@/lib/next-path';
 import { isTimeZone } from '@/lib/time';
 import { NEXT_COOKIE, siteUrl, TIMEZONE_COOKIE } from '@/lib/site';
 import { createClient } from '@/lib/supabase/server';
-import { WELCOME_HOME, welcomeSplash } from '@/features/notifications/welcome';
+import { WELCOME_HOME } from '@/features/notifications/welcome';
 import { plantWelcomeSplash } from '@/features/auth/welcome-splash';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -52,14 +52,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // After the zone is set, so the welcome splash lands on the signup day as
   // the device lives it (H58). Once per account; the flag says so.
-  const welcomed = await plantWelcomeSplash(supabase, user.id);
+  await plantWelcomeSplash(supabase, user.id);
 
   const to = safeNext(next ? decodeURIComponent(next) : null);
-  // A first sign-in that lands on Home opens its welcome splash, then the
-  // notifications card once it is closed (review, H58); one that came
-  // through an invite gets the pool's.
-  const greeting = welcomed ? welcomeSplash(welcomed) : WELCOME_HOME;
-  const response = NextResponse.redirect(`${home}${first && to === '/' ? greeting : to}`);
+  // A first sign-in that lands on Home stays on Home, greeted with the
+  // notifications card; the welcome splash waits there on top of the board,
+  // unopened (2026-10-29). One that came through an invite gets the pool's.
+  const response = NextResponse.redirect(`${home}${first && to === '/' ? WELCOME_HOME : to}`);
   response.cookies.delete(TIMEZONE_COOKIE);
   response.cookies.delete(NEXT_COOKIE);
   return response;
