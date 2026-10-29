@@ -1718,3 +1718,43 @@ describe('a YouTube video on the board (part 5)', () => {
     expect(container.querySelector('iframe')).toBeNull();
   });
 });
+
+describe('the title opens a date picker (2026-10-29)', () => {
+  const pick = (container: HTMLElement, value: string): void => {
+    fireEvent.change(container.querySelector('[data-board-date-picker]')!, { target: { value } });
+  };
+
+  it('opens the browser’s picker from the title, set to the page shown', () => {
+    const { container } = board();
+    const input = container.querySelector<HTMLInputElement>('[data-board-date-picker]')!;
+    expect(input.type).toBe('date');
+    expect(input.value).toBe('2026-10-18');
+    const shown = vi.fn();
+    input.showPicker = shown;
+    fireEvent.click(container.querySelector('[data-board-pick-date]')!);
+    expect(shown).toHaveBeenCalledOnce();
+  });
+
+  it('turns Week to the week holding the day chosen, Today among them', () => {
+    const { container } = board();
+    pick(container, '2026-08-06');
+    expect(container.querySelector('[data-board-title]')!.textContent).toBe('Aug 2 – 8');
+    // The picker's Today: the device's day, a day like any other.
+    pick(container, TODAY);
+    expect(container.querySelector('[data-board-title]')!.textContent).toBe('Oct 18 – 24');
+  });
+
+  it('turns Month to the month holding the day chosen', () => {
+    const months: string[] = [];
+    const { container } = board(OCTOBER, { onMonth: (m) => months.push(m) });
+    fireEvent.click(container.querySelector('[data-board-span-option="month"]')!);
+    pick(container, '2025-12-31');
+    expect(months.at(-1)).toBe('2025-12');
+  });
+
+  it('only closes on Clear: an empty value turns nothing', () => {
+    const { container } = board();
+    pick(container, '');
+    expect(container.querySelector('[data-board-title]')!.textContent).toBe('Oct 18 – 24');
+  });
+});

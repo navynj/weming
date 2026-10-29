@@ -316,6 +316,28 @@ export function MonthBoard({
     setWeek(halfOf(day));
     setSpan('week');
   };
+  // The title opens a date picker; a day chosen turns the board to the page
+  // holding it, in the span shown (2026-10-29). The browser's own picker,
+  // so its Today is there too; its Clear only closes it.
+  const picker = useRef<HTMLInputElement>(null);
+  // The first day shown: a phone's half starts where it says; a wider week at its first day.
+  const shownDay: IsoDate = span === 'month' ? `${month}-01` : phone ? week : weekOf(week);
+  const goTo = (day: string): void => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+    if (span === 'month') onMonth(monthKey(day));
+    else setWeek(halfOf(day));
+  };
+  const openPicker = (): void => {
+    const input = picker.current;
+    if (!input) return;
+    try {
+      input.showPicker();
+    } catch {
+      // No showPicker (an older browser), or not allowed here: the field itself.
+      input.focus();
+      input.click();
+    }
+  };
 
   // The post the stack is heading to (review): the board turns to its page
   // when it is on another — set as it renders, a month through its owner —
@@ -411,8 +433,27 @@ export function MonthBoard({
         >
           <ChevronLeft aria-hidden size={18} />
         </button>
-        <h2 data-board-title className="text-sm font-semibold tabular-nums">
-          {layout.title}
+        <h2 data-board-title className="relative text-sm font-semibold tabular-nums">
+          <button
+            type="button"
+            data-board-pick-date
+            aria-label={`${layout.title}, choose a date`}
+            onClick={openPicker}
+          >
+            {layout.title}
+          </button>
+          {/* Under the title, so the picker opens there; never seen or tabbed to. */}
+          <input
+            ref={picker}
+            type="date"
+            lang="en"
+            tabIndex={-1}
+            aria-hidden
+            data-board-date-picker
+            value={shownDay}
+            onChange={(event) => goTo(event.target.value)}
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+          />
         </h2>
         <button
           type="button"
