@@ -85,12 +85,51 @@ describe('a pool’s photo on the strip (0024)', () => {
   });
 });
 
-describe('switching places (review)', () => {
-  it('prefetches every place in full as soon as the strip is drawn', () => {
-    foot();
-    expect(new Set(prefetched.map((p) => p.href))).toEqual(
-      new Set(['/', '/pool/p-a', '/pool/p-b']),
+// Not every place on sight (2026-10-28: the storm): in full only the two
+// I went to last; the rest when the hand reaches for one.
+describe('switching places', () => {
+  // Past anything the tests above prefetched at the real time.
+  let clock = Date.parse('2030-01-01T00:00:00.000Z');
+  beforeEach(() => {
+    // Each place is prefetched at most once in 30s: a fresh minute per test.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    clock += 60_000;
+    vi.setSystemTime(clock);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  function strip() {
+    return render(
+      <PoolActivityProvider
+        activity={{}}
+        pools={[
+          { id: 'p-a', name: 'Sarang' },
+          { id: 'p-b', name: 'Study Crew' },
+          { id: 'p-c', name: 'Swim' },
+        ]}
+      >
+        <GroundFoot here="home" onCompose={() => {}} />
+      </PoolActivityProvider>,
     );
-    expect(prefetched.every((p) => p.kind === 'full')).toBe(true);
+  }
+
+  it('prefetches in full only the two places I went to last, never where I am', () => {
+    window.localStorage.setItem('weming.recent-places', JSON.stringify(['/pool/p-c', '/']));
+    strip();
+    expect(prefetched).toEqual([
+      { href: '/pool/p-c', kind: 'full' },
+      { href: '/pool/p-a', kind: 'full' },
+    ]);
+  });
+
+  it('prefetches another place in full when the hand reaches for it', () => {
+    window.localStorage.setItem('weming.recent-places', JSON.stringify(['/pool/p-c', '/']));
+    const { container } = strip();
+    prefetched.length = 0;
+    const b = container.querySelector('[data-home-foot] [data-strip-pool="p-b"]')!;
+    act(() => {
+      b.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    });
+    expect(prefetched).toEqual([{ href: '/pool/p-b', kind: 'full' }]);
   });
 });

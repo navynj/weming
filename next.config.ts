@@ -17,6 +17,13 @@ const nextConfig: NextConfig = {
   // allowed so a stray localhost visit still hydrates instead of rendering a
   // page whose buttons silently do nothing.
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  // A place or a post I visited paints from the browser's copy for five
+  // minutes instead of waiting on the server; FreshOnArrival reads it again
+  // behind (2026-10-28: only the two places I went to last are prefetched
+  // now, so the copy of the others is what keeps them instant).
+  experimental: {
+    staleTimes: { dynamic: 300 },
+  },
   // Baked into the build, for the browser and the server alike: a preview's
   // branch URL is known only to the build.
   env: {

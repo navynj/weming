@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { initialsOf } from '@/features/home/grid';
 import { audienceFor } from '@/features/pool/audience-for';
 import { originTag } from '@/features/pool/origin-tag';
+import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
 import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { declaredRange, orderBlocks } from '@/features/splash/block-day';
@@ -102,6 +103,9 @@ export async function PoolSplash({
 
   return (
     <PoolEditScope scope={poolScopeOf(view)}>
+      {/* A server render runs once per request: the stamp is when this copy was read. */}
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <FreshOnArrival renderedAt={Date.now()} />
       <SplashPage
         writing={writing}
         sidePool={invited ? id : null}

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
+import { FreshOnArrival } from '@/features/home/fresh-on-arrival';
 import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { declaredRange, orderBlocks } from '@/features/splash/block-day';
@@ -153,30 +154,37 @@ export async function HomeSplash({ id }: { id: string }) {
           }));
 
   return (
-    <SplashPage
-      splash={summary}
-      blocks={blocks}
-      photos={photos}
-      lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
-      categories={categories}
-      timeZone={profile.timezone}
-      today={today}
-      initials={initialsOf(profile.display_name)}
-      responses={responses}
-      respondable={respondable}
-      threads={threads}
-      initialsOf={Object.fromEntries((names ?? []).map((n) => [n.id, initialsOf(n.display_name)]))}
-      poolTags={board ? (tags.get(board.id) ?? []) : []}
-      audience={audienceFor({
-        board,
-        summary,
-        me: profile.id,
-        categories,
-        filed: filings[id] ?? null,
-        pools,
-        placements,
-        picks,
-      })}
-    />
+    <>
+      {/* A server render runs once per request: the stamp is when this copy was read. */}
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <FreshOnArrival renderedAt={Date.now()} />
+      <SplashPage
+        splash={summary}
+        blocks={blocks}
+        photos={photos}
+        lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
+        categories={categories}
+        timeZone={profile.timezone}
+        today={today}
+        initials={initialsOf(profile.display_name)}
+        responses={responses}
+        respondable={respondable}
+        threads={threads}
+        initialsOf={Object.fromEntries(
+          (names ?? []).map((n) => [n.id, initialsOf(n.display_name)]),
+        )}
+        poolTags={board ? (tags.get(board.id) ?? []) : []}
+        audience={audienceFor({
+          board,
+          summary,
+          me: profile.id,
+          categories,
+          filed: filings[id] ?? null,
+          pools,
+          placements,
+          picks,
+        })}
+      />
+    </>
   );
 }

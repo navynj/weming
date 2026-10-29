@@ -13,10 +13,31 @@ import { usePeople } from '@/features/people/people-provider';
 import { UnseenDot, useStripPools } from '@/features/pool/activity';
 
 import { PendingPlace } from './ground-skeleton';
+import { placesToWarm, recentPlaces, rememberPlace } from './recent-places';
 
-type PrefetchKind = NonNullable<Parameters<ReturnType<typeof useRouter>['prefetch']>[1]>['kind'];
+type Router = ReturnType<typeof useRouter>;
+type PrefetchKind = NonNullable<Parameters<Router['prefetch']>[1]>['kind'];
 /** `PrefetchKind.FULL`: a dynamic page with its data, not just down to its loading boundary. Next exports the enum only as a type. */
 const FULL = 'full' as PrefetchKind;
+
+/**
+ * A place is prefetched in full at most once in this long. Next calls a
+ * prefetch's onInvalidate whenever its entry is replaced — by another
+ * prefetch of the same place, or any action's revalidation — and answering
+ * each call at once with a new prefetch looped: opening Home with six pools
+ * sent over a thousand renders in twelve seconds (2026-10-28).
+ */
+const WARM_MS = 30_000;
+const warmedAt = new Map<string, number>();
+
+/** A full prefetch of `href`, unless one went out within WARM_MS; then the time left. */
+function prefetchFull(router: Router, href: string, onInvalidate?: () => void): number {
+  const left = (warmedAt.get(href) ?? -Infinity) + WARM_MS - Date.now();
+  if (left > 0) return left;
+  warmedAt.set(href, Date.now());
+  router.prefetch(href, { kind: FULL, onInvalidate });
+  return 0;
+}
 
 /**
  * The ground's foot (review): the places I go, as a strip — my face first
@@ -63,23 +84,32 @@ export function GroundFoot({
   const pools = useStripPools();
   const myName = me ? (people[me]?.name ?? '') : '';
   const atHome = here === 'home';
-  // Every place in full as soon as the strip is drawn (review), not only
-  // those in view: a switch then draws from the router's cache, and
-  // FreshOnArrival reads it again behind. One slot is enough; the other is
-  // the same places.
+  // In full, only the two places I went to last (not every place: the
+  // storm): a switch to either draws from the router's cache, and
+  // FreshOnArrival reads it again behind. Kept warm when an action
+  // invalidates them, at most once in WARM_MS each. Every other place is
+  // prefetched when the hand reaches for it (Place). One slot is enough;
+  // the other is the same places.
   const router = useRouter();
+  const place = atHome ? '/' : poolId ? `/pool/${poolId}` : null;
   const hrefs = ['/', ...pools.map((pool) => `/pool/${pool.id}`)].join(' ');
   useEffect(() => {
     if (wide) return;
+    if (place) rememberPlace(place);
     let live = true;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
     const warm = (href: string): void => {
-      if (live) router.prefetch(href, { kind: FULL, onInvalidate: () => warm(href) });
+      if (!live) return;
+      const left = prefetchFull(router, href, () => warm(href));
+      if (left > 0) timers.add(setTimeout(() => warm(href), left));
     };
-    hrefs.split(' ').forEach(warm);
+    placesToWarm(place, hrefs.split(' '), recentPlaces()).forEach(warm);
     return () => {
       live = false;
+      timers.forEach(clearTimeout);
     };
-  }, [hrefs, router, wide]);
+  }, [place, hrefs, router, wide]);
+  const reach = (href: string): void => void prefetchFull(router, href);
 
   return (
     <div
@@ -106,6 +136,7 @@ export function GroundFoot({
           label={atHome ? homeLabel : 'Home'}
           href="/"
           onTap={atHome ? onHome : undefined}
+          onReach={reach}
           pending={<PendingPlace here="home" />}
           shape="circle"
           data={{ 'data-home-tab': '', 'data-strip-home': '' }}
@@ -125,6 +156,7 @@ export function GroundFoot({
               label={current ? (poolLabel ?? pool.name) : pool.name}
               href={`/pool/${pool.id}`}
               onTap={current ? onPool : undefined}
+              onReach={reach}
               dot={pool.fresh && !current}
               pending={<PendingPlace here="pool" poolId={pool.id} />}
               shape="square"
@@ -166,6 +198,7 @@ function Place({
   label,
   href,
   onTap,
+  onReach,
   dot = false,
   pending,
   shape,
@@ -176,6 +209,8 @@ function Place({
   label?: string;
   href: string;
   onTap?: () => void;
+  /** The hand reaching for it — a press or a hover: prefetch it in full now. */
+  onReach: (href: string) => void;
   dot?: boolean;
   /** Drawn inside the link, so it can read whether a tap on it is waiting. */
   pending?: ReactNode;
@@ -211,9 +246,20 @@ function Place({
       </button>
     );
   }
+  const reach = (): void => onReach(href);
   return (
-    // In full, not just to the loading boundary (review): the place's data comes with it.
-    <Link href={href} prefetch aria-label={label} className={className} {...data}>
+    // Never on sight (the storm): in full when the hand reaches for it, the
+    // place's data with it, or ahead of time if it is one of the last two.
+    <Link
+      href={href}
+      prefetch={false}
+      onPointerDown={reach}
+      onTouchStart={reach}
+      onMouseEnter={reach}
+      aria-label={label}
+      className={className}
+      {...data}
+    >
       {body}
       {pending}
     </Link>
