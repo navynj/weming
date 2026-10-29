@@ -322,11 +322,34 @@ export function MonthBoard({
   const picker = useRef<HTMLInputElement>(null);
   // The first day shown: a phone's half starts where it says; a wider week at its first day.
   const shownDay: IsoDate = span === 'month' ? `${month}-01` : phone ? week : weekOf(week);
+  // In Month, the row holding the day chosen is scrolled to once its month
+  // has rendered, when it sits out of sight below or above (2026-10-29).
+  const [sought, setSought] = useState<{ day: IsoDate; seq: number } | null>(null);
+  const scrolledFor = useRef(0);
   const goTo = (day: string): void => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
-    if (span === 'month') onMonth(monthKey(day));
-    else setWeek(halfOf(day));
+    if (span === 'month') {
+      setSought((current) => ({ day, seq: (current?.seq ?? 0) + 1 }));
+      onMonth(monthKey(day));
+    } else setWeek(halfOf(day));
   };
+  useEffect(() => {
+    if (!sought || sought.seq === scrolledFor.current || span !== 'month') return;
+    const row = layout.weeks.find((w) => w.cells.some((cell) => cell.day === sought.day));
+    if (!row) return; // Its month has not rendered yet.
+    const box = scroller.current;
+    const el = box?.querySelector<HTMLElement>(`[data-board-week-row="${row.index}"]`);
+    if (box && el) {
+      const view = box.getBoundingClientRect();
+      const at = el.getBoundingClientRect();
+      if (at.top < view.top || at.bottom > view.bottom) {
+        el.scrollIntoView?.({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' });
+      }
+    }
+    scrolledFor.current = sought.seq;
+    // Once the month holding it has rendered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sought, layout.key]);
   const openPicker = (): void => {
     const input = picker.current;
     if (!input) return;

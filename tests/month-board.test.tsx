@@ -1752,6 +1752,35 @@ describe('the title opens a date picker (2026-10-29)', () => {
     expect(months.at(-1)).toBe('2025-12');
   });
 
+  it('in Month, scrolls to the row holding the day when it is out of sight', () => {
+    // No layout in jsdom: the scroller shows 300px, each week row is 200px down the last.
+    const rect = (top: number, h: number) =>
+      ({ top, bottom: top + h, left: 0, right: 0, width: 0, height: h, x: 0, y: top }) as DOMRect;
+    const boxes = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const row = this.getAttribute('data-board-week-row');
+        return row === null ? rect(0, 300) : rect(Number(row) * 200, 200);
+      });
+    const scrolled: string[] = [];
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.getAttribute('data-board-week-row') ?? '');
+    };
+    try {
+      const { container } = board();
+      fireEvent.click(container.querySelector('[data-board-span-option="month"]')!);
+      // Oct 29 sits in the fifth row, below what shows.
+      pick(container, '2026-10-29');
+      expect(scrolled).toEqual(['4']);
+      // Oct 2, in the first row, is in sight: nothing moves.
+      pick(container, '2026-10-02');
+      expect(scrolled).toEqual(['4']);
+    } finally {
+      boxes.mockRestore();
+      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+    }
+  });
+
   it('only closes on Clear: an empty value turns nothing', () => {
     const { container } = board();
     pick(container, '');
