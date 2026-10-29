@@ -84,6 +84,7 @@ let ana: string, ben: string, cal: string;
 let crew: string, crewLane: string, solo: string, club: string, clubLane: string;
 let record: string, benOnRecord: string;
 let answeredJoint: string, emptyJoint: string, bensJoint: string, benInBensJoint: string;
+let bensRecord: string, anaSide: string, anaUnanswered: string;
 let preview: unknown;
 let result: { deleted: boolean; counts: Record<string, number>; handed: unknown[]; torn: string[] };
 
@@ -91,7 +92,7 @@ beforeAll(async () => {
   [ana, ben, cal] = [await person('Ana'), await person('Ben'), await person('Cal')];
   [crew, crewLane] = await openPool(ana, 'Crew', [ben, cal]);
   [solo] = await openPool(ana, 'Solo', []);
-  [club, clubLane] = await openPool(ben, 'Club', [ana]);
+  [club, clubLane] = await openPool(ben, 'Club', [ana, cal]);
 
   // Ana's record, with a photo path, shared to Crew, where Ben writes.
   record = crypto.randomUUID();
@@ -142,6 +143,37 @@ beforeAll(async () => {
       await asUser(ana)
         .from('ripple_reactions')
         .insert({ ripple_id: benInBensJoint, user_id: ana, emoji: '🌊' })
+    ).error,
+  ).toBeNull();
+
+  // Ben's record shared to Club, where Ana wrote her side twice: Ben
+  // replied to one and Cal reacted to it; nobody answered the other.
+  bensRecord = crypto.randomUUID();
+  const benDay = (await asAdmin().from('my_categories').select('id').eq('user_id', ben).single())
+    .data!.id;
+  await asUser(ben)
+    .from('splashes')
+    .insert({ id: bensRecord, owner_id: ben, title: 'Squamish', declared_lane_id: benDay });
+  await write(ben, bensRecord, 'Ben on Squamish');
+  await asUser(ben)
+    .from('splash_placements')
+    .insert({ splash_id: bensRecord, pool_id: club, pool_lane_id: clubLane });
+  await asUser(ben).rpc('set_placement_together', {
+    p_splash: bensRecord,
+    p_pool: club,
+    p_users: [ana],
+    p_everyone: false,
+  });
+  anaSide = await write(ana, bensRecord, 'Ana on Squamish', club);
+  anaUnanswered = await write(ana, bensRecord, 'Ana, unanswered', club);
+  expect(
+    (await asUser(ben).rpc('add_reply', { p_ripple: anaSide, p_body: 'Ben answers Ana' })).error,
+  ).toBeNull();
+  expect(
+    (
+      await asUser(cal)
+        .from('ripple_reactions')
+        .insert({ ripple_id: anaSide, user_id: cal, emoji: '⛰️' })
     ).error,
   ).toBeNull();
 
@@ -271,6 +303,40 @@ describe('deleting my account', () => {
     expect(left.data).toEqual([{ author_id: null, note: null }]);
     const reply = await asAdmin().from('ripple_replies').select('body').eq('author_id', cal);
     expect(reply.data).toEqual([{ body: 'Cal answers' }]);
+  });
+
+  it('keeps what others said to my side of someone’s record, on a placeholder in that thread', async () => {
+    const left = await asAdmin()
+      .from('ripples')
+      .select('id, author_id, note, media, thread_pool_id, created_at')
+      .eq('splash_id', bensRecord)
+      .is('author_id', null);
+    expect(left.data).toHaveLength(1);
+    const holder = left.data![0];
+    expect(holder).toMatchObject({ note: null, media: [], thread_pool_id: club });
+    const mine = await asAdmin().from('ripples').select('id').in('id', [anaSide, anaUnanswered]);
+    expect(mine.data).toEqual([]);
+
+    // The record's owner and the pool's other member both read it and what hangs on it.
+    for (const reader of [ben, cal]) {
+      const seen = await asUser(reader).from('ripples').select('id').eq('id', holder.id);
+      expect(seen.data, reader).toHaveLength(1);
+      const replies = await asUser(reader).rpc('ripple_replies_in', { p_ripples: [holder.id] });
+      expect(
+        (replies.data ?? []).map((r) => ({ body: r.body, thread_pool_id: r.thread_pool_id })),
+        reader,
+      ).toEqual([{ body: 'Ben answers Ana', thread_pool_id: club }]);
+      const reactions = await asUser(reader)
+        .from('ripple_reactions')
+        .select('emoji')
+        .eq('ripple_id', holder.id);
+      expect(reactions.data, reader).toEqual([{ emoji: '⛰️' }]);
+    }
+    // Nobody outside the pool reads it.
+    const stranger = await person('Dee');
+    expect((await asUser(stranger).from('ripples').select('id').eq('id', holder.id)).data).toEqual(
+      [],
+    );
   });
 
   it('deletes a joint record left with no ripples, and keeps Ben’s with his', async () => {

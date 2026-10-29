@@ -20,14 +20,23 @@
 -- removes my storage objects and then the auth user with the service role.
 -- Run again it does nothing: with no profile there is nothing of mine.
 --
+-- My side of someone else's shared record (Yoonji, in the session: "when
+-- my account is deleted, replies and reactions that others left on my
+-- ripples on someone else's shared record must survive. Leave a 'This part
+-- was removed' placeholder ripple in place of mine on that record, in the
+-- same pool thread, carrying their replies and reactions, as H46 does
+-- elsewhere"): the profiles trigger leaves one there for each ripple of
+-- mine others answered, in its pool thread, and the pool reads it as it
+-- reads a placeholder on a joint record — while the record is shared there.
+--
 -- Found while rehearsing: when a profile goes, its layouts' updated_by is
 -- set null by the foreign key, and stamp_board_layout stamped that very
 -- update with the deleted user's id again, a reference to no one that the
 -- key's own action never checks. The stamp now leaves that update alone.
 -- None dangle locally or, with no account ever deleted, in production.
 --
--- Additive: three functions, and a trigger function's body replaced with
--- its signature unchanged.
+-- Additive: four functions, and three functions' bodies replaced with their
+-- signatures unchanged (ripple_in_my_pools widened for a placeholder only).
 
 -- Who a pool goes to without `leaving`: its longest-standing current member
 -- other than them (the earliest joined_at of their current stint).
@@ -173,6 +182,141 @@ begin
 end;
 $$;
 
+-- A placeholder in my thread ripple's place on someone's record: no author,
+-- no words, no media, my ripple's day and moment, in its pool thread; the
+-- replies and reactions others left there move onto it, with what they
+-- notified. As _leave_placeholder (0061), with the thread kept.
+create function public._leave_thread_placeholder(rid uuid, owner uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r record;
+  holder uuid;
+begin
+  select splash_id, thread_pool_id, occurred_on, created_at, written_on into r
+    from public.ripples where id = rid;
+  perform set_config('weming.inherit_backfill', 'on', true);
+  insert into public.ripples
+    (author_id, splash_id, thread_pool_id, note, media, occurred_on, created_at, written_on)
+  values (null, r.splash_id, r.thread_pool_id, null, '{}', r.occurred_on, r.created_at, r.written_on)
+  returning id into holder;
+  perform set_config('weming.inherit_backfill', 'off', true);
+  update public.ripple_replies set ripple_id = holder
+   where ripple_id = rid and author_id <> owner;
+  update public.ripple_reactions set ripple_id = holder
+   where ripple_id = rid and user_id <> owner;
+  update public.notifications set ripple_id = holder
+   where ripple_id = rid and recipient_id <> owner;
+end;
+$$;
+
+-- 0061's trigger, with my side of others' records answered there kept too.
+create or replace function public.hand_over_on_account_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  rec record;
+begin
+  for rec in
+    select distinct r.splash_id, r.thread_pool_id
+      from public.ripples r
+      join public.splashes s on s.id = r.splash_id
+     where s.owner_id = old.id and r.thread_pool_id is not null
+  loop
+    perform public._hand_over_thread(rec.splash_id, rec.thread_pool_id);
+  end loop;
+  -- My ripples on joint records go with me; what others said to them stays,
+  -- on a placeholder in each one's place.
+  for rec in
+    select r.id, r.splash_id
+      from public.ripples r
+      join public.splashes s on s.id = r.splash_id
+     where r.author_id = old.id and s.owner_id is null and r.parent_ripple_id is null
+       and public._answered_by_others(r.id, null, old.id)
+  loop
+    perform public._leave_placeholder(rec.id, rec.splash_id, null, old.id);
+  end loop;
+  -- Likewise my side of someone else's record, in its pool thread (0065).
+  for rec in
+    select r.id
+      from public.ripples r
+      join public.splashes s on s.id = r.splash_id
+     where r.author_id = old.id and r.thread_pool_id is not null
+       and s.owner_id is not null and s.owner_id <> old.id
+       and r.parent_ripple_id is null
+       and public._answered_by_others(r.id, null, old.id)
+  loop
+    perform public._leave_thread_placeholder(rec.id, old.id);
+  end loop;
+  -- A joint record I started that holds nothing of anyone else's goes with
+  -- me; one others wrote in stays, opened by no one (created_by set null).
+  delete from public.splashes s
+   where s.owner_id is null and s.created_by = old.id
+     and not exists (select 1 from public.ripples r
+                      where r.splash_id = s.id and r.author_id is distinct from old.id);
+  return old;
+end;
+$$;
+
+-- 0061's reader, with a placeholder in a member's thread on someone's
+-- record read as that thread is: by the record's owner, and by the pool's
+-- current members while the record is shared there.
+create or replace function public.ripple_in_my_pools(rid uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from public.ripples r
+      join public.splashes s on s.id = r.splash_id
+     where r.id = rid
+       and not public.ripple_is_locked(r.id)
+       and (
+         (s.owner_id is null
+           and public.is_current_member(s.pool_id)
+           -- A placeholder (0061) has no author: the pool reads it.
+           and (r.author_id is null or public.member_visible(s.pool_id, r.author_id)))
+         or (s.owner_id = r.author_id and public.splash_in_my_pools(s.id))
+         -- A member's ripple on someone's record (0035): followed by
+         -- keep_on_leave; read by the record's owner, on or off, and by
+         -- the pool's current members while the record is shared there.
+         -- A placeholder there (0065) has no author: the thread reads it.
+         or (r.thread_pool_id is not null
+           and s.owner_id is not null
+           and (r.author_id is null or public.member_visible(r.thread_pool_id, r.author_id))
+           and (
+             s.owner_id = auth.uid()
+             or (public.is_current_member(r.thread_pool_id)
+               and public.member_visible(r.thread_pool_id, s.owner_id)
+               and exists (
+                 select 1 from public.splash_placements p
+                  where p.splash_id = s.id and p.pool_id = r.thread_pool_id and p.shared
+               ))
+           ))
+         -- A thread handed over when I left its pool with remove (0061):
+         -- mine to read on my record as it stood then, nothing written after.
+         or (s.owner_id is null
+           and r.author_id is not null
+           and exists (
+             select 1 from public.splash_placements p
+               join public.splashes o on o.id = p.splash_id
+              where p.handed_to = s.id
+                and o.owner_id = auth.uid()
+                and r.created_at <= p.handed_at
+           ))
+       )
+  );
+$$;
+
 create or replace function public.stamp_board_layout()
 returns trigger
 language plpgsql
@@ -199,6 +343,8 @@ end;
 $$;
 
 revoke execute on function public._pool_heir(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public._leave_thread_placeholder(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.hand_over_on_account_delete() from public, anon, authenticated;
 revoke execute on function public.account_deletion_preview() from public, anon;
 revoke execute on function public.delete_my_account() from public, anon;
 grant execute on function public.account_deletion_preview() to authenticated;
