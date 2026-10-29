@@ -971,6 +971,27 @@ describe('labels, photos and bands, drawn', () => {
     ).toBe('+1');
   });
 
+  it('keeps a photo sized by hand at its size, a busy lane beside it or not (review)', () => {
+    const soup = card('soup', 'Soup', '2026-10-20', { photos: 1 });
+    // The next lane, the next day, holds a label where the photo would overhang.
+    const next = card('next', 'A long title on the very next day', '2026-10-21');
+    const sized = (size: number): Card => ({
+      ...soup,
+      layout: { photos: { 'a1/soup-0.webp': { size } } },
+    });
+    const widthOf = (cards: Card[]): number => {
+      const { container } = board(cards);
+      const w = parseFloat(
+        container.querySelector<HTMLElement>('[data-board-piece="soup"] [data-board-photo-card]')!
+          .style.width,
+      );
+      cleanup();
+      return w;
+    };
+    const lane = widthOf([sized(1), next]);
+    expect(widthOf([sized(2), next])).toBeCloseTo(lane * 2, -1);
+  });
+
   it('leaves a photo hidden from the board off it, and draws a post with all hidden as one with none (0044)', () => {
     const four = card('four', 'Four photos', '2026-10-23', { photos: 4 });
     const oneHidden: Card = { ...four, layout: { photos: { 'a1/four-1.webp': { hidden: true } } } };

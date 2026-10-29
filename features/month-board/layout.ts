@@ -978,8 +978,12 @@ function shapeC(card: Card, plan: Plan, ctx: Context): Shape {
     );
   let spread = pile(1);
   // Past the lane, it overhangs into empty lanes as a label does; with none
-  // empty, the whole pile shrinks to the lane, in the same proportions.
+  // empty, the whole pile shrinks to the lane, in the same proportions. A
+  // size set by hand is kept whatever is beside it (review): the layers
+  // decide what is on top, and a drag that stopped growing read as broken.
+  const handSized = shown.some((p) => card.layout?.photos?.[p.path]?.size);
   if (
+    !handSized &&
     x + spread.w > m.column &&
     !ctx.room({ x: m.column, y: 0, w: x + spread.w - m.column, h: spread.h })
   ) {
