@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Share } from 'lucide-react';
 
 import { AXIS_LOCK_PX } from '@/components/ui/use-axis-lock';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -36,7 +36,6 @@ import {
   HEADER_PX,
   layoutMonthBoard,
   layoutWeekBoard,
-  measureKey,
   MONTH_HEADER_PX,
   type Measured,
   type Recipe,
@@ -46,6 +45,7 @@ import {
 } from './layout';
 import type { BoardEditing } from './use-board-editing';
 import { useBoardPhotos } from './use-board-photos';
+import { useCaptionMeasure } from './use-caption-measure';
 import { storedAspects, usePhotoAspects, withAspects } from './photo-aspects';
 
 /** A sideways swipe this long turns the page, once its axis is decided (the first 8px). */
@@ -60,7 +60,7 @@ const SWIPE_PX = 48;
 const DAY_WAVE_W = { wide: 26, narrow: 22 } as const;
 const DAY_WAVE_STROKE = 1.2;
 
-function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
+export function DayWaves({ count, narrow }: { count: number; narrow: boolean }) {
   const lines = Math.min(DAY_WAVES_MAX, count);
   if (lines === 0) return null;
   return (
@@ -116,6 +116,7 @@ export function MonthBoard({
   onDrawn,
   editing = null,
   fixturePhotos,
+  onShare,
 }: {
   cards: Card[];
   /** `YYYY-MM`: the month shown, when Month is; the week shown is the board's own. */
@@ -136,6 +137,8 @@ export function MonthBoard({
   editing?: BoardEditing | null;
   /** The dev fixture's own images by path (/dev/board), which no server signs. */
   fixturePhotos?: SignedMedia;
+  /** Share as image (H63): the glyph on the title row opens its sheet. */
+  onShare?: () => void;
 }) {
   const [span, setSpan] = useBoardSpan();
   // The first day shown in Week: a half's first day (halfOf), so a phone
@@ -205,37 +208,9 @@ export function MonthBoard({
     onDrawn(recipes);
   }, [layout, onDrawn]);
 
-  // Measure each title's lines as drawn — unclamped, its full height — and
-  // keep any the estimate got wrong, by piece, room and indent; the next
-  // layout uses them. Settles in a pass or two: a width, once measured,
-  // keeps its count.
+  // Each title's lines as the browser wrapped them, fed back to the layout.
   const canvas = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = canvas.current;
-    if (!el) return;
-    const found: Measured = {};
-    for (const piece of layout.pieces) {
-      const text = el.querySelector<HTMLElement>(
-        `[data-board-piece="${piece.id}"] [data-board-text]`,
-      );
-      if (!text || text.scrollHeight === 0) continue;
-      const lines = Math.min(
-        piece.type.lines,
-        Math.max(1, Math.round(text.scrollHeight / piece.type.line)),
-      );
-      const key = measureKey(
-        piece.id,
-        piece.labelBox.w - piece.pad.left - piece.pad.right,
-        piece.indent,
-        piece.type.size,
-      );
-      if (lines !== piece.captionLines && measured[key] !== lines) found[key] = lines;
-    }
-    if (Object.keys(found).length === 0) return;
-    // Next frame: the measurement is the browser's, read after it has drawn.
-    const frame = requestAnimationFrame(() => setMeasured((current) => ({ ...current, ...found })));
-    return () => cancelAnimationFrame(frame);
-  }, [layout, measured]);
+  useCaptionMeasure(canvas, layout.pieces, measured, setMeasured);
   const signed = useBoardPhotos(layout.pieces);
   const photos = useMemo(
     () => (fixturePhotos ? { ...signed, ...fixturePhotos } : signed),
@@ -488,6 +463,17 @@ export function MonthBoard({
           <ChevronRight aria-hidden size={18} />
         </button>
         <div className="flex-1" />
+        {onShare ? (
+          <button
+            type="button"
+            aria-label="Share as image"
+            data-board-share
+            onClick={onShare}
+            className="flex h-8 w-8 items-center justify-center rounded-full"
+          >
+            <Share aria-hidden size={16} />
+          </button>
+        ) : null}
         <div
           role="tablist"
           aria-label="Board span"

@@ -210,6 +210,8 @@ export async function HomeScreen({
   const summaries = summarizeSplashes(boards, [...ripples, ...theirs], profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
+  // Who started each joint splash: its title is theirs (H63).
+  const jointMaker = new Map(joints.map((j) => [j.id, j.created_by]));
   // A joint entry sits in the lane of mine I filed it in, else in its pool's
   // column (H45): my filing, never the record.
   const linkedLane = new Map(joints.map((j) => [j.id, filings[j.id] ?? null]));
@@ -362,6 +364,7 @@ export async function HomeScreen({
       id: ripple.id,
       note: ripple.note ?? '',
       createdAt: ripple.created_at,
+      byMe: author === profile.id,
       ...(author !== profile.id
         ? { authorId: author, initials: initialsBy.get(author) ?? '' }
         : {}),
@@ -412,8 +415,16 @@ export async function HomeScreen({
         thread,
       );
       const pictured = photos.get(summary.id);
+      // Mine to draw in full on a shared image (H63): my record, a joint one I
+      // started, or a lone block of mine; someone's record I wrote on is not.
+      const madeByMe = jointMaker.has(summary.id)
+        ? jointMaker.get(summary.id) === profile.id
+        : !friendIdSet.has(summary.id) &&
+          (mineIds.has(summary.id) ||
+            (summary.orphan && thread.length > 0 && thread.every((r) => r.byMe)));
       const card = {
         ...placed,
+        madeByMe,
         ...(pictured ? { photos: pictured } : {}),
         ...jointFaces.get(summary.id),
         ...(filledMine.has(summary.id) ? { together: true } : {}),

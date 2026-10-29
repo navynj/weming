@@ -13,11 +13,14 @@ import { playerUrl, thumbnailUrl, videoAspect, type YouTubeVideo } from '@/lib/y
 export function VideoThumb({
   url,
   play = true,
+  small = false,
   className = '',
 }: {
   url: string | null | undefined;
   /** The play mark; off on the board, where a video is a sticker (H42c). */
   play?: boolean;
+  /** A small play mark, for a thumbnail a lane wide or less (H63: a shared image). */
+  small?: boolean;
   className?: string;
 }) {
   return (
@@ -33,9 +36,9 @@ export function VideoThumb({
       {play ? (
         <span
           aria-hidden
-          className="text-main-900 absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white"
+          className={`text-main-900 absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white ${small ? 'h-5 w-5' : 'h-8 w-8'}`}
         >
-          <Play size={14} className="translate-x-px" fill="currentColor" />
+          <Play size={small ? 9 : 14} className="translate-x-px" fill="currentColor" />
         </span>
       ) : null}
     </span>

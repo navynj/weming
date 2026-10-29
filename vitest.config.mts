@@ -57,6 +57,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/pool-owner-db.test.ts',
   'tests/delete-account-db.test.ts',
   'tests/join-name-db.test.ts',
+  'tests/share-image-db.test.ts',
 ];
 
 /**

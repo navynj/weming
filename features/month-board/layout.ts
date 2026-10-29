@@ -1480,11 +1480,19 @@ export function layoutWeekBoard(
     weekStart = WEEK_START,
     measured = {},
     half = false,
-  }: { width: number; weekStart?: number; measured?: Measured; half?: boolean },
+    days: count,
+  }: {
+    width: number;
+    weekStart?: number;
+    measured?: Measured;
+    half?: boolean;
+    /** So many days from `day` itself (H63: a shared image's Thu–Sat), at `width` for them all. */
+    days?: number;
+  },
 ): BoardLayout {
-  const columns = half ? HALF_COLUMNS : COLUMNS;
+  const columns = count ?? (half ? HALF_COLUMNS : COLUMNS);
   const m = boardMetrics(width, columns);
-  const first = half ? day : weekOf(day, weekStart);
+  const first = half || count !== undefined ? day : weekOf(day, weekStart);
   const days = Array.from({ length: columns }, (_, i) => addDays(first, i));
   const last = days[columns - 1];
   const laid = layoutBoard(

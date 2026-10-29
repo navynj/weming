@@ -32,6 +32,7 @@ import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
 import { MembersSheet } from './members-sheet';
+import { ShareSheet } from '@/features/share-image/share-sheet';
 import { poolCards, poolColumns, poolPinned, withPoolMoves, type PoolViewKind } from './pool-cards';
 import { PoolSettingsSheet } from './settings';
 import { rememberVisit } from './remembered';
@@ -54,7 +55,7 @@ function viewName(view: PoolViewKind): string {
 /** How many members' initials the header shows before the `+`. */
 const HEADER_AVATARS = 3;
 
-type Sheet = 'members' | 'invite' | null;
+type Sheet = 'members' | 'invite' | 'share' | null;
 
 /**
  * A pool's home (H23; `_docs/mockups/pool-home.png`, `pool-swimmers.png`):
@@ -332,6 +333,7 @@ export function PoolGround({
                 lanes={laneNames}
                 onDrawn={setRecipes}
                 editing={editing}
+                onShare={() => setSheet('share')}
               />
             </BoardFrame>
           ) : (
@@ -432,6 +434,15 @@ export function PoolGround({
           ownerId={view.pool.ownerId}
           members={view.members}
           me={me}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === 'share' ? (
+        <ShareSheet
+          cards={drafts.drawn}
+          lanes={laneNames}
+          today={today}
+          poolName={view.pool.name}
           onClose={() => setSheet(null)}
         />
       ) : null}
