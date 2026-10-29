@@ -401,7 +401,9 @@ export function SplashComposer({
         <ComposeTop describing={describing} onDescribing={setDescribing} />
       </div>
       {/* The description, only once asked for (review): under the title,
-          small, its placeholder faint, so it is not taken for the body. */}
+          small, its placeholder faint, and a divider under it as on the
+          post's page (Yoonji, in the session), so it is not taken for the
+          body. */}
       {describing ? (
         <textarea
           value={description}
@@ -412,7 +414,7 @@ export function SplashComposer({
           placeholder="Describe this splash"
           aria-label="Description"
           data-compose-description-field
-          className="text-ink placeholder:text-ink -mt-2 w-full resize-none text-sm/relaxed outline-none placeholder:opacity-30"
+          className="text-ink placeholder:text-ink border-pool-100 -mt-2 w-full resize-none border-b pb-4 text-sm/relaxed outline-none placeholder:opacity-30"
         />
       ) : null}
       {/* Backspace at the very start of the body walks the cursor back up

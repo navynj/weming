@@ -175,6 +175,9 @@ describe('the composer’s top line and the description (review)', () => {
     )!;
     expect(document.activeElement).toBe(field);
     expect(field.className).toContain('placeholder:opacity-30');
+    // A divider under it, as on the post's page, between it and the body.
+    expect(field.className).toMatch(/\bborder-b\b/);
+    expect(field.className).toContain('border-pool-100');
     fireEvent.change(field, { target: { value: '  Three days up north.  ' } });
     fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Whistler' } });
     fireEvent.click(view.drop());
