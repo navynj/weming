@@ -13,7 +13,7 @@ import {
 } from '@/lib/notifications/model';
 import type { PoolNotificationPrefs, ValuesByType } from '@/lib/queries/notifications';
 import { UnderlineTabs } from '@/components/ui/underline-tabs';
-import { useOptimisticAction } from '@/lib/use-optimistic-action';
+import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
 import { setMyNotificationPref, setPoolNotificationDefault } from './actions';
 
@@ -38,9 +38,24 @@ export function PoolNotifications({
   /** Home's list (0059): my notifications per pool, without the members' defaults. */
   mineOnly?: boolean;
 }) {
-  const defaults = useOptimisticAction<ValuesByType>(prefs.poolDefaults);
+  // The sheet reads prefs once, as it opens, and no page render brings them
+  // again: what a save made true is held here, set inside the save's own
+  // transition, so the pick never falls back to what was read (2026-10-29).
+  const [savedDefaults, setSavedDefaults] = useState(prefs.poolDefaults);
+  const [savedMine, setSavedMine] = useState(prefs.mine);
+  const defaults = useOptimisticAction<ValuesByType>(savedDefaults);
   const [group, setGroup] = useState<'mine' | 'defaults'>('mine');
-  const mine = useOptimisticAction<ValuesByType>(prefs.mine);
+  const mine = useOptimisticAction<ValuesByType>(savedMine);
+  const setMine = (
+    update: (current: ValuesByType) => ValuesByType,
+    type: NotificationType,
+    value: NotificationValue | null,
+  ): void =>
+    mine.run(
+      update,
+      held(setSavedMine, update, () => setMyNotificationPref({ poolId, type, value })),
+      'Saved',
+    );
   const poolValue = (type: NotificationType): NotificationValue =>
     defaults.value[type] ?? APP_DEFAULTS[type];
 
@@ -75,13 +90,7 @@ export function PoolNotifications({
                 <Chip
                   on={mine.value[type] === undefined}
                   data={`mine-${type}-default`}
-                  onClick={() =>
-                    mine.run(
-                      (current) => without(current, type),
-                      () => setMyNotificationPref({ poolId, type, value: null }),
-                      'Saved',
-                    )
-                  }
+                  onClick={() => setMine((current) => without(current, type), type, null)}
                 >
                   Pool default ({VALUE_LABELS[poolValue(type)]})
                 </Chip>
@@ -91,11 +100,7 @@ export function PoolNotifications({
                     on={mine.value[type] === value}
                     data={`mine-${type}-${value}`}
                     onClick={() =>
-                      mine.run(
-                        (current) => ({ ...current, [type]: value }),
-                        () => setMyNotificationPref({ poolId, type, value }),
-                        'Saved',
-                      )
+                      setMine((current) => ({ ...current, [type]: value }), type, value)
                     }
                   >
                     {VALUE_LABELS[value]}
@@ -128,13 +133,19 @@ export function PoolNotifications({
                       key={value}
                       on={poolValue(type) === value}
                       data={`default-${type}-${value}`}
-                      onClick={() =>
+                      onClick={() => {
+                        const update = (current: ValuesByType): ValuesByType => ({
+                          ...current,
+                          [type]: value,
+                        });
                         defaults.run(
-                          (current) => ({ ...current, [type]: value }),
-                          () => setPoolNotificationDefault({ poolId, type, value }),
+                          update,
+                          held(setSavedDefaults, update, () =>
+                            setPoolNotificationDefault({ poolId, type, value }),
+                          ),
                           'Saved',
-                        )
-                      }
+                        );
+                      }}
                     >
                       {VALUE_LABELS[value]}
                     </Chip>
@@ -163,6 +174,19 @@ const GROUPS = [
   { key: 'mine', label: 'Your notifications' },
   { key: 'defaults', label: 'Defaults for members' },
 ] as const;
+
+/** The save, then what it made true kept as the saved state, in the same transition. */
+function held(
+  keep: (update: (current: ValuesByType) => ValuesByType) => void,
+  update: (current: ValuesByType) => ValuesByType,
+  work: () => Promise<ActionOutcome>,
+): () => Promise<ActionOutcome> {
+  return async () => {
+    const outcome = await work();
+    if (outcome.ok) keep(update);
+    return outcome;
+  };
+}
 
 function without(values: ValuesByType, type: NotificationType): ValuesByType {
   const next = { ...values };

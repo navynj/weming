@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
@@ -258,6 +258,28 @@ describe('notification settings, from the bell in a pool (H32, 0059)', () => {
     await waitFor(() =>
       expect(prefs).toEqual([['mine', { poolId: 'p-a', type: 'new_post', value: 'all' }]]),
     );
+  });
+
+  it('keeps each pick once it has saved, though the sheet read its rows only on opening', async () => {
+    const { container } = await notifications(true);
+    const choice = (data: string) =>
+      container.querySelector<HTMLButtonElement>(`[data-notification-choice="${data}"]`)!;
+    fireEvent.click(choice('mine-reply-off'));
+    await waitFor(() => expect(prefs).toHaveLength(1));
+    // The save's transition over: the pick stays, never the row read on opening.
+    await act(async () => {});
+    expect(choice('mine-reply-off').getAttribute('aria-pressed')).toBe('true');
+    expect(choice('mine-reply-default').getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(choice('mine-reply-default'));
+    await waitFor(() => expect(prefs).toHaveLength(2));
+    await act(async () => {});
+    expect(choice('mine-reply-default').getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(container.querySelector('[data-notification-group="defaults"]')!);
+    fireEvent.click(choice('default-reaction-on'));
+    await waitFor(() => expect(prefs).toHaveLength(3));
+    await act(async () => {});
+    expect(choice('default-reaction-on').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('shows a member the defaults read-only, under their tab', async () => {
