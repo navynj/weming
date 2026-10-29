@@ -6,17 +6,21 @@ import { useRouter } from 'next/navigation';
 import { welcomePool } from '@/features/notifications/welcome';
 
 import { createPool } from './actions';
-import { LaneEditor, type DraftLane } from './lane-editor';
+import { LaneEditor, POOL_LANE_PRESET, type DraftLane } from './lane-editor';
 import { holdFailedPhoto } from './photo-retry';
 import { PoolPhotoField, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
- * "Open a new Pool" (1c): one screen — its photo and name, its visibility
- * and its lanes — and one button, which opens the pool, its lanes and my
+ * "Open a new Pool" (1c): one screen — its photo and name, and its lanes,
+ * five to start with (`POOL_LANE_PRESET`) — and one button, which opens the pool, its lanes and my
  * membership as one act (`create_pool`), then goes to the pool. No lane of
  * mine is connected: a record written there shows in the pool's column on
- * my Home until I file it (H45).
+ * my Home until I file it (H45). Every pool is private (`create_pool`
+ * writes it), so there is no visibility to choose; the column stays for
+ * open pools later.
+ *
+ * On a wide screen the photo and name sit left of the lanes.
  *
  * The pool's id comes from the database, so this one add waits on its round
  * trip: the button says so while it does.
@@ -24,7 +28,7 @@ import { PrimaryButton, StepPage } from './step-page';
 export function CreateFlow() {
   const router = useRouter();
   const [name, setName] = useState('');
-  const [lanes, setLanes] = useState<DraftLane[]>([]);
+  const [lanes, setLanes] = useState<DraftLane[]>(POOL_LANE_PRESET);
   const [photo, setPhoto] = useState<PoolPhotoChange>({ kind: 'keep' });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -58,45 +62,32 @@ export function CreateFlow() {
   };
 
   return (
-    <StepPage step={null} onBack={() => router.back()}>
+    <StepPage step={null} wide onBack={() => router.back()}>
       <div className="flex min-h-0 flex-1 flex-col">
         <section data-create-step="1" className="flex min-h-0 flex-1 flex-col">
           <h1 className="text-main-900 text-3xl/tight font-semibold">Open a new Pool</h1>
           <p className="text-pool-500 mt-3 text-sm">A pool for the people you keep records with.</p>
 
-          <div className="mt-10 flex items-start gap-4">
-            {/* The pool's photo (0024): the tile, the letters until one is picked. */}
-            <PoolPhotoField name={name} current={null} change={photo} onChange={setPhoto} />
-            <label className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="text-pool-500 text-xs">Pool name</span>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={60}
-                data-pool-name
-                className="border-pool-200 text-ink focus:border-main-900 h-16 rounded-2xl border px-5 text-lg outline-none"
-              />
-            </label>
-          </div>
+          <div className="mt-10 flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:gap-12">
+            <div className="flex items-start gap-4">
+              {/* The pool's photo (0024): the tile, the letters until one is picked. */}
+              <PoolPhotoField name={name} current={null} change={photo} onChange={setPhoto} />
+              <label className="flex min-w-0 flex-1 flex-col gap-2">
+                <span className="text-pool-500 text-xs">Pool name</span>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  maxLength={60}
+                  data-pool-name
+                  className="border-pool-200 text-ink focus:border-main-900 h-16 rounded-2xl border px-5 text-lg outline-none"
+                />
+              </label>
+            </div>
 
-          <fieldset className="mt-8 flex flex-col gap-3">
-            <legend className="text-pool-500 mb-3 text-xs">Visibility</legend>
-            <VisibilityCard
-              title="Private"
-              detail="Only people with the invite link can join"
-              selected
-            />
-            <VisibilityCard
-              title="Open"
-              detail="Anyone can find and join"
-              note="Coming later"
-              disabled
-            />
-          </fieldset>
-
-          <div className="mt-8">
-            <span className="text-pool-500 text-xs">Pool lanes</span>
-            <LaneEditor lanes={lanes} onChange={setLanes} />
+            <div>
+              <span className="text-pool-500 text-xs">Pool lanes</span>
+              <LaneEditor lanes={lanes} onChange={setLanes} />
+            </div>
           </div>
 
           <div className="mt-auto flex flex-col items-center gap-3 pt-10">
@@ -112,48 +103,5 @@ export function CreateFlow() {
         </section>
       </div>
     </StepPage>
-  );
-}
-
-/** A visibility card (1c): a title, a line, and a radio at the right. */
-function VisibilityCard({
-  title,
-  detail,
-  note,
-  selected = false,
-  disabled = false,
-}: {
-  title: string;
-  detail: string;
-  note?: string;
-  selected?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <div
-      role="radio"
-      aria-checked={selected}
-      aria-disabled={disabled || undefined}
-      data-visibility={title.toLowerCase()}
-      className={`flex items-center justify-between gap-4 rounded-2xl px-5 py-5 ${
-        selected ? 'border-main-900 border-2' : 'border-pool-200 border'
-      } ${disabled ? 'opacity-50' : ''}`}
-    >
-      <span className="flex flex-col gap-1">
-        <span className={`font-semibold ${selected ? 'text-main-900' : 'text-ink'}`}>
-          {title}
-          {note ? <span className="text-pool-500 ml-2 text-[10px] font-normal">{note}</span> : null}
-        </span>
-        <span className="text-pool-500 text-xs">{detail}</span>
-      </span>
-      <span
-        aria-hidden
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-          selected ? 'border-main-900 border-2' : 'border-pool-200 border'
-        }`}
-      >
-        {selected ? <span className="bg-main-900 h-3 w-3 rounded-full" /> : null}
-      </span>
-    </div>
   );
 }

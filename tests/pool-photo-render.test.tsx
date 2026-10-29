@@ -97,11 +97,8 @@ describe('choosing a pool photo (0024)', () => {
     expect(
       [...frame.querySelectorAll('span')].some((el) => el.className.includes('rounded-[18%]')),
     ).toBe(true);
+    // The preset lanes are already there: a name is all it needs.
     fireEvent.change(container.querySelector('[data-pool-name]')!, { target: { value: 'Sarang' } });
-    fireEvent.change(container.querySelector('[aria-label="Lane name"]')!, {
-      target: { value: 'Trips' },
-    });
-    fireEvent.click(container.querySelector('[data-save-lane]')!);
     await act(async () => {
       fireEvent.click(container.querySelector('[data-create-step="1"] [data-primary]')!);
     });

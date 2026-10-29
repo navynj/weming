@@ -92,11 +92,8 @@ async function createWithFailingPhoto() {
       target: { files: [new File(['jpg'], 'pool.jpg', { type: 'image/jpeg' })] },
     });
   });
+  // The preset lanes are already there: a name is all it needs.
   fireEvent.change(root.querySelector('[data-pool-name]')!, { target: { value: 'Sarang' } });
-  fireEvent.change(root.querySelector('[aria-label="Lane name"]')!, {
-    target: { value: 'Trips' },
-  });
-  fireEvent.click(root.querySelector('[data-save-lane]')!);
   await act(async () => {
     fireEvent.click(root.querySelector('[data-create-step="1"] [data-primary]')!);
   });

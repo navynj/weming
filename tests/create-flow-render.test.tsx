@@ -30,6 +30,9 @@ function addLane(root: HTMLElement, name: string): void {
   fireEvent.click(root.querySelector('[data-save-lane]')!);
 }
 
+const laneNames = (root: HTMLElement): string[] =>
+  [...root.querySelectorAll('[data-draft-lane]')].map((el) => el.textContent ?? '');
+
 const button = (root: HTMLElement) =>
   root.querySelector('[data-create-step="1"] [data-primary]') as HTMLButtonElement;
 
@@ -42,10 +45,37 @@ describe('opening a new pool (review)', () => {
     expect(container.querySelector('[data-create-connect]')).toBeNull();
     expect(container.querySelector('[data-pool-name]')).not.toBeNull();
     expect(container.querySelector('[data-pool-photo-field]')).not.toBeNull();
+    // Every pool is private: there is nothing to choose (2026-10-28).
+    expect(container.querySelector('[data-visibility]')).toBeNull();
+  });
+
+  it('starts with the five preset lanes, in order', () => {
+    const { container } = render(<CreateFlow />);
+    expect(laneNames(container)).toEqual(['☀️Day', '🍽️Food', '📍Place', '🎧Music', '👀Others']);
+  });
+
+  it('moves the open lane earlier or later', () => {
+    const { container } = render(<CreateFlow />);
+    fireEvent.click(container.querySelector('[data-draft-lane="preset-food"]')!);
+    fireEvent.click(container.querySelector('[data-move-lane="earlier"]')!);
+    expect(laneNames(container).slice(0, 2)).toEqual(['🍽️Food', '☀️Day']);
+    fireEvent.click(container.querySelector('[data-move-lane="later"]')!);
+    expect(laneNames(container).slice(0, 2)).toEqual(['☀️Day', '🍽️Food']);
+  });
+
+  it('deletes all lanes at once, offers Undo, and hides the button when empty', () => {
+    const { container } = render(<CreateFlow />);
+    fireEvent.click(container.querySelector('[data-clear-lanes]')!);
+    expect(laneNames(container)).toEqual([]);
+    expect(container.querySelector('[data-clear-lanes]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-undo-clear-lanes]')!);
+    expect(laneNames(container)).toHaveLength(5);
+    expect(container.querySelector('[data-undo-clear-lanes]')).toBeNull();
   });
 
   it('opens the pool only once it has a name and a lane', () => {
     const { container } = render(<CreateFlow />);
+    fireEvent.click(container.querySelector('[data-clear-lanes]')!);
     expect(button(container).disabled).toBe(true);
     fireEvent.change(container.querySelector('[data-pool-name]')!, { target: { value: 'Sarang' } });
     expect(button(container).disabled).toBe(true);
@@ -60,6 +90,7 @@ describe('opening a new pool (review)', () => {
     fireEvent.change(container.querySelector('[data-pool-name]')!, {
       target: { value: '  Sarang ' },
     });
+    fireEvent.click(container.querySelector('[data-clear-lanes]')!);
     addLane(container, 'Trips');
     fireEvent.click(button(container));
     await waitFor(() => expect(created).toHaveLength(1));
