@@ -158,6 +158,10 @@ describe('inviting everyone to new posts by default (0033)', () => {
   it('starts as the pool has it, and saves a flip at once', async () => {
     const { container } = settings(view('u-other'), 'advanced');
     expect(container.textContent).toContain('Invite everyone to new posts by default');
+    // Any member changes it for all (H61): the hint says it is the pool's.
+    expect(container.textContent).toContain(
+      'This is the Pool’s setting: changing it changes it for every member.',
+    );
     expect(toggle(container).getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle(container));
     expect(toggle(container).getAttribute('aria-checked')).toBe('true');

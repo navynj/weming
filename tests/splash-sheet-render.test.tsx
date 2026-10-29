@@ -740,10 +740,31 @@ describe('compose from a pool (H23, 0033)', () => {
     expect(everyone(view).getAttribute('aria-checked')).toBe('true');
   });
 
-  it('in a pool of one, shows With and starts on Everyone, with no faces (0033)', async () => {
-    const view = poolSheet({ ...SCOPE, members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }] });
+  it('with the pool’s switch off, starts without Everyone (H61)', () => {
+    const view = poolSheet({ ...SCOPE, inviteAllByDefault: false });
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('in a pool of one with the switch off, shows With, no faces, and starts without Everyone (H61)', () => {
+    const view = poolSheet({
+      ...SCOPE,
+      inviteAllByDefault: false,
+      members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }],
+    });
     expect(view.container.querySelector('[data-together]')).not.toBeNull();
     expect(view.container.querySelectorAll('[data-together-face]')).toHaveLength(0);
+    expect(everyone(view).getAttribute('aria-checked')).toBe('false');
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Mine alone' } });
+    pickLane(view, 'pl-trips');
+    expect(hint(view)).toBe('Yours · in Our Pool');
+  });
+
+  it('in a pool of one with the switch on, starts on Everyone and drops a joint record', async () => {
+    const view = poolSheet({
+      ...SCOPE,
+      inviteAllByDefault: true,
+      members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }],
+    });
     expect(everyone(view).getAttribute('aria-checked')).toBe('true');
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Alone' } });
     pickLane(view, 'pl-trips');
@@ -754,7 +775,11 @@ describe('compose from a pool (H23, 0033)', () => {
   });
 
   it('in a pool of one, Everyone turned off drops my pool record', async () => {
-    const view = poolSheet({ ...SCOPE, members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }] });
+    const view = poolSheet({
+      ...SCOPE,
+      inviteAllByDefault: true,
+      members: [{ id: 'a1', name: 'Yoonji', initials: 'YL' }],
+    });
     fireEvent.click(everyone(view));
     expect(everyone(view).getAttribute('aria-checked')).toBe('false');
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Mine alone' } });

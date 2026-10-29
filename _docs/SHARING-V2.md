@@ -204,7 +204,7 @@ No "lane" on compose or join: emoji chips and names only. Settings carry the wor
 - **Together:** under the chips, a line reading "With", then the member faces, none selected.
   - **Everyone** sits at the right of the "With" line as a word and a small switch, so it reads as an option that turns on and off. When on, the switch and the word are in the primary colour. It is not a chip: the faces are the only round items in the row.
   - **How it selects:** Everyone selects every face; deselecting any face turns it off and keeps the rest. Selecting every face one by one does not turn it on.
-  - **Default:** off, unless the pool's setting "Invite everyone to new posts by default" is on, or the pool has nobody else in it: a solo pool starts on Everyone (Yoonji, in the session).
+  - **Default:** exactly the pool's setting "Invite everyone to new posts by default": on, Everyone starts on; off, it starts off — a pool where I am the only current member included. Nothing overrides what the switch shows (H61, superseding the solo pool's start on Everyone). The setting is the pool's, one value any member changes for all, and settings says so under the switch.
   - **Always shown:** even in a pool of one, the With line shows, Everyone alone with no faces.
   - With none selected, the summary reads "Yours · in <Pool>", and Drop makes **my pool record**.
   - Selecting faces reads "Together with Mina, Jae", or "Together with everyone", and Drop makes a **joint record** whose "Add your side" slots are those members, or every current member.

@@ -124,7 +124,8 @@ function AdvancedTab({ view, me }: { view: PoolView; me: string }) {
               Invite everyone to new posts by default
             </span>
             <span className="text-pool-500 text-xs">
-              New posts here start with everyone in the Pool invited.
+              New posts here start with everyone in the Pool invited. This is the Pool’s setting:
+              changing it changes it for every member.
             </span>
           </span>
           <Switch

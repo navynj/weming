@@ -99,11 +99,10 @@ export function SplashComposer({
   const [laneId, setLaneId] = useState<string | null>(null);
   // From a pool: a pool lane, and Together (0033).
   const [pick, setPick] = useState<PoolPick>(null);
-  // Everyone starts on where the pool says so, and always in a pool of one
-  // (Yoonji, in the session).
-  const solo = pool ? pool.members.every((m) => m.id === me) : false;
+  // Everyone starts on exactly as the pool's switch says, nothing hidden
+  // over it: a pool of one included (H61).
   const noOne = (): Together => ({
-    everyone: Boolean(pool?.inviteAllByDefault) || solo,
+    everyone: Boolean(pool?.inviteAllByDefault),
     picked: [],
   });
   const [together, setTogether] = useState<Together>(noOne);
