@@ -114,8 +114,9 @@ export const THEMES = [
     name: 'Purple',
     hex: '#6338D8',
     pastel: {
-      tone: '#AE9BF9',
-      fill: '#DED8FF',
+      // Yoonji, in the session (H55): the foreground and the fill.
+      tone: '#A18AEB',
+      fill: '#D6CEFC',
       card: '#FAF9FF',
       stack: ['#EDEAFE', '#DBD5FF'],
       rule: '#F2F0FF',
