@@ -109,7 +109,7 @@ const POOL: PoolContext = {
   zoneOf: { [ME]: 'America/Vancouver', [MINA]: 'Asia/Seoul' },
 };
 
-function page(blocks: RippleWithSplash[] = BLOCKS) {
+function page(blocks: RippleWithSplash[] = BLOCKS, pool: PoolContext = POOL) {
   return render(
     <InputSheetProvider>
       <SplashPage
@@ -127,11 +127,39 @@ function page(blocks: RippleWithSplash[] = BLOCKS) {
         today="2026-10-23"
         initials="YO"
         poolTags={['Our Pool · 🎬 Media']}
-        pool={POOL}
+        pool={pool}
       />
     </InputSheetProvider>,
   );
 }
+
+describe('who wrote it, at the top of the left column', () => {
+  const authors = (view: ReturnType<typeof page>) =>
+    [...view.container.querySelectorAll('[data-splash-side] [data-splash-author]')].map((a) =>
+      a.getAttribute('data-splash-author'),
+    );
+
+  it('names a joint record’s writers in the order of their first block, never a removed part', () => {
+    expect(authors(page([...BLOCKS, ripple('r-gone', null, null)]))).toEqual([MINA, ME]);
+  });
+
+  it('names someone’s record by its owner, not by a member’s side on it', () => {
+    const side = {
+      ...ripple('r-side', ME, 'my side', '2026-10-22T16:00:00.000Z'),
+      thread_pool_id: 'p',
+    };
+    const view = page([side, ripple('r-mina', MINA, 'Mina’s record')], {
+      ...POOL,
+      scope: 'theirs',
+    });
+    expect(authors(view)).toEqual([MINA]);
+  });
+
+  it('names me on my own', () => {
+    const view = page([ripple('r-me', ME, 'mine')], { ...POOL, scope: 'mine' });
+    expect(authors(view)).toEqual([ME]);
+  });
+});
 
 describe('a pool’s splash on Home’s page (review)', () => {
   it('opens the inline editor on my ripple and none on another member’s', () => {

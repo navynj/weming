@@ -3,13 +3,9 @@
 import { useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 
-import { initialsOf } from '@/features/home/grid';
-import { Avatar } from '@/features/people/avatar';
-import { usePeople } from '@/features/people/people-provider';
-
 /**
- * The composer's top line (review): who is writing — my face and name — at
- * the left, and a quiet `…` at the right whose one item asks for the
+ * The composer's top line (review): a quiet `…` at the right — no face of
+ * mine, the writer always being me (Yoonji, in the session) — whose one item asks for the
  * splash's description, or takes the asked-for field away again. The field
  * is never shown unasked, so it is not taken for the body.
  */
@@ -20,19 +16,9 @@ export function ComposeTop({
   describing: boolean;
   onDescribing: (on: boolean) => void;
 }) {
-  const { me, people } = usePeople();
-  const name = (me && people[me]?.name) || 'Me';
   const [open, setOpen] = useState(false);
   return (
-    <div data-compose-top className="flex items-center justify-between gap-3">
-      <span data-compose-author className="flex min-w-0 items-center gap-2">
-        <Avatar
-          id={me}
-          initials={initialsOf(name)}
-          className="bg-pool-100 text-pool-500 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-        />
-        <span className="text-ink truncate text-sm font-medium">{name}</span>
-      </span>
+    <div data-compose-top className="flex items-center justify-end gap-3">
       <div className="relative shrink-0">
         <button
           type="button"

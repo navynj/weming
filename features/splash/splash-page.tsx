@@ -15,6 +15,7 @@ import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-ac
 import { deleteJointSplash } from '@/features/pool/actions';
 import { offerInstall } from '@/features/install/install-state';
 import { usePeople } from '@/features/people/people-provider';
+import { SplashAuthors } from './splash-authors';
 import { inThread, latestFromOthers, type RippleResponsesValue } from '@/features/responses/model';
 import { RippleResponses } from '@/features/responses/ripple-responses';
 import { isUnseen, rememberSeen, useSeenBefore } from '@/features/responses/seen';
@@ -386,12 +387,30 @@ export function SplashPage({
       }
     : page.splash;
 
+  // Who wrote it: a record's owner — me, or whoever wrote its blocks from no
+  // pool (a member's side is always written in one) — or a joint record's
+  // writers in the order of their first block.
+  const writers = [...new Set(blocks.flatMap((b) => (b.author_id ? [b.author_id] : [])))];
+  const owner =
+    scope === 'mine'
+      ? (pool?.me ?? me)
+      : blocks.find((b) => b.author_id && !b.thread_pool_id)?.author_id;
+  const authorIds = scope === 'joint' ? writers : owner ? [owner] : [];
+
   return (
     <div
       data-splash-page
       className="flex flex-1 flex-col bg-white pt-1 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-16"
     >
       <div data-splash-side className="flex flex-col lg:sticky lg:top-0 lg:pt-3">
+        <SplashAuthors
+          ids={authorIds}
+          initialsOf={{
+            ...pool?.initialsOf,
+            ...initialsOf,
+            ...(me && initials ? { [me]: initials } : {}),
+          }}
+        />
         <SplashHeader
           // Remounted when an edit from the sheet lands, so it reads the new words.
           key={`${headerSplash.id}:${headerSplash.title}:${headerSplash.icon ?? ''}`}

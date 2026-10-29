@@ -154,10 +154,10 @@ describe('the composer’s top line and the description (review)', () => {
     described.length = 0;
   });
 
-  it('shows who writes at the left and `…` at the right; no description field unasked', () => {
+  it('shows `…` at the right and no face of mine; no description field unasked', () => {
     const view = sheet();
     const top = view.container.querySelector('[data-compose-top]')!;
-    expect(top.firstElementChild!.hasAttribute('data-compose-author')).toBe(true);
+    expect(view.container.querySelector('[data-compose-author]')).toBeNull();
     expect(top.lastElementChild!.querySelector('[data-compose-more]')).not.toBeNull();
     expect(view.container.querySelector('[data-compose-description-field]')).toBeNull();
     expect(view.container.textContent).not.toContain('Add splash description');
