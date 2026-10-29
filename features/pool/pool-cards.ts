@@ -96,6 +96,7 @@ export function poolCards(
         initials: initialsOf.get(r.author_id) ?? '',
         authorId: r.author_id,
         authorName: nameOf.get(r.author_id),
+        byMe: r.author_id === me,
       }));
     const href = poolSplashHref(view.pool.id, splash.id);
     // Its photos, for the Board view: every image across its ripples, oldest first.
@@ -111,6 +112,8 @@ export function poolCards(
       cards.push({
         ...card,
         ...photo,
+        // Its maker's title (H63): a shared image draws it only for its maker.
+        madeByMe: splash.created_by === me,
         // With Everyone on: a band across Members' members (review).
         everyone: splash.joint_invite_all,
         // Filled with Everyone on, or once anyone besides its maker is picked (0033).
@@ -158,6 +161,7 @@ export function poolCards(
     cards.push({
       ...card,
       ...photo,
+      madeByMe: mine,
       // Shared here with Everyone on: a band across Members' members (review).
       everyone: Boolean(placement?.inviteAll),
       ...(together

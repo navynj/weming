@@ -396,6 +396,7 @@ function PhotoCardView({
   url,
   more,
   moved,
+  play = false,
   children,
 }: {
   photo: PhotoCard;
@@ -403,6 +404,8 @@ function PhotoCardView({
   more: number;
   /** Its offset and tilt set by hand, drawn without moving anything else (review). */
   moved: string | undefined;
+  /** A video's play mark: on a shared image, where it must read as a video (H63). */
+  play?: boolean;
   /** Its frame, while it is the part selected. */
   children?: ReactNode;
 }) {
@@ -423,7 +426,7 @@ function PhotoCardView({
         // A video is decoration here (H42c): its thumbnail in its own shape, a
         // sticker with no play mark, tapped like any part. It plays on the
         // stack card and in the detail sheet.
-        <VideoThumb url={url} play={false} />
+        <VideoThumb url={url} play={play} small />
       ) : url ? (
         // A signed URL for a few minutes: next/image would cache it past its life.
         // eslint-disable-next-line @next/next/no-img-element
@@ -472,6 +475,7 @@ export function BoardPieceView({
   order = 0,
   total = 1,
   stacking = null,
+  videoPlay = false,
 }: Shared & {
   piece: BoardPiece;
   /** Its place in the view's one stacking order, and how many pieces the view has (stacking.ts). */
@@ -483,6 +487,8 @@ export function BoardPieceView({
   onWrite: (card: Card) => void;
   /** Just dropped: it plunges in. */
   plunge: boolean;
+  /** Videos with their play mark (H63: a shared image); the board draws them as stickers. */
+  videoPlay?: boolean;
 }) {
   const { card } = piece;
   const icon = postIcon(card.splash, laneOfCard(card, lanes));
@@ -887,6 +893,7 @@ export function BoardPieceView({
                 key={photo.path}
                 photo={photo}
                 url={photos[photo.path]}
+                play={videoPlay}
                 more={at === top ? piece.morePhotos : 0}
                 moved={moveOf(
                   nudge(photoMove(layout.photos?.[photo.path], photo), layout.piece),
@@ -1427,5 +1434,46 @@ export function AuthorFace({ card, px }: { card: Card; px: number }) {
         />
       </span>
     </>
+  );
+}
+
+/**
+ * Someone else's record on a shared image (H63): its label's box in its
+ * label's fill, where the layout puts it and as a hand moved it, and nothing
+ * else — no words, icon, photos or faces. A label with no fill takes a
+ * band's pale one, so the shape is there to see. A compact month's piece is
+ * its sticker, so the shape is a disc.
+ */
+export function ShapePieceView({ piece, metrics }: { piece: BoardPiece; metrics: BoardMetrics }) {
+  const layout = piece.card.layout ?? {};
+  const box = piece.compact ? (piece.stickerBox ?? piece.labelBox) : piece.labelBox;
+  const fill = piece.label === 'none' ? 'pale' : piece.label;
+  return (
+    <div
+      data-board-shape={piece.id}
+      aria-hidden
+      className="absolute"
+      style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }}
+    >
+      <span
+        className={`absolute block ${LABEL_CLASS[fill]} ${piece.compact ? 'rounded-full' : ''} ${piece.muted ? 'opacity-50' : ''}`}
+        style={{
+          ...placed(box),
+          transform: moveOf(nudge(layout.label, layout.piece), metrics.column, piece.type.line),
+        }}
+      />
+    </div>
+  );
+}
+
+/** Someone else's ranged record on a shared image (H63): the band alone, no icon, no words. */
+export function ShapeTapeView({ tape }: { tape: BoardTape }) {
+  return (
+    <div
+      data-board-shape={tape.id}
+      aria-hidden
+      className={`label-pale absolute bg-white/20 ${tape.muted ? 'opacity-50' : ''}`}
+      style={placed(tape)}
+    />
   );
 }

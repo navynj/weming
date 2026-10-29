@@ -8,11 +8,15 @@ import {
   displayPathOf,
   isAppAsset,
   isStoragePath,
+  isVideoPath,
   mediaMetaOf,
+  rippleMedia,
   variantPath,
+  videoIdOf,
   type MediaMeta,
   type MediaVariant,
 } from '@/lib/ripple-media';
+import { thumbnailUrl } from '@/lib/youtube';
 import { storage } from '@/lib/storage';
 
 /** Long enough to load a sheet, short enough that a leaked URL rots fast. */
@@ -201,5 +205,88 @@ export async function signBoardPhotos(
   } catch (error) {
     reportSigningFailure(error);
     return unsigned;
+  }
+}
+
+/** How long a shared image waits for one video's thumbnail before drawing the plain tile. */
+const THUMB_TIMEOUT_MS = 3000;
+/** A thumbnail larger than this is not one: the plain tile instead. */
+const THUMB_MAX_BYTES = 512 * 1024;
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/**
+ * The media a shared image draws (H63): mine alone. The same check as
+ * `signBoardPhotos`, through the viewer's own session, and one more — the
+ * ripple an item hangs on must be written by the viewer. Someone else's
+ * photo or video is never signed or fetched for an export, whatever the
+ * browser asks: the image keeps others' records as shapes, and this is
+ * where that cannot be got round. Photos are signed fresh (the sheet may
+ * outlive the board's five-minute URLs); a video (`yt:<id>`) must be one the
+ * ripple's own words link to, its id YouTube's eleven characters, and its
+ * thumbnail is fetched here from a URL built here — never one the browser
+ * names — and returned as a data URL; `null` draws the plain tile.
+ */
+export async function signExportMedia(
+  items: { rippleId: string; path: string }[],
+): Promise<SignedMedia> {
+  const unsigned = unsignedMedia(items.map((p) => p.path));
+  if (items.length === 0) return unsigned;
+
+  try {
+    const supabase = await createClient();
+    const user = await getAuthUser(supabase);
+    if (!user) return unsigned;
+    const { data: rows } = await supabase
+      .from('ripples')
+      .select('id, media, media_meta, note, video_previews, author_id')
+      .in('id', [...new Set(items.map((p) => p.rippleId))])
+      .eq('author_id', user.id);
+    // Each ripple's own items, read from its row: photos it stores, videos its words link to.
+    const itemsOf = new Map(
+      (rows ?? []).map((row) => [row.id, new Set(rippleMedia(row).map((m) => m.path))]),
+    );
+    const carried = (p: { rippleId: string; path: string }): boolean =>
+      itemsOf.get(p.rippleId)?.has(p.path) === true;
+    const meta: MediaMeta = Object.assign(
+      {},
+      ...(rows ?? []).map((r) => mediaMetaOf(r.media_meta)),
+    );
+    const photos = [
+      ...new Set(items.flatMap((p) => (isStoragePath(p.path) && carried(p) ? [p.path] : []))),
+    ];
+    const videos = [
+      ...new Set(
+        items.flatMap((p) =>
+          isVideoPath(p.path) && VIDEO_ID.test(videoIdOf(p.path)) && carried(p) ? [p.path] : [],
+        ),
+      ),
+    ];
+    const [signed, thumbs] = await Promise.all([
+      photos.length > 0 ? signVariants(photos, meta, 'display') : new Map<string, string>(),
+      Promise.all(videos.map(async (path) => [path, await videoThumb(videoIdOf(path))] as const)),
+    ]);
+    return { ...unsigned, ...Object.fromEntries(signed), ...Object.fromEntries(thumbs) };
+  } catch (error) {
+    reportSigningFailure(error);
+    return unsigned;
+  }
+}
+
+/** A video's thumbnail as a data URL, from the URL YouTube's id makes; `null` on any failure. */
+async function videoThumb(id: string): Promise<string | null> {
+  if (!VIDEO_ID.test(id)) return null;
+  try {
+    const response = await fetch(thumbnailUrl(id), {
+      signal: AbortSignal.timeout(THUMB_TIMEOUT_MS),
+      redirect: 'error',
+      cache: 'no-store',
+    });
+    const type = response.headers.get('content-type') ?? '';
+    if (!response.ok || !type.startsWith('image/')) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > THUMB_MAX_BYTES) return null;
+    return `data:${type.split(';')[0]};base64,${bytes.toString('base64')}`;
+  } catch {
+    return null;
   }
 }

@@ -48,6 +48,12 @@ export type Card = {
   authorId?: string;
   /** In a pool: their name, written out under the mark and on the row (review). */
   authorName?: string;
+  /**
+   * Made by me (H63): my own record, or a joint one I started. A shared image
+   * draws only these with their title; anything else, absent included, is a
+   * shape with no words.
+   */
+  madeByMe?: boolean;
   /** A joint splash (H23), wherever it is drawn: its mark and its row are a pill, not a disc (review). */
   joint?: boolean;
   /**
@@ -168,6 +174,8 @@ export type CardRipple = {
   authorId?: string;
   /** In a pool: their name, written out in labels (review). */
   authorName?: string;
+  /** Written by me (H63): only these ripples' words and photos reach a shared image. Absent is someone else's. */
+  byMe?: boolean;
 };
 
 /** What a card names as its lane: an emoji and a name. */

@@ -100,6 +100,17 @@ The tests that call these (`tests/conversions-db.test.ts`'s fixtures, `tests/poo
 6. **Bob z-order:** stacking is wrong while cards bob.
 7. **Layout's stacking:** put stacking order on the position slider, with a label a non-developer reads, not "z-index".
 
+## Share as image, phase 2 (H63, after friends use phase 1)
+
+- **The Lane view** (pool and Home): lanes across, the range's days down, empty days compressed as the grid does; up to 8 columns at even width, past 8 the 8 with the most records in the range; scaled to fit, never below 0.8, then each day's newest and *+n*. Lane names behind *Show pool name and faces* in a pool, emoji only by default.
+- **The Members view** (pool): member columns; with the switch off, my column with my face and the others' neutral discs with no initials; an Everyone band not mine as a pale shape band across the columns.
+- **A custom range**: two dates, at most 42 days; up to 7 days takes the week's two rows, longer the month's layout over its weeks.
+- **A range variant of `layoutMonthBoard`**: whole weeks from the first date's week to the last date's, days outside the range drawn as a month's days around it are; the largest piece of layout work here.
+- **The view picker** in the sheet: only the views the place has (Home: Calendar, Lane).
+- **Phase 1's gap, after the iPhone test** (2026-10-29; videos were drawn before it, H63):
+  - **A floor on scaling the Calendar down**: today a board too full for the page scales down with no limit; hold it at 0.8, and past that draw each day's newest pieces and a *+n*.
+- On R2, the bucket's CORS must allow GET from the site's origins (the R2 entry below).
+
 ## Later, unscheduled
 
 Home Weekly zoom; one year ago today; background auto-collection (timeline autofill; Spotify first); Lists UI and multi-pool routing settings; notifications (Splash opened / Swim started / Link request only, max 2/day); Splash-born ephemeral pools; open/searchable pools; desktop score layout + ambient window; couple weekly grouping on Splash; recurrence engine; note-convention parsing; photo book export; dark mode (night pool); TTL setting UI (instant/1d/3d/7d).
