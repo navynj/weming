@@ -108,6 +108,19 @@ const view = (ownerId: string, inviteAllByDefault = false): PoolView => ({
   invites: [],
 });
 
+describe('the heading of the pool’s settings', () => {
+  it('ends in a small Log out that posts to the sign-out route', () => {
+    const { container } = settings(view('u-me'), 'pool');
+    const out = container.ownerDocument.querySelector('[data-sign-out]')!;
+    expect(out.textContent).toBe('Log out');
+    const form = out.closest('form')!;
+    expect(form.getAttribute('action')).toBe('/auth/sign-out');
+    expect(form.getAttribute('method')).toBe('post');
+    // On the title's own line.
+    expect(form.parentElement?.querySelector('h2')?.textContent).toBe('Pool settings');
+  });
+});
+
 describe('renaming the pool in settings (0021, 0059)', () => {
   it('is offered to its creator, shows at once, and saves trimmed', async () => {
     const { container } = settings(view('u-me'), 'pool');

@@ -15,7 +15,16 @@ export type SettingsTab = { key: string; label: string; render: () => ReactNode 
  * and Theme; a pool's, Pool, Theme and Advanced. Its heading and tabs stay
  * pinned; a tab draws at once from what the place already holds.
  */
-export function SettingsSheet({ title, tabs }: { title: string; tabs: SettingsTab[] }) {
+export function SettingsSheet({
+  title,
+  tabs,
+  signOut = false,
+}: {
+  title: string;
+  tabs: SettingsTab[];
+  /** A small "Log out" at the heading's right end (a pool's settings). */
+  signOut?: boolean;
+}) {
   const { tab, select, close } = useSettings();
   if (!tab) return null;
   const current = tabs.find((t) => t.key === tab) ?? tabs[0];
@@ -26,7 +35,21 @@ export function SettingsSheet({ title, tabs }: { title: string; tabs: SettingsTa
         data-settings-sheet={current.key}
         className="flex flex-col gap-3 pt-2 pb-4"
       >
-        <h2 className="text-main-900 text-2xl font-semibold">{title}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-main-900 text-2xl font-semibold">{title}</h2>
+          {signOut ? (
+            // A plain form post: the route signs out and sends me to sign in.
+            <form action="/auth/sign-out" method="post">
+              <button
+                type="submit"
+                data-sign-out
+                className="text-pool-500 px-1 py-1 text-xs font-medium"
+              >
+                Log out
+              </button>
+            </form>
+          ) : null}
+        </div>
         <UnderlineTabs
           tabs={tabs}
           current={current.key}
