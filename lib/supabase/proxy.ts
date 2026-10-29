@@ -46,14 +46,19 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
 
   // Refreshes the session cookie. Must stay directly after createServerClient:
   // anything between the two can cause hard-to-debug random sign-outs.
-  const result = await withDeadline(supabase.auth.getUser(), AUTH_DEADLINE_MS);
+  // getClaims, not getUser (2026-10-28): the project signs with an ES256 key,
+  // so the token's signature is checked here against the published key (one
+  // fetch per ten minutes per instance) instead of asking the auth server on
+  // every request; under load that ask hit this deadline again and again.
+  // A token is trusted until it expires, as PostgREST trusts it for the data.
+  const result = await withDeadline(supabase.auth.getClaims(), AUTH_DEADLINE_MS);
 
   if (result === 'deadline-exceeded') {
     return unreachable(request, response, pathname);
   }
 
   const { data, error } = result;
-  const user = data.user;
+  const user = data?.claims.sub ?? null;
 
   // "Cannot reach Supabase" is not "not signed in". Saying so costs nothing
   // and saves the next person from reading a redirect to sign-in as a bug in
