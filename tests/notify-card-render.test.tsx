@@ -64,10 +64,15 @@ describe('the Get notified popup after joining, opening a pool, or a first sign-
     expect(container.querySelector('[role="switch"]')).toBeNull();
   });
 
-  it('goes with Not now, the flag taken off the URL, nothing saved', () => {
+  it('goes with Not now, the flag taken off the URL, nothing saved', async () => {
     const replace = vi.spyOn(window.history, 'replaceState');
     const { container } = popup();
-    fireEvent.click(container.querySelector('[data-notify-not-now]')!);
+    const notNow = await waitFor(() => {
+      const found = container.querySelector('[data-notify-not-now]');
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    fireEvent.click(notNow);
     expect(container.querySelector('[data-notify-card]')).toBeNull();
     expect(replace).toHaveBeenCalledWith(null, '', '/pool/p-a');
     expect(saved).toEqual([]);
@@ -112,10 +117,20 @@ describe('Turn on notifications does what the device needs (review)', () => {
     expect(device.calls).toEqual([]);
   });
 
-  it('says so, with no button, when they are already on', async () => {
+  // Yoonji, in the session: on for this device, no popup.
+  it('is not shown when they are already on for this device, the flag taken off the URL', async () => {
     device.state = 'on';
+    const replace = vi.spyOn(window.history, 'replaceState');
     const { container } = popup();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(null, '', '/pool/p-a'));
+    expect(container.querySelector('[data-notify-card]')).toBeNull();
+    replace.mockRestore();
+  });
+
+  it('stays to say they are on, once turned on from it', async () => {
+    const { container } = popup();
+    await press(container);
     await waitFor(() => expect(container.querySelector('[data-push-on]')).not.toBeNull());
-    expect(container.querySelector('[data-turn-on-notifications]')).toBeNull();
+    expect(container.querySelector('[data-notify-card]')).not.toBeNull();
   });
 });
