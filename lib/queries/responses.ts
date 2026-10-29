@@ -85,28 +85,32 @@ export async function getResponsesOnMine(
   return out;
 }
 
-/** The newest response by someone else on my ripples in these splashes: the pool dot's other half (H25). */
-export async function latestResponseOnMine(
+/**
+ * Every response by someone else on my ripples in these splashes, each with
+ * the pool whose thread it is in (0053; null: from no pool): the pool dot's
+ * other half (H25). A pool's dot counts only its own thread's — what the
+ * pool's page shows — never one left in another pool, or on my Home.
+ */
+export async function responsesOnMine(
   supabase: DuringClient,
   me: string,
   splashIds: string[],
-): Promise<Map<string, string>> {
-  const latest = new Map<string, string>();
-  if (splashIds.length === 0) return latest;
+): Promise<{ splashId: string; pool: string | null; at: string }[]> {
+  if (splashIds.length === 0) return [];
   const { data: ripples, error } = await supabase
     .from('ripples')
     .select('id, splash_id')
     .in('splash_id', splashIds)
     .eq('author_id', me);
   if (error) throw error;
-  const times = await getResponsesOnMine(
-    supabase,
-    me,
-    ripples.flatMap((r) => (r.splash_id ? [{ id: r.id, splashKey: r.splash_id }] : [])),
-  );
-  for (const [splashId, byRipple] of Object.entries(times)) {
-    const newest = Object.values(byRipple).sort().at(-1);
-    if (newest) latest.set(splashId, newest);
-  }
-  return latest;
+  const splashOf = new Map(ripples.flatMap((r) => (r.splash_id ? [[r.id, r.splash_id]] : [])));
+  const value = await getRippleResponses(supabase, [...splashOf.keys()]);
+  const rows = [
+    ...value.reactions.map((r) => ({ ripple: r.ripple_id, who: r.user_id, r })),
+    ...value.replies.map((r) => ({ ripple: r.ripple_id, who: r.author_id, r })),
+  ];
+  return rows.flatMap(({ ripple, who, r }) => {
+    const splashId = splashOf.get(ripple);
+    return splashId && who !== me ? [{ splashId, pool: r.thread_pool_id, at: r.created_at }] : [];
+  });
 }

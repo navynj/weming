@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { asAdmin, asUser } from './as-user';
 import { othersLeave } from './pool-helpers';
+import { getPoolActivity } from '@/lib/queries/pools';
 
 /**
  * Replies and reactions follow threads (0053): the leak found in production,
@@ -106,6 +107,28 @@ afterAll(async () => {
   await admin.from('splashes').delete().eq('id', record);
   for (const id of pools) await admin.from('pools').delete().eq('id', id);
   for (const id of people) await admin.auth.admin.deleteUser(id);
+});
+
+describe('the pool dot follows the thread too (review)', () => {
+  it('lights only the pool a reaction was left in, not another the record is in', async () => {
+    const left = await asUser(cal)
+      .from('ripple_reactions')
+      .insert({ ripple_id: ripple, user_id: cal, emoji: '👀', thread_pool_id: beta });
+    expect(left.error).toBeNull();
+    try {
+      const activity = await getPoolActivity(asUser(ana), ana, [alpha, beta]);
+      expect(activity.has(beta)).toBe(true);
+      // Ben, in Alpha, cannot see it: Alpha has nothing new for Ana.
+      expect(activity.has(alpha)).toBe(false);
+    } finally {
+      await asAdmin()
+        .from('ripple_reactions')
+        .delete()
+        .eq('ripple_id', ripple)
+        .eq('user_id', cal)
+        .eq('emoji', '👀');
+    }
+  });
 });
 
 describe('a reply belongs to the pool it was written in (0053)', () => {

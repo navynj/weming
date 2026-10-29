@@ -12,7 +12,7 @@ import {
   getLockedIds,
   getRippleResponses,
   getResponsesOnMine,
-  latestResponseOnMine,
+  responsesOnMine,
 } from '@/lib/queries/responses';
 
 export type PoolRow = Database['public']['Tables']['pools']['Row'];
@@ -205,26 +205,34 @@ export async function getPoolActivity(
   ]);
   if (placements.error) throw placements.error;
   if (joints.error) throw joints.error;
-  const poolOf = new Map<string, string>();
-  for (const p of placements.data) poolOf.set(p.splash_id, p.pool_id);
-  for (const j of joints.data) if (j.pool_id) poolOf.set(j.id, j.pool_id);
-  if (poolOf.size === 0) return latest;
-  const { data: ripples, error } = await supabase
-    .from('ripples')
-    .select('splash_id, created_at')
-    .in('splash_id', [...poolOf.keys()])
-    .neq('author_id', me);
-  if (error) throw error;
-  const note = (splashId: string | null, at: string) => {
-    const pool = splashId ? poolOf.get(splashId) : undefined;
-    if (!pool) return;
+  // A splash shared to several of my pools is in each of them.
+  const poolsOf = new Map<string, Set<string>>();
+  const place = (splashId: string, pool: string) =>
+    (poolsOf.get(splashId) ?? poolsOf.set(splashId, new Set()).get(splashId)!).add(pool);
+  for (const p of placements.data) place(p.splash_id, p.pool_id);
+  for (const j of joints.data) if (j.pool_id) place(j.id, j.pool_id);
+  if (poolsOf.size === 0) return latest;
+  const note = (pool: string, at: string) => {
     const seen = latest.get(pool);
     if (!seen || at > seen) latest.set(pool, at);
   };
-  for (const r of ripples) note(r.splash_id, r.created_at);
-  // Reactions and replies on my ripples there count too (H25).
-  const responded = await latestResponseOnMine(supabase, me, [...poolOf.keys()]);
-  for (const [splashId, at] of responded) note(splashId, at);
+  const splashIds = [...poolsOf.keys()];
+  const [{ data: ripples, error }, responded] = await Promise.all([
+    supabase
+      .from('ripples')
+      .select('splash_id, created_at')
+      .in('splash_id', splashIds)
+      .neq('author_id', me),
+    // Reactions and replies on my ripples there count too (H25), each in its own pool's thread.
+    responsesOnMine(supabase, me, splashIds),
+  ]);
+  if (error) throw error;
+  for (const r of ripples) {
+    for (const pool of (r.splash_id && poolsOf.get(r.splash_id)) || []) note(pool, r.created_at);
+  }
+  for (const r of responded) {
+    if (r.pool && poolsOf.get(r.splashId)?.has(r.pool)) note(r.pool, r.at);
+  }
   return latest;
 }
 
