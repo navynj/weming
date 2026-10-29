@@ -106,7 +106,6 @@ export function HomeGround({
   const [newLane, setNewLane] = useState(false);
   // The gear's sheet (0059), and my profile from my face.
   const settings = useSettings();
-  const [lanesRound, setLanesRound] = useState(0);
   const [profile, setProfile] = useState(false);
   const { me } = usePeople();
   // Every visit opens on the Calendar, not the view used last (review); a
@@ -494,14 +493,7 @@ export function HomeGround({
             render: () => (
               <section data-settings-lanes className="flex flex-col gap-3">
                 <h2 className="text-ink font-semibold">My lanes</h2>
-                {/* Cancel or Save starts the rows afresh from Home's lanes. */}
-                <LanesSheet
-                  key={lanesRound}
-                  categories={lanes.value}
-                  apply={lanes.run}
-                  message={lanes.message}
-                  onClose={() => setLanesRound((n) => n + 1)}
-                />
+                <LanesSheet categories={lanes.value} apply={lanes.run} message={lanes.message} />
               </section>
             ),
           },

@@ -8,28 +8,24 @@ import { LaneRows } from './lane-rows';
 
 /**
  * My lanes, in the settings sheet's Home tab (0059): the lane rows (H42b)
- * over Home's optimistic lane state. A lane with records refuses deletion
- * and says so (H19).
+ * over Home's optimistic lane state, each change saved as it is made. A
+ * lane with records refuses deletion and says so (H19).
  */
 export function LanesSheet({
   categories,
   apply,
   message,
-  onClose,
 }: {
   categories: MyCategory[];
   apply: ReturnType<typeof useOptimisticAction<MyCategory[]>>['run'];
   /** The last refusal, from Home's optimistic lane state. */
   message?: string | null;
-  /** Ends an edit (the tab starts the rows afresh). */
-  onClose: () => void;
 }) {
   return (
     <LaneRows
       lanes={categories}
       apply={apply}
       message={message}
-      onDone={onClose}
       save={({ id, name, icon }) => saveLane({ id, name, icon })}
       reorder={reorderLanes}
       remove={deleteLane}

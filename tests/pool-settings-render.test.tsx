@@ -339,7 +339,7 @@ describe('the pool’s lanes are Home’s lane rows (H42b)', () => {
     lanes: [lane('l-a', 'Work', 0), lane('l-b', 'Play', 1)],
   });
 
-  it('reorders by the grip, for any current member, saved as one order', async () => {
+  it('reorders by the grip, for any current member, saved as one order at once', async () => {
     const { container } = settings(withLanes('u-other'), 'pool');
     const editor = container.querySelector('[data-pool-lanes-editor]')!;
     expect(editor.querySelectorAll('[data-lane-grip]')).toHaveLength(2);
@@ -351,27 +351,32 @@ describe('the pool’s lanes are Home’s lane rows (H42b)', () => {
     expect(
       [...editor.querySelectorAll('[data-lane-row]')].map((r) => r.getAttribute('data-lane-row')),
     ).toEqual(['l-b', 'l-a']);
-    fireEvent.click(editor.querySelector('[data-lanes-save]')!);
+    // No Save: the move is the write.
+    expect(editor.querySelector('[data-lanes-save]')).toBeNull();
     await waitFor(() => expect(laneWrites).toEqual([['reorder', 'p-a', ['l-b', 'l-a']]]));
   });
 
-  it('adds a lane in a row of its own, then orders it by the id it is given', async () => {
+  it('saves each row as it is left, a new one then ordered by the id it is given', async () => {
     const { container } = settings(withLanes('u-me'), 'pool');
     const editor = container.querySelector('[data-pool-lanes-editor]') as HTMLElement;
     fireEvent.click(editor.querySelector('[data-add-lane]')!);
     const names = within(editor).getAllByLabelText('Lane name') as HTMLInputElement[];
     expect(names).toHaveLength(3);
-    fireEvent.change(names[2]!, { target: { value: '  Trips ' } });
-    fireEvent.change(within(editor).getAllByLabelText('Lane description')[0]!, {
-      target: { value: 'Office days' },
-    });
-    fireEvent.click(editor.querySelector('[data-lanes-save]')!);
+    const description = within(editor).getAllByLabelText('Lane description')[0]!;
+    fireEvent.change(description, { target: { value: 'Office days' } });
+    fireEvent.blur(description);
     await waitFor(() =>
       expect(laneWrites).toEqual([
         [
           'save',
           { id: 'l-a', poolId: 'p-a', name: 'Work', icon: '🌊', description: 'Office days' },
         ],
+      ]),
+    );
+    fireEvent.change(names[2]!, { target: { value: '  Trips ' } });
+    fireEvent.blur(names[2]!);
+    await waitFor(() =>
+      expect(laneWrites.slice(1)).toEqual([
         ['save', { id: null, poolId: 'p-a', name: 'Trips', icon: null, description: null }],
         ['reorder', 'p-a', ['l-a', 'l-b', 'l-new']],
       ]),
