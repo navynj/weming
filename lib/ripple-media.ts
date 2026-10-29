@@ -11,6 +11,27 @@ export function videoIdOf(path: string): string {
   return path.slice(VIDEO_PREFIX.length);
 }
 
+/**
+ * A photo the app ships rather than one the author uploaded (H58): `app:` and
+ * a file under `public/`, one copy for every account. Never a storage path,
+ * so it is never signed and never removed.
+ */
+export const APP_ASSET_PREFIX = 'app:';
+
+export function isAppAsset(path: string): boolean {
+  return path.startsWith(APP_ASSET_PREFIX);
+}
+
+/** Where the browser loads an app asset from: same origin, no signing. */
+export function appAssetUrl(path: string): string {
+  return `/${path.slice(APP_ASSET_PREFIX.length)}`;
+}
+
+/** A path that names an object in the media bucket. */
+export function isStoragePath(path: string): boolean {
+  return !isVideoPath(path) && !isAppAsset(path);
+}
+
 /** One media item of a ripple: a photo by its storage path, or a video its words link to. */
 export type RippleMediaItem = { rippleId: string; path: string; video?: YouTubeVideo };
 

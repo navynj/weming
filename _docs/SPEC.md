@@ -251,7 +251,7 @@ One voice: **invitation, never absence, never a nudge** (H19). No exclamation ma
 
 ## 10. Open items
 
-- Onboarding flow beyond functional empty states (first drop before first invite; "everyone's submerged" roster copy).
+- Onboarding flow beyond functional empty states and the welcome splash (H58) (first drop before first invite; "everyone's submerged" roster copy).
 - Home-Lanes-Detail person/pool filter chips in mockup: undecided whether that view includes others' content (would be a new axis decision) or is mine-only (then remove chips).
 - Friend-rail wave unification; quiet-day row compression thresholds.
 - Swim focus screen: lane card enlarged + my timer, nothing more (one-liner, P3).

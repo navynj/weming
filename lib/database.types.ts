@@ -883,6 +883,7 @@ export type Database = {
           theme_color: string
           theme_mode: string
           timezone: string
+          welcome_splash_created: boolean
         }
         Insert: {
           avatar_path?: string | null
@@ -895,6 +896,7 @@ export type Database = {
           theme_color?: string
           theme_mode?: string
           timezone?: string
+          welcome_splash_created?: boolean
         }
         Update: {
           avatar_path?: string | null
@@ -907,6 +909,7 @@ export type Database = {
           theme_color?: string
           theme_mode?: string
           timezone?: string
+          welcome_splash_created?: boolean
         }
         Relationships: []
       }

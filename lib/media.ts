@@ -7,6 +7,7 @@ import { supabaseServiceRoleKey, supabaseUrl } from '@/lib/env';
 import { getAuthUser } from '@/lib/queries/profile';
 import { createClient } from '@/lib/supabase/server';
 import { MEDIA_BUCKET } from '@/lib/media-bucket';
+import { appAssetUrl, isAppAsset, isStoragePath } from '@/lib/ripple-media';
 
 /** Long enough to load a sheet, short enough that a leaked URL rots fast. */
 const SIGNED_URL_TTL_SECONDS = 300;
@@ -27,6 +28,13 @@ function serviceClient() {
   return createServiceClient<Database>(supabaseUrl(), supabaseServiceRoleKey(), {
     auth: { persistSession: false },
   });
+}
+
+/** Every path, before signing: `null`, except an app asset (H58), already its URL. */
+function unsignedMedia(paths: string[]): SignedMedia {
+  return Object.fromEntries(
+    paths.map((path) => [path, isAppAsset(path) ? appAssetUrl(path) : null]),
+  );
 }
 
 function reportSigningFailure(error: unknown): void {
@@ -61,15 +69,26 @@ export async function signRippleMedia(rippleId: string): Promise<string[]> {
 
     if (!ripple || ripple.media.length === 0) return [];
 
-    const { data, error } = await serviceClient()
-      .storage.from(MEDIA_BUCKET)
-      .createSignedUrls(ripple.media, SIGNED_URL_TTL_SECONDS);
-
-    if (error) {
-      reportSigningFailure(error);
-      return [];
+    // An app asset (H58) needs no signing; the rest keep their order around it.
+    const stored = ripple.media.filter(isStoragePath);
+    const signed = new Map<string, string>();
+    if (stored.length > 0) {
+      const { data, error } = await serviceClient()
+        .storage.from(MEDIA_BUCKET)
+        .createSignedUrls(stored, SIGNED_URL_TTL_SECONDS);
+      if (error) {
+        reportSigningFailure(error);
+        return [];
+      }
+      for (const entry of data) {
+        if (entry.signedUrl && entry.path) signed.set(entry.path, entry.signedUrl);
+      }
     }
-    return data.flatMap((entry) => (entry.signedUrl ? [entry.signedUrl] : []));
+    return ripple.media.flatMap((path) => {
+      if (isAppAsset(path)) return [appAssetUrl(path)];
+      const url = signed.get(path);
+      return url ? [url] : [];
+    });
   } catch (error) {
     reportSigningFailure(error);
     return [];
@@ -85,8 +104,10 @@ export async function signRippleMedia(rippleId: string): Promise<string[]> {
  * cannot reach storage should fail loudly, with the variable named.
  */
 export async function removeRippleMedia(paths: string[]): Promise<void> {
-  if (paths.length === 0) return;
-  await serviceClient().storage.from(MEDIA_BUCKET).remove(paths);
+  // An app asset (H58) is every account's one copy: never the record's to remove.
+  const stored = paths.filter(isStoragePath);
+  if (stored.length === 0) return;
+  await serviceClient().storage.from(MEDIA_BUCKET).remove(stored);
 }
 
 /**
@@ -103,7 +124,7 @@ export async function removeRippleMedia(paths: string[]): Promise<void> {
  * page draws placeholders; it does not fall over.
  */
 export async function signOwnMedia(paths: string[]): Promise<SignedMedia> {
-  const unsigned: SignedMedia = Object.fromEntries(paths.map((path) => [path, null]));
+  const unsigned = unsignedMedia(paths);
   if (paths.length === 0) return unsigned;
 
   try {
@@ -150,7 +171,7 @@ export async function signOwnMedia(paths: string[]): Promise<SignedMedia> {
 export async function signBoardPhotos(
   photos: { rippleId: string; path: string }[],
 ): Promise<SignedMedia> {
-  const unsigned: SignedMedia = Object.fromEntries(photos.map((p) => [p.path, null]));
+  const unsigned = unsignedMedia(photos.map((p) => p.path));
   if (photos.length === 0) return unsigned;
 
   try {
@@ -162,7 +183,9 @@ export async function signBoardPhotos(
     const mediaOf = new Map((rows ?? []).map((row) => [row.id, row.media]));
     const visible = [
       ...new Set(
-        photos.flatMap((p) => (mediaOf.get(p.rippleId)?.includes(p.path) ? [p.path] : [])),
+        photos.flatMap((p) =>
+          isStoragePath(p.path) && mediaOf.get(p.rippleId)?.includes(p.path) ? [p.path] : [],
+        ),
       ),
     ];
     if (visible.length === 0) return unsigned;

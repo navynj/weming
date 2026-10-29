@@ -10,3 +10,11 @@ export const WELCOME_HOME = `/?${WELCOME}=1`;
 export function welcomePool(id: string): string {
   return `/pool/${id}?${WELCOME}=1`;
 }
+
+/**
+ * A first sign-in's welcome splash (H58), open over Home; closing it carries
+ * the flag on to Home, where the notifications card takes it off.
+ */
+export function welcomeSplash(id: string): string {
+  return `/splash/${id}?${WELCOME}=1`;
+}
