@@ -28,7 +28,7 @@ grep -E 'Tests ' "$out" || true
 # touches the board or what the measurements run on (review: minutes a push,
 # for nothing, otherwise); E2E=1 runs them anyway. A range git cannot name
 # (a new branch, a remote commit not here) runs them too.
-board_paths='^(features/month-board/|app/dev/|e2e/|playwright\.config\.ts$|package\.json$|pnpm-lock\.yaml$|next\.config\.ts$|app/globals\.css$)'
+board_paths='^(features/month-board/|app/dev/|e2e/|patches/|playwright\.config\.ts$|package\.json$|pnpm-lock\.yaml$|next\.config\.ts$|app/globals\.css$)'
 zero='0000000000000000000000000000000000000000'
 touched=''
 while read -r _local_ref local_sha _remote_ref remote_sha; do

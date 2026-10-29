@@ -156,6 +156,7 @@ export function scrubSpan(span: StreamedSpan): StreamedSpan {
 
 /** The contexts Sentry keeps: the runtime and the trace, which hold no one's words. */
 // `action` is a server action's steps (lib/action-timing.ts): names and times, built here.
+// `watchdog` is a stall or a blank page (lib/watchdog.ts): route patterns and times.
 const KEPT_CONTEXTS = new Set([
   'os',
   'browser',
@@ -165,9 +166,11 @@ const KEPT_CONTEXTS = new Set([
   'app',
   'culture',
   'action',
+  'watchdog',
 ]);
 /** The tags kept: the operation that failed (captureFailure), and Sentry's own. */
-const KEPT_TAGS = new Set(['op', 'runtime', 'transaction', 'url']);
+// The watchdog's (lib/watchdog.ts): a stall or a blank page, and where.
+const KEPT_TAGS = new Set(['op', 'runtime', 'transaction', 'url', 'watchdog', 'route']);
 
 /** Every error event, before it leaves: the fields above and nothing more. */
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
@@ -189,7 +192,15 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
     // The active span's attributes ride along on an error, as on a span.
     const trace = event.contexts.trace;
     if (trace?.data) trace.data = scrubAttributes(trace.data);
+    // Route patterns and timings by construction; patterns again here, in case.
+    const watchdog = event.contexts.watchdog;
+    if (watchdog) {
+      for (const [key, value] of Object.entries(watchdog)) {
+        if (typeof value === 'string') watchdog[key] = scrubName(value);
+      }
+    }
   }
+  if (event.tags?.route !== undefined) event.tags.route = scrubName(String(event.tags.route));
   if (event.tags) {
     for (const key of Object.keys(event.tags)) {
       if (!KEPT_TAGS.has(key)) delete event.tags[key];

@@ -88,9 +88,11 @@ export function GroundFoot({
   // In full, only the two places I went to last (not every place: the
   // storm): a switch to either draws from the router's cache, and
   // FreshOnArrival reads it again behind. Kept warm when an action
-  // invalidates them, at most once in WARM_MS each. Every other place is
-  // prefetched when the hand reaches for it (Place). One slot is enough;
-  // the other is the same places.
+  // invalidates them, at most once in WARM_MS each. Every other place loads
+  // on its tap, behind the skeleton (PendingPlace): a prefetch at the press
+  // raced the tap's own navigation, and a fast switch left a place whose
+  // page rendered nothing until a reload (2026-10-29, e2e/fast-switch).
+  // One slot is enough; the other is the same places.
   const router = useRouter();
   const place = atHome ? '/' : poolId ? poolPath(poolId) : null;
   const hrefs = ['/', ...pools.map((pool) => poolPath(pool.id))].join(' ');
@@ -110,7 +112,6 @@ export function GroundFoot({
       timers.forEach(clearTimeout);
     };
   }, [place, hrefs, router, wide]);
-  const reach = (href: string): void => void prefetchFull(router, href);
 
   return (
     <div
@@ -137,7 +138,6 @@ export function GroundFoot({
           label={atHome ? homeLabel : 'Home'}
           href="/"
           onTap={atHome ? onHome : undefined}
-          onReach={reach}
           pending={<PendingPlace here="home" />}
           shape="circle"
           data={{ 'data-home-tab': '', 'data-strip-home': '' }}
@@ -157,7 +157,6 @@ export function GroundFoot({
               label={current ? (poolLabel ?? pool.name) : pool.name}
               href={poolPath(pool.id)}
               onTap={current ? onPool : undefined}
-              onReach={reach}
               dot={pool.fresh && !current}
               pending={<PendingPlace here="pool" poolId={pool.id} />}
               shape="square"
@@ -199,7 +198,6 @@ function Place({
   label,
   href,
   onTap,
-  onReach,
   dot = false,
   pending,
   shape,
@@ -210,8 +208,6 @@ function Place({
   label?: string;
   href: string;
   onTap?: () => void;
-  /** The hand reaching for it — a press or a hover: prefetch it in full now. */
-  onReach: (href: string) => void;
   dot?: boolean;
   /** Drawn inside the link, so it can read whether a tap on it is waiting. */
   pending?: ReactNode;
@@ -247,20 +243,9 @@ function Place({
       </button>
     );
   }
-  const reach = (): void => onReach(href);
   return (
-    // Never on sight (the storm): in full when the hand reaches for it, the
-    // place's data with it, or ahead of time if it is one of the last two.
-    <Link
-      href={href}
-      prefetch={false}
-      onPointerDown={reach}
-      onTouchStart={reach}
-      onMouseEnter={reach}
-      aria-label={label}
-      className={className}
-      {...data}
-    >
+    // Never on sight (the storm), and never at the press: see GroundFoot.
+    <Link href={href} prefetch={false} aria-label={label} className={className} {...data}>
       {body}
       {pending}
     </Link>
