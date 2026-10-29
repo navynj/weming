@@ -27,7 +27,6 @@ export function PoolSettingsSheet({ view, me }: { view: PoolView; me: string }) 
   return (
     <SettingsSheet
       title="Pool settings"
-      signOut
       tabs={[
         { key: 'pool', label: 'Pool', render: () => <PoolTab view={view} /> },
         { key: 'theme', label: 'Theme', render: () => <ThemePicker /> },

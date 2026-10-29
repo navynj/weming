@@ -13,18 +13,10 @@ export type SettingsTab = { key: string; label: string; render: () => ReactNode 
  * Settings (0059), a bottom sheet over the place it is opened from, as a
  * splash's detail is (its size, its drag, back to close): Home's tabs, Home
  * and Theme; a pool's, Pool, Theme and Advanced. Its heading and tabs stay
- * pinned; a tab draws at once from what the place already holds.
+ * pinned; a tab draws at once from what the place already holds. A small
+ * "Log out" sits at the heading's right end, the same on Home and a pool.
  */
-export function SettingsSheet({
-  title,
-  tabs,
-  signOut = false,
-}: {
-  title: string;
-  tabs: SettingsTab[];
-  /** A small "Log out" at the heading's right end (a pool's settings). */
-  signOut?: boolean;
-}) {
+export function SettingsSheet({ title, tabs }: { title: string; tabs: SettingsTab[] }) {
   const { tab, select, close } = useSettings();
   if (!tab) return null;
   const current = tabs.find((t) => t.key === tab) ?? tabs[0];
@@ -37,18 +29,16 @@ export function SettingsSheet({
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-main-900 text-2xl font-semibold">{title}</h2>
-          {signOut ? (
-            // A plain form post: the route signs out and sends me to sign in.
-            <form action="/auth/sign-out" method="post">
-              <button
-                type="submit"
-                data-sign-out
-                className="text-pool-500 px-1 py-1 text-xs font-medium"
-              >
-                Log out
-              </button>
-            </form>
-          ) : null}
+          {/* A plain form post: the route signs out and sends me to sign in. */}
+          <form action="/auth/sign-out" method="post">
+            <button
+              type="submit"
+              data-sign-out
+              className="text-pool-500 px-1 py-1 text-xs font-medium"
+            >
+              Log out
+            </button>
+          </form>
         </div>
         <UnderlineTabs
           tabs={tabs}
