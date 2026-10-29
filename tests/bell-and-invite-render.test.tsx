@@ -102,10 +102,15 @@ const invite = (over: Partial<PoolInvite>): PoolInvite =>
   }) as PoolInvite;
 
 describe('invite links, in plain words (0059)', () => {
-  it('says Make a link, Copy and Turn off link, and asks before turning one off', async () => {
+  it('offers a working link to Copy, Make a new link small under it, and asks before turning one off', async () => {
     const { container, getByText } = render(<InvitePanel poolId="p-a" invites={[invite({})]} />);
-    expect(getByText('Make a link')).toBeTruthy();
-    expect(getByText('Copy')).toBeTruthy();
+    // The whole URL, the domain with it.
+    expect(container.querySelector('[data-invite-url]')!.textContent).toMatch(
+      /^https?:\/\/[^/]+\/join\/abc$/,
+    );
+    expect(container.querySelector('[data-invite-current]')!.textContent).toContain('Works until');
+    expect(getByText('Copy link').className).toContain('bg-main-900');
+    expect(getByText('Make a new link').className).toContain('underline');
     fireEvent.click(getByText('Turn off link'));
     expect(container.querySelector('[data-invite-confirm]')!.textContent).toContain(
       'Turn off this link? Anyone who has it won’t be able to join with it. You can make a new one anytime.',
@@ -134,6 +139,70 @@ describe('invite links, in plain words (0059)', () => {
       expect(row.querySelector('[data-copy-invite], [data-revoke-invite]')).toBeNull();
     }
     expect(container.textContent).not.toMatch(/revoke|token/i);
+  });
+});
+
+describe('the invite sheet’s one blue button (review)', () => {
+  it('is Make a link with no working link, and the link it makes is there to copy at once', async () => {
+    const { container, getByText, queryByText } = render(
+      <InvitePanel
+        poolId="p-a"
+        invites={[invite({ id: 'i-old', token: 'old', expires_at: '2020-01-01T00:00:00Z' })]}
+      />,
+    );
+    expect(getByText('Make a link').className).toContain('bg-main-900');
+    expect(queryByText('Copy link')).toBeNull();
+    fireEvent.click(getByText('Make a link'));
+    await waitFor(() => expect(getByText('Copy link')).toBeTruthy());
+    expect(container.querySelector('[data-invite-url]')!.textContent).toMatch(/\/join\/newtoken$/);
+    expect(container.querySelector('[data-invite="old"] [data-invite-dead]')).not.toBeNull();
+  });
+
+  it('keeps the old link working when a new one is made, listed below with Turn off link', async () => {
+    const { container, getByText } = render(<InvitePanel poolId="p-a" invites={[invite({})]} />);
+    fireEvent.click(getByText('Make a new link'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-invite-current]')!.getAttribute('data-invite')).toBe(
+        'newtoken',
+      ),
+    );
+    const old = container.querySelector('[data-invite="abc"]:not([data-invite-current])')!;
+    expect(old.querySelector('[data-invite-dead]')).toBeNull();
+    expect(old.querySelector('[data-revoke-invite]')).not.toBeNull();
+    expect(turnedOff).toEqual([]);
+  });
+
+  it('copies the whole URL and reads Copied for two seconds', async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (text: string) => (written.push(text), Promise.resolve()) },
+    });
+    const { getByText, queryByText } = render(<InvitePanel poolId="p-a" invites={[invite({})]} />);
+    fireEvent.click(getByText('Copy link'));
+    await waitFor(() => expect(getByText('Copied')).toBeTruthy());
+    expect(written[0]).toMatch(/^https?:\/\/[^/]+\/join\/abc$/);
+    await waitFor(() => expect(queryByText('Copied')).toBeNull(), { timeout: 3000 });
+  });
+
+  it('shares on a phone when it can', async () => {
+    const shared: unknown[] = [];
+    const share = (data: unknown) => (shared.push(data), Promise.resolve());
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+    const media = window.matchMedia;
+    // jsdom has no matchMedia: a phone's pointer, and nothing else.
+    window.matchMedia = ((q: string) => ({
+      matches: q === '(pointer: coarse)',
+    })) as typeof window.matchMedia;
+    try {
+      const { getByText } = render(<InvitePanel poolId="p-a" invites={[invite({})]} />);
+      fireEvent.click(getByText('Copy link'));
+      await waitFor(() => expect(shared).toHaveLength(1));
+      expect((shared[0] as { url: string }).url).toMatch(/\/join\/abc$/);
+    } finally {
+      window.matchMedia = media;
+      Reflect.deleteProperty(navigator, 'share');
+    }
   });
 });
 
