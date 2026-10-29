@@ -61,6 +61,7 @@ The database holds records someone actually wrote. Everything below outranks con
 ## Stack
 
 - Next.js (App Router) + TypeScript strict. Deployed on Vercel.
+- **Next is patched** (`patches/next@16.3.5.patch`, H64): its router reused a page segment whose data had been cut off, and the page drew nothing until a reload. **On any Next upgrade, re-check every `patches/next@*.patch` against the new code** — pnpm refuses a patch that no longer applies, but one that applies can still patch the wrong thing, or a fix upstream can make it redundant — **and run `e2e/fast-switch.spec.ts` before merging.**
 - Supabase: Postgres, Auth, Storage, Realtime. Local-first development via `supabase start`. Schema changes only through migration files; never edit an applied migration.
 - Tailwind CSS. TanStack Query for server state. No global client-state library until a concrete need appears.
 - Waves are inline SVG components. No canvas in v1.
