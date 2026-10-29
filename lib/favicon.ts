@@ -7,13 +7,16 @@
  */
 export function faviconSvg(hex: string): string {
   // One line: four half-waves across the middle, quadratic arcs smoothed
-  // by T, so it reads as a sine without one being computed.
-  const line = (y: number): string => `<path d="M14 ${y}q9 -9 18 0t18 0t18 0t18 0" />`;
+  // by T, so it reads as a sine without one being computed. Three quarters
+  // of the tile's width (54 of 100), so the tile keeps a margin round the
+  // mark; the stroke stays 8, or the lines thin out at 16px.
+  const line = (y: number): string =>
+    `<path d="M23 ${y}q6.75 -6.75 13.5 0t13.5 0t13.5 0t13.5 0" />`;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">` +
     `<rect width="100" height="100" rx="24" fill="${hex}"/>` +
     `<g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round">` +
-    `${line(30)}${line(52)}${line(74)}` +
+    `${line(35.5)}${line(52)}${line(68.5)}` +
     `</g></svg>`
   );
 }
