@@ -17,7 +17,7 @@ const SAMPLE: Record<LabelStyle, string> = {
   ink: 'label-ink bg-ink text-white',
   outline: 'bg-main-900 text-white ring-1 ring-inset ring-white',
   second: 'label-ink label-second bg-ink text-white',
-  pale: 'bg-white/20 text-white',
+  pale: 'label-pale bg-white/20 text-white',
   glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
 };
 

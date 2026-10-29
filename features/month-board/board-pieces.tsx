@@ -151,11 +151,12 @@ const LABEL_CLASS: Record<LabelStyle, string> = {
   // Outline (H55): the ground's colour, edged and lettered white; the light
   // grounds' swap makes it white, edged and lettered in the colour.
   outline: 'bg-main-900 text-white ring-1 ring-inset ring-white',
-  // The rule's second fill (H55): ink on the dark ground, Outline on the
-  // light ones (label-second, globals.css).
+  // The rule's second fill (H55): ink on the dark ground, Glass on the
+  // light and pastel ones (label-second, globals.css).
   second: 'label-ink label-second bg-ink text-white',
-  // A period band's fill (review): my side on someone else's record.
-  pale: 'bg-white/20 text-white',
+  // A period band's fill (review): my side on someone else's record;
+  // Outline on the light and pastel grounds (label-pale, globals.css).
+  pale: 'label-pale bg-white/20 text-white',
   // Glass (0058): a band's fill, its edge a hairline of white drawn inside.
   glass: 'bg-white/20 text-white ring-1 ring-inset ring-white/30',
 };
@@ -165,7 +166,7 @@ const FACE_RING: Record<LabelStyle, string> = {
   white: 'ring-white',
   ink: 'ring-ink',
   outline: 'ring-main-900',
-  // White on the light grounds, where the second fill is Outline (globals.css).
+  // None on the light grounds, where the second fill is Glass (globals.css).
   second: 'ring-ink',
   pale: 'ring-transparent',
   glass: 'ring-transparent',

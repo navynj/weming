@@ -119,7 +119,7 @@ const FACES_CHARS = 4;
 /**
  * `pale`: my side on someone else's record (review), a period band's fill;
  * `second`: the rule's second fill for a together record, Black on the dark
- * ground and Outline on the light and pastel ones (H55, globals.css). Never
+ * ground and Glass on the light and pastel ones (H55, globals.css). Never
  * chosen, either.
  */
 export type LabelStyle = 'none' | 'white' | 'ink' | 'outline' | 'pale' | 'glass' | 'second';
@@ -498,7 +498,8 @@ type Plan = { recipe: Recipe; label: LabelStyle; size: StickerSize | null };
  * most once and only in a day of two or more. A record with invitees
  * (together, 0033) alternates the theme colour and the second fill with the
  * day's other such ones (H55: White and Black on the dark ground, the theme
- * colour and Outline on the light ones); everything else takes no fill. Its
+ * colour and Glass on the light ones, where a side's pale band is Outline);
+ * everything else takes no fill. Its
  * fill set by hand is the person's; a label with no fill stays so.
  */
 function planDay(cards: Card[]): Plan[] {
