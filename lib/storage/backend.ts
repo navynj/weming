@@ -77,7 +77,13 @@ export function supabaseBackend({ supabaseUrl, serviceRoleKey }: StorageConfig):
     },
 
     async get(bucket: Bucket, path: string) {
-      const { data, error } = await storage.from(bucket).download(path);
+      // A read for a backup or a rewrite must see the bytes stored now: the
+      // CDN keys the download by URL and served the old bytes of an object
+      // overwritten in place (the metadata scrub, 2026-10-29). A fresh nonce
+      // per read keeps it from answering.
+      const { data, error } = await storage
+        .from(bucket)
+        .download(path, { cacheNonce: crypto.randomUUID() }, { cache: 'no-store' });
       if (error || !data) throw failed('get', error);
       return new Uint8Array(await data.arrayBuffer());
     },
