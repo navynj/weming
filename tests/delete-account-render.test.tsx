@@ -77,12 +77,12 @@ describe('Delete my account', () => {
     await waitFor(() => expect(container.querySelector('[data-sign-in-again]')).not.toBeNull());
     expect(
       container.querySelector('[data-sign-in-again]')!.getAttribute('data-sign-in-again'),
-    ).toBe('/?settings=home&delete=1');
+    ).toBe('/?settings=advanced&delete=1');
     expect(container.querySelector('[data-delete-account-confirm]')).toBeNull();
   });
 
   it('opens by itself on the way back from signing in', async () => {
-    state.query = 'settings=home&delete=1';
+    state.query = 'settings=advanced&delete=1';
     const { container } = render(<DeleteAccount />);
     await waitFor(() =>
       expect(container.querySelector('[data-delete-account-preview]')).not.toBeNull(),

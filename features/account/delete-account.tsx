@@ -9,11 +9,11 @@ import { PoolSheet, SheetTitle } from '@/features/pool/sheet';
 import { deleteMyAccount, previewAccountDeletion, type DeletionPreview } from './actions';
 
 /** Where a fresh sign-in comes back to: this sheet, open again. */
-const RETURN_TO = '/?settings=home&delete=1';
+const RETURN_TO = '/?settings=advanced&delete=1';
 
 /**
- * Delete my account (H53), at the very foot of Home's settings in Leave
- * Pool's plain words. The sheet says what goes and what stays, lists each
+ * Delete my account (H53), in Home's Advanced tab, small, in Leave Pool's
+ * plain words. The sheet says what goes and what stays, lists each
  * pool I own and who takes it, asks for a sign-in within ten minutes and
  * the word typed. This is the one action that cannot be taken back, so it
  * waits for the server rather than showing itself done.
@@ -22,12 +22,12 @@ export function DeleteAccount() {
   // Back from signing in again: the sheet opens where it was.
   const [open, setOpen] = useState(useSearchParams().get('delete') === '1');
   return (
-    <section className="border-pool-100 mt-12 border-t pt-6" data-delete-account>
+    <section data-delete-account>
       <button
         type="button"
         data-delete-account-open
         onClick={() => setOpen(true)}
-        className="text-pool-500 self-start py-2 text-sm"
+        className="text-pool-500 self-start py-2 text-xs"
       >
         Delete my account
       </button>

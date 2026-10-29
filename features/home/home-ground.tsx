@@ -502,12 +502,12 @@ export function HomeGround({
                   message={lanes.message}
                   onClose={() => setLanesRound((n) => n + 1)}
                 />
-                {/* At the very foot, after a rule (H53). */}
-                <DeleteAccount />
               </section>
             ),
           },
           { key: 'theme', label: 'Theme', render: () => <ThemePicker /> },
+          // Leave Pool's place on Home (H53): the account's own door, small.
+          { key: 'advanced', label: 'Advanced', render: () => <DeleteAccount /> },
         ]}
       />
       {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
