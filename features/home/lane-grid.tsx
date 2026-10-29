@@ -45,6 +45,9 @@ import {
   cardColumn,
   daysDown,
   EVEN_COLUMNS_MAX,
+  PHONE_COLUMNS_SHOWN,
+  PHONE_EVEN_COLUMNS_MAX,
+  PHONE_GRID_MAX_PX,
   FIXED_COLUMN_PX,
   gridBounds,
   isOrphanCard,
@@ -223,16 +226,22 @@ export const LaneGrid = forwardRef<
     (drawPieces ? card.joint === true || card.everyone === true : card.branches !== undefined);
   const orphans = cards.some((card) => !banded(card) && isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
-  const even = dateView || columns <= EVEN_COLUMNS_MAX;
+  // Unmeasured, the grid is taken for a phone's: the app is mostly used on one.
+  const phone = viewportWidth === null || viewportWidth < PHONE_GRID_MAX_PX;
+  const even = dateView || columns <= (phone ? PHONE_EVEN_COLUMNS_MAX : EVEN_COLUMNS_MAX);
   // Every mark carries its short title (round 3). Past six lanes a column
   // keeps a sixth of the room and the rest scroll sideways, so six lanes
-  // always show at once; unmeasured, a column falls back to its fixed width.
+  // always show at once — on a phone, past four, a 4.5th (review); unmeasured,
+  // a column falls back to its fixed width.
   const titled = !dateView;
   const share =
     viewportWidth !== null
       ? Math.max(
           MIN_COLUMN_PX,
-          Math.floor((viewportWidth - RAIL_PX - (plusColumn ? PLUS_PX : 0)) / EVEN_COLUMNS_MAX),
+          Math.floor(
+            (viewportWidth - RAIL_PX - (plusColumn ? PLUS_PX : 0)) /
+              (phone ? PHONE_COLUMNS_SHOWN : EVEN_COLUMNS_MAX),
+          ),
         )
       : FIXED_COLUMN_PX;
   const template = dateView

@@ -12,6 +12,16 @@ import type { IsoDate } from '@/lib/time';
  * rail. Every mark carries its short title beneath it either way.
  */
 export const EVEN_COLUMNS_MAX = 6;
+
+/**
+ * On a phone (review), lanes or members alike: up to four share the width;
+ * past four each keeps a 4.5th of it, so the half column at the edge says
+ * the rest are a scroll away.
+ */
+export const PHONE_EVEN_COLUMNS_MAX = 4;
+export const PHONE_COLUMNS_SHOWN = 4.5;
+/** Narrower than this, the grid is a phone's. */
+export const PHONE_GRID_MAX_PX = 640;
 export const FIXED_COLUMN_PX = 56;
 
 /** The grid's one unit: a post as a card on the diving board and a mark on the grid. */

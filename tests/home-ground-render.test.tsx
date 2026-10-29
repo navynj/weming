@@ -445,22 +445,23 @@ describe('the lane grid', () => {
     ).toBe('');
   });
 
-  it('shares the width among six lanes or fewer, and scrolls the columns from the seventh', () => {
-    const six = Array.from({ length: 6 }, (_, i) => lane(`l${i}`, `Lane ${i}`, '🌊', i));
-    const { container: even } = ground([], null, null, six);
+  // Unmeasured in jsdom, the grid is a phone's: four share it, a fifth scrolls (review).
+  it('shares a phone’s width among four lanes or fewer, and scrolls the columns from the fifth', () => {
+    const four = Array.from({ length: 4 }, (_, i) => lane(`l${i}`, `Lane ${i}`, '🌊', i));
+    const { container: even } = ground([], null, null, four);
     const grid = even.querySelector<HTMLElement>('[data-lane-grid]')!;
     expect(grid.getAttribute('data-columns')).toBe('even');
     expect(grid.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
-      'repeat(6, minmax(0, 1fr))',
+      'repeat(4, minmax(0, 1fr))',
     );
     cleanup();
-    const seven = [...six, lane('l6', 'Lane 6', '🌊', 6)];
-    const { container: fixed } = ground([], null, null, seven);
+    const five = [...four, lane('l4', 'Lane 4', '🌊', 4)];
+    const { container: fixed } = ground([], null, null, five);
     const wide = fixed.querySelector<HTMLElement>('[data-lane-grid]')!;
     expect(wide.getAttribute('data-columns')).toBe('fixed');
     // Unmeasured in jsdom, a column falls back to its fixed width.
     expect(wide.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
-      'repeat(7, 56px)',
+      'repeat(5, 56px)',
     );
     // One axis per scroller: the outer moves only up and down with the header
     // bar sticky at its top; the inner moves only sideways, the rail sticky
