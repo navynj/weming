@@ -44,6 +44,8 @@ export function ReactionChips({
   const row = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
+  /** Shown by a mouse's hover, so its leaving takes it away; a long press stays. */
+  const hovered = useRef(false);
 
   /** Where a floating popover sits: under the chips' row, kept on screen. */
   function place(): void {
@@ -70,6 +72,21 @@ export function ReactionChips({
     }, LONG_PRESS_MS);
   }
 
+  // A desktop's hover says who at once (2026-10-29); touch has no hover, a long press does.
+  function enter(event: React.PointerEvent, emoji: string): void {
+    if (event.pointerType !== 'mouse') return;
+    hovered.current = true;
+    if (floating) place();
+    setShowing(emoji);
+  }
+
+  function leave(): void {
+    if (timer.current) clearTimeout(timer.current);
+    if (!hovered.current) return;
+    hovered.current = false;
+    setShowing(null);
+  }
+
   function release(emoji: string): void {
     if (timer.current) clearTimeout(timer.current);
     if (!held.current && canReact) onToggle(emoji);
@@ -92,12 +109,12 @@ export function ReactionChips({
           data-mine={chip.mine ? '' : undefined}
           aria-pressed={chip.mine}
           aria-label={`${chip.emoji} ${chip.count}`}
-          title={chip.who.map(nameOf).join(', ')}
           // A keyboard's Enter or Space has no pointer: it toggles here.
           onClick={(event) => event.detail === 0 && canReact && onToggle(chip.emoji)}
           onPointerDown={() => press(chip.emoji)}
           onPointerUp={() => release(chip.emoji)}
-          onPointerLeave={() => timer.current && clearTimeout(timer.current)}
+          onPointerEnter={(event) => enter(event, chip.emoji)}
+          onPointerLeave={leave}
           onContextMenu={(event) => event.preventDefault()}
           className={`${CHIP} select-none ${
             chip.mine ? 'bg-ink text-white' : 'border-pool-200 text-ink border bg-white'

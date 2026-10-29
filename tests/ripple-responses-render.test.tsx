@@ -81,13 +81,26 @@ describe('reactions under a block', () => {
     const heart = container.querySelector('[data-reaction="❤️"]')!;
     expect(heart.textContent).toBe('❤️2');
     expect(heart.className).toContain('bg-ink');
-    expect(heart.getAttribute('title')).toBe('Mina Kim, You');
     const laugh = [...container.querySelectorAll('[data-reaction]')].find(
       (el) => el.getAttribute('data-reaction') === '😂',
     )!;
     expect(laugh.className).not.toContain('bg-ink');
     fireEvent.click(heart);
     expect(onReact).toHaveBeenCalledWith('❤️');
+  });
+
+  it('a mouse over a chip says who left it, and leaving takes it away; touch waits for a long press', () => {
+    const { container } = view({
+      reactions: [reaction(MINA, '❤️', 1), reaction(ME, '❤️', 2)],
+      replies: [],
+    });
+    const heart = container.querySelector('[data-reaction="❤️"]')!;
+    fireEvent.pointerEnter(heart, { pointerType: 'touch' });
+    expect(container.querySelector('[data-reaction-who]')).toBeNull();
+    fireEvent.pointerEnter(heart, { pointerType: 'mouse' });
+    expect(container.querySelector('[data-reaction-who]')!.textContent).toBe('❤️ Mina Kim❤️ You');
+    fireEvent.pointerLeave(heart, { pointerType: 'mouse' });
+    expect(container.querySelector('[data-reaction-who]')).toBeNull();
   });
 
   it('"+" opens six quick ones and a field for any emoji', () => {
