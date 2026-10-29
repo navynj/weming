@@ -408,14 +408,6 @@ export function SplashPage({
       className="flex flex-1 flex-col bg-white pt-1 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-16"
     >
       <div data-splash-side className="flex flex-col lg:sticky lg:top-0 lg:pt-3">
-        <SplashAuthors
-          ids={authorIds}
-          initialsOf={{
-            ...pool?.initialsOf,
-            ...initialsOf,
-            ...(me && initials ? { [me]: initials } : {}),
-          }}
-        />
         <SplashHeader
           // Remounted when an edit from the sheet lands, so it reads the new words.
           key={`${headerSplash.id}:${headerSplash.title}:${headerSplash.icon ?? ''}`}
@@ -433,6 +425,30 @@ export function SplashPage({
           laneChip={pool ? pool.laneChip : undefined}
           description={
             describable ? { shown: descriptionShown, onToggle: toggleDescription } : null
+          }
+          byline={
+            <SplashAuthors
+              ids={authorIds}
+              initialsOf={{
+                ...pool?.initialsOf,
+                ...initialsOf,
+                ...(me && initials ? { [me]: initials } : {}),
+              }}
+            />
+          }
+          place={
+            poolTags.length > 0 ? (
+              <p
+                data-origin-tags
+                className="text-pool-500 flex flex-wrap justify-end gap-x-3 text-xs"
+              >
+                {poolTags.map((tag) => (
+                  <span key={tag} data-origin-tag>
+                    {tag}
+                  </span>
+                ))}
+              </p>
+            ) : null
           }
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
@@ -460,16 +476,6 @@ export function SplashPage({
             onSave={describe}
             onEmpty={() => setDescribing(false)}
           />
-        ) : null}
-
-        {poolTags.length > 0 ? (
-          <p data-origin-tags className="text-pool-500 flex flex-wrap gap-x-3 pb-4 text-xs">
-            {poolTags.map((tag) => (
-              <span key={tag} data-origin-tag>
-                {tag}
-              </span>
-            ))}
-          </p>
         ) : null}
 
         {message || answered.message ? (

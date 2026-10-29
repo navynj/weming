@@ -5,8 +5,8 @@ import { Avatar, PersonName } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 
 /**
- * Who wrote it (Yoonji, in the session): at the top of the page's left
- * column, the author's face and name; a joint record's writers, each, in
+ * Who wrote it (Yoonji, in the session): under the post's date, the
+ * author's face and name (2026-10-29); a joint record's writers, each, in
  * the order of their first block.
  */
 export function SplashAuthors({
@@ -19,7 +19,7 @@ export function SplashAuthors({
   const { people } = usePeople();
   if (ids.length === 0) return null;
   return (
-    <p data-splash-authors className="flex flex-wrap items-center gap-x-3 gap-y-1 pb-3">
+    <p data-splash-authors className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {ids.map((id) => {
         const name = people[id]?.name ?? 'Someone';
         return (

@@ -44,6 +44,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { PeopleProvider } from '@/features/people/people-provider';
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash, type Splash } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
@@ -197,6 +198,40 @@ describe('the white page above the water (SPEC 5, H21c)', () => {
     );
     expect(container.querySelector('[data-range]')!.textContent).toBe('2026. 8. 17 ~ 2026. 8. 20');
     expect(container.querySelector('[data-wave-underline]')!.getAttribute('data-lines')).toBe('2');
+  });
+
+  it('writes who wrote it under the date, and where it sits in a pool at that line’s end', () => {
+    const { container } = render(
+      <PeopleProvider me="u-me" people={{ 'u-me': { name: 'Yoonji', photo: null } }}>
+        <InputSheetProvider>
+          <SplashPage
+            splash={summarizeSplash(board, blocks, TZ, NOW)}
+            blocks={blocks}
+            photos={{}}
+            lockedIds={[]}
+            categories={LANES}
+            timeZone={TZ}
+            today={TODAY}
+            initials="YL"
+            poolTags={['Our Pool · 🎲 Games']}
+          />
+        </InputSheetProvider>
+      </PeopleProvider>,
+    );
+    const header = container.querySelector('[data-splash-header]')!;
+    const byline = header.querySelector('[data-splash-byline]')!;
+    // After the date, inside the header (2026-10-29).
+    const range = header.querySelector('[data-range]')!;
+    expect(range.compareDocumentPosition(byline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(byline.querySelector('[data-splash-author]')?.getAttribute('data-splash-author')).toBe(
+      'u-me',
+    );
+    // One line: the author at its start, the pool and its lane at its end.
+    expect(byline.className).toContain('justify-between');
+    expect(byline.lastElementChild?.querySelector('[data-origin-tag]')?.textContent).toBe(
+      'Our Pool · 🎲 Games',
+    );
+    expect(container.querySelectorAll('[data-origin-tags]')).toHaveLength(1);
   });
 
   it('reads the blocks by their day inside the range under small day labels, photos full width', () => {
