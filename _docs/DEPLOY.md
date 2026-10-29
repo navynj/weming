@@ -405,12 +405,32 @@ Sentry → Alerts → Create Alert → Issues:
 
 ### Looking up an error
 
+- A stuck page: `watchdog:stall` is a main thread that sent no heartbeat for
+  5s (reported by a worker, `lib/watchdog.worker.ts`); `watchdog:blank` is a
+  page area that drew nothing for 3s (`features/auth/page-slot.tsx`), its
+  `recovery` context saying whether the refresh was tried or Reload offered.
+  Both carry the route pattern, the route before it and timings, nothing else.
 - From a friend's report: Sentry → Issues, filter `environment:production`,
   then by time; `op:upload` (or compose, edit, join) narrows to that kind of
   failure.
 - From a commit: filter `release:<sha>` — the commit Vercel built.
 - The user id on an event is an opaque id: match it to a profile in Supabase
   only if the person asked for help.
+
+## Next.js is patched
+
+`patches/next@16.3.5.patch` (H64), applied by pnpm on every install, Vercel's
+included (`pnpm-workspace.yaml` → `patchedDependencies`). It makes Next's
+router fetch again a page segment whose data was cut off, instead of reusing
+it and drawing a blank page.
+
+**On any Next upgrade:** re-check every `patches/next@*.patch` against the new
+code. pnpm refuses a patch that no longer applies, but one that still applies
+can patch the wrong thing, and an upstream fix can make it redundant (the
+draft upstream report is `_docs/NEXT-UPSTREAM-BLANK-SEGMENT.md`). Then run
+`e2e/fast-switch.spec.ts` (`pnpm test:e2e e2e/fast-switch.spec.ts --project prod`)
+before merging: it switches pools as fast as possible for 30s, and forces the
+blank with the patch turned off to prove the page still recovers.
 
 ## Backups
 
