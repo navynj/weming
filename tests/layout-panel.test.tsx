@@ -361,7 +361,16 @@ describe('a label’s width and style in the panel (review)', () => {
     const { container } = home([{ ...ONE[0], together: true }], { color: 'pink', mode: 'light' });
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
     expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Pink');
-    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Black');
+    // Drawn white, edged in the colour, on the light ground, as pastel draws it.
+    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Outline');
+  });
+
+  it('keeps black’s two styles apart in light mode: Black, and Outline', () => {
+    media(true);
+    const { container } = home([{ ...ONE[0], together: true }], { color: 'black', mode: 'light' });
+    fireEvent.click(container.querySelector('[data-layout-toggle]')!);
+    expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Black');
+    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Outline');
   });
 
   it('names the fills after what they show in pastel mode: the pastel and Pale (0036)', () => {

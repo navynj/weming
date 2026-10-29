@@ -23,7 +23,8 @@ const SAMPLE: Record<LabelStyle, string> = {
  * The styles as they look (Yoonji, in the session): `white` is white on the
  * dark ground, but in light mode the ground's white is my theme colour, so
  * it is named after it ("Pink"), as in pastel mode, its pastel; `ink` is
- * "Black", and in pastel mode, nearly white, "Pale". The toolbar's swatch,
+ * "Black", in light mode, white edged in the colour, "Outline", and in pastel
+ * mode, nearly white, "Pale". The toolbar's swatch,
  * the panel and More all say them so.
  */
 export function useLabelStyleNames(): Record<LabelChoice, string> {
@@ -34,7 +35,8 @@ export function useLabelStyleNames(): Record<LabelChoice, string> {
       theme.mode === 'dark'
         ? 'White'
         : (THEMES.find((t) => t.key === theme.color)?.name ?? 'White'),
-    ink: theme.mode === 'pastel' ? 'Pale' : 'Black',
+    // Light mode draws it white, edged and lettered in the theme colour (globals.css).
+    ink: theme.mode === 'pastel' ? 'Pale' : theme.mode === 'light' ? 'Outline' : 'Black',
     glass: 'Glass',
   };
 }

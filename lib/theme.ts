@@ -38,7 +38,7 @@ export const THEMES = [
   {
     key: 'yellow',
     name: 'Yellow',
-    hex: '#B07C00',
+    hex: '#C08600',
     pastel: {
       tone: '#D0A535',
       fill: '#F2DCA9',
@@ -124,7 +124,7 @@ export const THEMES = [
   {
     key: 'pink',
     name: 'Pink',
-    hex: '#C2307A',
+    hex: '#E5318C',
     pastel: {
       tone: '#DE8ACF',
       fill: '#FBCDF2',

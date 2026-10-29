@@ -47,12 +47,22 @@ const MIN_CARD_WIDTH_PX = 320;
  * The fills, one family centred on the top card (review): below it each step
  * is another 8% of the water's colour (the theme, 0032) mixed into white. Above it the one read
  * card is **frosted glass** (`.frosted`): white at 20% over a blurred
- * backdrop, or the solid joint surface (`--color-joint`) when blur is unavailable; its words white
- * at 60%.
+ * backdrop, or, when blur is unavailable and while it moves, the solid that
+ * glass reads as (`upSolid`); its words white at 60%.
  */
 const DOWN_TINTS = [0, TINT_STEP, TINT_STEP * 2, TINT_STEP * 3] as const;
 const UP_ALPHA = 0.2;
-const UP_SOLID = [0x37, 0x39, 0xd4] as const;
+
+/**
+ * The frosted card as a solid (review): white at 20% over the ground. On
+ * the dark ground that is 20% white into the theme colour (#3739D4 for
+ * blue); light and pastel grounds are white, so it is white. A blue solid
+ * there was the flicker on light and pastel: the card turned dark while it
+ * moved to or from the top, then white as the glass took over.
+ */
+export function upSolid(hex: string, mode: string): string {
+  return mode === 'dark' ? face(1 - UP_ALPHA, hex) : '#FFFFFF';
+}
 const UP_INK = 0.6;
 
 /** How far the finger travels before a drag's axis is decided (review). */
@@ -87,6 +97,8 @@ export function seat(
   frostGlass = true,
   /** The theme colour the faces step toward (0032). */
   base = '#0507C9',
+  /** The read card's solid (upSolid), when glass is not drawn. */
+  solid = upSolid(base, 'dark'),
 ): {
   x: number;
   y: number;
@@ -133,13 +145,16 @@ export function seat(
       ink,
     };
   }
-  const channel = (white: number, solid: number): number => Math.round(lerp(white, solid, rise));
+  const target = solid.startsWith('rgb')
+    ? solid.match(/\d+/g)!.map(Number)
+    : [1, 3, 5].map((k) => parseInt(solid.slice(k, k + 2), 16));
+  const channel = (c: number): number => Math.round(lerp(255, c, rise));
   return {
     x,
     y,
     scale,
     opacity,
-    background: `rgb(${channel(255, UP_SOLID[0])}, ${channel(255, UP_SOLID[1])}, ${channel(255, UP_SOLID[2])})`,
+    background: `rgb(${channel(target[0])}, ${channel(target[1])}, ${channel(target[2])})`,
     ink,
   };
 }
@@ -445,27 +460,28 @@ function Step({
   // moves to or from the top, use the solid fallback so the full face is
   // not read through 20% white.
   const frostFill = frostGlass && !(moving && (from < 0 || to < 0));
-  const { hex } = useTheme();
+  const { hex, theme } = useTheme();
+  const solid = upSolid(hex, theme.mode);
 
   // The card's distance from the top as the stack's depth moves.
   const d = useTransform(p, (v) => (reducedMotion ? to : lerp(from, to, clamp01(v))));
-  const y = useTransform(d, (v) => seat(v, stair, frostFill, hex).y);
-  const x = useTransform(d, (v) => seat(v, stair, frostFill, hex).x);
-  const scale = useTransform(d, (v) => seat(v, stair, frostFill, hex).scale);
+  const y = useTransform(d, (v) => seat(v, stair, frostFill, hex, solid).y);
+  const x = useTransform(d, (v) => seat(v, stair, frostFill, hex, solid).x);
+  const scale = useTransform(d, (v) => seat(v, stair, frostFill, hex, solid).scale);
   const opacity = useTransform([d, p], ([v, pv]) => {
-    const at = seat(v as number, stair, frostFill, hex).opacity;
+    const at = seat(v as number, stair, frostFill, hex, solid).opacity;
     if (!reducedMotion || !moving) return at;
     // Reduced motion: the old top fades out as the new one fades in.
     if (from === 0) return at * (1 - clamp01(pv as number));
     if (to === 0) return at * clamp01(pv as number);
     return at;
   });
-  const background = useTransform(d, (v) => seat(v, stair, frostFill, hex).background);
+  const background = useTransform(d, (v) => seat(v, stair, frostFill, hex, solid).background);
   // A card moving to or from the top carries both faces and crossfades them
   // on its distance from the top, so nothing switches when it lands.
   const fullOpacity = useTransform(d, (v) => 1 - clamp01(Math.abs(v)));
   const edgeOpacity = useTransform(d, (v) => clamp01(Math.abs(v)));
-  const inkOpacity = useTransform(d, (v) => seat(v, stair, frostFill, hex).ink);
+  const inkOpacity = useTransform(d, (v) => seat(v, stair, frostFill, hex, solid).ink);
   // Nearer the top, nearer the eye; a card rising from below over one sliding up.
   const zIndex = useTransform(d, (v) => Math.round((30 - Math.abs(v)) * 10) + (v >= 0 ? 1 : 0));
 
