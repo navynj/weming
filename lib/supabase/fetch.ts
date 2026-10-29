@@ -8,10 +8,22 @@
  */
 const DEFAULT_TIMEOUT_MS = 3_000;
 
-export function fetchWithDeadline(timeoutMs: number = DEFAULT_TIMEOUT_MS): typeof fetch {
+/**
+ * A write gets its own, longer deadline. Aborting a request does not abort
+ * the statement: a PATCH cut off at five seconds can still commit, and the
+ * author is told it failed while the row changed (Sentry, an edit on a
+ * pool's page). Past this a write is reported as failed; until then a slow
+ * one is waited for.
+ */
+export function fetchWithDeadline(
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  writeTimeoutMs: number = timeoutMs,
+): typeof fetch {
   return (input, init) => {
     const caller = init?.signal;
-    const deadline = AbortSignal.timeout(timeoutMs);
+    const method = (init?.method ?? 'GET').toUpperCase();
+    const isRead = method === 'GET' || method === 'HEAD';
+    const deadline = AbortSignal.timeout(isRead ? timeoutMs : writeTimeoutMs);
 
     return fetch(input, {
       ...init,

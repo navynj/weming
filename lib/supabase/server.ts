@@ -20,7 +20,8 @@ export const createClient = cache(async function createClient() {
 
   // Named reads (lib/env.ts): a missing variable fails as `Missing <NAME>`.
   const client = createServerClient<Database>(supabaseUrl(), supabaseAnonKey(), {
-    global: { fetch: fetchWithDeadline(5_000) },
+    // Reads stay bounded for the render; writes may be slow but must land.
+    global: { fetch: fetchWithDeadline(5_000, 30_000) },
     cookies: {
       getAll() {
         return cookieStore.getAll();
