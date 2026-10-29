@@ -4,16 +4,19 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Monogram } from '@/components/ui/monogram';
+import { initialsOf } from '@/features/home/grid';
 import { saveProfile } from '@/features/people/actions';
 import { NAME_MAX } from '@/features/people/name';
 import { welcomePool } from '@/features/notifications/welcome';
+
+import type { InviteMember } from '@/lib/avatars';
 
 import { joinPool } from './actions';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
  * Joining from an invite link (H23; hotfix 2026-10-26): one screen — the
- * pool's name and its members' initials (0011 `invite_preview`), my name as
+ * pool's name and its members, each a face and a name (0067 `invite_members`), my name as
  * they will see it, and Join. Nothing about how my records connect: every
  * pool lane starts unconnected, writing from the pool works as for any
  * unconnected one, and connecting stays in the pool's settings. The token is
@@ -23,14 +26,15 @@ export function JoinFlow({
   token,
   poolName,
   photo = null,
-  initials,
+  members,
   myName,
 }: {
   token: string;
   poolName: string;
   /** The pool's photo, signed briefly for this invite (0024); the letters without one. */
   photo?: string | null;
-  initials: string[];
+  /** Who is in it now, in the order they joined: a name, and a photo signed briefly. */
+  members: InviteMember[];
   /** My name as it stands (from signing in); the members see it. */
   myName: string;
 }) {
@@ -63,25 +67,46 @@ export function JoinFlow({
   }
 
   return (
-    <StepPage step={null} onBack={() => router.replace('/')}>
+    // "Join Pool" names the place before anything else: the word a Pool is learnt by (review).
+    <StepPage step={null} title="Join Pool" onBack={() => router.replace('/')}>
       <p className="text-pool-500 text-sm">You are invited to</p>
       <div className="mt-4 flex items-center gap-4">
         <Monogram name={poolName} size="tile" photo={photo} />
-        <h1
+        <h2
           data-invite-pool
           className="text-main-900 min-w-0 text-3xl/tight font-semibold break-words"
         >
           {poolName}
-        </h1>
+        </h2>
       </div>
-      <ul aria-label="Members" className="mt-8 flex flex-wrap gap-2">
-        {initials.map((letters, index) => (
+      <ul aria-label="Members" className="mt-8 flex flex-wrap gap-x-3 gap-y-4">
+        {members.map((member, index) => (
           <li
-            key={`${letters}-${index}`}
+            key={`${member.name}-${index}`}
             data-invite-member
-            className="bg-pool-100 text-pool-500 flex h-10 w-10 items-center justify-center rounded-full text-xs font-medium"
+            className="flex w-14 flex-col items-center gap-1.5"
           >
-            {letters}
+            {member.photo ? (
+              // Signed for ten minutes (0067): this screen's life, no longer.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={member.photo}
+                alt=""
+                data-invite-member-photo
+                draggable={false}
+                className="h-12 w-12 rounded-full object-cover"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="bg-pool-100 text-pool-500 flex h-12 w-12 items-center justify-center rounded-full text-xs font-medium"
+              >
+                {initialsOf(member.name)}
+              </span>
+            )}
+            <span data-invite-member-name className="text-ink w-full truncate text-center text-xs">
+              {member.name}
+            </span>
           </li>
         ))}
       </ul>

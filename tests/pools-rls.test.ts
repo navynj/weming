@@ -848,6 +848,15 @@ describe('invites', () => {
     expect(data).toEqual([{ pool_name: 'Weekend crew', member_initials: ['AL', 'BE'] }]);
   });
 
+  it('names its members to the server alone (0067), never to a browser', async () => {
+    const asked = await asUser(cal).rpc('invite_members', { p_token: token });
+    expect(asked.error?.code).toBe('42501');
+    const { data } = await asAdmin().rpc('invite_members', { p_token: token });
+    expect(data?.map((m) => m.display_name)).toEqual(['Ana Lee', 'Ben']);
+    const none = await asAdmin().rpc('invite_members', { p_token: 'no-such-token' });
+    expect(none.data).toEqual([]);
+  });
+
   it('opens nothing once expired', async () => {
     const fresh = await asUser(ana).rpc('create_invite', { p_pool: pool });
     const expiring = fresh.data![0].token;

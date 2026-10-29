@@ -9,11 +9,14 @@ import { ChevronLeft } from 'lucide-react';
 export function StepPage({
   step,
   onBack,
+  title = null,
   wide = false,
   children,
 }: {
   /** "1 / 2", or null for a page that is not a numbered step. */
   step: string | null;
+  /** The page's name in the bar, centred: what this place is ("Join Pool"). */
+  title?: string | null;
   onBack: () => void;
   /** Both steps side by side on a wide screen (review): wider, and no step count there. */
   wide?: boolean;
@@ -27,10 +30,18 @@ export function StepPage({
         paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
       }}
     >
-      <div className="text-main-900 flex h-10 items-center justify-between">
+      <div className="text-main-900 relative flex h-10 items-center justify-between">
         <button type="button" aria-label="Back" onClick={onBack} className="-ml-2 p-2">
           <ChevronLeft aria-hidden size={22} strokeWidth={2.5} />
         </button>
+        {title ? (
+          <h1
+            data-step-title
+            className="pointer-events-none absolute inset-x-12 text-center text-base font-semibold"
+          >
+            {title}
+          </h1>
+        ) : null}
         {step ? (
           <span
             data-step

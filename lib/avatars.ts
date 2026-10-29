@@ -159,3 +159,43 @@ export async function signInvitePhoto(token: string): Promise<string | null> {
 
 /** Ten minutes: long enough to read an invite, short enough that a forwarded URL rots. */
 export const INVITE_PHOTO_TTL_SECONDS = 10 * 60;
+
+/** A current member as an invite shows them: their name, and their photo signed briefly. */
+export type InviteMember = { name: string; photo: string | null };
+
+/**
+ * Who is in the pool a valid invite opens (0067): each current member's name
+ * and photo, in the order they joined. The service role asks (invite_members
+ * checks the token as invite_preview does) and signs each photo for as long
+ * as the pool's own. Empty when the invite is not valid; a photo that could
+ * not sign is the member's initials.
+ */
+export async function signInviteMembers(token: string): Promise<InviteMember[]> {
+  try {
+    const service = createServiceClient<Database>(supabaseUrl(), supabaseServiceRoleKey(), {
+      auth: { persistSession: false },
+    });
+    const { data, error } = await service.rpc('invite_members', { p_token: token });
+    if (error) throw error;
+    const rows = data ?? [];
+    const paths = rows.flatMap((r) => (r.avatar_path ? [r.avatar_path] : []));
+    const urls = new Map<string, string>();
+    if (paths.length > 0) {
+      const { data: signedUrls, error: signError } = await service.storage
+        .from(AVATAR_BUCKET)
+        .createSignedUrls(paths, INVITE_PHOTO_TTL_SECONDS);
+      if (signError) throw signError;
+      for (const entry of signedUrls) {
+        if (entry.path && entry.signedUrl) urls.set(entry.path, entry.signedUrl);
+      }
+    }
+    return rows.map((r) => ({
+      name: r.display_name,
+      photo: r.avatar_path ? (urls.get(r.avatar_path) ?? null) : null,
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[during] invite members signing failed: ${message}`);
+    return [];
+  }
+}

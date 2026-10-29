@@ -1538,6 +1538,10 @@ export type Database = {
         Args: { owner: string; pid: string; rid: string; target: string }
         Returns: undefined
       }
+      _leave_thread_placeholder: {
+        Args: { owner: string; rid: string }
+        Returns: undefined
+      }
       _notification_pool: {
         Args: { actor: string; recipient: string; rid: string }
         Returns: string
@@ -1653,6 +1657,13 @@ export type Database = {
       hide_reply: {
         Args: { p_hidden?: boolean; p_reply: string }
         Returns: undefined
+      }
+      invite_members: {
+        Args: { p_token: string }
+        Returns: {
+          avatar_path: string
+          display_name: string
+        }[]
       }
       invite_photo: {
         Args: { p_token: string }

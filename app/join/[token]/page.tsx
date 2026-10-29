@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { JoinFlow } from '@/features/pool/join-flow';
 import { getMyProfile } from '@/lib/queries/profile';
-import { signInvitePhoto } from '@/lib/avatars';
+import { signInviteMembers, signInvitePhoto } from '@/lib/avatars';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -29,9 +29,10 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
 
   // The preview, and the pool's photo signed for ten minutes when the token
   // is valid, unexpired and unrevoked (0024, invite_photo; server only).
-  const [{ data: preview }, photo] = await Promise.all([
+  const [{ data: preview }, photo, members] = await Promise.all([
     supabase.rpc('invite_preview', { p_token: token }),
     signInvitePhoto(token),
+    signInviteMembers(token),
   ]);
   const pool = preview?.[0];
   if (!pool) {
@@ -52,7 +53,7 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
       token={token}
       poolName={pool.pool_name}
       photo={photo}
-      initials={pool.member_initials}
+      members={members}
       myName={profile.display_name}
     />
   );

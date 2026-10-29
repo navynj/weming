@@ -48,7 +48,15 @@ describe('no Korean in the UI (H23)', () => {
     expect(create.container.querySelector('[data-pool-kind]')).toBeNull();
     cleanup();
     const join = render(
-      <JoinFlow token="t" poolName="Our Pool" initials={['YL', 'MI']} myName="Yoonji" />,
+      <JoinFlow
+        token="t"
+        poolName="Our Pool"
+        members={[
+          { name: 'Yoonji Lee', photo: 'https://x/y.jpg' },
+          { name: 'Mina', photo: null },
+        ]}
+        myName="Yoonji"
+      />,
     );
     expect(join.container.textContent).not.toMatch(HANGUL);
   });

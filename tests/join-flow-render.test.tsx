@@ -46,7 +46,15 @@ afterEach(() => {
 
 function invite(myName = 'kakao user 1234') {
   return render(
-    <JoinFlow token="t-invite" poolName="Our Pool" initials={['YL', 'MI']} myName={myName} />,
+    <JoinFlow
+      token="t-invite"
+      poolName="Our Pool"
+      members={[
+        { name: 'Yoonji Lee', photo: 'https://x/y.jpg' },
+        { name: 'Mina', photo: null },
+      ]}
+      myName={myName}
+    />,
   );
 }
 
@@ -75,5 +83,19 @@ describe('joining a pool asks nothing about lanes (hotfix)', () => {
     cleanup();
     const empty = invite('');
     expect((empty.getByText('Join').closest('button') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('names the place, and shows each member as a face and a name (0067)', () => {
+    const { container } = invite();
+    expect(container.querySelector('[data-step-title]')?.textContent).toBe('Join Pool');
+    const members = [...container.querySelectorAll('[data-invite-member]')];
+    expect(members.map((m) => m.querySelector('[data-invite-member-name]')?.textContent)).toEqual([
+      'Yoonji Lee',
+      'Mina',
+    ]);
+    expect(members[0].querySelector('img')?.getAttribute('src')).toBe('https://x/y.jpg');
+    // No photo: the initials in its place.
+    expect(members[1].querySelector('img')).toBeNull();
+    expect(members[1].textContent).toContain('MI');
   });
 });
