@@ -105,11 +105,16 @@ function Thread({
       onClick={(event) => event.stopPropagation()}
     >
       {label ? (
-        <span data-card-thread-label className="text-pool-500 text-[10px] font-medium">
-          {label}
-        </span>
-      ) : null}
-      <ReactionChips chips={chips} canReact={canReact} onToggle={onReact} floating />
+        // A pool's reactions ride its label's line: "in Church 🙏 2".
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span data-card-thread-label className="text-pool-500 text-[10px] font-medium">
+            {label}
+          </span>
+          <ReactionChips chips={chips} canReact={canReact} onToggle={onReact} floating />
+        </div>
+      ) : (
+        <ReactionChips chips={chips} canReact={canReact} onToggle={onReact} floating />
+      )}
       {shown.length > 0 ? (
         <ol data-card-replies className="flex flex-col gap-1">
           {shown.map((reply) => (
