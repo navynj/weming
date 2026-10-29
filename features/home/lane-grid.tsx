@@ -145,7 +145,8 @@ export const LaneGrid = forwardRef<
     onAvatar?: () => void;
     /**
      * A joint splash as a band across every column (H23): in a pool's
-     * Members view only (review). Off, it is a mark in its own column.
+     * Members view only (review), which asks for it. Off, the default — Home
+     * and every Lane view — it is a piece in its own column.
      */
     bands?: boolean;
     /**
@@ -177,7 +178,7 @@ export const LaneGrid = forwardRef<
     onPick,
     onCreateLane,
     onAvatar,
-    bands = true,
+    bands = false,
     view = 'lane',
     pieces = false,
     onDrawn,

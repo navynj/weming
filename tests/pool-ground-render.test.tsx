@@ -238,6 +238,26 @@ const everyoneOn = (s: Splash): Splash =>
   s.id === 's-joint' ? { ...s, joint_invite_all: true } : s;
 const EVERYONE: PoolView = { ...A, splashes: A.splashes.map(everyoneOn) };
 
+describe('bands across columns are the Members view’s alone (review)', () => {
+  it('in Lane, draws every record — joint and Everyone too — as one piece in one lane', () => {
+    setView('lane');
+    const { container } = ground(EVERYONE);
+    expect(container.querySelectorAll('[data-lane-band]')).toHaveLength(0);
+    for (const piece of container.querySelectorAll('[data-lane-piece]')) {
+      expect(piece.closest('[data-cell]')!.getAttribute('data-cell')).toBeTruthy();
+    }
+    expect(container.querySelectorAll('[data-lane-piece="s-joint"]')).toHaveLength(1);
+  });
+
+  it('in Members, spans an Everyone record across every member’s column', () => {
+    setView('members');
+    const { container } = ground(EVERYONE);
+    const band = container.querySelector<HTMLElement>('[data-lane-band="s-joint"]')!;
+    const members = EVERYONE.members.filter((m) => !m.former).length;
+    expect(band.style.gridColumn).toBe(`span ${members}`);
+  });
+});
+
 describe('a joint splash on the grid (H23)', () => {
   it('with Everyone on, spans Members as one band, never also a piece (review)', () => {
     setView('members');

@@ -1277,3 +1277,40 @@ describe('author faces stay off Home (review)', () => {
     expect(ground().container.querySelector('[data-row-author-face]')).toBeNull();
   });
 });
+
+describe('the Lane view draws no band across its lanes (review)', () => {
+  it('draws a joint record and an Everyone record each as one piece in one lane column', () => {
+    homeView = 'lane';
+    const drawn = cards(POSTS).map((card) =>
+      card.splash.id === 'late'
+        ? { ...card, joint: true, together: true }
+        : card.splash.id === 'soup'
+          ? { ...card, everyone: true, together: true }
+          : card,
+    );
+    const { container } = render(
+      <PeopleProvider me="u-me" people={{ 'u-me': { name: 'Yoonji Lee', photo: null } }}>
+        <InputSheetProvider>
+          <HomeGround
+            initialView="lane"
+            cards={drawn}
+            pinned={[]}
+            categories={LANES}
+            today={TODAY}
+            timeZone={TZ}
+            initials="YL"
+            scrollToMonth={null}
+            topParam={null}
+            board="stair"
+          />
+        </InputSheetProvider>
+      </PeopleProvider>,
+    );
+    expect(container.querySelectorAll('[data-lane-band]')).toHaveLength(0);
+    for (const id of ['late', 'soup']) {
+      const pieces = container.querySelectorAll(`[data-lane-piece="${id}"]`);
+      expect(pieces, id).toHaveLength(1);
+      expect(cellOf(pieces[0]).getAttribute('data-cell'), id).toBeTruthy();
+    }
+  });
+});
