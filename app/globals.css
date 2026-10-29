@@ -461,12 +461,17 @@ body {
  */
 [data-mode='light'] .water-ground .label-ink.label-second {
   background-color: color-mix(in srgb, var(--theme-900) 20%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-900) 30%, transparent);
+  box-shadow: none;
   color: var(--theme-900);
+}
+/* Light's and pastel's Glass have no edge (Yoonji, in the session): the tint alone. */
+[data-mode='light'] .water-ground .label-glass,
+[data-mode='pastel'] .water-ground .label-glass {
+  --tw-ring-color: transparent;
 }
 [data-mode='pastel'] .water-ground .label-ink.label-second {
   background-color: color-mix(in srgb, var(--theme-pastel) 20%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-pastel) 30%, transparent);
+  box-shadow: none;
   color: var(--pastel-ink);
 }
 /* Its faces part on nothing there, as on Glass. */
