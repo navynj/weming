@@ -481,14 +481,18 @@ Rows first, so the paths in `ripples.media` and `profiles.avatar_path` point at
 files again. Then re-upload each bucket's folder:
 
 ```sh
-SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<key> \
-  node scripts/restore-storage.mjs backup/<stamp>/storage ripple-media
-SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
-  node scripts/restore-storage.mjs backup/<stamp>/storage avatars
+for bucket in ripple-media avatars pool-photos; do
+  SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<key> \
+    node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON \
+    scripts/restore-storage.mjs backup/<stamp>/storage "$bucket"
+done
 ```
 
 Each object goes back to its own path with the content type the manifest
 recorded. Objects already in the bucket are kept unless `--overwrite` is
 passed. The script names the target project and waits for its ref to be
-typed before it writes anything. The bucket must exist (migrations 0003 and
-0018 make both).
+typed before it writes anything. The bucket must exist (migrations 0003,
+0018 and 0024 make them). Both scripts read and write through the storage
+adapter (`lib/storage`), so they follow `STORAGE_BACKEND`. Backups before
+2026-10-28 have no `pool-photos` folder: that bucket was not backed up until
+then.
