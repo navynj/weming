@@ -9,16 +9,43 @@
 const DEFAULT_TIMEOUT_MS = 3_000;
 
 /**
- * A write gets its own, longer deadline. Aborting a request does not abort
- * the statement: a PATCH cut off at five seconds can still commit, and the
- * author is told it failed while the row changed (Sentry, an edit on a
- * pool's page). Past this a write is reported as failed; until then a slow
- * one is waited for.
+ * RPCs that only read: STABLE in their latest migration, so Postgres itself
+ * holds them to reading. PostgREST calls every RPC with a POST, but these
+ * keep the read deadline; tests/read-rpcs.test.ts keeps this list equal to
+ * the migrations.
  */
+export const READ_RPCS: ReadonlySet<string> = new Set([
+  'account_deletion_preview',
+  'invite_members',
+  'invite_photo',
+  'invite_preview',
+  'joint_together',
+  'my_left_pool_ripples',
+  'my_thread_ripples',
+  'placement_together',
+  'ripple_replies_in',
+  'visible_avatars',
+  'visible_pool_photos',
+]);
+
+/** A read: GET or HEAD, or a POST to one of READ_RPCS. Anything else may write. */
+export function isReadRequest(url: string, method: string): boolean {
+  if (method === 'GET' || method === 'HEAD') return true;
+  const rpc = /\/rest\/v1\/rpc\/([a-z_]+)/.exec(url)?.[1];
+  return method === 'POST' && rpc !== undefined && READ_RPCS.has(rpc);
+}
+
 /** One request as it finished: its status, or how it was cut off. */
 export type StepOutcome = number | 'timeout' | 'network';
 export type OnStep = (url: string, method: string, ms: number, outcome: StepOutcome) => void;
 
+/**
+ * A write gets its own, longer deadline. Aborting a request does not abort
+ * the statement: a PATCH cut off at five seconds can still commit, and the
+ * author is told it failed while the row changed (Sentry, an edit on a
+ * pool's page). Past this a write is reported as failed; until then a slow
+ * one is waited for. A read — READ_RPCS included — keeps the short one.
+ */
 export function fetchWithDeadline(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   writeTimeoutMs: number = timeoutMs,
@@ -27,9 +54,8 @@ export function fetchWithDeadline(
   return async (input, init) => {
     const caller = init?.signal;
     const method = (init?.method ?? 'GET').toUpperCase();
-    const isRead = method === 'GET' || method === 'HEAD';
-    const deadline = AbortSignal.timeout(isRead ? timeoutMs : writeTimeoutMs);
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const deadline = AbortSignal.timeout(isReadRequest(url, method) ? timeoutMs : writeTimeoutMs);
     const started = performance.now();
 
     try {

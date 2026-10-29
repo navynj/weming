@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { after } from 'next/server';
 
-import type { StepOutcome } from '@/lib/supabase/fetch';
+import { isReadRequest, type StepOutcome } from '@/lib/supabase/fetch';
 
 /**
  * Where a server action's time went (the 5-second edit on a pool's page,
@@ -65,7 +65,7 @@ export function recordStep(url: string, method: string, ms: number, outcome: Ste
   if (timing.steps.length >= MAX_STEPS) return;
   timing.steps.push({ name: stepName(url, method), ms, outcome });
   timing.ended = now;
-  if (method !== 'GET' && method !== 'HEAD') timing.wrote = true;
+  if (!isReadRequest(url, method)) timing.wrote = true;
   scope.setContext('action', {
     duration_ms: Math.round(timing.ended - timing.started),
     steps: describeSteps(timing.steps),

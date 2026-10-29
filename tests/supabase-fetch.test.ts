@@ -19,6 +19,18 @@ describe('fetchWithDeadline', () => {
     expect(deadlineFor('GET')).toBe(5_000);
   });
 
+  it('keeps a read RPC on the read deadline, though PostgREST POSTs it', () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+    void fetchWithDeadline(5_000, 30_000)('http://db.test/rest/v1/rpc/visible_avatars', {
+      method: 'POST',
+    });
+    void fetchWithDeadline(5_000, 30_000)('http://db.test/rest/v1/rpc/move_pool_splash', {
+      method: 'POST',
+    });
+    expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([5_000, 30_000]);
+  });
+
   it('gives a write the write deadline', () => {
     expect(deadlineFor('PATCH')).toBe(30_000);
     expect(deadlineFor('POST')).toBe(30_000);
