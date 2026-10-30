@@ -1,6 +1,6 @@
 # Weming: Product Spec (v0.25)
 
-> A one-line diary that assembles itself. While you write it, your presence shows on the surface for a few close friends.
+> **Weming Diary.** Pool your days with a few close friends. We're swimming side by side, each in our own lane. (H65)
 >
 > **The hand throws moments at stories; the machine shelves them in time.** (H20)
 >

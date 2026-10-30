@@ -1,7 +1,7 @@
 # Weming
 
-A one-line diary that assembles itself. While you write it, your presence shows on the
-surface for a few close friends.
+**Weming Diary.** Pool your days with a few close friends. We're swimming side by side,
+each in our own lane.
 
 - Product spec: [`_docs/SPEC.md`](_docs/SPEC.md) — authoritative for behavior and vocabulary.
 - Decision log: [`_docs/DECISIONS.md`](_docs/DECISIONS.md) — rationale and rejected alternatives.

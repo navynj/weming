@@ -15,7 +15,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Weming',
     short_name: 'Weming',
-    description: 'A one-line diary that assembles itself.',
+    description:
+      "Pool your days with a few close friends. We're swimming side by side, each in our own lane.",
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

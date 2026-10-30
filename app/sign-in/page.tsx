@@ -21,10 +21,17 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6 text-center">
-      <div className="space-y-3">
-        <h1 className="text-main-900 text-3xl font-semibold">Weming</h1>
-        <p className="text-pool-500 max-w-xs">
-          A one-line diary that assembles itself, for a few close friends.
+      {/* The title, then the bold line, then the soft one between them (H65). */}
+      <div className="max-w-xs space-y-3">
+        <h1 className="text-main-900 text-3xl font-semibold">Weming Diary</h1>
+        {/* Each line breaks only between its halves, never inside one. */}
+        <p className="text-pool-500 text-sm font-light">
+          <span className="whitespace-nowrap">We&rsquo;re swimming side by side,</span>{' '}
+          <span className="whitespace-nowrap">each in our own lane.</span>
+        </p>
+        <p className="text-ink font-semibold">
+          <span className="whitespace-nowrap">Pool your days</span>{' '}
+          <span className="whitespace-nowrap">with a few close friends.</span>
         </p>
       </div>
 

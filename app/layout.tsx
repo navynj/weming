@@ -18,9 +18,15 @@ const poppins = Poppins({
   display: 'swap',
 });
 
+// The intro's two lines, bold one first (H65); a link preview reads the same.
+const description =
+  "Pool your days with a few close friends. We're swimming side by side, each in our own lane.";
+
 export const metadata: Metadata = {
   title: 'Weming',
-  description: 'A one-line diary that assembles itself.',
+  description,
+  openGraph: { title: 'Weming', description },
+  twitter: { card: 'summary', title: 'Weming', description },
   // Installed on a phone it is an app, so it gets an app's name and an
   // app's status bar rather than a browser's.
   appleWebApp: { capable: true, title: 'Weming', statusBarStyle: 'default' },
