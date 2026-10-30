@@ -169,6 +169,12 @@ export const LaneGrid = forwardRef<
     onDrawn?: (recipes: Record<string, Recipe>) => void;
     /** Direct manipulation on the pieces (review): taps go through it. */
     editing?: BoardEditing | null;
+    /**
+     * A picture of the grid (the sign-in screen's pool): the same lanes and
+     * marks, with nothing to tap, focus or scroll, hidden from assistive
+     * tech, its window never growing and its ropes a little brighter.
+     */
+    decorative?: boolean;
   }
 >(function LaneGrid(
   {
@@ -187,6 +193,7 @@ export const LaneGrid = forwardRef<
     pieces = false,
     onDrawn,
     editing = null,
+    decorative = false,
   },
   ref,
 ) {
@@ -432,7 +439,7 @@ export const LaneGrid = forwardRef<
   useEffect(() => {
     const el = sentinel.current;
     const root = scroller.current;
-    if (!el || !root) return;
+    if (!el || !root || decorative) return;
     if (limit >= allDays.length) return;
     // Without an observer there is no telling where the bottom is: every day.
     if (typeof IntersectionObserver === 'undefined') {
@@ -449,7 +456,7 @@ export const LaneGrid = forwardRef<
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [limit, allDays.length]);
+  }, [limit, allDays.length, decorative]);
 
   /** The scroll that brings a mark into view, and where the mark sits once it has. */
   const reveal = useCallback(
@@ -542,7 +549,13 @@ export const LaneGrid = forwardRef<
         if ((event.target as Element).closest(ON_PIECE)) return;
         editing.deactivate();
       }}
-      className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+      aria-hidden={decorative || undefined}
+      inert={decorative}
+      className={`no-scrollbar relative min-h-0 flex-1 overflow-x-hidden ${
+        decorative
+          ? 'pointer-events-none overflow-y-hidden select-none [&_[data-rope]]:bg-white/25'
+          : 'overflow-y-auto overscroll-contain'
+      }`}
       // Room under the last day for a phone's docked toolbar (H41), while it is up.
       style={{ paddingBottom: 'var(--edit-dock, 0px)' }}
     >
@@ -606,7 +619,13 @@ export const LaneGrid = forwardRef<
         ref={across}
         data-x-scroller
         onScroll={followAcross}
-        className={`no-scrollbar ${dateView ? '' : 'overflow-x-auto overflow-y-hidden overscroll-x-contain'}`}
+        className={`no-scrollbar ${
+          dateView
+            ? ''
+            : decorative
+              ? 'overflow-hidden'
+              : 'overflow-x-auto overflow-y-hidden overscroll-x-contain'
+        }`}
       >
         <div
           ref={gridRef}
