@@ -173,8 +173,12 @@ export function SplashPage({
   const [expanded, setExpanded] = useState<string[]>([]);
   const openedRipple = thread.replies.find((r) => `reply-${r.id}` === openedAt)?.ripple_id;
   const isExpanded = (id: string): boolean => expanded.includes(id) || id === openedRipple;
-  // Seen as of this open, on this device; its dots stay until the next (H25).
+  // Seen as of this open, on this device; its dots stay until the next (H25),
+  // or until I tap that block's reactions or replies (Yoonji, in the session).
   const seenBefore = useSeenBefore(splash.id);
+  const [answeredSeen, setAnsweredSeen] = useState<string[]>([]);
+  const seeAnswers = (id: string): void =>
+    setAnsweredSeen((ids) => (ids.includes(id) ? ids : [...ids, id]));
   const fromOthers = latestFromOthers(thread, me ?? '', (id) =>
     blocks.some((b) => b.id === id && b.author_id === me),
   );
@@ -546,7 +550,10 @@ export function SplashPage({
                 authorId: block.author_id ?? undefined,
                 removed: block.author_id === null,
                 // Something new from someone else on my ripple since I last opened it (H25).
-                dot: block.author_id === me && isUnseen(fromOthers[block.id], seenBefore),
+                dot:
+                  block.author_id === me &&
+                  !answeredSeen.includes(block.id) &&
+                  isUnseen(fromOthers[block.id], seenBefore),
                 body: (
                   <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
                     {editor?.kind === 'edit' && editor.block.id === block.id ? (
@@ -605,16 +612,18 @@ export function SplashPage({
                               : undefined
                           }
                         />
-                        <RippleResponses
-                          rippleId={block.id}
-                          rippleAuthor={block.author_id}
-                          value={thread}
-                          canRespond={respondable && !page.lockedIds.includes(block.id)}
-                          expanded={isExpanded(block.id)}
-                          onExpand={() => setExpanded((ids) => [...ids, block.id])}
-                          onReact={(emoji) => answered.react(block.id, emoji)}
-                          on={answered.handlers(block.id)}
-                        />
+                        <div onPointerDownCapture={() => seeAnswers(block.id)}>
+                          <RippleResponses
+                            rippleId={block.id}
+                            rippleAuthor={block.author_id}
+                            value={thread}
+                            canRespond={respondable && !page.lockedIds.includes(block.id)}
+                            expanded={isExpanded(block.id)}
+                            onExpand={() => setExpanded((ids) => [...ids, block.id])}
+                            onReact={(emoji) => answered.react(block.id, emoji)}
+                            on={answered.handlers(block.id)}
+                          />
+                        </div>
                       </>
                     )}
                   </div>

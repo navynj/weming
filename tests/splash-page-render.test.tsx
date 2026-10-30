@@ -31,6 +31,13 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
   deleteRipple: record('deleteRipple', { ok: true, rippleId: 'r' }),
   setRippleLock: record('setRippleLock', { ok: true, rippleId: 'r' }),
 }));
+vi.mock('@/features/responses/actions', () => ({
+  setReaction: record('setReaction'),
+  addReply: record('addReply'),
+  editReply: record('editReply'),
+  deleteReply: record('deleteReply'),
+  setReplyHidden: record('setReplyHidden'),
+}));
 vi.mock('@/lib/compress-image', async (actual) => ({
   ...(await actual<typeof import('@/lib/compress-image')>()),
   compressImage: (file: File) =>
@@ -649,5 +656,46 @@ describe('a splash’s description (0037)', () => {
     expect(reader.container.querySelector('[data-splash-description-block]')).toBeNull();
     // Nor a menu item to add one.
     expect(reader.container.querySelector('[data-description-toggle]')).toBeNull();
+  });
+});
+
+describe('the dot for what others left on my block (H25)', () => {
+  it('goes when I tap that block’s reactions, without waiting for the next open', async () => {
+    window.localStorage.clear();
+    const { container } = render(
+      <PeopleProvider me="a1" people={{ a1: { name: 'Yoonji', photo: null } }}>
+        <InputSheetProvider>
+          <SplashPage
+            splash={summarizeSplash(board, blocks, TZ, NOW)}
+            blocks={blocks}
+            photos={{}}
+            lockedIds={[]}
+            categories={LANES}
+            timeZone={TZ}
+            today={TODAY}
+            respondable
+            responses={{
+              reactions: [
+                {
+                  ripple_id: 'first',
+                  user_id: 'u-friend',
+                  emoji: '🙏',
+                  created_at: '2026-09-25T19:00:00.000Z',
+                  thread_pool_id: null,
+                },
+              ],
+              replies: [],
+            }}
+          />
+        </InputSheetProvider>
+      </PeopleProvider>,
+    );
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-responses-unseen]')).toHaveLength(1),
+    );
+    fireEvent.pointerDown(
+      container.querySelector('[data-ripple-responses="first"] [data-reaction]')!,
+    );
+    expect(container.querySelector('[data-responses-unseen]')).toBeNull();
   });
 });

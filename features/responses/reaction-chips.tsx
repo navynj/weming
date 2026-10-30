@@ -30,8 +30,8 @@ export function ReactionChips({
   canReact: boolean;
   onToggle: (emoji: string) => void;
   /**
-   * At the row's left end: the "Reply" that opens the reply field. With it,
-   * the chips go to the right end (Yoonji, in the session).
+   * At the row's left end: the "Reply" that opens the reply field. The chips
+   * keep to the right end, with it or without (Yoonji, in the session).
    */
   leading?: React.ReactNode;
   /**
@@ -50,14 +50,14 @@ export function ReactionChips({
   /** Shown by a mouse's hover, so its leaving takes it away; a long press stays. */
   const hovered = useRef(false);
 
-  /** Where a floating popover sits: under the chips' row, kept on screen. */
+  /** Where a floating popover sits: under the chips, at the row's right end, kept on screen. */
   function place(): void {
     const box = row.current?.getBoundingClientRect();
     if (!box) return;
     setAnchor({
       position: 'fixed',
       top: box.bottom + 4,
-      left: Math.max(8, Math.min(box.left, window.innerWidth - 8 - 320)),
+      right: Math.max(8, window.innerWidth - box.right),
     });
   }
   const pop = (node: React.ReactNode): React.ReactNode =>
@@ -103,11 +103,9 @@ export function ReactionChips({
   }
 
   return (
-    <div ref={row} data-reactions className="relative flex flex-wrap items-center gap-1.5">
+    <div ref={row} data-reactions className="relative flex grow flex-wrap items-center gap-1.5">
       {leading}
-      <span
-        className={`flex flex-wrap items-center gap-1.5 ${leading ? 'ml-auto justify-end' : ''}`}
-      >
+      <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
         {chips.map((chip) => (
           <button
             key={chip.emoji}
@@ -154,7 +152,6 @@ export function ReactionChips({
               onPick={pick}
               onClose={() => setPicking(false)}
               style={floating ? anchor : null}
-              end={leading !== null}
             />,
           )
         : null}
@@ -168,7 +165,7 @@ export function ReactionChips({
               onClick={() => setShowing(null)}
               style={floating && anchor ? anchor : undefined}
               className={`border-pool-200 text-ink z-50 flex flex-col gap-0.5 rounded-lg border bg-white px-3 py-2 text-xs shadow-sm ${
-                floating && anchor ? '' : `absolute top-full mt-1 ${leading ? 'right-0' : 'left-0'}`
+                floating && anchor ? '' : 'absolute top-full right-0 mt-1'
               }`}
             >
               {chips
@@ -190,12 +187,9 @@ function Picker({
   onPick,
   onClose,
   style = null,
-  end = false,
 }: {
   onPick: (emoji: string) => void;
   onClose: () => void;
-  /** Opens from the row's right end, under chips that sit there. */
-  end?: boolean;
   /** Floating: fixed where its chips are, over everything. */
   style?: CSSProperties | null;
 }) {
@@ -207,7 +201,7 @@ function Picker({
       data-reaction-picker
       style={style ?? undefined}
       className={`border-pool-200 z-50 flex items-center gap-1 rounded-full border bg-white p-1 shadow-sm ${
-        style ? '' : `absolute top-full mt-1 ${end ? 'right-0' : 'left-0'}`
+        style ? '' : 'absolute top-full right-0 mt-1'
       }`}
       onKeyDown={(event) => event.key === 'Escape' && onClose()}
     >
