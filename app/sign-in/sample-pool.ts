@@ -1,3 +1,4 @@
+import { WELCOME_SPLASH } from '@/features/auth/welcome-splash';
 import type { SampleLane, SampleSplash } from '@/features/auth/pool-block';
 
 /**
@@ -13,12 +14,16 @@ export const SAMPLE_LANES: SampleLane[] = [
   { id: 'music', name: 'Music', icon: '🎧' },
 ];
 
-/** Newest first. Short titles: a lane on a phone here is about 64px wide. */
+/**
+ * Newest first. Short titles: a lane on a phone here is about 64px wide.
+ * Three pooled (filled), three one's own (no fill), and one carrying the
+ * shell photo every new account's first splash has (H58).
+ */
 export const SAMPLE_SPLASHES: SampleSplash[] = [
   { id: 'sample-1', title: 'Sunrise', lane: 'day', day: '2026-10-12' },
-  { id: 'sample-2', title: 'Ramen', lane: 'food', day: '2026-10-12' },
-  { id: 'sample-3', title: 'Beach', lane: 'place', day: '2026-10-11' },
-  { id: 'sample-4', title: 'Playlist', lane: 'music', day: '2026-10-11' },
-  { id: 'sample-5', title: 'Walk', lane: 'day', day: '2026-10-10' },
+  { id: 'sample-2', title: 'Ramen', lane: 'food', day: '2026-10-12', together: true },
+  { id: 'sample-3', title: 'Shell', lane: 'place', day: '2026-10-11', photo: WELCOME_SPLASH.photo },
+  { id: 'sample-4', title: 'Playlist', lane: 'music', day: '2026-10-11', together: true },
+  { id: 'sample-5', title: 'Walk', lane: 'day', day: '2026-10-10', together: true },
   { id: 'sample-6', title: 'Brunch', lane: 'food', day: '2026-10-10' },
 ];

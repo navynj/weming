@@ -785,7 +785,10 @@ export const LaneGrid = forwardRef<
                         <div
                           data-lane-pieces={day}
                           className="relative"
-                          style={{ gridColumn: `span ${Math.max(columns, 1)}`, height: h }}
+                          // At least its pieces' height, and as tall as the row: a
+                          // rail taller than them (a month's first day, its year and
+                          // month above the date) no longer cuts the ropes short.
+                          style={{ gridColumn: `span ${Math.max(columns, 1)}`, minHeight: h }}
                         >
                           {Array.from({ length: Math.max(columns - 1, 0) }, (_, rope) => (
                             <span

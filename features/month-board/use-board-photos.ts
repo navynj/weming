@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { signBoardPhotos, type SignedMedia } from '@/lib/media';
-import { isVideoPath, videoIdOf } from '@/lib/ripple-media';
+import { appAssetUrl, isAppAsset, isVideoPath, videoIdOf } from '@/lib/ripple-media';
 import { thumbnailUrl } from '@/lib/youtube';
 
 import type { BoardPiece } from './layout';
@@ -17,18 +17,23 @@ export function useSignedPhotos(refs: { rippleId: string; path: string }[]): Sig
   const key = JSON.stringify([...refs].sort((a, b) => a.path.localeCompare(b.path)));
   const [signed, setSigned] = useState<SignedMedia>({});
   // A video's thumbnail needs no signing (part 5): YouTube's own, fetched
-  // only where it is drawn.
-  const videos = useMemo(() => {
+  // only where it is drawn. Nor does a photo the app ships (H58): same
+  // origin, so it asks the server nothing, signed in or out.
+  const unsigned = useMemo(() => {
     const refsNow = JSON.parse(key) as { path: string }[];
     return Object.fromEntries(
-      refsNow
-        .filter((r) => isVideoPath(r.path))
-        .map((r) => [r.path, thumbnailUrl(videoIdOf(r.path))]),
+      refsNow.flatMap((r) =>
+        isVideoPath(r.path)
+          ? [[r.path, thumbnailUrl(videoIdOf(r.path))]]
+          : isAppAsset(r.path)
+            ? [[r.path, appAssetUrl(r.path)]]
+            : [],
+      ),
     );
   }, [key]);
   useEffect(() => {
     const photos = (JSON.parse(key) as { rippleId: string; path: string }[]).filter(
-      (p) => !isVideoPath(p.path),
+      (p) => !isVideoPath(p.path) && !isAppAsset(p.path),
     );
     if (photos.length === 0) return;
     let live = true;
@@ -42,7 +47,7 @@ export function useSignedPhotos(refs: { rippleId: string; path: string }[]): Sig
       live = false;
     };
   }, [key]);
-  return useMemo(() => ({ ...signed, ...videos }), [signed, videos]);
+  return useMemo(() => ({ ...signed, ...unsigned }), [signed, unsigned]);
 }
 
 /** The month's thumbnails, signed once the board shows them. */

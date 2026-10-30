@@ -32,11 +32,11 @@ describe('the sign-in screen’s pool block (H67)', () => {
   it('draws the sample lanes and splashes with Home’s grid, as a picture', () => {
     const { container } = render(<PoolBlock lanes={SAMPLE_LANES} splashes={SAMPLE_SPLASHES} />);
     const block = container.querySelector('[data-pool-block]')!;
-    // The line, set off as a white label with blue words.
-    const line = block.querySelector('p > span')!;
+    // The line: white words on the water, no fill.
+    const line = block.querySelector('p')!;
     expect(line.textContent).toBe('Pool your days.');
-    expect(line.className).toContain('bg-white');
-    expect(line.className).toContain('text-main-900');
+    expect(line.className).toContain('text-white');
+    expect(line.className).not.toContain('bg-white');
     const grid = block.querySelector('[data-lane-grid]')!;
     expect(grid.getAttribute('aria-hidden')).toBe('true');
     expect(grid.hasAttribute('inert')).toBe(true);

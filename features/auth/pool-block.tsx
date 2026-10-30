@@ -8,7 +8,16 @@ import type { SplashSummary } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
 export type SampleLane = { id: string; name: string; icon: string };
-export type SampleSplash = { id: string; title: string; lane: string; day: IsoDate };
+export type SampleSplash = {
+  id: string;
+  title: string;
+  lane: string;
+  day: IsoDate;
+  /** Pooled with others, so its label is filled; else no fill, as a record of one's own. */
+  together?: boolean;
+  /** A photo the app ships (`app:` path), drawn on the board as Home draws one. */
+  photo?: string;
+};
 
 const NONE = (): void => {};
 
@@ -20,12 +29,14 @@ const NONE = (): void => {};
  */
 export function PoolBlock({ lanes, splashes }: { lanes: SampleLane[]; splashes: SampleSplash[] }) {
   const { cards, columns, top, water } = useMemo(() => {
-    // Pooled, so filled as Home fills a record with others in it (0033, H55),
-    // each label one lane wide, as a person can set it, so none runs past the block.
+    // Filled where pooled, as Home fills a record with others in it (0033,
+    // H55); each label one lane wide, as a person can set it, so none runs
+    // past the block.
     const cards = splashes.map((s) => ({
       ...placeCard(summaryOf(s), '', 'UTC'),
-      together: true,
+      together: s.together === true,
       layout: { label: { width: 1 } },
+      ...(s.photo ? { photos: [{ rippleId: s.id, path: s.photo }] } : {}),
     }));
     return {
       cards,
@@ -39,10 +50,7 @@ export function PoolBlock({ lanes, splashes }: { lanes: SampleLane[]; splashes: 
 
   return (
     <div data-pool-block className="bg-main-900 w-full overflow-hidden rounded-3xl">
-      {/* The line set off as a white label on the water, its words blue (review). */}
-      <p className="px-5 pt-5 pb-3 text-lg font-semibold">
-        <span className="text-main-900 rounded-md bg-white px-2 py-0.5">Pool your days.</span>
-      </p>
+      <p className="px-5 pt-5 pb-3 text-lg font-semibold text-white">Pool your days.</p>
       <div className="flex h-64 flex-col">
         <LaneGrid
           decorative
