@@ -19,8 +19,14 @@ const NONE = (): void => {};
  * focused or read out but its line.
  */
 export function PoolBlock({ lanes, splashes }: { lanes: SampleLane[]; splashes: SampleSplash[] }) {
-  const { cards, columns, top, water, ring } = useMemo(() => {
-    const cards = splashes.map((s) => placeCard(summaryOf(s), '', 'UTC'));
+  const { cards, columns, top, water } = useMemo(() => {
+    // Pooled, so filled as Home fills a record with others in it (0033, H55),
+    // each label one lane wide, as a person can set it, so none runs past the block.
+    const cards = splashes.map((s) => ({
+      ...placeCard(summaryOf(s), '', 'UTC'),
+      together: true,
+      layout: { label: { width: 1 } },
+    }));
     return {
       cards,
       // No header links: a lane here is a picture of one.
@@ -28,21 +34,24 @@ export function PoolBlock({ lanes, splashes }: { lanes: SampleLane[]; splashes: 
       top: splashes[0]?.day ?? '2026-10-12',
       // The newest is the solid mark; the rest read translucent, as on Home.
       water: new Set(splashes.slice(1).map((s) => s.id)),
-      // One ring at the newest, on first render; none under reduced motion (CommitRing).
-      ring: splashes[0] ? { id: splashes[0].id, seq: 1 } : null,
     };
   }, [lanes, splashes]);
 
   return (
     <div data-pool-block className="bg-main-900 w-full overflow-hidden rounded-3xl">
-      <p className="px-5 pt-5 pb-3 text-lg font-semibold text-white">Pool your days.</p>
+      {/* The line set off as a white label on the water, its words blue (review). */}
+      <p className="px-5 pt-5 pb-3 text-lg font-semibold">
+        <span className="text-main-900 rounded-md bg-white px-2 py-0.5">Pool your days.</span>
+      </p>
       <div className="flex h-64 flex-col">
         <LaneGrid
           decorative
+          // Drawn as Home draws them now: labels, not the older marks.
+          pieces
           cards={cards}
           categories={columns}
           today={top}
-          ring={ring}
+          ring={null}
           waterIds={water}
           initials={null}
           scrollToMonth={null}

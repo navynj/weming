@@ -13,12 +13,12 @@ export const SAMPLE_LANES: SampleLane[] = [
   { id: 'music', name: 'Music', icon: '🎧' },
 ];
 
-/** Newest first: the first is the one solid mark, and its ring plays once. */
+/** Newest first. Short titles: a lane on a phone here is about 64px wide. */
 export const SAMPLE_SPLASHES: SampleSplash[] = [
-  { id: 'sample-1', title: 'Slow morning', lane: 'day', day: '2026-10-12' },
-  { id: 'sample-2', title: 'Ramen night', lane: 'food', day: '2026-10-12' },
-  { id: 'sample-3', title: 'Sea to Sky', lane: 'place', day: '2026-10-11' },
-  { id: 'sample-4', title: 'Night drive', lane: 'music', day: '2026-10-11' },
-  { id: 'sample-5', title: 'Long walk', lane: 'day', day: '2026-10-10' },
+  { id: 'sample-1', title: 'Sunrise', lane: 'day', day: '2026-10-12' },
+  { id: 'sample-2', title: 'Ramen', lane: 'food', day: '2026-10-12' },
+  { id: 'sample-3', title: 'Beach', lane: 'place', day: '2026-10-11' },
+  { id: 'sample-4', title: 'Playlist', lane: 'music', day: '2026-10-11' },
+  { id: 'sample-5', title: 'Walk', lane: 'day', day: '2026-10-10' },
   { id: 'sample-6', title: 'Brunch', lane: 'food', day: '2026-10-10' },
 ];

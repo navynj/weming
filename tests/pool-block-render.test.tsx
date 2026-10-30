@@ -32,7 +32,11 @@ describe('the sign-in screen’s pool block (H67)', () => {
   it('draws the sample lanes and splashes with Home’s grid, as a picture', () => {
     const { container } = render(<PoolBlock lanes={SAMPLE_LANES} splashes={SAMPLE_SPLASHES} />);
     const block = container.querySelector('[data-pool-block]')!;
-    expect(block.querySelector('p')!.textContent).toBe('Pool your days.');
+    // The line, set off as a white label with blue words.
+    const line = block.querySelector('p > span')!;
+    expect(line.textContent).toBe('Pool your days.');
+    expect(line.className).toContain('bg-white');
+    expect(line.className).toContain('text-main-900');
     const grid = block.querySelector('[data-lane-grid]')!;
     expect(grid.getAttribute('aria-hidden')).toBe('true');
     expect(grid.hasAttribute('inert')).toBe(true);
@@ -45,8 +49,8 @@ describe('the sign-in screen’s pool block (H67)', () => {
     // No lane opens its page from here, and nothing adds a lane.
     expect(grid.querySelector('a')).toBeNull();
     expect(grid.querySelector('[data-new-lane]')).toBeNull();
-    expect(grid.querySelectorAll('[data-mark]')).toHaveLength(SAMPLE_SPLASHES.length);
-    // The newest is the solid mark; the rest read translucent.
-    expect(grid.querySelectorAll('[data-mark]:not([data-dived])')).toHaveLength(1);
+    // Drawn as Home draws them now: pieces with labels, never the older marks.
+    expect(grid.querySelectorAll('[data-board-piece]')).toHaveLength(SAMPLE_SPLASHES.length);
+    expect(grid.querySelector('[data-mark]')).toBeNull();
   });
 });
