@@ -37,7 +37,7 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
 
       <div className="mt-10 flex w-full max-w-sm flex-col items-center">
         <PoolBlock lanes={SAMPLE_LANES} splashes={SAMPLE_SPLASHES} />
-        <p className="text-pool-500 mt-4 mb-3 text-xs">For a few close friends.</p>
+        <p className="text-pool-500 mt-4 mb-10 text-xs">For a few close friends.</p>
         <SignInButton next={typeof params.next === 'string' ? safeNext(params.next) : null} />
       </div>
 

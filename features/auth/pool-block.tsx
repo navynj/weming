@@ -35,7 +35,7 @@ export function PoolBlock({ lanes, splashes }: { lanes: SampleLane[]; splashes: 
 
   return (
     <div data-pool-block className="bg-main-900 w-full overflow-hidden rounded-3xl">
-      <p className="px-5 pt-5 pb-3 text-base font-semibold text-white">Pool your days.</p>
+      <p className="px-5 pt-5 pb-3 text-lg font-semibold text-white">Pool your days.</p>
       <div className="flex h-64 flex-col">
         <LaneGrid
           decorative
