@@ -17,6 +17,8 @@ export type SampleSplash = {
   together?: boolean;
   /** A photo the app ships (`app:` path), drawn on the board as Home draws one. */
   photo?: string;
+  /** Its icon inline before the words, as a person can set it (Inline). */
+  inline?: boolean;
 };
 
 const NONE = (): void => {};
@@ -35,7 +37,7 @@ export function PoolBlock({ lanes, splashes }: { lanes: SampleLane[]; splashes: 
     const cards = splashes.map((s) => ({
       ...placeCard(summaryOf(s), '', 'UTC'),
       together: s.together === true,
-      layout: { label: { width: 1 } },
+      layout: { label: { width: 1 }, ...(s.inline ? { icon: { inline: true } } : {}) },
       ...(s.photo ? { photos: [{ rippleId: s.id, path: s.photo }] } : {}),
     }));
     return {

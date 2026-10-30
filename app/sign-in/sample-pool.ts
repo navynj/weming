@@ -20,7 +20,7 @@ export const SAMPLE_LANES: SampleLane[] = [
  * shell photo every new account's first splash has (H58).
  */
 export const SAMPLE_SPLASHES: SampleSplash[] = [
-  { id: 'sample-1', title: 'Sunrise', lane: 'day', day: '2026-10-12' },
+  { id: 'sample-1', title: 'Sunrise', lane: 'day', day: '2026-10-12', inline: true },
   { id: 'sample-2', title: 'Ramen', lane: 'food', day: '2026-10-12', together: true },
   { id: 'sample-3', title: 'Shell', lane: 'place', day: '2026-10-11', photo: WELCOME_SPLASH.photo },
   { id: 'sample-4', title: 'Playlist', lane: 'music', day: '2026-10-11', together: true },
