@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Weming',
     short_name: 'Weming',
     description:
-      "Pool your days with a few close friends. We're swimming side by side, each in our own lane.",
+      "Pool your days. We're swimming side by side, each in our own lane. For a few close friends.",
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

@@ -21,18 +21,21 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6 text-center">
-      {/* The title, then the bold line, then the soft one between them (H65). */}
+      {/* The title, the soft line, then the bold line right above the button,
+          and a note under it (H65, revised). */}
       <div className="max-w-xs space-y-3">
         <h1 className="text-main-900 text-3xl font-semibold">Weming Diary</h1>
-        {/* Each line breaks only between its halves, never inside one. */}
+        {/* Breaks only between its halves, never inside one. */}
         <p className="text-pool-500 text-sm font-light">
           <span className="whitespace-nowrap">We&rsquo;re swimming side by side,</span>{' '}
           <span className="whitespace-nowrap">each in our own lane.</span>
         </p>
-        <p className="text-ink font-semibold">
-          <span className="whitespace-nowrap">Pool your days</span>{' '}
-          <span className="whitespace-nowrap">with a few close friends.</span>
-        </p>
+      </div>
+
+      <div className="flex flex-col items-center">
+        <p className="text-ink mb-4 font-semibold">Pool your days.</p>
+        <SignInButton next={typeof params.next === 'string' ? safeNext(params.next) : null} />
+        <p className="text-pool-500 mt-5 text-xs font-light">For a few close friends.</p>
       </div>
 
       {message ? (
@@ -43,8 +46,6 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
           {message}
         </p>
       ) : null}
-
-      <SignInButton next={typeof params.next === 'string' ? safeNext(params.next) : null} />
     </main>
   );
 }

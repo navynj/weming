@@ -1,6 +1,6 @@
 # Weming: Product Spec (v0.25)
 
-> **Weming Diary.** Pool your days with a few close friends. We're swimming side by side, each in our own lane. (H65)
+> **Weming Diary.** Pool your days. We're swimming side by side, each in our own lane. For a few close friends. (H65)
 >
 > **The hand throws moments at stories; the machine shelves them in time.** (H20)
 >

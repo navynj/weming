@@ -18,9 +18,9 @@ const poppins = Poppins({
   display: 'swap',
 });
 
-// The intro's two lines, bold one first (H65); a link preview reads the same.
+// The intro's lines, bold one first (H65); a link preview reads the same.
 const description =
-  "Pool your days with a few close friends. We're swimming side by side, each in our own lane.";
+  "Pool your days. We're swimming side by side, each in our own lane. For a few close friends.";
 
 export const metadata: Metadata = {
   title: 'Weming',
