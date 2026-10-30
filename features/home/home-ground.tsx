@@ -363,8 +363,7 @@ export function HomeGround({
             </p>
           ) : null}
 
-          {/* On a phone the Board takes the pinned strip's height (review). */}
-          {boardView ? null : pinnedStrip('phone')}
+          {pinnedStrip('phone')}
           {boardView ? (
             // In the grid's place, the stack beside or beneath it as in the
             // Lane view: a tap brings the post's card to the top.

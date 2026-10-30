@@ -310,8 +310,7 @@ export function PoolGround({
             </p>
           ) : null}
 
-          {/* On a phone the Board takes the pinned strip's height (review). */}
-          {boardView ? null : pinnedStrip('phone')}
+          {pinnedStrip('phone')}
 
           {shown.length === 0 && !boardView ? (
             <p data-pool-empty className="px-6 pt-6 text-sm/relaxed text-white/80">

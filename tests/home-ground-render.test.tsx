@@ -909,6 +909,14 @@ describe('pinned posts as cards (round 3)', () => {
     expect(card.closest('li')!.className).toContain('w-[calc(100%-2.5rem)]');
   });
 
+  it('sits under the header on a phone in the Board view too', () => {
+    homeView = 'board';
+    const { container } = ground(pinnedPosts());
+    expect(container.querySelector('[data-board-frame]')).not.toBeNull();
+    const strip = container.querySelector('[data-pinned-cards="phone"]')!;
+    expect(strip.querySelectorAll('[data-pinned-card]')).toHaveLength(2);
+  });
+
   it('is absent when nothing is pinned', () => {
     const { container } = ground(POSTS.filter((p) => !p.pinnedAt));
     expect(container.querySelector('[data-pinned-cards]')).toBeNull();
