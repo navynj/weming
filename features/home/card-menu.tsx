@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { MoreHorizontal, Pencil } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 
@@ -12,9 +12,9 @@ import { usePoolEditScope } from '@/features/pool/edit-scope';
 import type { Card } from './grid';
 
 /**
- * The top card's quiet menu (review): the `…` at its top right, the same
- * three things the post's page offers from its header — open the page,
- * pin or unpin, delete behind a small confirm. No conversions (H45): a
+ * The top card's quiet menu (review): the `…` at its top right — open the
+ * page, edit it in the compose sheet, pin or unpin, delete behind a small
+ * confirm. No conversions (H45): a
  * record opens to others through its Audience. In ink, the selection
  * channel. A sibling of the card's link, never inside it.
  */
@@ -39,19 +39,6 @@ export function CardMenu({
       className="absolute top-3 right-3 z-20 flex items-center"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {card.editable || (card.fileable && !pool) ? (
-        // Edit, beside the menu (review): the compose sheet in edit mode —
-        // for someone's record on my Home, only where it shows there (H45).
-        <button
-          type="button"
-          aria-label="Edit"
-          data-card-edit
-          onClick={() => openEdit(card.splash.id, pool)}
-          className="text-pool-500 flex h-8 w-8 items-center justify-center rounded-full"
-        >
-          <Pencil aria-hidden size={16} />
-        </button>
-      ) : null}
       <button
         type="button"
         aria-label="More"
@@ -85,6 +72,24 @@ export function CardMenu({
                 Open
               </Link>
             </li>
+            {card.editable || (card.fileable && !pool) ? (
+              // The compose sheet in edit mode — for someone's record on my
+              // Home, only where it shows there (H45).
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-card-edit
+                  onClick={() => {
+                    setMenu('closed');
+                    openEdit(card.splash.id, pool);
+                  }}
+                  className="w-full px-4 py-2.5 text-left"
+                >
+                  Edit
+                </button>
+              </li>
+            ) : null}
             {card.menu?.pin === false ? null : (
               <li>
                 <button

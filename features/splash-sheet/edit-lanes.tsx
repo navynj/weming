@@ -38,8 +38,8 @@ export type EditLanes = {
 
 /**
  * The edit sheet's lanes (0022, 0033, H45). Opened from a pool the record
- * is in: that pool's lane chips, and With on a joint record or my pool
- * record. Opened from Home: my lanes and the Audience for my Home record;
+ * is in: that pool's lane chips, With on a joint record or my pool record,
+ * and the Audience for my Home record or my pool record, as on its page. Opened from Home: my lanes and the Audience for my Home record;
  * for a pool record, a joint record or someone's record I wrote on, where it
  * shows on my Home — its pool's chip, then my lanes — filed at once, and for
  * my pool record its Audience too. Nothing changes kind here.
@@ -130,16 +130,33 @@ export function useEditLanes(
         jointChanged,
       node: (
         <div data-edit-pool-lanes className="flex flex-col gap-2">
-          <PoolLanePicker
-            scope={pool}
-            pick={poolLane ? { kind: joint ? 'joint' : 'own', poolLaneId: poolLane } : null}
-            onPick={(next) => next && setChosenLane(next.poolLaneId)}
-            together={together}
-            onTogether={setTogether}
-            fixed={fixed}
-            fixedEveryone={joint && !makerWith && initial.inviteAll}
-            withTogether={joint || own}
-          />
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <PoolLanePicker
+                scope={pool}
+                pick={poolLane ? { kind: joint ? 'joint' : 'own', poolLaneId: poolLane } : null}
+                onPick={(next) => next && setChosenLane(next.poolLaneId)}
+                together={together}
+                onTogether={setTogether}
+                fixed={fixed}
+                fixedEveryone={joint && !makerWith && initial.inviteAll}
+                withTogether={joint || own}
+              />
+            </div>
+            {!joint && pools.length > 0 ? (
+              // Switched in place, as on its page (H23, 0056): my pool
+              // record's own pool always on until Move to Home.
+              <SplashAudience
+                splashId={initial.id}
+                myLaneId={own ? (initial.home?.filed ?? null) : initial.declaredLaneId}
+                shared={own ? initial.ownShared : initial.sharedIn}
+                pools={pools}
+                locked={own ? initial.poolId : null}
+                moveHome={own ? { lanes: categories, filed: initial.home?.filed ?? null } : null}
+                onMoved={onMoved}
+              />
+            ) : null}
+          </div>
           <Notes
             lines={
               dropped.length > 0

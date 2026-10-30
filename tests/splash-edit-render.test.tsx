@@ -98,11 +98,11 @@ const SUMMARY = {
   orphan: false,
 } satisfies SplashSummary;
 
-describe('the edit pencil (review)', () => {
+describe('the card menu’s Edit (review)', () => {
   it('shows only where I can edit', () => {
     const card = placeCard(SUMMARY, '', 'UTC');
-    const menu = (editable: boolean) =>
-      render(
+    const menu = (editable: boolean) => {
+      const view = render(
         <InputSheetProvider>
           <CardMenu
             card={{ ...card, editable }}
@@ -112,6 +112,9 @@ describe('the edit pencil (review)', () => {
           />
         </InputSheetProvider>,
       );
+      fireEvent.click(view.container.querySelector('[data-card-menu-button]')!);
+      return view;
+    };
     expect(menu(true).container.querySelector('[data-card-edit]')).not.toBeNull();
     cleanup();
     expect(menu(false).container.querySelector('[data-card-edit]')).toBeNull();
@@ -402,6 +405,25 @@ describe('converting from the edit sheet (0022, 0033)', () => {
   const warnings = (view: ReturnType<typeof render>) =>
     [...view.container.querySelectorAll('[data-edit-warning]')].map((w) => w.textContent);
 
+  it('from a pool: my Home record and my pool record show their Audience', async () => {
+    const home = await sheet(MINE_SHARED, SCOPE);
+    expect(home.container.querySelector('[data-audience-chip]')).not.toBeNull();
+    cleanup();
+    const own = await sheet(
+      {
+        ...MINE_SHARED,
+        kind: 'own',
+        poolId: 'p-ours',
+        poolLaneId: 'l-media',
+        sharedIn: [],
+        ownShared: [{ poolId: 'p-ours', poolLaneId: 'l-media' }],
+        ownTogether: { everyone: false, picked: [] },
+      },
+      SCOPE,
+    );
+    expect(own.container.querySelector('[data-audience-chip]')).not.toBeNull();
+  });
+
   it('from a pool: my Home record offers no With there; it never becomes joint here', async () => {
     const view = await sheet(MINE_SHARED, SCOPE);
     expect(view.container.querySelector('[data-together]')).toBeNull();
@@ -416,6 +438,7 @@ describe('converting from the edit sheet (0022, 0033)', () => {
         poolId: 'p-ours',
         poolLaneId: 'l-media',
         sharedIn: [],
+        ownShared: [],
         ownTogether: { everyone: false, picked: [] },
       },
       SCOPE,
@@ -439,7 +462,14 @@ describe('converting from the edit sheet (0022, 0033)', () => {
 
   it('from a pool: with nobody picked, moves my pool record among the pool lanes', async () => {
     const view = await sheet(
-      { ...MINE_SHARED, kind: 'own', poolId: 'p-ours', poolLaneId: 'l-media', sharedIn: [] },
+      {
+        ...MINE_SHARED,
+        kind: 'own',
+        poolId: 'p-ours',
+        poolLaneId: 'l-media',
+        sharedIn: [],
+        ownShared: [],
+      },
       SCOPE,
     );
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="l-games"]')!);
