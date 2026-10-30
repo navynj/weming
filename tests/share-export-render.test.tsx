@@ -106,10 +106,20 @@ describe('the shared image’s page (H63)', () => {
         el.getAttribute('data-board-shape'),
       ),
     );
-    expect([...shapes].sort()).toEqual(['joint', 'ranged', 'theirs', 'unflagged']);
+    expect([...shapes].sort()).toEqual(['ranged', 'theirs', 'unflagged']);
     for (const el of container.querySelectorAll('[data-board-shape]')) {
       expect(el.textContent).toBe('');
     }
+  });
+
+  it('draws someone’s record I wrote on as my photo alone, with no words', () => {
+    const { container } = exported('week', false);
+    const piece = container.querySelector('[data-board-piece="joint"]')!;
+    expect(piece).not.toBeNull();
+    expect([...piece.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual([
+      MY_PHOTOS[`${ME}/side.webp`],
+    ]);
+    expect(piece.textContent?.trim()).toBe('');
   });
 
   it('is the week in two rows, Sun–Wed over Thu–Sat, the wordmark in the eighth cell', () => {
@@ -207,11 +217,16 @@ describe('the share sheet (H63)', () => {
     await waitFor(() => expect(signed.asked.length).toBeGreaterThan(0));
     const asked = signed.asked.flat();
     expect(asked.length).toBeGreaterThan(0);
-    // My photos and my video, on my ripples; never Mina's photo or video.
+    // My photos and my video, on my ripples — her record's too; never Mina's photo or video.
     expect(asked.map((p) => p.path).sort()).toEqual(
-      [`${ME}/side.webp`, `${ME}/swim.webp`, `yt:${MY_VIDEO}`].sort(),
+      [`${ME}/side.webp`, `${ME}/side.webp`, `${ME}/swim.webp`, `yt:${MY_VIDEO}`].sort(),
     );
-    expect(asked.map((p) => p.rippleId).sort()).toEqual(['mine-1', 'mine-1', 'side-me']);
+    expect(asked.map((p) => p.rippleId).sort()).toEqual([
+      'joint-me',
+      'mine-1',
+      'mine-1',
+      'side-me',
+    ]);
   });
 
   it('keeps the pool’s name and faces off until the switch, then shows the name', async () => {

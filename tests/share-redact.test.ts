@@ -12,7 +12,7 @@ describe('a shared image’s records (H63)', () => {
     for (const faces of [false, true]) {
       const { cards, shapes } = redactForExport(shareCards(), { faces });
       const of = byId(cards);
-      for (const id of ['theirs', 'joint', 'ranged', 'unflagged']) {
+      for (const id of ['theirs', 'ranged', 'unflagged']) {
         expect(shapes.has(id)).toBe(true);
         const json = JSON.stringify(of[id]);
         for (const s of SENTINELS) expect(json).not.toContain(s);
@@ -56,12 +56,27 @@ describe('a shared image’s records (H63)', () => {
     expect(on.origins).toBeUndefined();
   });
 
-  it('draws someone’s joint record I wrote on as a shape: its title is theirs', () => {
-    const { cards, shapes } = redactForExport(shareCards(), { faces: true });
-    expect(shapes.has('joint')).toBe(true);
-    // My side's photo stays off her frame too.
-    expect(byId(cards).joint.photos).toBeUndefined();
-    expect(byId(cards).joint.waitsForMe).toBeUndefined();
+  it('draws someone’s record I wrote on as my photos alone: no label, nothing of hers', () => {
+    for (const faces of [false, true]) {
+      const { cards, shapes } = redactForExport(shareCards(), { faces });
+      const joint = byId(cards).joint;
+      expect(shapes.has('joint')).toBe(false);
+      expect(joint.photos?.map((p) => p.path)).toEqual([`${ME}/side.webp`]);
+      expect(joint.layout?.label?.hidden).toBe(true);
+      expect(joint.layout?.icon?.hidden).toBe(true);
+      expect(joint.ripples).toEqual([]);
+      expect(joint.waitsForMe).toBeUndefined();
+      const json = JSON.stringify(joint);
+      for (const s of SENTINELS) expect(json).not.toContain(s);
+    }
+  });
+
+  it('leaves out someone’s record I wrote on with no photo of mine', () => {
+    const joint = shareCards().find((c) => c.splash.id === 'joint')!;
+    const wordsOnly = { ...joint, photos: [] };
+    const { cards, shapes } = redactForExport([wordsOnly], { faces: false });
+    expect(cards).toEqual([]);
+    expect(shapes.size).toBe(0);
   });
 
   it('reads an untitled record’s first words only when they are mine', () => {

@@ -6,7 +6,8 @@ import type { SplashSummary } from '@/features/splash/summary';
  * What a shared image may say (H63). My own records are drawn as they are;
  * anyone else's is a shape in its label's colour, with no words, photos,
  * faces or names. The rule for a record with others on it: the title follows
- * who made the record, each photo who posted it. The pool's name and its
+ * who made the record, each photo who posted it — so someone's record I
+ * wrote on is my photos there with no label, or nothing when I posted none. The pool's name and its
  * members' faces show only with the switch on.
  */
 export type ExportOptions = {
@@ -33,10 +34,14 @@ export const SHAPE_WORDS = 'xxxxxxxx';
  */
 export function redactForExport(cards: Card[], { faces }: ExportOptions): Redacted {
   const shapes = new Set<string>();
-  const out = cards.map((card) => {
-    if (card.madeByMe === true) return mineCard(card, faces);
+  const out = cards.flatMap((card) => {
+    if (card.madeByMe === true) return [mineCard(card, faces)];
+    if (card.ripples.some((r) => r.byMe === true)) {
+      const side = mySideCard(card);
+      return side ? [side] : [];
+    }
     shapes.add(card.splash.id);
-    return shapeCard(card);
+    return [shapeCard(card)];
   });
   return { cards: out, shapes };
 }
@@ -91,6 +96,38 @@ function mineCard(card: Card, faces: boolean): Card {
           ...(card.sharedPools ? { sharedPools: card.sharedPools } : {}),
         }
       : {}),
+  };
+}
+
+/**
+ * Someone's record I wrote on (Yoonji, in the session): my photos and
+ * videos on it, no label, no icon; with none of mine, not drawn. On its last
+ * day, a ranged one too, since a band has no photos to carry.
+ */
+function mySideCard(card: Card): Card | null {
+  const own = new Set(card.ripples.filter((r) => r.byMe === true).map((r) => r.id));
+  const photos = (card.photos ?? []).filter((p) => own.has(p.rippleId));
+  if (photos.length === 0) return null;
+  const day = { start: card.day, end: card.day };
+  const shape = shapeCard(card);
+  // My photos' and videos' own settings, hidden ones included; nobody else's.
+  const paths = new Set(photos.map((p) => p.path));
+  const mine = <T>(set: Record<string, T> | undefined, key: (k: string) => string) =>
+    set ? Object.fromEntries(Object.entries(set).filter(([k]) => paths.has(key(k)))) : undefined;
+  const layout: BoardLayoutJson = {
+    ...shape.layout,
+    label: { hidden: true },
+    icon: { hidden: true },
+  };
+  const ownPhotos = mine(card.layout?.photos, (k) => k);
+  const ownVideos = mine(card.layout?.videos, (k) => `yt:${k}`);
+  if (ownPhotos) layout.photos = ownPhotos;
+  if (ownVideos) layout.videos = ownVideos;
+  return {
+    ...shape,
+    splash: { ...shape.splash, declaredRange: day, range: day },
+    photos,
+    layout,
   };
 }
 
