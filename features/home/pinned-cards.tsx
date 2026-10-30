@@ -47,7 +47,7 @@ export function PinnedCards({
     >
       <ol
         ref={strip}
-        className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-6"
+        className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-6 sm:px-4"
         style={{ scrollPaddingLeft: 16 }}
       >
         {cards.map((card) => {
