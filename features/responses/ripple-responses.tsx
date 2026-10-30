@@ -10,8 +10,8 @@ import { ReplyList, type ReplyHandlers } from './reply-list';
 
 /**
  * What readers left under one block (H25): its reaction chips, then its
- * replies. The reply field is not always open: "Reply" at the right end of
- * the reactions row opens it, with Cancel and Save (Yoonji, in the
+ * replies. The reply field is not always open: "Reply" at the left end of
+ * the reactions row, its chips at the right end, opens it, with Cancel and Save (Yoonji, in the
  * session). Nothing at all where nobody else can see the ripple and nothing
  * was left; a locked ripple takes none (0030).
  */
@@ -45,7 +45,7 @@ export function RippleResponses({
         chips={chips}
         canReact={canRespond}
         onToggle={onReact}
-        trailing={
+        leading={
           canRespond ? (
             <button
               type="button"

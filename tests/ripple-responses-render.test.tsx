@@ -124,10 +124,11 @@ describe('replies under a block', () => {
     expect(more.textContent).toBe('+3 more replies');
     fireEvent.click(more);
     expect(onExpand).toHaveBeenCalled();
-    // Not always open (Yoonji, in the session): "Reply" at the reactions row's right end.
+    // Not always open (Yoonji, in the session): "Reply" at the reactions row's left end.
     expect(container.querySelector('[data-reply-input]')).toBeNull();
     const toggle = container.querySelector('[data-reactions] [data-reply-toggle]')!;
     expect(toggle.textContent).toBe('Reply');
+    expect(container.querySelector('[data-reactions]')!.firstElementChild).toBe(toggle);
     fireEvent.click(toggle);
     const input = container.querySelector('[data-reply-input] textarea')!;
     expect(input.getAttribute('placeholder')).toBe('Reply…');

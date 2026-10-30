@@ -24,13 +24,16 @@ export function ReactionChips({
   canReact,
   onToggle,
   floating = false,
-  trailing = null,
+  leading = null,
 }: {
   chips: ReactionChip[];
   canReact: boolean;
   onToggle: (emoji: string) => void;
-  /** At the row's right end: the "Reply" that opens the reply field. */
-  trailing?: React.ReactNode;
+  /**
+   * At the row's left end: the "Reply" that opens the reply field. With it,
+   * the chips go to the right end (Yoonji, in the session).
+   */
+  leading?: React.ReactNode;
   /**
    * The picker and the who-reacted list float over the page, where the chips
    * sit in something that clips: the top card, cut at its fixed height.
@@ -61,7 +64,7 @@ export function ReactionChips({
     floating && anchor ? createPortal(node, document.body) : node;
   const nameOf = (id: string): string => (id === me ? 'You' : (people[id]?.name ?? 'Someone'));
 
-  if (chips.length === 0 && !canReact && !trailing) return null;
+  if (chips.length === 0 && !canReact && !leading) return null;
 
   function press(emoji: string): void {
     held.current = false;
@@ -101,45 +104,49 @@ export function ReactionChips({
 
   return (
     <div ref={row} data-reactions className="relative flex flex-wrap items-center gap-1.5">
-      {chips.map((chip) => (
-        <button
-          key={chip.emoji}
-          type="button"
-          data-reaction={chip.emoji}
-          data-mine={chip.mine ? '' : undefined}
-          aria-pressed={chip.mine}
-          aria-label={`${chip.emoji} ${chip.count}`}
-          // A keyboard's Enter or Space has no pointer: it toggles here.
-          onClick={(event) => event.detail === 0 && canReact && onToggle(chip.emoji)}
-          onPointerDown={() => press(chip.emoji)}
-          onPointerUp={() => release(chip.emoji)}
-          onPointerEnter={(event) => enter(event, chip.emoji)}
-          onPointerLeave={leave}
-          onContextMenu={(event) => event.preventDefault()}
-          className={`${CHIP} select-none ${
-            chip.mine ? 'bg-ink text-white' : 'border-pool-200 text-ink border bg-white'
-          }`}
-        >
-          <span aria-hidden>{chip.emoji}</span>
-          <span>{chip.count}</span>
-        </button>
-      ))}
-      {canReact ? (
-        <button
-          type="button"
-          data-reaction-add
-          aria-label="Add a reaction"
-          aria-expanded={picking}
-          onClick={() => {
-            if (floating) place();
-            setPicking((open) => !open);
-          }}
-          className={`${CHIP} border-pool-200 text-pool-500 border bg-white`}
-        >
-          +
-        </button>
-      ) : null}
-      {trailing ? <span className="ml-auto">{trailing}</span> : null}
+      {leading}
+      <span
+        className={`flex flex-wrap items-center gap-1.5 ${leading ? 'ml-auto justify-end' : ''}`}
+      >
+        {chips.map((chip) => (
+          <button
+            key={chip.emoji}
+            type="button"
+            data-reaction={chip.emoji}
+            data-mine={chip.mine ? '' : undefined}
+            aria-pressed={chip.mine}
+            aria-label={`${chip.emoji} ${chip.count}`}
+            // A keyboard's Enter or Space has no pointer: it toggles here.
+            onClick={(event) => event.detail === 0 && canReact && onToggle(chip.emoji)}
+            onPointerDown={() => press(chip.emoji)}
+            onPointerUp={() => release(chip.emoji)}
+            onPointerEnter={(event) => enter(event, chip.emoji)}
+            onPointerLeave={leave}
+            onContextMenu={(event) => event.preventDefault()}
+            className={`${CHIP} select-none ${
+              chip.mine ? 'bg-ink text-white' : 'border-pool-200 text-ink border bg-white'
+            }`}
+          >
+            <span aria-hidden>{chip.emoji}</span>
+            <span>{chip.count}</span>
+          </button>
+        ))}
+        {canReact ? (
+          <button
+            type="button"
+            data-reaction-add
+            aria-label="Add a reaction"
+            aria-expanded={picking}
+            onClick={() => {
+              if (floating) place();
+              setPicking((open) => !open);
+            }}
+            className={`${CHIP} border-pool-200 text-pool-500 border bg-white`}
+          >
+            +
+          </button>
+        ) : null}
+      </span>
 
       {picking
         ? pop(
@@ -147,6 +154,7 @@ export function ReactionChips({
               onPick={pick}
               onClose={() => setPicking(false)}
               style={floating ? anchor : null}
+              end={leading !== null}
             />,
           )
         : null}
@@ -160,7 +168,7 @@ export function ReactionChips({
               onClick={() => setShowing(null)}
               style={floating && anchor ? anchor : undefined}
               className={`border-pool-200 text-ink z-50 flex flex-col gap-0.5 rounded-lg border bg-white px-3 py-2 text-xs shadow-sm ${
-                floating && anchor ? '' : 'absolute top-full left-0 mt-1'
+                floating && anchor ? '' : `absolute top-full mt-1 ${leading ? 'right-0' : 'left-0'}`
               }`}
             >
               {chips
@@ -182,9 +190,12 @@ function Picker({
   onPick,
   onClose,
   style = null,
+  end = false,
 }: {
   onPick: (emoji: string) => void;
   onClose: () => void;
+  /** Opens from the row's right end, under chips that sit there. */
+  end?: boolean;
   /** Floating: fixed where its chips are, over everything. */
   style?: CSSProperties | null;
 }) {
@@ -196,7 +207,7 @@ function Picker({
       data-reaction-picker
       style={style ?? undefined}
       className={`border-pool-200 z-50 flex items-center gap-1 rounded-full border bg-white p-1 shadow-sm ${
-        style ? '' : 'absolute top-full left-0 mt-1'
+        style ? '' : `absolute top-full mt-1 ${end ? 'right-0' : 'left-0'}`
       }`}
       onKeyDown={(event) => event.key === 'Escape' && onClose()}
     >
