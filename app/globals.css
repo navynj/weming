@@ -470,11 +470,7 @@ body {
   box-shadow: none;
   color: var(--theme-900);
 }
-/* Light's and pastel's Glass have no edge (Yoonji, in the session): the tint alone. */
-[data-mode='light'] .water-ground .label-glass,
-[data-mode='pastel'] .water-ground .label-glass {
-  --tw-ring-color: transparent;
-}
+/* Glass has no edge on any ground (H66): the tint alone. */
 [data-mode='light'] .water-ground .label-glass {
   background-color: color-mix(in srgb, var(--theme-900) 20%, #ffffff);
 }

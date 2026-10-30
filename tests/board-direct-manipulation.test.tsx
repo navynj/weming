@@ -1166,13 +1166,13 @@ describe('the toolbar’s style swatch and eye (0058)', () => {
     expect(swatch.getAttribute('data-edit-style')).toBe('auto');
     fireEvent.click(swatch);
     fireEvent.click(q(container, '[data-edit-style-choice="glass"]'));
-    expect(label(container, 's2').className).toContain('ring-white/30');
+    expect(label(container, 's2').className).toContain('label-glass');
     expect(container.querySelector('[data-edit-style-menu]')).toBeNull();
     await rest();
     expect(saved.at(-1)!.patch).toEqual({ label: { style: 'glass' } });
     fireEvent.click(q(container, '[data-edit-style]'));
     fireEvent.click(q(container, '[data-edit-style-choice="auto"]'));
-    expect(label(container, 's2').className).not.toContain('ring-white/30');
+    expect(label(container, 's2').className).not.toContain('label-glass');
     await rest();
     expect(saved.at(-1)!.clear).toContain('label.style');
     vi.useRealTimers();

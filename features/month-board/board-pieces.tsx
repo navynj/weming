@@ -157,8 +157,8 @@ const LABEL_CLASS: Record<LabelStyle, string> = {
   // A period band's fill (review): my side on someone else's record;
   // Outline on the light and pastel grounds (label-pale, globals.css).
   pale: 'label-pale bg-white/20 text-white',
-  // Glass (0058): a band's fill, its edge a hairline of white drawn inside.
-  glass: 'label-glass bg-white/20 text-white ring-1 ring-inset ring-white/30',
+  // Glass (0058): a band's fill, the tint alone, no edge on any ground (H66).
+  glass: 'label-glass bg-white/20 text-white',
 };
 /** The faces' ring is the surface beneath them, so it parts them unseen. */
 const FACE_RING: Record<LabelStyle, string> = {
