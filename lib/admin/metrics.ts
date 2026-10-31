@@ -76,8 +76,22 @@ function tally(ratio: Ratio, answer: boolean | null): void {
 }
 
 /**
+ * A pool's owner joined when the pool was made (asked in the session:
+ * "using pools.created_at as their join date"): the day 3 and day 7
+ * windows, and the time to a first splash, run from there.
+ */
+export function withOwnersJoined(people: PersonRow[], pools: PoolRow[]): PersonRow[] {
+  const created = new Map(pools.map((p) => [p.pool_id, p.created_at]));
+  return people.map((p) =>
+    p.is_owner && created.has(p.pool_id) ? { ...p, joined_at: created.get(p.pool_id)! } : p,
+  );
+}
+
+/**
  * invited → joined → first splash → back on day 3 → on day 7. A pool's
- * owner made it and was never invited, so is left out.
+ * owner made it and was never invited, so is left out of that step alone:
+ * they count from joined on, so Joined can exceed Invited. Expects people
+ * through withOwnersJoined.
  */
 export function funnelOf(
   people: PersonRow[],
@@ -96,8 +110,7 @@ export function funnelOf(
     day7: { strict: { yes: 0, of: 0 }, retained: { yes: 0, of: 0 } },
   };
   for (const p of people) {
-    if (p.is_owner) continue;
-    funnel.invited += 1;
+    if (!p.is_owner) funnel.invited += 1;
     if (!p.joined_at) continue;
     funnel.joined += 1;
     if (splashed.has(key(p.pool_id, p.user_id))) funnel.firstSplash += 1;
