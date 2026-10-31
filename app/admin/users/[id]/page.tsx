@@ -138,7 +138,7 @@ export default async function AdminUser({ params, searchParams }: PageProps<'/ad
 
       <Section
         title="Activity"
-        note="One line per place: Home, then each pool from the day they joined it. A record shown in several places counts once in each; the faint dashed line counts each thing written once. App opens sit in their own row under the axis. Hover a day for the breakdown."
+        note="One line per place: Home, then each pool from the day they joined it. A record shown in several places counts once in each; the faint dashed line counts each thing written once, so a record written on Home and shared into a pool later shows in that pool's count on the day it was shared (the hover says so: “+1 shared from Home”) and in the unique line on the day it was written. App opens sit in their own row under the axis. Hover a day for the breakdown."
       >
         <ActivityCharts data={chart} />
       </Section>

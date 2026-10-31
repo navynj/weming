@@ -31,6 +31,12 @@ export type ActivitySeries = {
   hasOpens: boolean;
   /** Drawn as a small multiple of stacked bars. */
   bars: boolean;
+  /**
+   * Per day, how many of this series' splashes are records written on Home
+   * on an earlier day and shared in that day: the gap between a pool's
+   * line and the unique one, said in the hover table.
+   */
+  sharedFromHome?: number[];
 };
 
 export type OpensRow = { name: string; color: string; startIndex: number; counts: number[] };
@@ -394,6 +400,15 @@ function DayTooltip({ data, hover }: { data: ActivityData; hover: Hover }) {
     <td className={`px-1.5 text-right tabular-nums ${n === 0 ? 'text-pool-500' : ''}`}>{n}</td>
   );
   const none = <td className="text-pool-500 px-1.5 text-right">—</td>;
+  // "1 (+1 shared from Home)": written here, and brought in from Home.
+  const splashCell = (n: number, shared: number): ReactNode =>
+    shared > 0 ? (
+      <td className="px-1.5 text-right whitespace-nowrap tabular-nums">
+        {n - shared} <span className="text-pool-500">(+{shared} shared from Home)</span>
+      </td>
+    ) : (
+      cell(n)
+    );
   return (
     <div
       className="border-pool-200 pointer-events-none fixed z-10 rounded border bg-white px-3 py-2 text-xs shadow-md"
@@ -430,7 +445,7 @@ function DayTooltip({ data, hover }: { data: ActivityData; hover: Hover }) {
                     </span>
                     {quiet ? <span className="text-pool-500"> · no activity</span> : null}
                   </td>
-                  {cell(c[0])}
+                  {splashCell(c[0], s.sharedFromHome?.[day] ?? 0)}
                   {cell(c[1])}
                   {cell(c[2])}
                   {cell(c[3])}

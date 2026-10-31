@@ -140,4 +140,30 @@ describe('the activity charts', () => {
       'Unique (Ana)11002',
     ]);
   });
+
+  it('says inline how much of a pool’s splash count was shared in from Home', () => {
+    const shared: ActivityData = {
+      days: ['2026-10-28'],
+      trackingStartIndex: null,
+      axisLabel: 'Actions by place',
+      rowLabel: 'Place',
+      series: [
+        {
+          name: 'Crew',
+          color: '#4E79A7',
+          style: 'solid',
+          startIndex: 0,
+          counts: counts([2, 0, 0, 0, 0]),
+          hasOpens: false,
+          bars: false,
+          sharedFromHome: [1],
+        },
+      ],
+      opensRows: [],
+    };
+    const { container } = render(<ActivityCharts data={shared} />);
+    hoverDay(container, 0);
+    const row = within(screen.getByRole('table')).getAllByRole('row')[1];
+    expect(row.textContent).toBe('Crew1 (+1 shared from Home)000—');
+  });
 });

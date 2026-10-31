@@ -360,6 +360,28 @@ hook's build is the one that goes live.
 `DURING_DDL_APPROVED='…'` for destructive DDL) still work by hand; then
 redeploy main in Vercel.
 
+### Release: 0073, the admin dashboard's per-user view (2026-10-31)
+
+0073 adds `splashes.is_welcome` and `ripples.is_welcome` and backfills them
+once, but the pipeline applies the migration **before** the deploy. A welcome
+splash planted in between is made by the old app, which does not set the
+flag, and would count as a Home-only record the person never wrote. So the
+backfill runs again once the new app is live:
+
+1. Merge the 0073 PR (#33), approve it in `production-db`, and wait until
+   Vercel's production deployment of that commit is **Ready**: from then on
+   `plantWelcomeSplash` sets the flags itself.
+2. Then merge the follow-up PR that adds `0074_welcome_backfill_rerun.sql`
+   (the same two `update` statements, idempotent: they only turn the flag on,
+   matched by the built-in photo `app:welcome/shell.png`), and approve it the
+   same way. The pipeline backs up first, as for any migration.
+3. Read the run's log for the line `0074: flagged N welcome splash(es)` — a
+   count only. N is usually 0; anything above it was a splash planted in
+   the window, now left out of the dashboard's counts.
+
+Merging 0074 early does no harm, but misses the point: it must land after
+step 1's deploy to catch the window.
+
 ### Settings and secrets
 
 GitHub → Settings → Environments → **New environment** `production-db`:

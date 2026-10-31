@@ -156,12 +156,28 @@ export function userChart(
     bars: false,
   };
   const seen = new Set<string>();
-  for (const e of input.events) {
+  // In time order, so a thing counts in the unique line on the day it was first written.
+  const events = [...input.events].sort((a, b) => a.at.localeCompare(b.at));
+  // The day each Home record was written, to tell a pool's new splashes from shared ones.
+  const homeDay = new Map<string, number>();
+  for (const e of events) {
+    const i = cal.dayOf(e.at);
+    if (e.pool_id === null && e.kind === 'splash' && i !== undefined) homeDay.set(e.item_key, i);
+  }
+  for (const e of events) {
     const i = cal.dayOf(e.at);
     const k = kindIndex(e.kind);
     if (i === undefined || k < 0) continue;
     const place = byPlace.get(e.pool_id);
-    if (place) place.counts[i][k] += 1;
+    if (place) {
+      place.counts[i][k] += 1;
+      const written =
+        e.pool_id !== null && e.kind === 'splash' ? homeDay.get(e.item_key) : undefined;
+      if (written !== undefined && written < i) {
+        place.sharedFromHome ??= cal.days.map(() => 0);
+        place.sharedFromHome[i] += 1;
+      }
+    }
     // Once per thing written, wherever it shows.
     const key = `${e.kind}:${e.item_key}`;
     if (!seen.has(key)) {
