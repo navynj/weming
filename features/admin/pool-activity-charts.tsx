@@ -67,8 +67,10 @@ export function PoolActivityCharts({ data }: { data: PoolActivityData }) {
     1,
     ...members.flatMap((m) => m.counts.map((c, i) => (i >= m.joinedIndex ? writes(c) : 0))),
   );
-  // The admin first, so everyone else is drawn over them.
-  const drawOrder = [...members].sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin));
+  // The admin last, thin and dashed (asked in the session): on top, so it
+  // never vanishes under a line with the same counts, and thin enough
+  // never to hide one.
+  const drawOrder = [...members].sort((a, b) => Number(a.isAdmin) - Number(b.isAdmin));
 
   const track = (day: number) => ({
     onPointerEnter: (e: PointerEvent) => setHover({ day, x: e.clientX, y: e.clientY }),
@@ -191,7 +193,8 @@ export function PoolActivityCharts({ data }: { data: PoolActivityData }) {
                   d={path}
                   fill="none"
                   stroke={m.color}
-                  strokeWidth={m.isAdmin ? 1.5 : 2}
+                  strokeWidth={m.isAdmin ? 1 : 2}
+                  strokeDasharray={m.isAdmin ? '4 3' : undefined}
                   strokeLinejoin="round"
                 />
                 {points.map(([i, n]) => (
@@ -199,7 +202,17 @@ export function PoolActivityCharts({ data }: { data: PoolActivityData }) {
                     key={i}
                     cx={cx(i)}
                     cy={lineY(n)}
-                    r={hover?.day === i ? 4 : n > 0 ? 3 : 2}
+                    r={
+                      m.isAdmin
+                        ? hover?.day === i
+                          ? 2.5
+                          : 1.5
+                        : hover?.day === i
+                          ? 4
+                          : n > 0
+                            ? 3
+                            : 2
+                    }
                     fill={m.color}
                   />
                 ))}
@@ -306,8 +319,8 @@ function Legend({ tracking }: { tracking: boolean }) {
         </span>
       ))}
       <span className="text-pool-500">
-        Kind colours are for the bars below. Lines are one per person (yours gray); a dot is that
-        day&apos;s total. An open marker&apos;s size grows with the count.
+        Kind colours are for the bars below. Lines are one per person (yours thin, gray and dashed,
+        on top); a dot is that day&apos;s total. An open marker&apos;s size grows with the count.
         {tracking ? ' The long-dashed line is where opens start being recorded.' : ''} Short dashes:
         a member&apos;s join.
       </span>
