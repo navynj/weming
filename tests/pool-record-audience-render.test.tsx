@@ -93,6 +93,14 @@ describe('my record written in a pool: its Audience (0056, H45)', () => {
     await waitFor(() => expect(placed).toEqual([['s1', 'p-alpha', true, 'a2']]));
   });
 
+  it('ends in Done, which closes the sheet (review, 2026-10-31)', () => {
+    audience();
+    const done = document.querySelector<HTMLButtonElement>('[data-audience-done]')!;
+    expect(done.textContent).toBe('Done');
+    fireEvent.click(done);
+    expect(document.querySelector('[data-audience-row]')).toBeNull();
+  });
+
   it('offers Move to Home in the header’s … with its hint; a Home record has no …', () => {
     audience();
     fireEvent.click(document.querySelector('[data-audience-more]')!);

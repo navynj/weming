@@ -266,6 +266,16 @@ function AudienceSheet({
           ) : null}
         </ul>
       </section>
+      {/* Each switch and chip applies as it is touched, so this only closes:
+          Done, as the edit sheet's (review, 2026-10-31). */}
+      <button
+        type="button"
+        data-audience-done
+        onClick={onClose}
+        className="border-pool-200 text-ink w-full rounded-full border py-2.5 text-base font-medium"
+      >
+        Done
+      </button>
     </PoolSheet>
   );
 }
