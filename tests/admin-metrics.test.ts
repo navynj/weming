@@ -87,21 +87,31 @@ describe('the funnel', () => {
     expect(f.day7.retained).toEqual({ yes: 1, of: 3 });
   });
 
-  it('counts the owner from Joined on, joined when the pool was made, though never invited', () => {
+  it("keeps an owner's own join, as for one handed the pool after it was made", () => {
+    const pools = [{ pool_id: 'p', name: 'Crew', created_at: at(-5), owner_id: 'owner' }];
+    const [owner] = withOwnersJoined([person('owner', { is_owner: true })], pools);
+    expect(owner.joined_at).toBe(at(0));
+  });
+
+  it('counts the owner from Joined on, joined when the pool was made without a member row', () => {
     const pools = [{ pool_id: 'p', name: 'Crew', created_at: at(-2), owner_id: 'owner' }];
-    // The owner's member row says day 0; the pool was made on day -2.
-    const people = withOwnersJoined([person('owner', { is_owner: true }), person('ana')], pools);
+    // No join of the owner's own: the pool's making, day -2, stands in.
+    const people = withOwnersJoined(
+      [person('owner', { is_owner: true, joined_at: null }), person('ana', { joined_at: null })],
+      pools,
+    );
     expect(people[0].joined_at).toBe(at(-2));
-    expect(people[1].joined_at).toBe(at(0));
+    // Only an owner falls back: Ana opened an invite and never joined.
+    expect(people[1].joined_at).toBeNull();
     // Back on day 1 (day 3 from the pool's making), and splashing; Ana is quiet.
     const events = [event('owner', 'splash', at(1, 2))];
     const f = funnelOf(people, events, activityOf(events, []), T0 + 10 * DAY_MS);
     expect(f.invited).toBe(1);
-    expect(f.joined).toBe(2);
+    expect(f.joined).toBe(1);
     expect(f.firstSplash).toBe(1);
-    expect(f.day3.strict).toEqual({ yes: 1, of: 2 });
-    expect(f.day3.retained).toEqual({ yes: 1, of: 2 });
-    expect(f.day7.retained).toEqual({ yes: 0, of: 2 });
+    expect(f.day3.strict).toEqual({ yes: 1, of: 1 });
+    expect(f.day3.retained).toEqual({ yes: 1, of: 1 });
+    expect(f.day7.retained).toEqual({ yes: 0, of: 1 });
     const [owner] = memberRows(people, events, []);
     expect(owner.joinToFirstSplash).toBe(3 * DAY_MS + 2 * 3_600_000);
   });

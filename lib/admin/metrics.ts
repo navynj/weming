@@ -76,14 +76,17 @@ function tally(ratio: Ratio, answer: boolean | null): void {
 }
 
 /**
- * A pool's owner joined when the pool was made (asked in the session:
- * "using pools.created_at as their join date"): the day 3 and day 7
- * windows, and the time to a first splash, run from there.
+ * A pool's owner joined when their member row says, and when the pool was
+ * made only without one (asked in the session: "use their own
+ * pool_members.joined_at if it exists, and fall back to pools.created_at
+ * only when it doesn't"). An owner handed the pool keeps their own join.
  */
 export function withOwnersJoined(people: PersonRow[], pools: PoolRow[]): PersonRow[] {
   const created = new Map(pools.map((p) => [p.pool_id, p.created_at]));
   return people.map((p) =>
-    p.is_owner && created.has(p.pool_id) ? { ...p, joined_at: created.get(p.pool_id)! } : p,
+    p.is_owner && !p.joined_at && created.has(p.pool_id)
+      ? { ...p, joined_at: created.get(p.pool_id)! }
+      : p,
   );
 }
 

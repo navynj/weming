@@ -35,7 +35,7 @@ export default async function AdminOverview({ searchParams }: PageProps<'/admin'
     <AdminFrame path="/admin" zone={zone} trackingStart={start}>
       <Section
         title="Funnel, all pools"
-        note="Each membership counted once per pool. Owners are left out of Invited only, and count from Joined on, joined when they made the pool. Day N strict: any write in the pool or app open in the 24 hours starting N days after joining. Retained: any at all from day N on. Shown as yes/eligible: a member counts once the window can be answered. Opens only exist from the tracking start, so earlier returns rely on writes."
+        note="Each membership counted once per pool. Owners are left out of Invited only, and count from Joined on, from their own join (or the pool's creation when they have none). Day N strict: any write in the pool or app open in the 24 hours starting N days after joining. Retained: any at all from day N on. Shown as yes/eligible: a member counts once the window can be answered. Opens only exist from the tracking start, so earlier returns rely on writes."
       >
         <FunnelTable funnel={funnelOf(people, events, activity, now)} />
       </Section>
