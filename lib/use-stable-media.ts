@@ -6,6 +6,7 @@ import {
   cachedMediaUrl,
   mediaUrlsVersion,
   rememberMediaUrls,
+  stableSignedUrl,
   subscribeMediaUrls,
 } from '@/lib/media-url-cache';
 import type { MediaVariant } from '@/lib/ripple-media';
@@ -44,4 +45,18 @@ export function useStableMedia(
     // `urls` is in `key`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant, key, version]);
+}
+
+/**
+ * One signed URL, swapped after hydration for the one this browser already
+ * keeps for the same object and version (`stableSignedUrl`): a face another
+ * server instance signed draws from the bytes already here. The server's
+ * render, and the first client one, draw the URL as given.
+ */
+export function useStableUrl(url: string | null): string | null {
+  const hydrated = useSyncExternalStore(subscribeMediaUrls, mediaUrlsVersion, () => ON_SERVER);
+  return useMemo(
+    () => (url && hydrated !== ON_SERVER ? stableSignedUrl(url) : url),
+    [url, hydrated],
+  );
 }

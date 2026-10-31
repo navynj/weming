@@ -157,6 +157,45 @@ export function rememberMediaUrls(variant: MediaVariant, urls: SignedMedia): voi
   }
 }
 
+/**
+ * What a signed URL is a URL of: its object (origin and path) and its
+ * fragment, which a signer may use to name the version (lib/avatars.ts);
+ * never the token. `null` for what is not a signed http URL — a preview's
+ * `blob:`, an app asset — which is drawn as it is.
+ */
+function objectKeyOf(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+    if (!parsed.search) return null;
+    return `url:${parsed.origin}${parsed.pathname}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The URL to draw for one a server signed, outside a ripple's paths:
+ * avatars and pool photos (2026-10-30). The first one this browser kept for
+ * the same object and version, while it has time left; else this one, kept
+ * from now on. Who may see a face is still the server's call: only a URL it
+ * handed over is ever looked up.
+ */
+export function stableSignedUrl(url: string): string {
+  if (typeof window === 'undefined') return url;
+  const key = objectKeyOf(url);
+  if (!key) return url;
+  const all = load();
+  const now = Date.now();
+  const held = all.get(key);
+  if (held && fresh(held, now)) return held.url;
+  const entry = { url, exp: signedUrlExpiry(url) ?? now + ASSUMED_LEFT_MS };
+  if (!fresh(entry, now)) return url;
+  all.set(key, entry);
+  persist();
+  return url;
+}
+
 /** On sign-out: the next person on this browser starts with nothing. */
 export function clearMediaUrls(): void {
   entries = new Map();

@@ -1,4 +1,7 @@
+'use client';
+
 import { monogram } from '@/features/pool/monogram';
+import { useStableUrl } from '@/lib/use-stable-media';
 
 const SIZES = {
   // The create screen's tile (1c), beside the name field.
@@ -34,12 +37,14 @@ export function Monogram({
   className?: string;
 }) {
   const letters = monogram(name);
-  if (photo) {
+  // The URL this browser keeps for the photo's version (2026-10-30), so a
+  // page another server instance signed draws from the cache.
+  const kept = useStableUrl(photo);
+  if (kept) {
     return (
-      // A signed URL that holds for a day (0024): the browser caches it.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={photo}
+        src={kept}
         alt=""
         aria-hidden
         data-monogram={letters}
