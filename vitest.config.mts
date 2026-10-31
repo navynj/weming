@@ -60,6 +60,7 @@ export const NEEDS_LOCAL_STACK = [
   'tests/share-image-db.test.ts',
   'tests/joint-photo-db.test.ts',
   'tests/media-discard-db.test.ts',
+  'tests/media-sweep-db.test.ts',
 ];
 
 /**

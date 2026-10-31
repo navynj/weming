@@ -4,6 +4,7 @@
   "regions": ["sfo1"],
   "buildCommand": "next build",
   "ignoreCommand": "node scripts/vercel-ignore.mjs",
+  "crons": [{ "path": "/api/cron/sweep-media", "schedule": "0 11 * * *" }],
   "redirects": [
     {
       "source": "/:path*",

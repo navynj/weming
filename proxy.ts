@@ -25,10 +25,11 @@ export default async function proxy(request: NextRequest) {
  * criteria are never met, and the home-screen shortcut opens as a plain
  * bookmark with the URL bar showing — signed in or not. `sw.js` (H32) the
  * same: the browser re-checks the push worker in the background, where a
- * redirect would fail the update.
+ * redirect would fail the update. `api/cron/` (H70): Vercel Cron calls it
+ * with a secret, never a session.
  */
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2?|webmanifest)$).*)',
+    '/((?!_next/static|_next/image|api/cron/|sw\\.js$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2?|webmanifest)$).*)',
   ],
 };

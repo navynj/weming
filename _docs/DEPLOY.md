@@ -203,6 +203,7 @@ suite, the database tests included (`vitest.config.mts` names them).
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the project's anon key | browser and server |
 | `NEXT_PUBLIC_SITE_URL` | `https://during.today` — **Production only** | browser and server |
 | `SUPABASE_SERVICE_ROLE_KEY` | the project's service role key | **server only** |
+| `CRON_SECRET` | a random string (`openssl rand -hex 32`) — **Production only**, *Sensitive* | **server only** |
 
 **Previews set no `NEXT_PUBLIC_SITE_URL`, per branch or otherwise.** When it is
 unset on a Vercel preview, `lib/site.ts` uses `https://${VERCEL_BRANCH_URL}` —
@@ -222,6 +223,14 @@ Vercel. It is needed because the `ripple-media` bucket is private: the
 service role signs photo URLs (`lib/media.ts`, after the viewer's own session
 has passed the RLS visibility check) and removes objects on delete. Nothing
 else imports it, and `lib/env.ts` is the only place it is read.
+
+**`CRON_SECRET` guards the daily media sweep** (H70, `app/api/cron/sweep-media`).
+Vercel Cron (`vercel.json`, 11:00 UTC) sends it as `Authorization: Bearer …`;
+without it set, the route answers 401 to everyone, the cron included, and
+nothing is swept. To see what a run would remove without removing it:
+`curl -H "Authorization: Bearer $CRON_SECRET" https://during.today/api/cron/sweep-media?dry`,
+or `scripts/sweep-media.mjs` from a laptop. Each run logs one line of counts
+and bytes per bucket (Vercel → Logs, `[during] media sweep`), never a path.
 
 **The photo incident.** An earlier version of this page said the service key
 never goes to Vercel. It was missing on the first photo deploy, the service
