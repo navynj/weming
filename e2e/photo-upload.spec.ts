@@ -10,7 +10,8 @@ config({ path: '.env.local', quiet: true });
 /**
  * A photo from the picker to the page (2026-10-28), against the local stack
  * as a throwaway person: made ready in Chrome, sent by PUT to the URLs the
- * server issued, its display copy beside it, its size on the row, and its
+ * server issued, its display copy and thumbnail beside it (2026-10-30), its
+ * size on the row, and its
  * box reserved on the post's page before it loads. Removed after.
  */
 const admin = createClient<Database>(
@@ -70,7 +71,7 @@ test.afterAll(async () => {
   if (user) await admin.auth.admin.deleteUser(user);
 });
 
-test('a picked photo goes up ready, with its display copy and size, and holds its box', async ({
+test('a picked photo goes up ready, with its display copy, thumbnail and size, and holds its box', async ({
   page,
   baseURL,
 }, info) => {
@@ -106,7 +107,7 @@ test('a picked photo goes up ready, with its display copy and size, and holds it
   await expect(page.locator('[data-media-previews] img')).toHaveCount(1, { timeout: 30_000 });
   await page.getByRole('button', { name: 'Save' }).click();
 
-  // The row: one path in my folder, its size, its display copy's size.
+  // The row: one path in my folder, its size, its display copy's and thumbnail's.
   let row: { media: string[]; media_meta: unknown } | null = null;
   await expect
     .poll(
@@ -124,19 +125,21 @@ test('a picked photo goes up ready, with its display copy and size, and holds it
     .toBe(1);
   const [path] = row!.media;
   expect(path).toMatch(new RegExp(`^${user}/[0-9a-f-]{36}\\.webp$`));
-  expect(row!.media_meta).toEqual({ [path]: { w: 2048, h: 1365, d: { w: 1024, h: 683 } } });
-  expect(puts).toEqual(['image/webp', 'image/webp']);
+  expect(row!.media_meta).toEqual({
+    [path]: { w: 1600, h: 1067, d: { w: 1024, h: 683 }, t: { w: 400, h: 267 } },
+  });
+  expect(puts).toEqual(['image/webp', 'image/webp', 'image/webp']);
 
-  // Both objects are there.
+  // All three objects are there.
   const { data: objects } = await admin.storage.from('ripple-media').list(user); // storage-boundary: allow
   expect((objects ?? []).map((o) => `${user}/${o.name}`).sort()).toEqual(
-    [path, path.replace(/\.webp$/, '.d.webp')].sort(),
+    [path, path.replace(/\.webp$/, '.d.webp'), path.replace(/\.webp$/, '.t.webp')].sort(),
   );
 
   // On the page after a fresh load: the display copy, its box reserved.
   await page.reload();
   const photo = page.locator('img[data-photo]');
-  await expect(photo).toHaveAttribute('width', '2048');
-  await expect(photo).toHaveAttribute('height', '1365');
+  await expect(photo).toHaveAttribute('width', '1600');
+  await expect(photo).toHaveAttribute('height', '1067');
   await expect(photo).toHaveAttribute('src', /\.d\.webp/);
 });

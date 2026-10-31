@@ -15,6 +15,7 @@ import {
   type PoolNotificationPrefs,
 } from '@/lib/queries/notifications';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { getMyPoolNames } from '@/lib/queries/pools';
 import { poolPath } from '@/lib/routes';
 
@@ -59,9 +60,7 @@ export async function setMyNotificationPref(input: z.input<typeof Pref>): Promis
   const { poolId, type, value } = parsed.data;
   if (value !== null && !isValue(type, value)) return refused('That setting is not valid.');
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return refused('Sign in again.');
   const { error } =
     value === null
@@ -101,9 +100,7 @@ export async function setPoolNotificationDefault(
 
 export async function loadNotificationSettings(): Promise<NotificationSettings> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { paused: false, showTitles: false };
   return getNotificationSettings(supabase, user.id);
 }
@@ -117,9 +114,7 @@ export async function setNotificationSettings(
   const parsed = Settings.safeParse(input);
   if (!parsed.success) return refused('That setting is not valid.');
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return refused('Sign in again.');
   const { error } = await supabase.from('notification_settings').upsert({
     user_id: user.id,
@@ -166,9 +161,7 @@ export async function removePushSubscription(endpoint: string): Promise<ActionOu
 export async function loadPoolNotificationPrefs(poolId: string): Promise<PoolNotificationPrefs> {
   if (!z.uuid().safeParse(poolId).success) throw new Error('That Pool is not known.');
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) throw new Error('Sign in again.');
   return getPoolNotificationPrefs(supabase, poolId, user.id);
 }
@@ -178,9 +171,7 @@ export async function loadMyPoolsNotificationPrefs(): Promise<
   { poolId: string; name: string; prefs: PoolNotificationPrefs }[]
 > {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) throw new Error('Sign in again.');
   const pools = await getMyPoolNames(supabase, user.id);
   const prefs = await Promise.all(

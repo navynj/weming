@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { CommitResult } from '@/features/input-sheet/commit';
 import { MediaMetaInput, mediaMetaFor, mediaMetaOf } from '@/lib/ripple-media';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { splashPath } from '@/lib/routes';
 
 const Block = z.object({
@@ -54,9 +55,7 @@ export async function addBlock(input: z.input<typeof NewBlock>): Promise<CommitR
   const block = parsed.data;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, reason: 'error', message: 'Sign in again to record this.' };
 
   const { error } = await supabase.from('ripples').insert({

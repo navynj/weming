@@ -8,6 +8,7 @@ import { dayOf } from '@/lib/flow-key';
 import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { rippleDurationMinutes, rippleKind } from '@/lib/ripple-kind';
 import { mediaMetaOf } from '@/lib/ripple-media';
+import { useStableMedia } from '@/lib/use-stable-media';
 import type { IsoDate } from '@/lib/time';
 
 import { blockDay, isRange } from './block-day';
@@ -28,7 +29,7 @@ export function shortDay(date: IsoDate): string {
 export function BlockView({
   block,
   range = null,
-  photos,
+  photos: signedPhotos,
   timeZone,
   today,
   onEdit,
@@ -46,6 +47,8 @@ export function BlockView({
   clock?: { mine: string; theirs: string | null } | null;
 }) {
   const kind = rippleKind(block, timeZone);
+  // The page draws each photo's display copy, by the URL this browser already holds.
+  const photos = useStableMedia('display', block.media, signedPhotos);
   const annotation = draftFrom(block, timeZone).annotation;
   // The photos line up with its paths only when every one came back signed.
   const meta = mediaMetaOf(block.media_meta);

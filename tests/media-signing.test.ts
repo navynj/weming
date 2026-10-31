@@ -10,7 +10,7 @@ const remove = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
+    auth: { getClaims: async () => ({ data: { claims: { sub: 'u1' } } }) },
   }),
 }));
 vi.mock('@supabase/supabase-js', () => ({
@@ -18,6 +18,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 import { removeRippleMedia, signOwnMedia } from '@/lib/media';
+import { clearSignedMediaCache } from '@/lib/signed-media-objects';
 
 const MINE = ['u1/a.jpg', 'u1/b.jpg'];
 let key: string | undefined;
@@ -29,6 +30,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'http://127.0.0.1:54321';
   sign.mockReset();
   remove.mockReset();
+  clearSignedMediaCache();
   reported = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
@@ -125,8 +127,8 @@ describe('an app asset (H58) is the app’s, not the account’s', () => {
     await removeRippleMedia([SHELL]);
     expect(remove).not.toHaveBeenCalled();
     await removeRippleMedia([SHELL, 'u1/a.jpg']);
-    // The display copy's path is derived (0070), so it goes too.
-    expect(remove).toHaveBeenCalledWith(['u1/a.jpg', 'u1/a.d.jpg']);
+    // The display copy's and thumbnail's paths are derived, so they go too.
+    expect(remove).toHaveBeenCalledWith(['u1/a.jpg', 'u1/a.d.jpg', 'u1/a.t.jpg']);
   });
 });
 
@@ -158,5 +160,65 @@ describe('the display copy (0070)', () => {
       'u1/a.webp': 'https://signed/a',
     });
     expect(sign).toHaveBeenCalledWith(['u1/a.webp'], expect.any(Number));
+  });
+});
+
+describe('the thumbnail (2026-10-30)', () => {
+  const meta = {
+    'u1/a.webp': { w: 1600, h: 1200, d: { w: 1024, h: 768 }, t: { w: 400, h: 300 } },
+    'u1/b.webp': { w: 1600, h: 1200, d: { w: 1024, h: 768 } },
+  };
+
+  it('signs the thumbnail, else the display copy, else the photo', async () => {
+    sign.mockResolvedValue({
+      data: [
+        { path: 'u1/a.t.webp', signedUrl: 'https://signed/a-thumb', error: null },
+        { path: 'u1/b.d.webp', signedUrl: 'https://signed/b-display', error: null },
+        { path: 'u1/c.jpg', signedUrl: 'https://signed/c', error: null },
+      ],
+      error: null,
+    });
+    await expect(
+      signOwnMedia(['u1/a.webp', 'u1/b.webp', 'u1/c.jpg'], meta, 'thumb'),
+    ).resolves.toEqual({
+      'u1/a.webp': 'https://signed/a-thumb',
+      'u1/b.webp': 'https://signed/b-display',
+      'u1/c.jpg': 'https://signed/c',
+    });
+  });
+});
+
+describe('one URL per object (2026-10-30)', () => {
+  it('hands the same URL to the next call, asking storage once, for a week', async () => {
+    sign.mockResolvedValue({
+      data: [{ path: 'u1/a.jpg', signedUrl: 'https://signed/a?token=1', error: null }],
+      error: null,
+    });
+    const first = await signOwnMedia(['u1/a.jpg'], {}, 'display');
+    sign.mockResolvedValue({
+      data: [{ path: 'u1/a.jpg', signedUrl: 'https://signed/a?token=2', error: null }],
+      error: null,
+    });
+    const second = await signOwnMedia(['u1/a.jpg'], {}, 'display');
+    expect(second).toEqual(first);
+    expect(sign).toHaveBeenCalledTimes(1);
+    expect(sign).toHaveBeenCalledWith(['u1/a.jpg'], 7 * 24 * 60 * 60);
+  });
+
+  it('signs only the objects it has not issued yet', async () => {
+    sign.mockResolvedValueOnce({
+      data: [{ path: 'u1/a.jpg', signedUrl: 'https://signed/a', error: null }],
+      error: null,
+    });
+    await signOwnMedia(['u1/a.jpg'], {}, 'display');
+    sign.mockResolvedValueOnce({
+      data: [{ path: 'u1/b.jpg', signedUrl: 'https://signed/b', error: null }],
+      error: null,
+    });
+    await expect(signOwnMedia(['u1/a.jpg', 'u1/b.jpg'], {}, 'display')).resolves.toEqual({
+      'u1/a.jpg': 'https://signed/a',
+      'u1/b.jpg': 'https://signed/b',
+    });
+    expect(sign).toHaveBeenLastCalledWith(['u1/b.jpg'], expect.any(Number));
   });
 });

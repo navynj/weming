@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * path and holds no storage client.
  */
 const uploads = vi.hoisted(() => ({
-  asked: [] as { type: string; display: boolean }[][],
+  asked: [] as { type: string; display: boolean; thumb: boolean }[][],
   puts: [] as string[],
   status: 200,
   body: '{}',
@@ -16,6 +16,7 @@ const uploads = vi.hoisted(() => ({
 }));
 const ready = vi.hoisted(() => ({
   display: false,
+  thumb: false,
 }));
 vi.mock('@/lib/compress-image', async (actual) => ({
   ...(await actual<typeof import('@/lib/compress-image')>()),
@@ -28,15 +29,18 @@ vi.mock('@/lib/compress-image', async (actual) => ({
     }
     const blob = new Blob(['x'.repeat(2048)], { type: 'image/webp' });
     return {
-      full: { blob, size: { w: 2048, h: 1536 } },
+      full: { blob, size: { w: 1600, h: 1200 } },
       display: ready.display
         ? { blob: new Blob(['y'], { type: 'image/webp' }), size: { w: 1024, h: 768 } }
+        : null,
+      thumb: ready.thumb
+        ? { blob: new Blob(['z'], { type: 'image/webp' }), size: { w: 400, h: 300 } }
         : null,
     };
   },
 }));
 vi.mock('@/features/input-sheet/upload-actions', () => ({
-  requestMediaUploads: async (asked: { type: string; display: boolean }[]) => {
+  requestMediaUploads: async (asked: { type: string; display: boolean; thumb: boolean }[]) => {
     uploads.asked.push(asked);
     if (uploads.signedOut) {
       return { ok: false, message: 'You are signed out. Sign in again to attach a photo.' };
@@ -47,6 +51,7 @@ vi.mock('@/features/input-sheet/upload-actions', () => ({
         path: `u1/0000000${i}-0000-4000-8000-000000000000.webp`,
         upload: { url: 'https://storage/full', headers: { 'content-type': a.type } },
         display: a.display ? { url: 'https://storage/display', headers: {} } : null,
+        thumb: a.thumb ? { url: 'https://storage/thumb', headers: {} } : null,
       })),
     };
   },
@@ -63,6 +68,7 @@ beforeEach(() => {
   uploads.body = '{}';
   uploads.signedOut = false;
   ready.display = false;
+  ready.thumb = false;
   URL.createObjectURL = () => 'blob:preview';
   globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
     uploads.puts.push(String(url));
@@ -89,20 +95,39 @@ describe('attaching a photo (review: a friend could not)', () => {
   it('goes up at the path the server minted, never its own name, with its size', async () => {
     const { attach, changed, meta } = harness();
     await attach([file('카카오톡_20261027_사진.jpg', 'image/jpeg')]);
-    expect(uploads.asked).toEqual([[{ type: 'image/webp', display: false }]]);
+    expect(uploads.asked).toEqual([[{ type: 'image/webp', display: false, thumb: false }]]);
     expect(uploads.puts).toEqual(['https://storage/full']);
     const [path] = changed[0];
     expect(path).toMatch(/^u1\/[0-9a-f-]{36}\.webp$/);
-    expect(meta()).toEqual({ [path]: { w: 2048, h: 1536 } });
+    expect(meta()).toEqual({ [path]: { w: 1600, h: 1200 } });
   });
 
   it('sends the display copy beside it and records its size', async () => {
     ready.display = true;
     const { attach, changed, meta } = harness();
     await attach([file('big.jpg', 'image/jpeg')]);
-    expect(uploads.asked).toEqual([[{ type: 'image/webp', display: true }]]);
+    expect(uploads.asked).toEqual([[{ type: 'image/webp', display: true, thumb: false }]]);
     expect(uploads.puts).toEqual(['https://storage/full', 'https://storage/display']);
-    expect(meta()[changed[0][0]]).toEqual({ w: 2048, h: 1536, d: { w: 1024, h: 768 } });
+    expect(meta()[changed[0][0]]).toEqual({ w: 1600, h: 1200, d: { w: 1024, h: 768 } });
+  });
+
+  it('sends the thumbnail beside it too and records its size (2026-10-30)', async () => {
+    ready.display = true;
+    ready.thumb = true;
+    const { attach, changed, meta } = harness();
+    await attach([file('big.jpg', 'image/jpeg')]);
+    expect(uploads.asked).toEqual([[{ type: 'image/webp', display: true, thumb: true }]]);
+    expect(uploads.puts).toEqual([
+      'https://storage/full',
+      'https://storage/display',
+      'https://storage/thumb',
+    ]);
+    expect(meta()[changed[0][0]]).toEqual({
+      w: 1600,
+      h: 1200,
+      d: { w: 1024, h: 768 },
+      t: { w: 400, h: 300 },
+    });
   });
 
   it('mints keys in my folder, by type', () => {

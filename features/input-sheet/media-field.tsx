@@ -14,7 +14,8 @@ import { requestMediaUploads } from './upload-actions';
 
 /**
  * Photos on a Ripple. Each is made ready on the phone first (lib/compress-
- * image: at most 2048px, WebP, no metadata, a 1024px display copy), then
+ * image: at most 1600px, WebP, no metadata, a 1024px display copy and a
+ * 400px thumbnail), then
  * sent with a PUT to URLs the server issued for a path it minted in my own
  * folder (`requestMediaUploads`) — the browser never names where its bytes go.
  *
@@ -88,12 +89,16 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
 
 type UploadError = { message?: string; statusCode?: string | number };
 
-/** One photo up: its URLs asked for, its bytes sent, its display copy beside it. */
+/** One photo up: its URLs asked for, its bytes sent, its display copy and thumbnail beside it. */
 async function send(
   ready: Compressed,
 ): Promise<{ path: string; entry: MediaMetaEntry } | { error: UploadError }> {
   const asked = await requestMediaUploads([
-    { type: ready.full.blob.type as MediaType, display: ready.display !== null },
+    {
+      type: ready.full.blob.type as MediaType,
+      display: ready.display !== null,
+      thumb: ready.thumb !== null,
+    },
   ]);
   if (!asked.ok) return { error: { message: asked.message } };
   const [issued] = asked.uploads;
@@ -102,16 +107,20 @@ async function send(
   const entry: MediaMetaEntry = { ...ready.full.size };
   // A display copy that would not go up is not a failed photo: without one,
   // the photo is its own display image, as an older photo is.
-  if (ready.display && issued.display) {
-    const displayRefused = await putSigned(issued.display, ready.display.blob);
-    if (!displayRefused) entry.d = ready.display.size;
-    else reportFailure('upload', displayRefused);
-  }
+  // Nor is a thumbnail: a board then loads the display copy, or the photo.
+  const [displayRefused, thumbRefused] = await Promise.all([
+    ready.display && issued.display ? putSigned(issued.display, ready.display.blob) : undefined,
+    ready.thumb && issued.thumb ? putSigned(issued.thumb, ready.thumb.blob) : undefined,
+  ]);
+  if (ready.display && displayRefused === null) entry.d = ready.display.size;
+  else if (displayRefused) reportFailure('upload', displayRefused);
+  if (ready.thumb && thumbRefused === null) entry.t = ready.thumb.size;
+  else if (thumbRefused) reportFailure('upload', thumbRefused);
   return { path: issued.path, entry };
 }
 
 function bytesOf(ready: Compressed): number {
-  return ready.full.blob.size + (ready.display?.blob.size ?? 0);
+  return ready.full.blob.size + (ready.display?.blob.size ?? 0) + (ready.thumb?.blob.size ?? 0);
 }
 
 /** A size as the composer says it: KB below a megabyte, MB with one decimal above. */

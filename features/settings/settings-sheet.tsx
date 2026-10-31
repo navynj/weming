@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { UnderlineTabs } from '@/components/ui/underline-tabs';
 import { SplashModal } from '@/features/splash/splash-modal';
+import { clearMediaUrls } from '@/lib/media-url-cache';
 
 import { useSettings } from './use-settings';
 
@@ -29,8 +30,9 @@ export function SettingsSheet({ title, tabs }: { title: string; tabs: SettingsTa
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-main-900 text-2xl font-semibold">{title}</h2>
-          {/* A plain form post: the route signs out and sends me to sign in. */}
-          <form action="/auth/sign-out" method="post">
+          {/* A plain form post: the route signs out and sends me to sign in.
+              The photo URLs this browser kept go first (lib/media-url-cache). */}
+          <form action="/auth/sign-out" method="post" onSubmit={clearMediaUrls}>
             <button
               type="submit"
               data-sign-out

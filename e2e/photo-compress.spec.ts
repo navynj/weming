@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * What a photo becomes before it leaves the phone (2026-10-28), in Chrome's
- * own decoder and encoder, on /dev/compress: a large JPEG carrying a GPS
- * location and a turn comes out at most 2048px, turned upright, with no
- * metadata left; a transparent PNG keeps its alpha; both get a 1024px
- * display copy.
+ * What a photo becomes before it leaves the phone (2026-10-28, sizes
+ * 2026-10-30), in Chrome's own decoder and encoder, on /dev/compress: a
+ * large JPEG carrying a GPS location and a turn comes out at most 1600px,
+ * turned upright, with no metadata left; a transparent PNG keeps its alpha;
+ * both get a 1024px display copy and a 400px thumbnail.
  */
 
 /** An EXIF block, by hand: Orientation 6 (turned a quarter) and a GPS latitude. */
@@ -54,7 +54,7 @@ test.beforeEach(async ({ page }, info) => {
   await page.waitForFunction(() => typeof window.__compress === 'function');
 });
 
-test('a large JPEG: at most 2048px, upright, no EXIF or location, and a display copy', async ({
+test('a large JPEG: at most 1600px, upright, no EXIF or location, a display copy and a thumbnail', async ({
   page,
 }) => {
   const result = await page.evaluate(async (exif) => {
@@ -87,22 +87,24 @@ test('a large JPEG: at most 2048px, upright, no EXIF or location, and a display 
   // The fixture really carried the location.
   expect(holds(result.input, 'Exif')).toBe(true);
 
-  const { full, display } = result.out;
-  expect(Math.max(full.w, full.h)).toBe(2048);
+  const { full, display, thumb } = result.out;
+  expect(Math.max(full.w, full.h)).toBe(1600);
   // Turned upright: the orientation is in the pixels, not a tag.
-  expect(full).toMatchObject({ w: 1536, h: 2048 });
-  expect(result.decoded).toEqual({ w: 1536, h: 2048 });
+  expect(full).toMatchObject({ w: 1200, h: 1600 });
+  expect(result.decoded).toEqual({ w: 1200, h: 1600 });
   expect(full.type).toBe('image/webp');
-  for (const copy of [full, display!]) {
+  for (const copy of [full, display!, thumb!]) {
     expect(holds(copy.bytes, 'Exif')).toBe(false);
     expect(holds(copy.bytes, 'EXIF')).toBe(false);
     expect(holds(copy.bytes, 'XMP')).toBe(false);
   }
   expect(display).toMatchObject({ w: 768, h: 1024, type: 'image/webp' });
   expect(display!.bytes.length).toBeLessThan(full.bytes.length);
+  expect(thumb).toMatchObject({ w: 300, h: 400, type: 'image/webp' });
+  expect(thumb!.bytes.length).toBeLessThan(display!.bytes.length);
 });
 
-test('a transparent PNG keeps its alpha, in both copies', async ({ page }) => {
+test('a transparent PNG keeps its alpha, in every copy', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 3000;
@@ -126,19 +128,23 @@ test('a transparent PNG keeps its alpha, in both copies', async ({ page }) => {
     return {
       full: { type: out.full.type, w: out.full.w, h: out.full.h },
       display: out.display && { type: out.display.type, w: out.display.w, h: out.display.h },
+      thumb: out.thumb && { type: out.thumb.type, w: out.thumb.w, h: out.thumb.h },
       alpha: {
         fullSubject: await alphaAt(out.full.bytes, 0.25, 0.5),
         fullEmpty: await alphaAt(out.full.bytes, 0.75, 0.5),
         displayEmpty: out.display ? await alphaAt(out.display.bytes, 0.75, 0.5) : null,
+        thumbEmpty: out.thumb ? await alphaAt(out.thumb.bytes, 0.75, 0.5) : null,
       },
     };
   });
 
-  expect(result.full).toEqual({ type: 'image/webp', w: 2048, h: 1024 });
+  expect(result.full).toEqual({ type: 'image/webp', w: 1600, h: 800 });
   expect(result.display).toEqual({ type: 'image/webp', w: 1024, h: 512 });
+  expect(result.thumb).toEqual({ type: 'image/webp', w: 400, h: 200 });
   expect(result.alpha.fullSubject).toBe(255);
   expect(result.alpha.fullEmpty).toBe(0);
   expect(result.alpha.displayEmpty).toBe(0);
+  expect(result.alpha.thumbEmpty).toBe(0);
 });
 
 test('a small photo is drawn again all the same, so its metadata never leaves', async ({
@@ -162,6 +168,7 @@ test('a small photo is drawn again all the same, so its metadata never leaves', 
 
   expect(result.display).toBeNull();
   expect(result.full).toMatchObject({ w: 480, h: 640 });
+  expect(result.thumb).toMatchObject({ w: 300, h: 400 });
   expect(holds(result.full.bytes, 'Exif')).toBe(false);
 });
 

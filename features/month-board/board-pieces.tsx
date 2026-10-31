@@ -428,7 +428,7 @@ function PhotoCardView({
         // stack card and in the detail sheet.
         <VideoThumb url={url} play={play} small />
       ) : url ? (
-        // A signed URL for a few minutes: next/image would cache it past its life.
+        // A signed URL kept by path (lib/media-url-cache): next/image would cache it past its life.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={url}

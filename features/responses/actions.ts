@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import type { ActionOutcome } from '@/lib/use-optimistic-action';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { pushAfter } from '@/lib/notifications/after';
 
 import { isOneEmoji, REPLY_MAX } from './model';
@@ -41,9 +42,7 @@ export async function setReaction(input: z.input<typeof Reaction>): Promise<Acti
   if (!parsed.success) return refused('That is not one emoji.');
   const { rippleId, emoji, on, poolId } = parsed.data;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return refused('Sign in again.');
   const { error } = on
     ? await supabase

@@ -2,6 +2,7 @@ import { after } from 'next/server';
 
 import { reportFailure } from '@/lib/report-failure';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 
 import { dispatchPushes } from './dispatch';
 
@@ -16,9 +17,7 @@ export function pushAfter(): void {
     after(async () => {
       try {
         const supabase = await createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getAuthUser(supabase);
         if (user) await dispatchPushes(user.id);
       } catch (error) {
         reportFailure('push', error);

@@ -2,12 +2,16 @@ import { isHeic, readableImage } from './heic';
 import type { MediaSize } from './ripple-media';
 
 /**
- * A photo, made ready before it leaves the phone (2026-10-28).
+ * A photo, made ready before it leaves the phone (2026-10-28, sizes
+ * 2026-10-30).
  *
  * A modern phone ships 12MP frames of several megabytes, and no screen here
  * draws more than a column's width. So every picked image is decoded and
- * drawn again: the long edge at most 2048px, WebP at 0.82, and a display
- * copy at 1024px for the boards, cards and pages. Drawing it again is also
+ * drawn again: the long edge at most 1600px, WebP at 0.82, a display copy at
+ * 1024px for the post's page, and a 400px thumbnail for the boards, the
+ * grid, the cards and lists. A cutout Safari can only write as PNG (H59)
+ * that is still over 500 KB at 1600px goes up at 1024px instead: its display
+ * copy becomes the photo. Drawing it again is also
  * what strips its metadata: a canvas carries pixels only, so EXIF and XMP,
  * the location among them, never leave the phone. The orientation survives
  * because the decoder applies it to the pixels first.
@@ -15,8 +19,11 @@ import type { MediaSize } from './ripple-media';
  * An animated GIF is the one exception: a canvas would keep its first frame,
  * so it goes up as it is (GIF carries no EXIF), at most 10MB.
  */
-export const FULL_EDGE = 2048;
+export const FULL_EDGE = 1600;
 export const DISPLAY_EDGE = 1024;
+export const THUMB_EDGE = 400;
+/** A PNG cutout heavier than this at full size goes up at the display size. */
+export const CUTOUT_MAX_BYTES = 500 * 1024;
 export const QUALITY = 0.82;
 export const GIF_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -24,8 +31,8 @@ export { isHeic };
 
 export type Encoded = { blob: Blob; size: MediaSize };
 
-/** What goes up: the photo, and its display copy when it is larger than one. */
-export type Compressed = { full: Encoded; display: Encoded | null };
+/** What goes up: the photo, and its display copy and thumbnail when it is larger than each. */
+export type Compressed = { full: Encoded; display: Encoded | null; thumb: Encoded | null };
 
 /** Why a picked file will not go up, in words the composer shows as they are. */
 export type Refusal = { refused: string };
@@ -44,11 +51,25 @@ export function fitWithin(size: MediaSize, edge: number): MediaSize {
   };
 }
 
-/** The two sizes a photo is drawn at: the display copy only when it would be smaller. */
-export function plannedSizes(source: MediaSize): { full: MediaSize; display: MediaSize | null } {
+/** The sizes a photo is drawn at: each smaller copy only when it would be smaller. */
+export function plannedSizes(source: MediaSize): {
+  full: MediaSize;
+  display: MediaSize | null;
+  thumb: MediaSize | null;
+} {
   const full = fitWithin(source, FULL_EDGE);
-  const display = Math.max(full.w, full.h) > DISPLAY_EDGE ? fitWithin(source, DISPLAY_EDGE) : null;
-  return { full, display };
+  const edge = Math.max(full.w, full.h);
+  const display = edge > DISPLAY_EDGE ? fitWithin(source, DISPLAY_EDGE) : null;
+  const thumb = edge > THUMB_EDGE ? fitWithin(source, THUMB_EDGE) : null;
+  return { full, display, thumb };
+}
+
+/**
+ * A PNG cutout still over `CUTOUT_MAX_BYTES` at full size: its display copy,
+ * already drawn, goes up as the photo, and there is no display copy beside it.
+ */
+export function capsCutout(full: Encoded, display: Encoded | null): boolean {
+  return full.blob.type === 'image/png' && full.blob.size > CUTOUT_MAX_BYTES && display !== null;
 }
 
 /**
@@ -122,7 +143,7 @@ export async function compressImage(picked: File): Promise<Compressed | Refusal>
     if (picked.size > GIF_MAX_BYTES) return { refused: GIF_TOO_LARGE };
     const size = await gifSize(picked);
     if (!size) return { refused: UNREADABLE };
-    return { full: { blob: picked, size }, display: null };
+    return { full: { blob: picked, size }, display: null, thumb: null };
   }
 
   // A HEIC this browser cannot draw is decoded first (lib/heic.ts).
@@ -138,24 +159,32 @@ export async function compressImage(picked: File): Promise<Compressed | Refusal>
     const sizes = plannedSizes({ w: bitmap.width, h: bitmap.height });
     const fullContext = draw(bitmap, sizes.full);
     const displayContext = sizes.display ? draw(bitmap, sizes.display) : null;
-    if (!fullContext || (sizes.display && !displayContext)) return { refused: UNREADABLE };
+    const thumbContext = sizes.thumb ? draw(bitmap, sizes.thumb) : null;
+    if (!fullContext || (sizes.display && !displayContext) || (sizes.thumb && !thumbContext)) {
+      return { refused: UNREADABLE };
+    }
 
+    const smallest = thumbContext ?? displayContext ?? fullContext;
     const transparent =
       mayBeTransparent(file.type) &&
-      hasTransparency(displayContext ?? fullContext, sizes.display ?? sizes.full);
-    const full = await encode(fullContext.canvas, transparent);
-    const display = displayContext ? await encode(displayContext.canvas, transparent) : null;
-    if (!full || (displayContext && !display)) return { refused: UNREADABLE };
+      hasTransparency(smallest, sizes.thumb ?? sizes.display ?? sizes.full);
+    const fullBlob = await encode(fullContext.canvas, transparent);
+    const displayBlob = displayContext ? await encode(displayContext.canvas, transparent) : null;
+    const thumbBlob = thumbContext ? await encode(thumbContext.canvas, transparent) : null;
+    if (!fullBlob || (displayContext && !displayBlob) || (thumbContext && !thumbBlob)) {
+      return { refused: UNREADABLE };
+    }
 
-    // The display copy's path is the photo's with `.d` (displayPathOf), so it
-    // must be the same format; a browser that disagreed with itself sends none.
-    return {
-      full: { blob: full, size: sizes.full },
-      display:
-        display && sizes.display && display.type === full.type
-          ? { blob: display, size: sizes.display }
-          : null,
-    };
+    // Each copy's path is the photo's with `.d` or `.t` (displayPathOf,
+    // thumbPathOf), so it must be the same format; a browser that disagreed
+    // with itself sends none.
+    const sameAs = (blob: Blob | null, size: MediaSize | null): Encoded | null =>
+      blob && size && blob.type === fullBlob.type ? { blob, size } : null;
+    const full: Encoded = { blob: fullBlob, size: sizes.full };
+    const display = sameAs(displayBlob, sizes.display);
+    const thumb = sameAs(thumbBlob, sizes.thumb);
+    if (display && capsCutout(full, display)) return { full: display, display: null, thumb };
+    return { full, display, thumb };
   } finally {
     bitmap.close();
   }

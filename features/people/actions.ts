@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AVATAR_BUCKET, avatarPath } from '@/lib/avatar-bucket';
 import { storage, type SignedUpload } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { THEME_COLORS, THEME_MODES, type ThemeColor, type ThemeMode } from '@/lib/theme';
 
 import { displayName } from './name';
@@ -32,9 +33,7 @@ export async function requestAvatarUpload(
     return { ok: false, message: 'That photo’s type isn’t one we keep.' };
   }
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to save your profile.' };
   try {
     const upload = await storage().signedUploadUrl(AVATAR_BUCKET, avatarPath(user.id), {
@@ -55,9 +54,7 @@ export async function saveProfile(raw: ProfileSave): Promise<ProfileSaved> {
   const { name, photo } = parsed.data;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to save your profile.' };
 
   const { data: current, error: readError } = await supabase
@@ -112,9 +109,7 @@ export async function saveTheme(raw: z.input<typeof themeInput>): Promise<Profil
   const parsed = themeInput.safeParse(raw);
   if (!parsed.success) return { ok: false, message: 'That theme is not one of the twelve.' };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to save your theme.' };
   const { home, mode, everywhere } = parsed.data;
   const [settings, profile] = await Promise.all([
@@ -166,9 +161,7 @@ export async function setMyPoolTheme(
   const parsed = poolTheme.safeParse({ poolId, color, mode });
   if (!parsed.success) return { ok: false, message: 'That colour is not one of the twelve.' };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to save your colour.' };
   const { error } = await supabase.from('member_pool_settings').upsert({
     pool_id: parsed.data.poolId,
