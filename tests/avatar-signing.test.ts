@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Avatar URLs (0018): signed for a day and cached per (person, version), so
+ * Avatar URLs (0018): signed for a week (2026-10-30) and cached per (person, version), so
  * the same photo is the same URL across renders and the browser's cache
  * holds; a new version is a new URL. Only whom `visible_avatars` allows is
  * signed, and a failure is initials, never a throw.
@@ -39,13 +39,15 @@ afterEach(() => {
 });
 
 describe('signAvatars', () => {
-  it('signs for a day, once per version', async () => {
+  it('signs for a week, once per version', async () => {
     const first = await signAvatars(viewer(['ben']), [{ id: 'ben', version: 1 }]);
     const again = await signAvatars(viewer(['ben']), [{ id: 'ben', version: 1 }]);
     expect(again.ben).toBe(first.ben);
     expect(sign).toHaveBeenCalledTimes(1);
     expect(sign).toHaveBeenCalledWith(['ben'], AVATAR_TTL_SECONDS);
-    expect(AVATAR_TTL_SECONDS).toBe(86400);
+    expect(AVATAR_TTL_SECONDS).toBe(7 * 86400);
+    // The version keys the browser's kept URL; a fragment is never sent.
+    expect(first.ben).toMatch(/#v1$/);
 
     const next = await signAvatars(viewer(['ben']), [{ id: 'ben', version: 2 }]);
     expect(next.ben).not.toBe(first.ben);

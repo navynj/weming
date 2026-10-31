@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 
 import { initialsOf } from '@/features/home/grid';
+import { useStableUrl } from '@/lib/use-stable-media';
 
 import { usePeople } from './people-provider';
 
@@ -26,12 +27,14 @@ export function Avatar({
 }) {
   const { people } = usePeople();
   const person = id ? people[id] : undefined;
-  if (person?.photo) {
+  // The URL this browser keeps for the photo's version, whichever server
+  // instance signed this one (2026-10-30): its bytes come from the cache.
+  const photo = useStableUrl(person?.photo ?? null);
+  if (photo) {
     return (
-      // A signed URL that is the same for a day (0018): the browser caches it.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={person.photo}
+        src={photo}
         alt=""
         aria-hidden
         data-avatar-photo

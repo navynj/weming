@@ -8,13 +8,14 @@ import type { DuringClient } from '@/lib/queries/profile';
 import { storage, type Bucket } from '@/lib/storage';
 
 /**
- * A day: a face is drawn on every screen, and a URL that changes each render
- * would defeat the browser's cache. A photo change bumps the version, so a
- * long-lived URL never outlives the photo it shows.
+ * A week, as ripple media's (2026-10-30, H68): a face is drawn on every
+ * screen, and a URL that changes each render would defeat the browser's
+ * cache. A photo change bumps the version, so a long-lived URL never
+ * outlives the photo it shows.
  */
-export const AVATAR_TTL_SECONDS = 24 * 60 * 60;
-/** Reissued once less than this is left, so no page is handed a URL about to rot. */
-const REISSUE_BEFORE_MS = 60 * 60 * 1000;
+export const AVATAR_TTL_SECONDS = 7 * 24 * 60 * 60;
+/** Reissued once less than this is left: the browser keeps a URL while it has more (lib/media-url-cache). */
+const REISSUE_BEFORE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Per (backend, bucket, id, version) on this server: the same version is the
@@ -82,8 +83,12 @@ async function signPhotos(
     );
 
     for (const ref of missing) {
-      const url = urls.get(kind.path(ref.id));
-      if (!url) continue;
+      const signedUrl = urls.get(kind.path(ref.id));
+      if (!signedUrl) continue;
+      // The object's name never changes with its photo, so the version rides
+      // in the fragment: never sent, it keys the browser's kept URL
+      // (lib/media-url-cache) to this photo, not to whatever the name holds.
+      const url = `${signedUrl}#v${ref.version}`;
       signed.set(key(ref), { url, expires: now + AVATAR_TTL_SECONDS * 1000 });
       out[ref.id] = url;
     }

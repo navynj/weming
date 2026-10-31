@@ -15,6 +15,7 @@ config({ path: '.env.local', quiet: true });
  * objects.ts) lets the browser's cache answer every time after the first;
  * five-minute URLs signed afresh fetched the same photo three times a
  * session. Boards and cards load the thumbnail, the page the display copy.
+ * A face and a pool's photo too (lib/avatars.ts): one URL per version.
  */
 const admin = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +24,7 @@ const admin = createClient<Database>(
 );
 
 let user = '';
+let pool = '';
 let splash = '';
 let cookie = '';
 const paths: string[] = [];
@@ -87,6 +89,13 @@ test.beforeAll(async () => {
     .insert({ author_id: user, splash_id: splash, note: 'A walk', media: paths, media_meta: meta });
   if (ripple.error) throw ripple.error;
 
+  // My face, and a pool of mine with its photo: both drawn on Home's foot and header.
+  const face = await admin.storage // storage-boundary: allow
+    .from('avatars')
+    .upload(user, await webp(256, 256, 90), { contentType: 'image/webp' });
+  if (face.error) throw face.error;
+  await admin.from('profiles').update({ avatar_path: user, avatar_version: 1 }).eq('id', user);
+
   const link = await admin.auth.admin.generateLink({ type: 'magiclink', email });
   if (link.error) throw link.error;
   const verified = await fetch(link.data.properties.action_link, { redirect: 'manual' });
@@ -100,6 +109,28 @@ test.beforeAll(async () => {
     user: made.data.user,
   };
   cookie = 'base64-' + Buffer.from(JSON.stringify(session)).toString('base64url');
+
+  const as = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${session.access_token}` } },
+    },
+  );
+  const created = await as.rpc('create_pool', {
+    p_name: 'Once',
+    p_kind: null as unknown as 'friends',
+    p_lanes: [{ name: 'Walks', icon: '🚶', my_category_id: null }],
+    p_include_history: false,
+  });
+  if (created.error) throw created.error;
+  pool = created.data!;
+  const tile = await admin.storage // storage-boundary: allow
+    .from('pool-photos')
+    .upload(pool, await webp(256, 256, 220), { contentType: 'image/webp' });
+  if (tile.error) throw tile.error;
+  await admin.from('pools').update({ photo_path: pool, photo_version: 1 }).eq('id', pool);
 });
 
 test.afterAll(async () => {
@@ -109,6 +140,11 @@ test.afterAll(async () => {
     if (stored.length) await admin.storage.from('ripple-media').remove(stored); // storage-boundary: allow
   }
   if (splash) await admin.from('splashes').delete().eq('id', splash);
+  if (pool) {
+    await admin.storage.from('pool-photos').remove([pool]); // storage-boundary: allow
+    await admin.from('pools').delete().eq('id', pool);
+  }
+  if (user) await admin.storage.from('avatars').remove([user]); // storage-boundary: allow
   if (user) await admin.auth.admin.deleteUser(user);
 });
 
@@ -138,10 +174,13 @@ test('each photo copy is fetched once, by one URL, across reloads and the page',
   // the browser's cache did not answer.
   const urls = new Map<string, Set<string>>();
   const fetched = new Map<string, number>();
-  const objectOf = (url: string) =>
-    url.includes('/storage/v1/object/sign/ripple-media/')
-      ? decodeURIComponent(new URL(url).pathname.split('/ripple-media/')[1])
-      : null;
+  // Bucket and object: a photo's copies, a face, a pool's photo.
+  const objectOf = (url: string) => {
+    const match = new URL(url).pathname.match(
+      /\/storage\/v1\/object\/sign\/(ripple-media|avatars|pool-photos)\/(.+)$/,
+    );
+    return match ? `${match[1]}/${decodeURIComponent(match[2])}` : null;
+  };
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Network.enable');
   const sent = new Map<string, string>();
@@ -165,6 +204,17 @@ test('each photo copy is fetched once, by one URL, across reloads and the page',
   const onPage = 'img[data-photo]';
   await page.goto('/');
   await loaded(page, card, 2);
+  // The face and the pool's photo, drawn by Home's foot and header.
+  await page.waitForFunction(
+    () =>
+      ['img[data-avatar-photo]', 'img[data-pool-photo]'].every((selector) =>
+        [...document.querySelectorAll<HTMLImageElement>(selector)].some(
+          (img) => img.complete && img.naturalWidth > 0,
+        ),
+      ),
+    null,
+    { timeout: 30_000 },
+  );
   await page.reload();
   await loaded(page, card, 2);
   await page.goto(splashPath(splash));
@@ -174,10 +224,13 @@ test('each photo copy is fetched once, by one URL, across reloads and the page',
   await page.reload();
   await loaded(page, card, 2);
 
-  const thumbs = paths.map((p) => p.replace(/\.webp$/, '.t.webp'));
-  const displays = paths.map((p) => p.replace(/\.webp$/, '.d.webp'));
-  // Cards load the thumbnail, the page the display copy, nothing the full photo.
-  expect([...urls.keys()].sort()).toEqual([...thumbs, ...displays].sort());
+  const thumbs = paths.map((p) => `ripple-media/${p.replace(/\.webp$/, '.t.webp')}`);
+  const displays = paths.map((p) => `ripple-media/${p.replace(/\.webp$/, '.d.webp')}`);
+  // Cards load the thumbnail, the page the display copy, nothing the full
+  // photo; the face and the pool's photo load too.
+  expect([...urls.keys()].sort()).toEqual(
+    [...thumbs, ...displays, `avatars/${user}`, `pool-photos/${pool}`].sort(),
+  );
   for (const object of urls.keys()) {
     expect(urls.get(object)!.size, `one URL for ${object.slice(-12)}`).toBe(1);
     expect(fetched.get(object) ?? 0, `fetched once: ${object.slice(-12)}`).toBeLessThanOrEqual(1);

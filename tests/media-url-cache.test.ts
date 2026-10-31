@@ -91,6 +91,35 @@ describe('one URL per photo copy', () => {
   });
 });
 
+describe('a face or a pool photo (2026-10-30)', () => {
+  const face = (nonce: string, version = 1) =>
+    urlFor('ben', 7 * DAY, nonce).replace('ripple-media', 'avatars') + `#v${version}`;
+
+  it('draws the first URL kept for the same object and version', async () => {
+    const cache = await freshModule();
+    const first = face('instance-a');
+    expect(cache.stableSignedUrl(first)).toBe(first);
+    // Another server instance signed the same photo: the kept one is drawn.
+    expect(cache.stableSignedUrl(face('instance-b'))).toBe(first);
+  });
+
+  it('takes a new version as a new photo', async () => {
+    const cache = await freshModule();
+    cache.stableSignedUrl(face('a', 1));
+    const next = face('b', 2);
+    expect(cache.stableSignedUrl(next)).toBe(next);
+  });
+
+  it('draws what is not a signed URL as it is, and forgets on sign-out', async () => {
+    const cache = await freshModule();
+    expect(cache.stableSignedUrl('blob:http://x/1')).toBe('blob:http://x/1');
+    expect(cache.stableSignedUrl('/welcome/shell.png')).toBe('/welcome/shell.png');
+    cache.stableSignedUrl(face('a'));
+    cache.clearMediaUrls();
+    expect(cache.stableSignedUrl(face('b'))).toBe(face('b'));
+  });
+});
+
 describe('asking the server', () => {
   it('asks once, in one call, for what every list wants in the same tick', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout'] });
