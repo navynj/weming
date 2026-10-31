@@ -6,6 +6,7 @@ import { formatAt, ZONES, type Zone } from '@/lib/admin/zones';
 const PAGES = [
   { href: '/admin', label: 'Overview' },
   { href: '/admin/pools', label: 'Pools' },
+  { href: '/admin/users', label: 'Users' },
   { href: '/admin/notifications', label: 'Notifications' },
 ] as const;
 
@@ -106,7 +107,8 @@ export function Table({
           <tr>
             {head.map((h, j) => (
               <th
-                key={h}
+                // Grouped tables repeat a label (Strict under Day 3 and Day 7).
+                key={`${j}-${h}`}
                 className={`border-pool-200 border-b px-2 py-1 font-semibold whitespace-nowrap ${
                   groups && groupStarts(groups).has(j) ? 'border-l' : ''
                 }`}

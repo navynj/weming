@@ -332,6 +332,7 @@ export function SplashPage({
         parent_ripple_id: null,
         thread_pool_id: sidePool,
         video_previews: true,
+        is_welcome: false,
         media_meta: {},
         splash_id: target.splashId,
         splash: {

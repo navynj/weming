@@ -60,6 +60,7 @@ function splash(
     pool_lane_id: null,
     own_pool_id: null,
     joint_invite_all: false,
+    is_welcome: false,
     description: null,
     created_by: null,
     type: 'free',

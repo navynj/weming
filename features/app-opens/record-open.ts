@@ -10,7 +10,7 @@ function write(source: OpenSource, notificationId: string | null): void {
     window.matchMedia?.('(display-mode: standalone)').matches === true ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
   void createClient()
-    .rpc('log_app_open', {
+    .rpc('record_app_open', {
       p_source: source,
       p_platform: platformOf({
         userAgent: navigator.userAgent,
@@ -18,6 +18,8 @@ function write(source: OpenSource, notificationId: string | null): void {
         standalone,
       }),
       ...(notificationId ? { p_notification: notificationId } : {}),
+      // What this browser allows; the OS may still silence it (H71).
+      p_permission: 'Notification' in window ? Notification.permission : 'unsupported',
     })
     .then(
       () => {},

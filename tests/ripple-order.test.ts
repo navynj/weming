@@ -32,6 +32,7 @@ function splash(over: Partial<Splash> & { id: string }): Splash {
     pool_lane_id: 'l',
     own_pool_id: null,
     joint_invite_all: true,
+    is_welcome: false,
     description: null,
     created_by: MINA,
     type: 'free',
