@@ -3,6 +3,7 @@ import { Poppins } from 'next/font/google';
 
 import { Providers } from '@/app/providers';
 import { getMyTheme } from '@/lib/queries/theme';
+import { siteUrl } from '@/lib/site';
 import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_THEME, resolveTheme, type MyTheme } from '@/lib/theme';
 import './globals.css';
@@ -22,11 +23,25 @@ const poppins = Poppins({
 const description =
   "Pool your days. We're swimming side by side, each in our own lane. For a few close friends.";
 
+// Without an og:image a crawler takes the page's first <img>, the intro's
+// shell photo. The query is bumped when the image changes, so a platform's
+// cached preview is fetched again.
+const ogImage = {
+  url: '/og-image.png?v=2',
+  width: 1200,
+  height: 630,
+  alt: 'Weming: lanes across, days down, a few days of posts on the water.',
+  type: 'image/png',
+};
+
 export const metadata: Metadata = {
+  // The origin comes from configuration (lib/site.ts), so og:image is absolute
+  // on every deployment without a domain in source.
+  metadataBase: new URL(siteUrl()),
   title: 'Weming',
   description,
-  openGraph: { title: 'Weming', description },
-  twitter: { card: 'summary', title: 'Weming', description },
+  openGraph: { title: 'Weming', description, images: [ogImage] },
+  twitter: { card: 'summary_large_image', title: 'Weming', description, images: [ogImage] },
   // Installed on a phone it is an app, so it gets an app's name and an
   // app's status bar rather than a browser's.
   appleWebApp: { capable: true, title: 'Weming', statusBarStyle: 'default' },
