@@ -132,4 +132,29 @@ describe('userChart', () => {
     ]);
     expect(JSON.stringify(data)).not.toMatch(/"(crew|club|ana)"/);
   });
+
+  it('marks a pool splash shared from Home on a later day, not one shared the day it was written', () => {
+    const later = userChart({
+      name: 'Ana',
+      signedUp: '2026-10-26T18:00:00Z',
+      events: [
+        ev(null, 'splash', '2026-10-26T18:00:00Z', 'old'),
+        ev('crew', 'splash', '2026-10-28T18:00:00Z', 'old'),
+        ev('crew', 'splash', '2026-10-28T19:00:00Z', 'joint'),
+        ev(null, 'splash', '2026-10-28T20:00:00Z', 'same'),
+        ev('crew', 'splash', '2026-10-28T20:00:00Z', 'same'),
+      ],
+      opens: [],
+      pools: [{ poolId: 'crew', name: 'Crew', joinedAt: '2026-10-26T18:00:00Z' }],
+      trackingStart: null,
+      now: Date.parse('2026-10-29T18:00:00Z'),
+      zone: 'America/Vancouver',
+    });
+    const [home, crew, unique] = later.series;
+    expect(crew.counts[2][0]).toBe(3);
+    expect(crew.sharedFromHome?.[2]).toBe(1);
+    expect(home.sharedFromHome).toBeUndefined();
+    // The gap the hover explains: 3 in Crew, 2 new that day.
+    expect(unique.counts[2][0]).toBe(2);
+  });
 });
