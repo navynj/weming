@@ -39,6 +39,7 @@ import {
   CONTENT_TYPES,
   copyPathOf,
   formatOfPath,
+  FULL_EDGE,
   REENCODE_OVER_BYTES,
   THUMB_EDGE,
   thumbLike,
@@ -140,6 +141,16 @@ if (onlyRipple) {
   for (const path of photos.keys()) if (!row.media.includes(path)) photos.delete(path);
 }
 
+/**
+ * Already drawn the way an upload draws one now — WebP, within 1600px, its
+ * thumbnail beside it — whatever its bytes: drawing it again only loses
+ * quality (2026-10-30: a second run would have redrawn this run's output).
+ */
+function isCurrent(photo, format) {
+  const entry = photo.entry;
+  return format === 'webp' && Boolean(entry?.t) && Math.max(entry.w, entry.h) <= FULL_EDGE;
+}
+
 const tally = {
   photos: photos.size,
   missing: 0,
@@ -155,6 +166,7 @@ for (const photo of photos.values()) {
   if (!info) tally.missing += 1;
   else if (format === 'gif') tally.gif += 1;
   else if (!format) tally.unknownFormat += 1;
+  else if (isCurrent(photo, format)) tally.done += 1;
   else if (info.size > REENCODE_OVER_BYTES) tally.reencode.push({ ...photo, info, format });
   else if (
     !photo.entry?.t &&
@@ -197,7 +209,16 @@ if (tally.reencode.length > 0) {
 }
 
 // ── Measure, and in --apply write ────────────────────────────────────────
-const result = { moved: 0, skipped: 0, raced: 0, failed: 0, thumbs: 0, before: 0, after: 0 };
+const result = {
+  moved: 0,
+  skipped: 0,
+  raced: 0,
+  failed: 0,
+  thumbs: 0,
+  sized: 0,
+  before: 0,
+  after: 0,
+};
 
 async function updateRow(id, change) {
   const { data: row, error } = await db
@@ -312,7 +333,19 @@ async function addThumb(photo) {
     result.failed += 1;
     return;
   }
-  if (!made.thumb) return;
+  if (!made.thumb) {
+    // Too small for a thumbnail: it is its own. Its size goes on the row, so
+    // the next run knows that without downloading it again.
+    if (from !== photo.path) return;
+    for (const id of photo.rowIds) {
+      await updateRow(id, (row) => {
+        if (!row.media.includes(photo.path) || row.media_meta?.[photo.path]) return null;
+        return { media_meta: { ...(row.media_meta ?? {}), [photo.path]: made.source } };
+      });
+    }
+    result.sized += 1;
+    return;
+  }
   const thumbPath = copyPathOf(photo.path, 't');
   try {
     await storage.put(BUCKET, thumbPath, made.thumb.bytes, {
@@ -357,6 +390,7 @@ console.log(
 if (apply) {
   console.log(
     `  ✓ ${result.moved} moved to WebP, ${result.thumbs} thumbnails added` +
+      (result.sized ? `, ${result.sized} too small for one (size recorded)` : '') +
       (result.raced ? `, ${result.raced} left (changed meanwhile)` : ''),
   );
 } else {
