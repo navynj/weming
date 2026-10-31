@@ -109,7 +109,8 @@ describe('the push payload', () => {
     expect(plain).toEqual({
       title: 'Weming',
       body: 'Mina replied in Our Pool',
-      url: '/pool/p1/splash/s1#reply-y1',
+      // Marked as this push's (H71), the hash kept last.
+      url: '/pool/p1/splash/s1?src=notif&nid=n1#reply-y1',
       tag: 'n1',
       unread: 2,
     });
@@ -196,7 +197,7 @@ describe('delivery', () => {
     expect(JSON.parse(bodies[0])).toEqual({
       title: 'Weming',
       body: 'Mina invited you to add your side in Our Pool',
-      url: '/pool/p/splash/s',
+      url: '/pool/p/splash/s?src=notif&nid=n',
       tag: 'n',
       unread: 1,
     });

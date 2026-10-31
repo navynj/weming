@@ -34,6 +34,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_opens: {
+        Row: {
+          id: string
+          notification_id: string | null
+          platform: string
+          source: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          notification_id?: string | null
+          platform: string
+          source: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          notification_id?: string | null
+          platform?: string
+          source?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_opens_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_opens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       board_layouts: {
         Row: {
           id: string
@@ -135,6 +177,65 @@ export type Database = {
           },
           {
             foreignKeyName: "home_filing_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invite_link_opens: {
+        Row: {
+          id: number
+          invite_id: string
+          opened_at: string
+        }
+        Insert: {
+          id?: never
+          invite_id: string
+          opened_at?: string
+        }
+        Update: {
+          id?: never
+          invite_id?: string
+          opened_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_link_opens_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "pool_invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invite_opens: {
+        Row: {
+          opened_at: string
+          pool_id: string
+          user_id: string
+        }
+        Insert: {
+          opened_at?: string
+          pool_id: string
+          user_id: string
+        }
+        Update: {
+          opened_at?: string
+          pool_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_opens_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_opens_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -523,8 +624,10 @@ export type Database = {
       notifications: {
         Row: {
           actor_id: string
+          clicked_at: string | null
           count: number
           created_at: string
+          delivered_at: string | null
           id: string
           invited: boolean
           pool_id: string
@@ -538,8 +641,10 @@ export type Database = {
         }
         Insert: {
           actor_id: string
+          clicked_at?: string | null
           count?: number
           created_at?: string
+          delivered_at?: string | null
           id?: string
           invited?: boolean
           pool_id: string
@@ -553,8 +658,10 @@ export type Database = {
         }
         Update: {
           actor_id?: string
+          clicked_at?: string | null
           count?: number
           created_at?: string
+          delivered_at?: string | null
           id?: string
           invited?: boolean
           pool_id?: string
@@ -1608,11 +1715,75 @@ export type Database = {
             }
             Returns: string
           }
+      admin_app_opens: {
+        Args: { p_users?: string[] }
+        Returns: {
+          id: string
+          kind: string
+          notification_pool_id: string
+          platform: string
+          started_at: string
+          user_id: string
+        }[]
+      }
+      admin_invite_link_visits: {
+        Args: never
+        Returns: {
+          opened_at: string
+          pool_id: string
+        }[]
+      }
+      admin_notifications: {
+        Args: never
+        Returns: {
+          clicked_at: string
+          delivered_at: string
+          influenced_open_at: string
+          notification_id: string
+          pool_id: string
+          type: string
+          user_id: string
+        }[]
+      }
+      admin_pool_events: {
+        Args: { p_pool?: string }
+        Returns: {
+          at: string
+          has_media: boolean
+          kind: string
+          pool_id: string
+          splash_id: string
+          user_id: string
+        }[]
+      }
+      admin_pool_people: {
+        Args: { p_pool?: string }
+        Returns: {
+          display_name: string
+          invited_at: string
+          is_owner: boolean
+          joined_at: string
+          left_at: string
+          pool_id: string
+          user_id: string
+        }[]
+      }
+      admin_pools: {
+        Args: never
+        Returns: {
+          created_at: string
+          name: string
+          owner_id: string
+          pool_id: string
+        }[]
+      }
+      admin_tracking_start: { Args: never; Returns: string }
       applied_migrations: { Args: never; Returns: string[] }
       board_layout_valid: { Args: { l: Json }; Returns: boolean }
       can_read_responses: { Args: { rid: string }; Returns: boolean }
       can_respond: { Args: { rid: string }; Returns: boolean }
       can_see_ripple: { Args: { rid: string }; Returns: boolean }
+      count_invite_link_open: { Args: { p_token: string }; Returns: undefined }
       create_invite: {
         Args: { p_pool: string }
         Returns: {
@@ -1705,6 +1876,10 @@ export type Database = {
         Args: { p_keep: boolean; p_pool: string }
         Returns: undefined
       }
+      log_app_open: {
+        Args: { p_notification?: string; p_platform: string; p_source: string }
+        Returns: undefined
+      }
       mark_notifications_read: {
         Args: { p_ids?: string[] }
         Returns: undefined
@@ -1756,6 +1931,7 @@ export type Database = {
         }[]
       }
       pool_creator_is_me: { Args: { pid: string }; Returns: boolean }
+      record_invite_open: { Args: { p_token: string }; Returns: undefined }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
       remove_pool_member: {
         Args: { p_pool: string; p_user: string }

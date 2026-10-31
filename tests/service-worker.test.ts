@@ -90,6 +90,18 @@ describe('the push worker', () => {
     expect(sw.opened).toEqual([]);
   });
 
+  it("keeps a push's open marker on the way to the app (H71)", async () => {
+    const open: Client = { url: `${ORIGIN}/pool/p`, focused: false, messages: [] };
+    const sw = worker([open]);
+    await sw.fire('notificationclick', click('/splash/s?src=notif&nid=n1#block-r'));
+    expect(open.messages).toEqual([
+      { type: 'weming:open', url: '/splash/s?src=notif&nid=n1#block-r' },
+    ]);
+    const cold = worker([]);
+    await cold.fire('notificationclick', click('/splash/s?src=notif&nid=n1'));
+    expect(cold.opened).toEqual([`${ORIGIN}/splash/s?src=notif&nid=n1`]);
+  });
+
   it('opens a window at the record when none is open', async () => {
     const elsewhere: Client = { url: 'https://other.test/', focused: false, messages: [] };
     const sw = worker([elsewhere]);

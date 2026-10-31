@@ -5,7 +5,9 @@
  * that says it cannot reach the network).
  *
  * A push carries { title, body, url, tag, unread }: who and where, never
- * what was written (the server decides the words, lib/notifications).
+ * what was written (the server decides the words, lib/notifications). Its
+ * url ends in ?src=notif&nid=<id> (H71), kept through to the app, which
+ * counts the tap and takes the marker out.
  */
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -53,7 +55,7 @@ async function open(url) {
   const open = windows.find((client) => new URL(client.url).origin === target.origin);
   if (open) {
     await open.focus();
-    open.postMessage({ type: 'weming:open', url: target.pathname + target.hash });
+    open.postMessage({ type: 'weming:open', url: target.pathname + target.search + target.hash });
     return;
   }
   await self.clients.openWindow(target.href);

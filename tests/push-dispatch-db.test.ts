@@ -133,7 +133,9 @@ describe('dispatching', () => {
       title: 'Weming',
       body: 'Ana invited you to add your side in Crew',
       // In its pool (H42d): Home's reader reads only my own records.
-      url: poolSplashPath(pool, record),
+      url: expect.stringMatching(
+        new RegExp(`^${poolSplashPath(pool, record)}\\?src=notif&nid=[0-9a-f-]{36}$`),
+      ),
     });
     expect(sent[0].body).not.toContain('Secret trip');
     expect(payload.unread).toBeGreaterThanOrEqual(1);
@@ -146,6 +148,10 @@ describe('dispatching', () => {
       .eq('endpoint', endpoint)
       .single();
     expect(used.data!.last_used_at).not.toBeNull();
+    // Sent, for the dashboard (H71): the push's own id is in its link.
+    const nid = new URL(payload.url, 'http://x').searchParams.get('nid')!;
+    const row = await asAdmin().from('notifications').select('delivered_at').eq('id', nid).single();
+    expect(row.data!.delivered_at).not.toBeNull();
   });
 
   it('carries the title when the recipient shows titles', async () => {
@@ -200,10 +206,12 @@ describe('dispatching', () => {
     expect(sent).toEqual([]);
     const row = await asUser(ben)
       .from('notifications')
-      .select('pushed_at')
+      .select('pushed_at, delivered_at')
       .eq('splash_id', record)
       .single();
     expect(row.data!.pushed_at).not.toBeNull();
+    // Claimed, never sent: not a send the dashboard counts (H71).
+    expect(row.data!.delivered_at).toBeNull();
   });
 
   it('pushes nothing for the actor’s own subscription', async () => {

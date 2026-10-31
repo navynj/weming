@@ -16,6 +16,13 @@ const DEFAULT_TIMEOUT_MS = 3_000;
  */
 export const READ_RPCS: ReadonlySet<string> = new Set([
   'account_deletion_preview',
+  'admin_app_opens',
+  'admin_invite_link_visits',
+  'admin_notifications',
+  'admin_pool_events',
+  'admin_pool_people',
+  'admin_pools',
+  'admin_tracking_start',
   'invite_members',
   'invite_photo',
   'invite_preview',

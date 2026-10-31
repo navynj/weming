@@ -79,3 +79,15 @@ export function vapidKeys(): { publicKey: string; privateKey: string; subject: s
   const subject = process.env.VAPID_SUBJECT;
   return publicKey && privateKey && subject ? { publicKey, privateKey, subject } : null;
 }
+
+/**
+ * The accounts that may open /admin (H71): user ids, comma separated.
+ * Optional, like the push keys: unset, nobody is an admin and the
+ * dashboard is a 404 for everyone.
+ */
+export function adminUserIds(): string[] {
+  return (process.env.ADMIN_USER_IDS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
