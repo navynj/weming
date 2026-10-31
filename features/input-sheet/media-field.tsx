@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 import { compressImage, type Compressed } from '@/lib/compress-image';
@@ -10,7 +10,7 @@ import type { MediaMeta, MediaMetaEntry } from '@/lib/ripple-media';
 import { putSigned } from '@/lib/storage/upload';
 
 import { QuietAffordance } from './annotation-control';
-import { requestMediaUploads } from './upload-actions';
+import { discardMediaUploads, requestMediaUploads } from './upload-actions';
 
 /**
  * Photos on a Ripple. Each is made ready on the phone first (lib/compress-
@@ -26,6 +26,11 @@ import { requestMediaUploads } from './upload-actions';
  *
  * Two pieces, because the mockup puts them apart: the `+ Add Image` pill sits
  * under the note field and the thumbnails preview above the commit row.
+ *
+ * What it uploaded is its to clean up (2026-10-30) until the draft is
+ * handed over (`keep`): a photo taken off is removed at once, and a sheet
+ * closed without dropping removes the rest as it goes. The same file
+ * picked again while attached is not sent twice.
  */
 export function useMediaAttach(paths: string[], onChange: (next: string[]) => void) {
   const input = useRef<HTMLInputElement>(null);
@@ -37,6 +42,35 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
   // and shows as a tile until the detail sheet signs it.
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [meta, setMeta] = useState<MediaMeta>({});
+  // Paths this draft uploaded and has not handed over, and which file each was.
+  const owned = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    const uploads = owned.current;
+    // Unmounted with uploads not handed over: the sheet closed without them.
+    return () => {
+      if (uploads.size > 0) void discardMediaUploads([...uploads.keys()]);
+      uploads.clear();
+    };
+  }, []);
+
+  /** The draft's photos changed by hand: what it took off and uploaded goes now. */
+  function change(next: string[]): void {
+    const gone = paths.filter((path) => !next.includes(path) && owned.current.has(path));
+    for (const path of gone) owned.current.delete(path);
+    if (gone.length > 0) void discardMediaUploads(gone);
+    onChange(next);
+  }
+
+  /**
+   * The draft is handed over with these photos: whoever commits it owns them
+   * now. Returns the ones this draft uploaded, for a refusal to remove.
+   */
+  function keep(handed: string[]): string[] {
+    const mine = handed.filter((path) => owned.current.has(path));
+    for (const path of mine) owned.current.delete(path);
+    return mine;
+  }
 
   async function attach(files: FileList | null): Promise<void> {
     if (!files?.length) return;
@@ -49,7 +83,12 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
       const sized: MediaMeta = {};
       const refused: string[] = [];
       // Each photo on its own: one that fails says why and the rest still go.
+      const attached = new Set([...owned.current.values()]);
       for (const file of Array.from(files)) {
+        // Picked again while still on the draft: it is already up.
+        const which = fileKey(file);
+        if (attached.has(which)) continue;
+        attached.add(which);
         const ready = await compressImage(file);
         if ('refused' in ready) {
           reportFailure('upload', ready.refused);
@@ -65,6 +104,7 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
           continue;
         }
         added.push(sent.path);
+        owned.current.set(sent.path, which);
         sized[sent.path] = sent.entry;
         seen[sent.path] = URL.createObjectURL(ready.full.blob);
       }
@@ -84,7 +124,30 @@ export function useMediaAttach(paths: string[], onChange: (next: string[]) => vo
     }
   }
 
-  return { input, busy, failed, previews, attach, meta, progress };
+  return { input, busy, failed, previews, attach, meta, progress, change, keep };
+}
+
+/** The same file picked twice reads the same: its name, size, type and when it was last changed. */
+function fileKey(file: File): string {
+  return [file.name, file.size, file.type, file.lastModified].join('|');
+}
+
+/**
+ * A commit that, refused, removes the photos its draft uploaded
+ * (2026-10-30): the post is taken back, so nothing will name them. A path
+ * a row does name — a drop that landed before a later step failed — is
+ * left by the server.
+ */
+export function discardingOnRefusal<R extends { ok: boolean }>(
+  commit: () => Promise<R>,
+  uploaded: string[],
+): () => Promise<R> {
+  if (uploaded.length === 0) return commit;
+  return async () => {
+    const result = await commit();
+    if (!result.ok) void discardMediaUploads(uploaded);
+    return result;
+  };
 }
 
 type UploadError = { message?: string; statusCode?: string | number };

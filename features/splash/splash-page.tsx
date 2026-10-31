@@ -12,6 +12,7 @@ import type { RippleWithSplash } from '@/lib/queries/ripples';
 import { mediaMetaOf } from '@/lib/ripple-media';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
+import { discardingOnRefusal } from '@/features/input-sheet/media-field';
 
 import { deleteJointSplash } from '@/features/pool/actions';
 import { offerInstall } from '@/features/install/install-state';
@@ -295,14 +296,20 @@ export function SplashPage({
         }),
         async () =>
           outcome(
-            await editBlock({
-              id: block.id,
-              note: draft.note,
-              media: draft.media,
-              mediaMeta: draft.mediaMeta,
-              ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
-              ...(draft.videoPreviews !== undefined ? { videoPreviews: draft.videoPreviews } : {}),
-            }),
+            await discardingOnRefusal(
+              () =>
+                editBlock({
+                  id: block.id,
+                  note: draft.note,
+                  media: draft.media,
+                  mediaMeta: draft.mediaMeta,
+                  ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
+                  ...(draft.videoPreviews !== undefined
+                    ? { videoPreviews: draft.videoPreviews }
+                    : {}),
+                }),
+              draft.uploaded,
+            )(),
           ),
       );
       return;
@@ -342,16 +349,22 @@ export function SplashPage({
       }),
       async () =>
         outcome(
-          await addBlock({
-            id: draft.id,
-            note: draft.note,
-            media: draft.media,
-            mediaMeta: draft.mediaMeta,
-            splashId: target.splashId,
-            ...(sidePool ? { threadPoolId: sidePool } : {}),
-            ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
-            ...(draft.videoPreviews !== undefined ? { videoPreviews: draft.videoPreviews } : {}),
-          }),
+          await discardingOnRefusal(
+            () =>
+              addBlock({
+                id: draft.id,
+                note: draft.note,
+                media: draft.media,
+                mediaMeta: draft.mediaMeta,
+                splashId: target.splashId,
+                ...(sidePool ? { threadPoolId: sidePool } : {}),
+                ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
+                ...(draft.videoPreviews !== undefined
+                  ? { videoPreviews: draft.videoPreviews }
+                  : {}),
+              }),
+            draft.uploaded,
+          )(),
         ),
     );
   }

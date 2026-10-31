@@ -58,6 +58,8 @@ export const NEEDS_LOCAL_STACK = [
   'tests/delete-account-db.test.ts',
   'tests/join-name-db.test.ts',
   'tests/share-image-db.test.ts',
+  'tests/joint-photo-db.test.ts',
+  'tests/media-discard-db.test.ts',
 ];
 
 /**
