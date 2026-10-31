@@ -322,6 +322,7 @@ export function PoolGround({
           {boardView ? (
             <BoardFrame>
               <MonthBoard
+                spanScope={`pool.${poolId}`}
                 cards={drafts.drawn}
                 month={boardMonth}
                 onMonth={setBoardMonth}
@@ -442,6 +443,7 @@ export function PoolGround({
           lanes={laneNames}
           today={today}
           poolName={view.pool.name}
+          spanScope={`pool.${poolId}`}
           onClose={() => setSheet(null)}
         />
       ) : null}

@@ -99,7 +99,7 @@ export function BoardFrame({ children }: { children: ReactNode }) {
  * time (Sun–Wed, Wed–Sat), its pieces a quarter of the width; the month,
  * rows that grow to
  * their tallest lane, a day's number opening its week. Week or Month is
- * remembered per device. Laid out at the room's own width, scrolling
+ * remembered per device and per board. Laid out at the room's own width, scrolling
  * down, never sideways. A tap brings the post's card to the top of the
  * stack; the post the stack heads to bobs on its water, the board turning
  * to its page first if it is on another.
@@ -117,6 +117,7 @@ export function MonthBoard({
   editing = null,
   fixturePhotos,
   onShare,
+  spanScope = null,
 }: {
   cards: Card[];
   /** `YYYY-MM`: the month shown, when Month is; the week shown is the board's own. */
@@ -139,8 +140,10 @@ export function MonthBoard({
   fixturePhotos?: SignedMedia;
   /** Share as image (H63): the glyph on the title row opens its sheet. */
   onShare?: () => void;
+  /** Whose Week | Month is remembered: a pool's id, or none for Home's. */
+  spanScope?: string | null;
 }) {
-  const [span, setSpan] = useBoardSpan();
+  const [span, setSpan] = useBoardSpan(spanScope);
   // The first day shown in Week: a half's first day (halfOf), so a phone
   // opens on the half holding today (review), unless the ground was opened
   // on another month; a wider board shows the whole week around it.

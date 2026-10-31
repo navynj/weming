@@ -33,6 +33,7 @@ export function ShareSheet({
   lanes,
   today,
   poolName,
+  spanScope = null,
   onClose,
 }: {
   /** The Calendar's cards, with its layouts. */
@@ -41,9 +42,11 @@ export function ShareSheet({
   today: IsoDate;
   /** In a pool, its name: the switch is offered. On Home, none. */
   poolName: string | null;
+  /** Whose board span it starts from: a pool's id, or none for Home's. */
+  spanScope?: string | null;
   onClose: () => void;
 }) {
-  const [boardSpan] = useBoardSpan();
+  const [boardSpan] = useBoardSpan(spanScope);
   const [span, setSpan] = useState<ShareSpan>(boardSpan);
   const [faces, setFaces] = useState(false);
   const { range, redacted, photos, image, onSettled } = useShareImage({
