@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { Monogram } from '@/components/ui/monogram';
 
@@ -17,6 +18,7 @@ import type { PoolView } from '@/lib/queries/pools';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
+import { EditModeDone } from '@/features/month-board/edit-mode-done';
 import { LayoutPanel } from '@/features/month-board/layout-panel';
 import { LayoutSheet } from '@/features/month-board/layout-sheet';
 import { useBoardEditing, useLayoutHistory } from '@/features/month-board/use-board-editing';
@@ -33,7 +35,14 @@ import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
 import { MembersSheet } from './members-sheet';
 import { ShareSheet } from '@/features/share-image/share-sheet';
-import { poolCards, poolColumns, poolPinned, withPoolMoves, type PoolViewKind } from './pool-cards';
+import {
+  poolCards,
+  poolColumns,
+  poolPinned,
+  poolSplashHref,
+  withPoolMoves,
+  type PoolViewKind,
+} from './pool-cards';
 import { PoolSettingsSheet } from './settings';
 import { rememberVisit } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
@@ -248,16 +257,32 @@ export function PoolGround({
   const [panelOpen, setPanelOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const member = view.members.some((m) => m.userId === me && !m.former);
+  // A phone's Board (review, 2026-10-31), as Home's: a tap opens the
+  // record's sheet; a member edits in a mode of its own, the stack out of sight.
+  const phoneBoard = boardView && !wide;
+  const [editModeOn, setEditModeOn] = useState(false);
+  if (editModeOn && !boardView) setEditModeOn(false);
+  const editMode = editModeOn && phoneBoard && member;
   const editing = useBoardEditing({
     drafts: viewDrafts,
     history,
     view: laneKind ? 'lane' : membersKind ? 'members' : 'calendar',
     topId: heading,
-    canEdit: member && (boardView || laneKind || membersKind),
+    canEdit: member && ((boardView && (wide || editMode)) || laneKind || membersKind),
     onPick: bringForward,
     onMore: () => (wide ? setPanelOpen(true) : setSheetOpen(true)),
+    direct: editMode,
   });
   if (sheetOpen && editing.activeId === null) setSheetOpen(false);
+  const toggleEditMode = (): void => {
+    editing.deactivate();
+    setEditModeOn(!editMode);
+  };
+  const router = useRouter();
+  const openRecord = (id: string): void => {
+    const card = shown.find((c) => c.splash.id === id);
+    router.push(card?.href ?? poolSplashHref(poolId, id), { scroll: false });
+  };
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
   const current = view.members.filter((m) => !m.former);
   const laneNames = view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }));
@@ -329,11 +354,14 @@ export function PoolGround({
                 today={today}
                 ring={ring}
                 dropped={dropHere?.splash.id ?? null}
-                onPick={bringForward}
+                onPick={phoneBoard && !editMode ? openRecord : bringForward}
                 lanes={laneNames}
                 onDrawn={setRecipes}
-                editing={editing}
+                editing={phoneBoard && !editMode ? null : editing}
                 onShare={() => setSheet('share')}
+                editMode={editMode}
+                // Only a current member sets the pool's layouts (0025).
+                onEditMode={member ? toggleEditMode : undefined}
               />
             </BoardFrame>
           ) : (
@@ -362,18 +390,22 @@ export function PoolGround({
           className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
         >
           {pinnedStrip('wide')}
-          <StairBoard
-            cards={shown}
-            flip={flip}
-            categories={laneNames}
-            initials=""
-            pinnedIds={pinnedIds}
-            onPin={pin}
-            onDelete={remove}
-            low={boardView}
-            collapsed={editing.activeId !== null}
-            hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? poolPath(poolId)}
-          />
+          {editMode ? (
+            <EditModeDone onDone={toggleEditMode} />
+          ) : (
+            <StairBoard
+              cards={shown}
+              flip={flip}
+              categories={laneNames}
+              initials=""
+              pinnedIds={pinnedIds}
+              onPin={pin}
+              onDelete={remove}
+              low={boardView}
+              collapsed={editing.activeId !== null}
+              hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? poolPath(poolId)}
+            />
+          )}
           {/* Desktop only (review): the top card's layout, the pool's, under the stack; not keyed by the card, so open it stays open as another label is picked. */}
           {/* The Calendar, the Lane view and Members, each its own layouts. */}
           {(boardView || laneKind || membersKind) && wide && topCard ? (

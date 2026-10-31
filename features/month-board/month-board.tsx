@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Share } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PencilRuler, Share } from 'lucide-react';
 
 import { AXIS_LOCK_PX } from '@/components/ui/use-axis-lock';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -117,6 +117,8 @@ export function MonthBoard({
   editing = null,
   fixturePhotos,
   onShare,
+  editMode = false,
+  onEditMode,
   spanScope = null,
 }: {
   cards: Card[];
@@ -140,6 +142,10 @@ export function MonthBoard({
   fixturePhotos?: SignedMedia;
   /** Share as image (H63): the glyph on the title row opens its sheet. */
   onShare?: () => void;
+  /** A phone's edit mode is on (review, 2026-10-31): its glyph reads as chosen. */
+  editMode?: boolean;
+  /** A phone's edit mode (review): the glyph beside Share turns it on and off. */
+  onEditMode?: () => void;
   /** Whose Week | Month is remembered: a pool's id, or none for Home's. */
   spanScope?: string | null;
 }) {
@@ -475,6 +481,19 @@ export function MonthBoard({
             className="flex h-8 w-8 items-center justify-center rounded-full"
           >
             <Share aria-hidden size={16} />
+          </button>
+        ) : null}
+        {onEditMode ? (
+          // A phone's only: a wide screen edits on a second tap, as ever.
+          <button
+            type="button"
+            aria-label={editMode ? 'Stop editing the board' : 'Edit the board'}
+            aria-pressed={editMode}
+            data-board-edit-mode
+            onClick={onEditMode}
+            className={`flex h-8 w-8 items-center justify-center rounded-full lg:hidden ${editMode ? 'text-main-900 bg-white' : ''}`}
+          >
+            <PencilRuler aria-hidden size={16} />
           </button>
         ) : null}
         <div

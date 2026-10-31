@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -21,6 +22,7 @@ import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
 import { homeViewName, nextHomeView, ViewToggle, type HomeView } from './view-toggle';
 import { BoardFrame, MonthBoard } from '@/features/month-board/month-board';
+import { EditModeDone } from '@/features/month-board/edit-mode-done';
 import { LayoutPanel } from '@/features/month-board/layout-panel';
 import { LayoutSheet } from '@/features/month-board/layout-sheet';
 import { useBoardEditing, useLayoutHistory } from '@/features/month-board/use-board-editing';
@@ -28,6 +30,7 @@ import type { Recipe } from '@/features/month-board/layout';
 import { useLayoutDrafts } from '@/features/month-board/use-layout-drafts';
 import { useWide } from '@/components/ui/use-wide';
 import { monthKey } from '@/features/splash/summary';
+import { splashHref } from './scope';
 import { PlaceHeader } from '@/features/header/place-header';
 import { usePeople } from '@/features/people/people-provider';
 import { ProfileSheet } from '@/features/people/profile-sheet';
@@ -221,17 +224,34 @@ export function HomeGround({
   // desktop and the sheet on a phone.
   const [panelOpen, setPanelOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // A phone's Board (review, 2026-10-31): a tap opens the record's sheet;
+  // its layouts are edited in a mode of its own, the glyph beside Share,
+  // the stack out of sight while it is on.
+  const phoneBoard = view === 'board' && !wide;
+  const [editModeOn, setEditModeOn] = useState(false);
+  if (editModeOn && view !== 'board') setEditModeOn(false);
+  const editMode = editModeOn && phoneBoard;
   const editing = useBoardEditing({
     drafts: viewDrafts,
     history,
     view: laneView ? 'lane' : 'calendar',
     topId: heading,
-    canEdit: view === 'board' || laneView,
+    canEdit: (view === 'board' && (wide || editMode)) || laneView,
     onPick: goTo,
     onMore: () => (wide ? setPanelOpen(true) : setSheetOpen(true)),
+    direct: editMode,
   });
   // The sheet goes with the piece it edits.
   if (sheetOpen && editing.activeId === null) setSheetOpen(false);
+  const toggleEditMode = (): void => {
+    editing.deactivate();
+    setEditModeOn(!editMode);
+  };
+  const router = useRouter();
+  const openRecord = (id: string): void => {
+    const card = shown.find((c) => c.splash.id === id);
+    router.push(card?.href ?? splashHref(id), { scroll: false });
+  };
 
   // A bare `/` reached by the browser's back button finds the card that was
   // on top in this tab, put back at once rather than flipped to (review).
@@ -375,11 +395,13 @@ export function HomeGround({
                 today={today}
                 ring={ring}
                 dropped={pendingDrop?.splash.id ?? null}
-                onPick={goTo}
+                onPick={phoneBoard && !editMode ? openRecord : goTo}
                 lanes={columns}
                 onDrawn={setRecipes}
-                editing={editing}
+                editing={phoneBoard && !editMode ? null : editing}
                 onShare={() => setSharing(true)}
+                editMode={editMode}
+                onEditMode={toggleEditMode}
               />
             </BoardFrame>
           ) : (
@@ -410,7 +432,9 @@ export function HomeGround({
           className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
         >
           {pinnedStrip('wide')}
-          {board === 'stair' ? (
+          {editMode ? (
+            <EditModeDone onDone={toggleEditMode} />
+          ) : board === 'stair' ? (
             <StairBoard
               cards={shown}
               flip={flip}

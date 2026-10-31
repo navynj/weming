@@ -114,6 +114,7 @@ export function useBoardEditing({
   canEdit,
   onPick,
   onMore,
+  direct = false,
 }: {
   drafts: LayoutDrafts;
   history: LayoutHistory;
@@ -126,6 +127,12 @@ export function useBoardEditing({
   onPick: (id: string) => void;
   /** More: the panel on a desktop, the sheet on a phone. */
   onMore: () => void;
+  /**
+   * A phone's edit mode (review, 2026-10-31): the stack is out of sight, so
+   * a tap on any piece brings its record to the top and makes it active at
+   * once, with no first tap to pick it.
+   */
+  direct?: boolean;
 }): BoardEditing {
   const [active, setActive] = useState<{ id: string; part: BoardPart } | null>(null);
   const [layers, setLayers] = useState<LayerControls | null>(null);
@@ -148,12 +155,15 @@ export function useBoardEditing({
       if (activeId === id) setActive({ id, part: tapped });
       // Becoming active, the whole piece is selected (H41): All, its layers.
       else if (id === topId && canEdit) setActive({ id, part: PIECE_PART });
-      else {
+      else if (direct && canEdit) {
+        onPick(id);
+        setActive({ id, part: PIECE_PART });
+      } else {
         setActive(null);
         onPick(id);
       }
     },
-    [activeId, topId, canEdit, onPick],
+    [activeId, topId, canEdit, onPick, direct],
   );
   const deactivate = useCallback((): void => setActive(null), []);
 

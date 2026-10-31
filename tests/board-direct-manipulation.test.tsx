@@ -3,10 +3,16 @@ import { useState } from 'react';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const pushed = vi.hoisted((): string[] => []);
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),
+  useRouter: () => ({
+    push: (href: string) => pushed.push(href),
+    replace: () => {},
+    refresh: () => {},
+    prefetch: () => {},
+  }),
 }));
 type Saved = { splashId: string; poolId: string | null; patch: unknown; clear: string[] };
 const saved: Saved[] = [];
@@ -120,8 +126,9 @@ const TWO = [
   card('s1', 'Grand Austria Hotel', '2026-10-21'),
 ];
 
-function home(cards: Card[] = TWO, mode = DEFAULT_THEME.mode) {
-  return render(
+/** Home, on a phone in its edit mode (review, 2026-10-31) unless `editMode` is false. */
+function home(cards: Card[] = TWO, mode = DEFAULT_THEME.mode, { editMode = true } = {}) {
+  const view = render(
     <ThemeProvider initial={{ home: DEFAULT_THEME.color, mode, everywhere: false }}>
       <InputSheetProvider>
         <HomeGround
@@ -136,6 +143,10 @@ function home(cards: Card[] = TWO, mode = DEFAULT_THEME.mode) {
       </InputSheetProvider>
     </ThemeProvider>,
   );
+  const toggle = view.container.querySelector<HTMLElement>('[data-board-edit-mode]');
+  if (editMode && !window.matchMedia('(min-width: 64rem)').matches && toggle)
+    fireEvent.click(toggle);
+  return view;
 }
 
 /** The Calendar alone, its editing as a ground holds it, with or without the right to edit. */
@@ -238,6 +249,7 @@ beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   saved.length = 0;
+  pushed.length = 0;
   answer = async () => ({ ok: true, layout: {} });
   Element.prototype.scrollTo = function scrollTo() {} as Element['scrollTo'];
   Element.prototype.scrollIntoView = function scrollIntoView() {} as Element['scrollIntoView'];
@@ -249,7 +261,8 @@ afterEach(() => {
 });
 
 describe('direct manipulation: which tap does what (review, 2026-10-27)', () => {
-  it('a first tap brings the record to the top without handles; a second shows them', () => {
+  it('a first tap brings the record to the top without handles; a second shows them (a desktop)', () => {
+    media(true);
     const { container } = home();
     expect(q(container, '[data-stack-card="s2"]').dataset.stair).toBe('top');
     fireEvent.click(label(container, 's1'));
@@ -271,7 +284,8 @@ describe('direct manipulation: which tap does what (review, 2026-10-27)', () => 
     expect(q(container, '[data-edit-text-value]').textContent).toBe('10');
   });
 
-  it('lets go on a tap on empty board, on Escape, on Done, and on a tap on another piece', () => {
+  it('lets go on a tap on empty board, on Escape, on Done, and on a tap on another piece (a desktop)', () => {
+    media(true);
     const { container } = home();
     const frame = () => container.querySelector('[data-edit-frame]');
     fireEvent.click(label(container, 's2'));
@@ -294,7 +308,8 @@ describe('direct manipulation: which tap does what (review, 2026-10-27)', () => 
     expect(q(container, '[data-stack-card="s1"]').dataset.stair).toBe('top');
   });
 
-  it('taps a YouTube video like any part: up first, then edited; it never plays (H42c)', () => {
+  it('taps a YouTube video like any part: up first, then edited; it never plays (H42c) (a desktop)', () => {
+    media(true);
     const video = { id: 'dQw4w9WgXcQ', start: null, short: false };
     const path = `yt:${video.id}`;
     const { container } = home([
@@ -625,17 +640,39 @@ describe('direct manipulation: the page around it', () => {
     expect(key()).toBe('2026-10-25');
   });
 
-  it('on a phone, folds the stack to its title strip while a piece is active, and brings it back', () => {
-    const { container } = home();
-    expect(container.querySelector('[data-stack-collapsed]')).toBeNull();
-    fireEvent.click(label(container, 's2'));
-    const strip = q(container, '[data-stack-collapsed="s2"]');
-    expect(strip.style.height).toBe('44px');
-    expect(strip.textContent).toContain('Lynn Canyon');
+  it('on a phone, a tap opens the record’s sheet: no flip, no handles (review, 2026-10-31)', () => {
+    const { container } = home(TWO, DEFAULT_THEME.mode, { editMode: false });
+    fireEvent.click(label(container, 's1'));
+    expect(pushed).toEqual(['/splash/s1']);
+    expect(q(container, '[data-stack-card="s2"]').dataset.stair).toBe('top');
+    fireEvent.click(label(container, 's1'));
+    expect(container.querySelector('[data-edit-frame]')).toBeNull();
+  });
+
+  it('on a phone, edit mode puts Done editing in the stack’s place; a tap edits any piece at once', () => {
+    const { container } = home(TWO, DEFAULT_THEME.mode, { editMode: false });
+    const toggle = q(container, '[data-board-edit-mode]');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
     expect(container.querySelector('[data-stack]')).toBeNull();
-    fireEvent.click(q(container, '[data-edit-done]'));
-    expect(container.querySelector('[data-stack-collapsed]')).toBeNull();
-    expect(container.querySelector('[data-stack]')).not.toBeNull();
+    expect(container.querySelector('[data-edit-mode-done]')).not.toBeNull();
+    // Not the one on top: active on the first tap, and nothing opened.
+    fireEvent.click(label(container, 's1'));
+    expect(q(container, '[data-board-piece="s1"] [data-edit-frame="piece"]')).not.toBeNull();
+    expect(pushed).toEqual([]);
+    // Done editing lets go and brings the stack back, s1 on top.
+    fireEvent.click(q(container, '[data-edit-mode-done] button'));
+    expect(container.querySelector('[data-edit-frame]')).toBeNull();
+    expect(container.querySelector('[data-edit-mode-done]')).toBeNull();
+    expect(q(container, '[data-stack-card="s1"]').dataset.stair).toBe('top');
+  });
+
+  it('offers no edit mode on a desktop, where a second tap edits', () => {
+    media(true);
+    const { container } = home();
+    expect(q(container, '[data-board-edit-mode]').className).toContain('lg:hidden');
+    expect(container.querySelector('[data-edit-mode-done]')).toBeNull();
   });
 
   it('opens More as a sheet of every slider on a phone, the panel on a desktop', () => {
