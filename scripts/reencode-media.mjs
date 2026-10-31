@@ -71,7 +71,9 @@ const PARALLEL = 4;
 const PAGE = 1000;
 
 if (apply) {
-  const today = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+  // Local, as scripts/backup.sh stamps its files (`date +%Y%m%d`): never UTC.
+  const now = new Date();
+  const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   let backups = [];
   try {
     backups = readdirSync('backups').filter((name) => name.startsWith(`${today}-`));
