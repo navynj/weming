@@ -1,7 +1,10 @@
 'use server';
 
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
+import type { Database } from '@/lib/database.types';
+import { supabaseServiceRoleKey, supabaseUrl } from '@/lib/env';
 import { MEDIA_BUCKET, MEDIA_EXTENSIONS, mediaKey, type MediaType } from '@/lib/media-bucket';
 import { displayPathOf, thumbPathOf } from '@/lib/ripple-media';
 import { storage, type SignedUpload } from '@/lib/storage';
@@ -63,5 +66,57 @@ export async function requestMediaUploads(
     return { ok: true, uploads };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const Discarded = z.array(z.string().min(1).max(200)).max(16);
+
+/**
+ * Removes photos uploaded for a draft that will not use them (2026-10-30):
+ * one taken off before Drop, a sheet closed without dropping, a drop the
+ * server refused. A photo goes up the moment it is picked, so each of
+ * those left its objects behind — stored, and named by no row, which is a
+ * delete that never happened (CLAUDE.md).
+ *
+ * Only my own folder, and only what no ripple names: a path a row holds,
+ * whoever's row, is a record's photo and stays; the check runs with the
+ * service role because a row I cannot read (a handed-over record) still
+ * counts. The display copy and thumbnail go with each photo.
+ */
+export async function discardMediaUploads(paths: string[]): Promise<{ ok: boolean }> {
+  const parsed = Discarded.safeParse(paths);
+  if (!parsed.success || parsed.data.length === 0) return { ok: parsed.success };
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  if (!user) return { ok: false };
+  const mine = parsed.data.filter(
+    (path) => path.startsWith(`${user.id}/`) && !path.slice(user.id.length + 1).includes('/'),
+  );
+  if (mine.length === 0) return { ok: true };
+
+  try {
+    const service = createServiceClient<Database>(supabaseUrl(), supabaseServiceRoleKey(), {
+      auth: { persistSession: false },
+    });
+    const { data: rows, error } = await service
+      .from('ripples')
+      .select('media')
+      .overlaps('media', mine);
+    if (error) throw error;
+    const named = new Set((rows ?? []).flatMap((row) => row.media));
+    const unused = mine.filter((path) => !named.has(path));
+    if (unused.length === 0) return { ok: true };
+    await storage().remove(MEDIA_BUCKET, [
+      ...unused,
+      ...unused.map(displayPathOf),
+      ...unused.map(thumbPathOf),
+    ]);
+    return { ok: true };
+  } catch (error) {
+    // Nothing waits on this: what slips through is the sweep's (see H69).
+    console.error(
+      `[during] discarding uploads failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { ok: false };
   }
 }

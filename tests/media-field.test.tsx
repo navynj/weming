@@ -13,6 +13,8 @@ const uploads = vi.hoisted(() => ({
   status: 200,
   body: '{}',
   signedOut: false,
+  minted: 0,
+  discarded: [] as string[][],
 }));
 const ready = vi.hoisted(() => ({
   display: false,
@@ -47,18 +49,28 @@ vi.mock('@/features/input-sheet/upload-actions', () => ({
     }
     return {
       ok: true,
-      uploads: asked.map((a, i) => ({
-        path: `u1/0000000${i}-0000-4000-8000-000000000000.webp`,
+      uploads: asked.map((a) => ({
+        path: `u1/0000000${uploads.minted++}-0000-4000-8000-000000000000.webp`,
         upload: { url: 'https://storage/full', headers: { 'content-type': a.type } },
         display: a.display ? { url: 'https://storage/display', headers: {} } : null,
         thumb: a.thumb ? { url: 'https://storage/thumb', headers: {} } : null,
       })),
     };
   },
+  discardMediaUploads: async (paths: string[]) => {
+    uploads.discarded.push(paths);
+    return { ok: true };
+  },
 }));
 
 import { mediaKey } from '@/lib/media-bucket';
-import { formatBytes, uploadFailure, useMediaAttach } from '@/features/input-sheet/media-field';
+import {
+  discardingOnRefusal,
+  formatBytes,
+  uploadFailure,
+  useMediaAttach,
+} from '@/features/input-sheet/media-field';
+import { useState } from 'react';
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -67,6 +79,8 @@ beforeEach(() => {
   uploads.status = 200;
   uploads.body = '{}';
   uploads.signedOut = false;
+  uploads.minted = 0;
+  uploads.discarded.length = 0;
   ready.display = false;
   ready.thumb = false;
   URL.createObjectURL = () => 'blob:preview';
@@ -189,5 +203,74 @@ describe('attaching a photo (review: a friend could not)', () => {
   it('says the size going up in words', () => {
     expect(formatBytes(420_000)).toBe('410 KB');
     expect(formatBytes(3_500_000)).toBe('3.3 MB');
+  });
+});
+
+/** A draft that holds its photos, as a sheet does, so taking one off is a real change. */
+function draftHarness() {
+  let api: ReturnType<typeof useMediaAttach> | null = null;
+  let current: string[] = [];
+  function Draft() {
+    const [paths, setPaths] = useState<string[]>([]);
+    current = paths;
+    api = useMediaAttach(paths, setPaths);
+    return null;
+  }
+  const view = render(<Draft />);
+  return {
+    view,
+    paths: () => current,
+    api: () => api!,
+    attach: (files: File[]) =>
+      act(() => api!.attach(files as unknown as FileList) as Promise<void>),
+  };
+}
+
+describe('what a draft uploaded is its to clean up (2026-10-30)', () => {
+  it('sends the same photo once, picked again while it is on the draft', async () => {
+    const draft = draftHarness();
+    const photo = file('IMG_0002.jpg', 'image/jpeg', 300);
+    await draft.attach([photo]);
+    await draft.attach([photo]);
+    expect(uploads.asked).toHaveLength(1);
+    expect(draft.paths()).toHaveLength(1);
+  });
+
+  it('removes a photo taken off at once, and sends it again if picked again', async () => {
+    const draft = draftHarness();
+    const photo = file('IMG_0003.jpg', 'image/jpeg', 300);
+    await draft.attach([photo]);
+    const [first] = draft.paths();
+    act(() => draft.api().change([]));
+    expect(uploads.discarded).toEqual([[first]]);
+    await draft.attach([photo]);
+    expect(uploads.asked).toHaveLength(2);
+    expect(draft.paths()).toEqual([expect.not.stringMatching(first)]);
+  });
+
+  it('removes what it uploaded when the sheet closes without dropping', async () => {
+    const draft = draftHarness();
+    await draft.attach([file('a.jpg', 'image/jpeg'), file('b.jpg', 'image/jpeg', 2)]);
+    const both = draft.paths();
+    draft.view.unmount();
+    expect(uploads.discarded).toEqual([both]);
+  });
+
+  it('leaves what it handed over to the commit', async () => {
+    const draft = draftHarness();
+    await draft.attach([file('a.jpg', 'image/jpeg')]);
+    const handed = draft.api().keep(draft.paths());
+    expect(handed).toEqual(draft.paths());
+    draft.view.unmount();
+    expect(uploads.discarded).toEqual([]);
+  });
+
+  it('removes them when the commit is refused, and only then', async () => {
+    const refused = discardingOnRefusal(async () => ({ ok: false }), ['u1/x.webp']);
+    await refused();
+    expect(uploads.discarded).toEqual([['u1/x.webp']]);
+    const landed = discardingOnRefusal(async () => ({ ok: true }), ['u1/y.webp']);
+    await landed();
+    expect(uploads.discarded).toEqual([['u1/x.webp']]);
   });
 });

@@ -118,8 +118,11 @@ export function InputSheet({
           endInstant,
           splashId: draft.splashId,
         });
-        if (outcome.ok) onCommitted(outcome.rippleId);
-        else setResult(outcome);
+        if (outcome.ok) {
+          // Saved: the photos are the ripple's now, not the draft's to remove.
+          media.keep(draft.media);
+          onCommitted(outcome.rippleId);
+        } else setResult(outcome);
       });
       return;
     }
@@ -136,8 +139,10 @@ export function InputSheet({
         endInstant,
         splashId: draft.splashId,
       });
-      if (outcome.ok) onCommitted(outcome.rippleId);
-      else setResult(outcome);
+      if (outcome.ok) {
+        media.keep(draft.media);
+        onCommitted(outcome.rippleId);
+      } else setResult(outcome);
     });
   }
 
@@ -212,7 +217,7 @@ export function InputSheet({
             paths={draft.media}
             previews={media.previews}
             failed={media.failed}
-            onChange={(next) => setDraft((d) => ({ ...d, media: next }))}
+            onChange={media.change}
           />
 
           <SplashPicker

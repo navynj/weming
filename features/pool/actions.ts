@@ -527,6 +527,9 @@ const Joint = z.object({
   title: z.string().trim().max(120),
   icon: ICON,
   body: z.string().trim().max(8000),
+  /** My first ripple's photos, as an own drop's: never dropped on the way (2026-10-30). */
+  media: z.array(z.string()).max(8).default([]),
+  mediaMeta: MediaMetaInput,
   /** The splash's range, which every ripple on it takes (H24). */
   declaredStart: z.string().regex(ISO_DAY),
   declaredEnd: z.string().regex(ISO_DAY).nullable(),
@@ -585,10 +588,13 @@ async function createJointSplashWork(input: z.input<typeof Joint>): Promise<Made
 
   // My ripple takes no lane (H24): where the splash shows on my Home is
   // derived from my link to its pool lane.
-  if (joint.body) {
+  // A photo alone is a ripple too: it was dropped, so it lands.
+  if (joint.body || joint.media.length > 0) {
     const { error: blockError } = await supabase.from('ripples').insert({
       author_id: user.id,
-      note: joint.body,
+      note: joint.body || null,
+      media: joint.media,
+      media_meta: mediaMetaFor(joint.media, joint.mediaMeta ?? {}),
       splash_id: joint.id,
       ...(joint.blockDay && joint.declaredEnd ? { occurred_on: joint.blockDay } : {}),
     });

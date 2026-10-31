@@ -27,6 +27,8 @@ export type BlockDraft = {
   media: string[];
   /** Sizes of the photos added in this edit (0070). */
   mediaMeta: MediaMeta;
+  /** The photos this edit uploaded: a refused save removes them (2026-10-30). */
+  uploaded: string[];
   /** Its own day, on a range splash only (0031); absent elsewhere. */
   occurredOn?: IsoDate;
   /** Its YouTube links drawn as videos (part 5); absent when it links none. */
@@ -96,6 +98,7 @@ export function BlockEditor({
       note,
       media,
       mediaMeta: attach.meta,
+      uploaded: attach.keep(media),
       ...(day ? { occurredOn: day } : {}),
       ...(linksVideos ? { videoPreviews: previews } : {}),
     });
@@ -129,7 +132,7 @@ export function BlockEditor({
         paths={media}
         previews={attach.previews}
         failed={attach.failed}
-        onChange={setMedia}
+        onChange={attach.change}
       />
 
       {linksVideos ? (

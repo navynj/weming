@@ -8,6 +8,7 @@ import { LaneChips } from '@/features/input-sheet/lane-chips';
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import {
   AddImageAffordance,
+  discardingOnRefusal,
   MediaPreviews,
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
@@ -226,6 +227,8 @@ export function SplashComposer({
       now,
     );
 
+    // Handed over with the drop: a refusal takes the post back and its photos with it.
+    const uploaded = media.keep(mediaPaths);
     const shared = audience;
     // The card this pool seats before the server has it (H23).
     const poolCard: Card | null =
@@ -307,45 +310,50 @@ export function SplashComposer({
       note: body.length > 0 ? body : null,
       ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
       ...(home ? { home } : {}),
-      commit: withDescription(
-        own
-          ? () =>
-              dropOwnPoolSplash({
-                id,
-                poolId: pool!.poolId,
-                poolLaneId: pick.poolLaneId,
-                title,
-                icon: icon || null,
-                body,
-                media: mediaPaths,
-                mediaMeta: media.meta,
-                declaredStart,
-                declaredEnd,
-                blockDay,
-              })
-          : joint
+      commit: discardingOnRefusal(
+        withDescription(
+          own
             ? () =>
-                createJointSplash({
+                dropOwnPoolSplash({
                   id,
                   poolId: pool!.poolId,
                   poolLaneId: pick.poolLaneId,
                   title,
                   icon: icon || null,
                   body,
+                  media: mediaPaths,
+                  mediaMeta: media.meta,
                   declaredStart,
                   declaredEnd,
                   blockDay,
-                  invitees: together.everyone ? [] : together.picked,
-                  everyone: together.everyone,
                 })
-            : async () => {
-                const made = await dropSplash(input);
-                if (!made.ok || shared.length === 0) return made;
-                const placed = await placeNewSplash(id, shared);
-                return placed.ok
-                  ? placed
-                  : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
-              },
+            : joint
+              ? () =>
+                  createJointSplash({
+                    id,
+                    poolId: pool!.poolId,
+                    poolLaneId: pick.poolLaneId,
+                    title,
+                    icon: icon || null,
+                    body,
+                    media: mediaPaths,
+                    mediaMeta: media.meta,
+                    declaredStart,
+                    declaredEnd,
+                    blockDay,
+                    invitees: together.everyone ? [] : together.picked,
+                    everyone: together.everyone,
+                  })
+              : async () => {
+                  const made = await dropSplash(input);
+                  if (!made.ok || shared.length === 0) return made;
+                  const placed = await placeNewSplash(id, shared);
+                  return placed.ok
+                    ? placed
+                    : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
+                },
+        ),
+        uploaded,
       ),
     });
 
@@ -465,7 +473,7 @@ export function SplashComposer({
         paths={mediaPaths}
         previews={media.previews}
         failed={media.failed}
-        onChange={setMediaPaths}
+        onChange={media.change}
       />
 
       {/* The post's lane: every block of it takes this one (H24).
