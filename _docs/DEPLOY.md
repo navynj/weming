@@ -375,9 +375,11 @@ backfill runs again once the new app is live:
    (the same two `update` statements, idempotent: they only turn the flag on,
    matched by the built-in photo `app:welcome/shell.png`), and approve it the
    same way. The pipeline backs up first, as for any migration.
-3. Read the run's log for the line `0074: flagged N welcome splash(es)` — a
-   count only. N is usually 0; anything above it was a splash planted in
-   the window, now left out of the dashboard's counts.
+3. The migration raises a Postgres NOTICE, `0074: flagged N welcome
+   splash(es)` — a count only. Look for it in the run's log; whether
+   `supabase db push` echoes notices was not confirmed when this was written,
+   so its absence means nothing. N is usually 0; anything above it was a
+   splash planted in the window, now left out of the dashboard's counts.
 
 Merging 0074 early does no harm, but misses the point: it must land after
 step 1's deploy to catch the window.
