@@ -3,8 +3,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { recordOpen } from '@/features/app-opens/record-open';
 import { InstallOffer } from '@/features/install/install-offer';
 import { useSplashOpening } from '@/features/splash/opening-context';
+import { takeOpenMarker } from '@/lib/app-opens';
 import { setBadge } from '@/lib/notifications/badge';
 
 import { loadUnreadCount } from './actions';
@@ -71,8 +73,11 @@ export function NotificationsProvider({
         typeof data.url === 'string' &&
         data.url.startsWith('/')
       ) {
-        if (openings) openings.open(data.url);
-        else router.push(data.url);
+        // The tap is counted (H71), and its marker never reaches the address.
+        const { path, notificationId } = takeOpenMarker(data.url);
+        recordOpen(notificationId);
+        if (openings) openings.open(path);
+        else router.push(path);
       }
     }
     navigator.serviceWorker.addEventListener('message', onMessage);

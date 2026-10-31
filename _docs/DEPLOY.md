@@ -204,6 +204,7 @@ suite, the database tests included (`vitest.config.mts` names them).
 | `NEXT_PUBLIC_SITE_URL` | `https://during.today` — **Production only** | browser and server |
 | `SUPABASE_SERVICE_ROLE_KEY` | the project's service role key | **server only** |
 | `CRON_SECRET` | a random string (`openssl rand -hex 32`) — **Production only**, *Sensitive* | **server only** |
+| `ADMIN_USER_IDS` | the admin's auth user id(s), comma separated — **Production only** | **server only** |
 
 **Previews set no `NEXT_PUBLIC_SITE_URL`, per branch or otherwise.** When it is
 unset on a Vercel preview, `lib/site.ts` uses `https://${VERCEL_BRANCH_URL}` —
@@ -231,6 +232,13 @@ nothing is swept. To see what a run would remove without removing it:
 `curl -H "Authorization: Bearer $CRON_SECRET" https://during.today/api/cron/sweep-media?dry`,
 or `scripts/sweep-media.mjs` from a laptop. Each run logs one line of counts
 and bytes per bucket (Vercel → Logs, `[during] media sweep`), never a path.
+
+**`ADMIN_USER_IDS` opens `/admin`** (H71), the metadata-only dashboard. Unset or
+empty, nobody is an admin and `/admin` is a 404 for everyone. The id is
+`auth.users.id` (Supabase → Authentication → Users). Signed out, `/admin`
+redirects to sign-in like every other path; signed in and not listed, it is
+the same 404 as a page that does not exist. Every admin page checks on its
+own (`lib/admin/access.ts`); there is no admin API endpoint.
 
 **The photo incident.** An earlier version of this page said the service key
 never goes to Vercel. It was missing on the first photo deploy, the service

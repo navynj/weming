@@ -40,6 +40,12 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
     signInviteMembers(token),
     // My own face, as the members will see it.
     signAvatars(supabase, [{ id: profile.id, version: profile.avatar_version }]),
+    // Opened, signed in, for the dashboard's funnel (H71): a live link,
+    // first time only, and never in the way of the page.
+    supabase.rpc('record_invite_open', { p_token: token }).then(
+      () => {},
+      () => {},
+    ),
   ]);
   const pool = preview?.[0];
   if (!pool) {

@@ -107,10 +107,12 @@ export async function dispatchPushes(actorId: string): Promise<void> {
       await service.from('push_subscriptions').delete().in('id', result.gone);
     }
     if (result.sent.length > 0) {
-      await service
-        .from('push_subscriptions')
-        .update({ last_used_at: new Date().toISOString() })
-        .in('id', result.sent);
+      const at = new Date().toISOString();
+      await Promise.all([
+        service.from('push_subscriptions').update({ last_used_at: at }).in('id', result.sent),
+        // Sent, for the dashboard's tap rate (H71): pushed_at is only claimed.
+        service.from('notifications').update({ delivered_at: at }).eq('id', row.id),
+      ]);
     }
     // The status alone: never the endpoint, the payload or whose it was.
     for (const failure of result.failed) {

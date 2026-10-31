@@ -1,3 +1,5 @@
+import { withOpenMarker } from '@/lib/app-opens';
+
 import { notificationPath, notificationText, type NotificationType } from './model';
 
 /**
@@ -38,12 +40,17 @@ export function pushPayload(
       poolName: facts.poolName,
       title: facts.title,
     }),
-    url: notificationPath({
-      poolId: row.pool_id,
-      splashId: row.splash_id,
-      rippleId: row.ripple_id,
-      replyId: row.reply_id,
-    }),
+    // Marked as this push's (H71), so a tap is counted as one; the app
+    // takes the marker out of the address as it lands.
+    url: withOpenMarker(
+      notificationPath({
+        poolId: row.pool_id,
+        splashId: row.splash_id,
+        rippleId: row.ripple_id,
+        replyId: row.reply_id,
+      }),
+      row.id,
+    ),
     // A pool's reactions replace one another on the lock screen, as they
     // fold into one notification in the list.
     tag: row.type === 'reaction' ? `reaction:${row.pool_id}` : row.id,

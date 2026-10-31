@@ -1,6 +1,7 @@
 import { SheetHost } from '@/features/input-sheet/sheet-host';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { ShellDataProvider } from '@/features/home/shell-data';
+import { AppOpenLog } from '@/features/app-opens/app-open-log';
 import { TimezoneSync } from '@/features/auth/timezone-sync';
 import { SentryUser } from '@/features/auth/sentry-user';
 import { PageSlot } from '@/features/auth/page-slot';
@@ -91,6 +92,7 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
                 <SplashOpeningHost />
                 {context ? <SheetHost context={context} /> : null}
                 {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
+                {profile ? <AppOpenLog /> : null}
                 <SentryUser id={profile?.id ?? null} />
               </ShellDataProvider>
             </InputSheetProvider>
