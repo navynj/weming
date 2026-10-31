@@ -235,6 +235,20 @@ export function scrubLog(log: Log): Log {
   return log;
 }
 
+// Turbopack starts a worker from `turbopack-worker-*.js#params=<json>` and
+// parses the whole fragment. The app's URL holds one `#` (the JSON is
+// percent-encoded); a crawler that appends its own (Meta's, WEMING-8:
+// `#<id>#{"navigator":…}`) breaks that parse in Next's code, not ours.
+const TAMPERED_WORKER = /\/turbopack-worker-[^/#]*\.js#params=[^#]*#/;
+
+/** An error thrown by Turbopack's worker bootstrap, from a URL something else rewrote. */
+export function fromTamperedWorker(event: ErrorEvent): boolean {
+  return (event.exception?.values ?? []).some((exception) => {
+    const top = exception.stacktrace?.frames?.at(-1);
+    return TAMPERED_WORKER.test(top?.filename ?? '');
+  });
+}
+
 /** What every runtime's init shares. */
 export function sentryOptions(vercelEnv: string | undefined, release: string | undefined) {
   const environment = sentryEnvironment(vercelEnv);
@@ -264,7 +278,7 @@ export function sentryOptions(vercelEnv: string | undefined, release: string | u
       genAI: { inputs: false, outputs: false },
       mcp: { inputs: false, outputs: false },
     },
-    beforeSend: (event: ErrorEvent) => scrubEvent(event),
+    beforeSend: (event: ErrorEvent) => (fromTamperedWorker(event) ? null : scrubEvent(event)),
     // Spans stream (the default lifecycle): beforeSendTransaction and
     // ignoreTransactions would never run, so neither is set.
     beforeSendSpan: scrubSpan,

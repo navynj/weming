@@ -7,7 +7,14 @@ vi.mock('@sentry/nextjs', () => ({
   },
 }));
 
-import { scrubEvent, scrubLog, scrubName, scrubText, sentryOptions } from '@/lib/observability';
+import {
+  fromTamperedWorker,
+  scrubEvent,
+  scrubLog,
+  scrubName,
+  scrubText,
+  sentryOptions,
+} from '@/lib/observability';
 import { reported, reportFailure } from '@/lib/report-failure';
 
 beforeEach(() => {
@@ -239,5 +246,38 @@ describe('the watchdog’s reports (lib/watchdog.ts)', () => {
         navigated_ms_before: 412,
       },
     });
+  });
+});
+
+describe('noise a crawler makes in Next’s code (WEMING-8)', () => {
+  const thrownAt = (filename: string) => ({
+    type: undefined,
+    exception: {
+      values: [
+        {
+          type: 'Error',
+          value: 'Uncaught SyntaxError: Unexpected non-whitespace character after JSON',
+          stacktrace: { frames: [{ filename, lineno: 1, colno: 137 }] },
+        },
+      ],
+    },
+  });
+  const worker =
+    'https://example.app/_next/static/immutable/chunks/turbopack-worker-1tv8tw60o5c2r.js#params=%5B%5D';
+
+  it('drops the worker bootstrap’s error when something appended to its URL', () => {
+    const event = thrownAt(
+      `${worker}#jL0WDYZPml3/KCMsVFtf2mdY#{"navigator":{"platform":"Windows"}}`,
+    );
+    expect(fromTamperedWorker(event)).toBe(true);
+    expect(sentryOptions('production', 'r').beforeSend(event)).toBeNull();
+  });
+
+  it('keeps the bootstrap’s error from the URL the app made, and every other error', () => {
+    expect(fromTamperedWorker(thrownAt(worker))).toBe(false);
+    expect(fromTamperedWorker(thrownAt('https://example.app/_next/static/chunks/app.js#a#b'))).toBe(
+      false,
+    );
+    expect(sentryOptions('production', 'r').beforeSend(thrownAt(worker))).not.toBeNull();
   });
 });
