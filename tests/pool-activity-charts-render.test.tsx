@@ -50,6 +50,15 @@ describe('the activity charts', () => {
     expect(labels).toEqual(expect.arrayContaining(['10-26', '10-27', '10-28']));
   });
 
+  it('draws my line last, thin and dashed, so it never hides or vanishes under another', () => {
+    const { container } = render(<PoolActivityCharts data={data} />);
+    const lines = [...container.querySelectorAll('svg[role="img"]')[0].querySelectorAll('path')];
+    expect(lines.map((p) => p.getAttribute('stroke'))).toEqual(['#4E79A7', '#B8BECC']);
+    expect(lines[1].getAttribute('stroke-dasharray')).toBe('4 3');
+    expect(lines[1].getAttribute('stroke-width')).toBe('1');
+    expect(lines[0].getAttribute('stroke-dasharray')).toBeNull();
+  });
+
   it('lists every joined member with every kind in order, zeros included', () => {
     const { container } = render(<PoolActivityCharts data={data} />);
     hoverDay(container, 1);
