@@ -365,12 +365,24 @@ describe('a label’s width and style in the panel (review)', () => {
     expect(container.querySelector('[data-layout-choice="outline"]')!.textContent).toBe('Outline');
   });
 
-  it('names the fills after what they show in pastel mode: the pastel and Pale (0036)', () => {
+  it('names the fills after what they show in pastel mode, in the order they look (0036, H72)', () => {
     media(true);
     const { container } = home([{ ...ONE[0], together: true }], { color: 'pink', mode: 'pastel' });
     fireEvent.click(container.querySelector('[data-layout-toggle]')!);
     expect(container.querySelector('[data-layout-choice="white"]')!.textContent).toBe('Pink');
-    expect(container.querySelector('[data-layout-choice="ink"]')!.textContent).toBe('Pale');
+    const style = container.querySelector('[data-layout-control="Style"]')!;
+    expect(
+      [...style.querySelectorAll('[data-layout-choice]')].map((b) => [
+        b.getAttribute('data-layout-choice'),
+        b.textContent,
+      ]),
+    ).toEqual([
+      ['white', 'Pink'],
+      ['outline', 'Black'],
+      ['glass', 'Outline'],
+      ['ink', 'Glass'],
+      ['none', 'None'],
+    ]);
   });
 
   it('offers Style on any record, with the five styles in order and Auto (0058, H55)', () => {

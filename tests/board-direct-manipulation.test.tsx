@@ -120,11 +120,9 @@ const TWO = [
   card('s1', 'Grand Austria Hotel', '2026-10-21'),
 ];
 
-function home(cards: Card[] = TWO) {
+function home(cards: Card[] = TWO, mode = DEFAULT_THEME.mode) {
   return render(
-    <ThemeProvider
-      initial={{ home: DEFAULT_THEME.color, mode: DEFAULT_THEME.mode, everywhere: false }}
-    >
+    <ThemeProvider initial={{ home: DEFAULT_THEME.color, mode, everywhere: false }}>
       <InputSheetProvider>
         <HomeGround
           cards={cards}
@@ -1209,6 +1207,37 @@ describe('the toolbar’s style swatch and eye (0058)', () => {
     expect(
       q(container, '[data-edit-style] [data-label-swatch]').getAttribute('data-label-swatch'),
     ).toBe('glass');
+    vi.useRealTimers();
+  });
+
+  it('offers the styles in pastel mode in the order they look, ink named Glass (H72)', () => {
+    vi.useFakeTimers();
+    const { container } = home(TWO, 'pastel');
+    editLabel(container, 's2');
+    fireEvent.click(q(container, '[data-edit-style]'));
+    expect(
+      [...container.querySelectorAll('[data-edit-style-choice]')].map((b) => [
+        b.getAttribute('data-edit-style-choice'),
+        b.getAttribute('aria-label'),
+      ]),
+    ).toEqual([
+      ['auto', 'Auto'],
+      ['white', 'Blue'],
+      ['outline', 'Black'],
+      ['glass', 'Outline'],
+      ['ink', 'Glass'],
+      ['none', 'None'],
+    ]);
+    fireEvent.click(q(container, '[data-edit-style-choice="ink"]'));
+    fireEvent.click(q(container, '[data-edit-style]'));
+    const chosen = [
+      ...q(container, '[data-edit-style-menu]').querySelectorAll('[data-chosen-dot]'),
+    ];
+    expect(
+      chosen.map((dot) =>
+        dot.closest('[data-edit-style-choice]')!.getAttribute('data-edit-style-choice'),
+      ),
+    ).toEqual(['ink']);
     vi.useRealTimers();
   });
 

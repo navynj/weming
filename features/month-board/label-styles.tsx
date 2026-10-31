@@ -25,22 +25,34 @@ const SAMPLE: Record<LabelStyle, string> = {
  * The styles as they look (Yoonji, in the session): `white` is white on the
  * dark ground, but in light mode the ground's white is my theme colour, so
  * it is named after it ("Pink"), as in pastel mode, its pastel; `ink` is
- * "Black", and in pastel mode, nearly white, "Pale"; Outline is Outline
- * everywhere (H55). The toolbar's swatch,
- * the panel and More all say them so.
+ * "Black", `outline` Outline and `glass` Glass, but pastel swaps their faces
+ * (H72): ink is Glass there, glass Outline and outline Black. The toolbar's
+ * swatch, the panel and More all say them so.
  */
 export function useLabelStyleNames(): Record<LabelChoice, string> {
   const { theme } = useTheme();
+  const pastel = theme.mode === 'pastel';
   return {
     none: 'None',
     white:
       theme.mode === 'dark'
         ? 'White'
         : (THEMES.find((t) => t.key === theme.color)?.name ?? 'White'),
-    ink: theme.mode === 'pastel' ? 'Pale' : 'Black',
-    outline: 'Outline',
-    glass: 'Glass',
+    ink: pastel ? 'Glass' : 'Black',
+    outline: pastel ? 'Black' : 'Outline',
+    glass: pastel ? 'Outline' : 'Glass',
   };
+}
+
+/**
+ * The styles in the order they look (H55): in pastel mode ink draws as
+ * Glass, glass as Outline and outline as Black (H72), so they are offered
+ * in that order there — the colour, Black, Outline, Glass, None — as on the
+ * other grounds.
+ */
+export function useLabelChoices(): readonly LabelChoice[] {
+  const { theme } = useTheme();
+  return theme.mode === 'pastel' ? ['white', 'outline', 'glass', 'ink', 'none'] : LABEL_STYLES;
 }
 
 /**

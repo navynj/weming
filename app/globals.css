@@ -433,12 +433,6 @@ body {
 [data-mode='pastel'] .water-ground .surface-edge {
   box-shadow: 0 0 0 1px var(--pastel-rule);
 }
-/* A filled label's second style, in pastel mode: nearly white, a pastel edge. */
-[data-mode='pastel'] .water-ground .label-ink {
-  background-color: var(--pastel-card);
-  box-shadow: inset 0 0 0 1px var(--theme-pastel);
-  color: var(--pastel-ink);
-}
 /* A filled label in its first style takes the pastel, grey words on it. */
 [data-mode='pastel'] .water-ground .label-fill {
   background-color: var(--theme-pastel);
@@ -474,19 +468,23 @@ body {
 [data-mode='light'] .water-ground .label-glass {
   background-color: color-mix(in srgb, var(--theme-900) 20%, #ffffff);
 }
-/* Pastel's tint is already pale: at 20% over white it was lost ("너무 흐려서
-   잘 안보임"), so its Glass takes half. */
-[data-mode='pastel'] .water-ground .label-glass {
-  background-color: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
-}
-[data-mode='pastel'] .water-ground .label-ink.label-second {
-  background-color: color-mix(in srgb, var(--theme-pastel) 50%, #ffffff);
+/*
+ * Pastel swaps three styles' faces (H72): Pale, ink's old face here, is
+ * gone, so ink draws as Glass, glass as Outline and outline as the ink fill.
+ * Nothing stored changes; the picker names each after how it looks.
+ *
+ * Glass, then — ink, chosen or the rule's second fill. Pastel's tint is
+ * already pale: at 20% over white it was lost ("너무 흐려서 잘 안보임"), and
+ * half still read faint, so it takes 70%, no edge.
+ */
+[data-mode='pastel'] .water-ground .label-ink {
+  background-color: color-mix(in srgb, var(--theme-pastel) 70%, #ffffff);
   box-shadow: none;
   color: var(--pastel-ink);
 }
 /* Its faces part on nothing there, as on Glass. */
 [data-mode='light'] .water-ground .label-second .ring-ink,
-[data-mode='pastel'] .water-ground .label-second .ring-ink {
+[data-mode='pastel'] .water-ground .label-ink .ring-ink {
   --tw-ring-color: transparent;
 }
 [data-mode='light'] .water-ground .label-pale {
@@ -494,18 +492,29 @@ body {
   box-shadow: inset 0 0 0 1px var(--theme-900);
   color: var(--theme-900);
 }
-[data-mode='pastel'] .water-ground .label-pale {
+/* Outline on pastel: my side's band, and the glass style (H72). */
+[data-mode='pastel'] .water-ground .label-pale,
+[data-mode='pastel'] .water-ground .label-glass {
   background-color: #ffffff;
   box-shadow: inset 0 0 0 1px var(--theme-pastel);
 }
-/* Pastel's Glass, Outline and no fill (Yoonji, in the session): dark grey
-   words, as on its fills, not the soft tone the ground's words take. As
-   heavy as that rule and later, so this one holds. */
+/* Pastel's Outline and no fill (Yoonji, in the session): dark grey words,
+   as on its fills, not the soft tone the ground's words take. As heavy as
+   that rule and later, so this one holds. */
 [data-mode='pastel']
   .water-ground
-  [class*='text-white']:is(.label-glass, .label-outline, .label-none, .label-pale):not(.surface *),
-[data-mode='pastel'] .water-ground .label-ink.label-second {
+  [class*='text-white']:is(.label-glass, .label-none, .label-pale):not(.surface *) {
   color: var(--pastel-ink);
+}
+/* The ink fill on pastel: the outline style (H72), the dark grey with white
+   words, no edge, its faces parted in the same grey. */
+[data-mode='pastel'] .water-ground [class*='text-white'].label-outline:not(.surface *) {
+  background-color: var(--pastel-ink);
+  box-shadow: none;
+  color: #ffffff;
+}
+[data-mode='pastel'] .water-ground .label-outline .ring-main-900 {
+  --tw-ring-color: var(--pastel-ink);
 }
 /* Black is the one theme its ink matches: on the black ground a label in
    the ink style keeps a white edge. */

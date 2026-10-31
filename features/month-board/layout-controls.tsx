@@ -6,8 +6,8 @@ import { RotateCcw } from 'lucide-react';
 import type { Card } from '@/features/home/grid';
 
 import type { BoardLayoutJson, LayoutSource } from './board-layout';
-import { LABEL_STYLES, type Recipe } from './layout';
-import { ChosenDot, useLabelStyleNames } from './label-styles';
+import { type Recipe } from './layout';
+import { ChosenDot, useLabelChoices, useLabelStyleNames } from './label-styles';
 import { PartOrder } from './part-order';
 import { LAYER_RANGE } from './stacking';
 import { useSignedPhotos } from './use-board-photos';
@@ -220,6 +220,7 @@ export function LayoutControls({
   onRevert,
 }: LayoutControlsProps) {
   const styleNames = useLabelStyleNames();
+  const styleChoices = useLabelChoices();
   // Every photo, so one hidden from the board (0044) can be shown again.
   const photos = card.photos ?? [];
   const signed = useSignedPhotos(photos);
@@ -387,7 +388,7 @@ export function LayoutControls({
             <Choice
               name="Style"
               value={label.style}
-              options={LABEL_STYLES.map((value) => ({ value, label: styleNames[value] }))}
+              options={styleChoices.map((value) => ({ value, label: styleNames[value] }))}
               onChange={(v) => onEdit({ label: { style: v } })}
               onReset={() => onEdit({}, ['label.style'])}
             />

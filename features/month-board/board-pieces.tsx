@@ -146,7 +146,7 @@ const LABEL_CLASS: Record<LabelStyle, string> = {
   none: 'label-none text-white',
   // label-fill: the colour's pastel in pastel mode (0036, globals.css).
   white: 'label-fill bg-white text-main-900',
-  // label-ink: a pale fill in pastel mode (0036, globals.css).
+  // label-ink: Glass in pastel mode, where Pale is gone (H72, globals.css).
   ink: 'label-ink bg-ink text-white',
   // Outline (H55): the ground's colour, edged and lettered white; the light
   // grounds' swap makes it white, edged and lettered in the colour.

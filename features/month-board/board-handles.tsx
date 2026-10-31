@@ -45,10 +45,11 @@ import {
   AutoSwatch,
   ChosenDot,
   LabelSwatch,
+  useLabelChoices,
   useLabelStyleNames,
   type LabelChoice,
 } from './label-styles';
-import { LABEL_STYLES, type LabelStyle } from './layout';
+import { type LabelStyle } from './layout';
 import type { LayerControls, LayerMove } from './stacking';
 import type { BoardEditing, PartChip } from './use-board-editing';
 
@@ -922,6 +923,7 @@ function StyleSwatch({
 }) {
   const [open, setOpen] = useState(false);
   const names = useLabelStyleNames();
+  const choices = useLabelChoices();
   const pick = (style: LabelChoice | undefined): void => {
     setOpen(false);
     if (style === undefined) editing.edit({}, ['label.style']);
@@ -967,7 +969,7 @@ function StyleSwatch({
               <ChosenDot on={labelStyle.set === undefined} />
             </span>
           </button>
-          {LABEL_STYLES.map((style) => (
+          {choices.map((style) => (
             <button
               key={style}
               type="button"
