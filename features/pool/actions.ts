@@ -9,6 +9,7 @@ import { POOL_PHOTO_BUCKET } from '@/lib/pool-photo-bucket';
 import { MediaMetaInput, mediaMetaFor } from '@/lib/ripple-media';
 import { storage, type SignedUpload } from '@/lib/storage';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { writeRefusal } from '@/lib/supabase/fetch';
 import { reportFailure, reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
@@ -124,9 +125,7 @@ async function joinPoolWork(input: z.infer<typeof Join>): Promise<Made> {
     return { ok: false, message: nameIssue?.message ?? DEAD_LINK };
   }
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to join.' };
   const { data: profile, error: readError } = await supabase
     .from('profiles')
@@ -395,9 +394,7 @@ export async function setPlacement(
     .safeParse({ splashId, poolId, shared, poolLaneId });
   if (!parsed.success) return { ok: false, message: 'That didn’t save. Try again.' };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to change this.' };
 
   const { data: existing } = await supabase
@@ -555,9 +552,7 @@ async function createJointSplashWork(input: z.input<typeof Joint>): Promise<Made
   if (!parsed.success) return { ok: false, message: 'That joint splash is incomplete.' };
   const joint = parsed.data;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to drop this.' };
 
   // Everyone said explicitly (0033): the column's default is the old app's.
@@ -657,9 +652,7 @@ async function dropOwnPoolSplashWork(input: z.infer<typeof OwnDrop>): Promise<Ma
   if (!parsed.success) return { ok: false, message: 'That splash is incomplete.' };
   const drop = parsed.data;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to drop this.' };
 
   const hasBlock = Boolean(drop.body) || drop.media.length > 0;

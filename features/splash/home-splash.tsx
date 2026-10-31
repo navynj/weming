@@ -121,7 +121,10 @@ export async function HomeSplash({ id }: { id: string }) {
   const theirPhotos = await Promise.all(
     others
       .filter((r) => r.media.length > 0)
-      .map(async (r) => [r.id, await signRippleMedia(r.id, 'display')]),
+      .map(async (r) => {
+        const theirs = await signRippleMedia(r.id, 'display');
+        return [r.id, r.media.map((path) => theirs[path] ?? null)];
+      }),
   );
   const photos = {
     ...Object.fromEntries(

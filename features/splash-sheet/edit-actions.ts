@@ -10,6 +10,7 @@ import { setPlacement, setPlacementTogether } from '@/features/pool/actions';
 import { getJointInvitees, getPlacementPicks } from '@/lib/queries/pools';
 import { saveHeader } from '@/features/splash/header';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { isCutOff, writeRefusal } from '@/lib/supabase/fetch';
 import { reported } from '@/lib/report-failure';
 import { pushAfter } from '@/lib/notifications/after';
@@ -82,9 +83,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
   if (!z.uuid().safeParse(id).success) return { ok: false, message: 'No such splash.' };
   const supabase = await createClient();
   const [
-    {
-      data: { user },
-    },
+    user,
     { data: splash },
     { data: placements },
     { data: writers },
@@ -94,7 +93,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     { data: filing },
     { data: myThread },
   ] = await Promise.all([
-    supabase.auth.getUser(),
+    getAuthUser(supabase),
     supabase
       .from('splashes')
       .select(

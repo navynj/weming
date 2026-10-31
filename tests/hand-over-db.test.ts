@@ -546,12 +546,12 @@ describe('photos in the thread Ana handed over', () => {
       (await asUser(w.ana).rpc('leave_pool', { p_pool: w.crew, p_keep: false })).error,
     ).toBeNull();
     as.user = w.ana;
-    expect(await signRippleMedia(photo.data!.id, 'full')).toHaveLength(1);
+    expect((await signRippleMedia(photo.data!.id, 'full'))[path]).toBeTruthy();
     // Home's cards sign through the same check, batched.
     const board = await signBoardPhotos([{ rippleId: photo.data!.id, path }]);
     expect(board[path]).toBeTruthy();
     as.user = w.ben;
-    expect(await signRippleMedia(photo.data!.id, 'full')).toHaveLength(1);
+    expect((await signRippleMedia(photo.data!.id, 'full'))[path]).toBeTruthy();
 
     // One written on the joint record after Ana left is not hers to see.
     const joint = (await jointIn(w.ben, w.crew))[0];
@@ -562,7 +562,7 @@ describe('photos in the thread Ana handed over', () => {
       .single();
     expect(later.error).toBeNull();
     as.user = w.ana;
-    expect(await signRippleMedia(later.data!.id, 'full')).toEqual([]);
+    expect(await signRippleMedia(later.data!.id, 'full')).toEqual({});
     await asAdmin().storage.from(MEDIA_BUCKET).remove([path]);
   });
 });

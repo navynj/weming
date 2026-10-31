@@ -6,6 +6,7 @@ import { MEDIA_BUCKET } from '@/lib/media-bucket';
 import {
   appAssetUrl,
   displayPathOf,
+  thumbPathOf,
   isAppAsset,
   isStoragePath,
   isVideoPath,
@@ -17,10 +18,8 @@ import {
   type MediaVariant,
 } from '@/lib/ripple-media';
 import { thumbnailUrl } from '@/lib/youtube';
+import { signMediaObjects } from '@/lib/signed-media-objects';
 import { storage } from '@/lib/storage';
-
-/** Long enough to load a sheet, short enough that a leaked URL rots fast. */
-const SIGNED_URL_TTL_SECONDS = 300;
 
 /**
  * Signed URLs by path. `null` is a photo that could not be signed — the
@@ -39,11 +38,7 @@ async function signVariants(
   variant: MediaVariant,
 ): Promise<Map<string, string>> {
   const objectOf = new Map(paths.map((path) => [path, variantPath(path, meta, variant)]));
-  const signed = await storage().signedReadUrls(
-    MEDIA_BUCKET,
-    [...new Set(objectOf.values())],
-    SIGNED_URL_TTL_SECONDS,
-  );
+  const signed = await signMediaObjects([...objectOf.values()]);
   const out = new Map<string, string>();
   for (const [path, object] of objectOf) {
     const url = signed.get(object);
@@ -76,9 +71,15 @@ function reportSigningFailure(error: unknown): void {
  * and only then does the service role sign. The same code path serves the
  * owner and a pool member without changing.
  *
- * Fallible per item and never throwing: what could not be signed is left out.
+ * Keyed by the path the record names, so a caller lines each URL up with
+ * its path (and the browser's cache can keep it by path). Fallible per item
+ * and never throwing: what could not be signed is `null`, and a Ripple the
+ * viewer may not see comes back empty.
  */
-export async function signRippleMedia(rippleId: string, variant: MediaVariant): Promise<string[]> {
+export async function signRippleMedia(
+  rippleId: string,
+  variant: MediaVariant,
+): Promise<SignedMedia> {
   try {
     const supabase = await createClient();
 
@@ -89,22 +90,18 @@ export async function signRippleMedia(rippleId: string, variant: MediaVariant): 
       .eq('id', rippleId)
       .maybeSingle();
 
-    if (!ripple || ripple.media.length === 0) return [];
+    if (!ripple || ripple.media.length === 0) return {};
 
-    // An app asset (H58) needs no signing; the rest keep their order around it.
+    // An app asset (H58) needs no signing.
     const stored = ripple.media.filter(isStoragePath);
     const signed =
       stored.length > 0
         ? await signVariants(stored, mediaMetaOf(ripple.media_meta), variant)
         : new Map<string, string>();
-    return ripple.media.flatMap((path) => {
-      if (isAppAsset(path)) return [appAssetUrl(path)];
-      const url = signed.get(path);
-      return url ? [url] : [];
-    });
+    return { ...unsignedMedia(ripple.media), ...Object.fromEntries(signed) };
   } catch (error) {
     reportSigningFailure(error);
-    return [];
+    return {};
   }
 }
 
@@ -121,9 +118,13 @@ export async function removeRippleMedia(paths: string[]): Promise<void> {
   // An app asset (H58) is every account's one copy: never the record's to remove.
   const stored = paths.filter(isStoragePath);
   if (stored.length === 0) return;
-  // The display copy's path is derived, so it goes whether or not the row
-  // said it had one; removing a path that is not there is no error.
-  await storage().remove(MEDIA_BUCKET, [...stored, ...stored.map(displayPathOf)]);
+  // The display copy's and thumbnail's paths are derived, so they go whether
+  // or not the row said it had them; removing a path that is not there is no error.
+  await storage().remove(MEDIA_BUCKET, [
+    ...stored,
+    ...stored.map(displayPathOf),
+    ...stored.map(thumbPathOf),
+  ]);
 }
 
 /**
@@ -164,9 +165,13 @@ export async function signOwnMedia(
   }
 }
 
+/** The copies the browser may ask `signBoardPhotos` for: never the full photo. */
+const BOARD_VARIANTS: readonly MediaVariant[] = ['thumb', 'display'];
+
 /**
  * Signs the Board view's thumbnails in one round trip, keyed by path: each
- * path with the Ripple it hangs on, on Home and in a pool.
+ * path with the Ripple it hangs on, on Home and in a pool. Every list that
+ * shows photos asks through here, batched (lib/media-url-cache.ts).
  *
  * The same check as `signRippleMedia`, batched: the viewer's own session asks
  * for the Ripples, so RLS answers which may be seen, and a path is signed only
@@ -175,9 +180,12 @@ export async function signOwnMedia(
  */
 export async function signBoardPhotos(
   photos: { rippleId: string; path: string }[],
+  variant: MediaVariant = 'thumb',
 ): Promise<SignedMedia> {
   const unsigned = unsignedMedia(photos.map((p) => p.path));
   if (photos.length === 0) return unsigned;
+  // A server action: what the browser names is checked, never trusted.
+  const copy = BOARD_VARIANTS.includes(variant) ? variant : 'thumb';
 
   try {
     const supabase = await createClient();
@@ -200,8 +208,7 @@ export async function signBoardPhotos(
     ];
     if (visible.length === 0) return unsigned;
 
-    // Thumbnails: the display copy where there is one.
-    return { ...unsigned, ...Object.fromEntries(await signVariants(visible, meta, 'display')) };
+    return { ...unsigned, ...Object.fromEntries(await signVariants(visible, meta, copy)) };
   } catch (error) {
     reportSigningFailure(error);
     return unsigned;
@@ -220,8 +227,8 @@ const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
  * ripple an item hangs on must be written by the viewer. Someone else's
  * photo or video is never signed or fetched for an export, whatever the
  * browser asks: the image keeps others' records as shapes, and this is
- * where that cannot be got round. Photos are signed fresh (the sheet may
- * outlive the board's five-minute URLs); a video (`yt:<id>`) must be one the
+ * where that cannot be got round. Photos are signed here, not taken from
+ * the board's own URLs, so the check above is the one that decides; a video (`yt:<id>`) must be one the
  * ripple's own words link to, its id YouTube's eleven characters, and its
  * thumbnail is fetched here from a URL built here — never one the browser
  * names — and returned as a data URL; `null` draws the plain tile.

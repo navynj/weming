@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/media', () => ({ signRippleMedia: () => Promise.resolve([]) }));
+vi.mock('@/lib/media', () => ({ signRippleMedia: () => Promise.resolve({}) }));
 const locks: boolean[] = [];
 vi.mock('@/features/ripple-sheet/actions', () => ({
   deleteRipple: () => Promise.resolve({ ok: true, rippleId: 'r' }),

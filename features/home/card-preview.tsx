@@ -37,7 +37,7 @@ export function CardPreview({ card, signed }: { card: Card; signed: SignedMedia 
           className={`block h-16 self-start overflow-hidden rounded-md ${url ? '' : 'bg-pool-100 aspect-[4/3]'}`}
         >
           {url ? (
-            // A signed URL for a few minutes, or YouTube's own thumbnail: next/image would cache it past its life.
+            // A signed URL kept by path (lib/media-url-cache), or YouTube's own thumbnail: next/image would cache it past its life.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="" draggable={false} className="block h-full w-auto" />
           ) : null}

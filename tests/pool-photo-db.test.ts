@@ -17,10 +17,10 @@ vi.mock('@/lib/supabase/server', async () => {
   return {
     createClient: async () => {
       const supabase = client(as.user);
-      supabase.auth.getUser = (async () => ({
-        data: { user: { id: as.user } },
+      supabase.auth.getClaims = (async () => ({
+        data: { claims: { sub: as.user } },
         error: null,
-      })) as unknown as typeof supabase.auth.getUser;
+      })) as unknown as typeof supabase.auth.getClaims;
       return supabase;
     },
   };

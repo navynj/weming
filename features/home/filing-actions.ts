@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 
 /**
  * Home filing (H45, 0060): where a record that is not in one of my lanes
@@ -20,9 +21,7 @@ export async function fileOnHome(
     .safeParse({ splashId, laneId });
   if (!parsed.success) return { ok: false, message: 'That didn’t save. Try again.' };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to change this.' };
 
   // Moved among my lanes, else filed anew: an upsert would write every

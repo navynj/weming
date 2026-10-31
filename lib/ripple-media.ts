@@ -37,8 +37,11 @@ export function isStoragePath(path: string): boolean {
 /** A photo's size in pixels. */
 export type MediaSize = { w: number; h: number };
 
-/** What 0070 keeps per path: the photo's size, and its display copy's when it has one. */
-export type MediaMetaEntry = MediaSize & { d?: MediaSize };
+/**
+ * What 0070 keeps per path: the photo's size, its display copy's when it has
+ * one, and its thumbnail's (2026-10-30) when it has one.
+ */
+export type MediaMetaEntry = MediaSize & { d?: MediaSize; t?: MediaSize };
 
 /** `ripples.media_meta`, keyed by path. A path missing here is a photo from before 0070. */
 export type MediaMeta = Record<string, MediaMetaEntry>;
@@ -49,7 +52,9 @@ const Size = z.object({
 });
 
 /** `media_meta` as an action takes it from the browser: sizes only, for layout, nothing trusted beyond that. */
-export const MediaMetaInput = z.record(z.string(), Size.extend({ d: Size.optional() })).optional();
+export const MediaMetaInput = z
+  .record(z.string(), Size.extend({ d: Size.optional(), t: Size.optional() }))
+  .optional();
 
 /**
  * What a row stores beside `media`: only the paths it names, the later entry
@@ -61,8 +66,11 @@ export function mediaMetaFor(media: string[], ...metas: MediaMeta[]): MediaMeta 
   return Object.fromEntries(media.flatMap((path) => (merged[path] ? [[path, merged[path]]] : [])));
 }
 
-/** Which copy a surface draws: the display copy on boards, cards and pages; the full one up close. */
-export type MediaVariant = 'display' | 'full';
+/**
+ * Which copy a surface draws (2026-10-30): the thumbnail on boards, the grid,
+ * cards and lists; the display copy on the post's page; the full one up close.
+ */
+export type MediaVariant = 'thumb' | 'display' | 'full';
 
 function sizeOf(value: unknown): MediaSize | null {
   if (!value || typeof value !== 'object') return null;
@@ -78,7 +86,8 @@ export function mediaMetaOf(value: unknown): MediaMeta {
     const size = sizeOf(entry);
     if (!size) continue;
     const d = sizeOf((entry as Record<string, unknown>).d);
-    out[path] = d ? { ...size, d } : size;
+    const t = sizeOf((entry as Record<string, unknown>).t);
+    out[path] = { ...size, ...(d ? { d } : {}), ...(t ? { t } : {}) };
   }
   return out;
 }
@@ -89,14 +98,29 @@ export function mediaMetaOf(value: unknown): MediaMeta {
  * that only knows the path can take both.
  */
 export function displayPathOf(path: string): string {
-  const slash = path.lastIndexOf('/');
-  const dot = path.lastIndexOf('.');
-  return dot > slash ? `${path.slice(0, dot)}.d${path.slice(dot)}` : `${path}.d`;
+  return copyPathOf(path, 'd');
 }
 
-/** The object a surface loads for a path: the display copy only when one was uploaded. */
+/** Where a photo's thumbnail lives: beside it, `.t` before the extension, derived like `.d`. */
+export function thumbPathOf(path: string): string {
+  return copyPathOf(path, 't');
+}
+
+function copyPathOf(path: string, mark: 'd' | 't'): string {
+  const slash = path.lastIndexOf('/');
+  const dot = path.lastIndexOf('.');
+  return dot > slash ? `${path.slice(0, dot)}.${mark}${path.slice(dot)}` : `${path}.${mark}`;
+}
+
+/**
+ * The object a surface loads for a path: the smallest copy it asked for that
+ * was uploaded. A thumbnail falls back to the display copy, then the photo.
+ */
 export function variantPath(path: string, meta: MediaMeta, variant: MediaVariant): string {
-  return variant === 'display' && meta[path]?.d ? displayPathOf(path) : path;
+  const entry = meta[path];
+  if (variant === 'thumb' && entry?.t) return thumbPathOf(path);
+  if (variant !== 'full' && entry?.d) return displayPathOf(path);
+  return path;
 }
 
 /** Width over height, when 0070 knows it. */

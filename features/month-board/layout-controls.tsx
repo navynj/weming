@@ -464,7 +464,7 @@ export function LayoutControls({
             return (
               <div key={photo.path} data-layout-photo={photo.path} className="flex gap-2">
                 {signed[photo.path] ? (
-                  // A signed URL for a few minutes: next/image would cache it past its life.
+                  // A signed URL kept by path (lib/media-url-cache): next/image would cache it past its life.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={signed[photo.path]!}

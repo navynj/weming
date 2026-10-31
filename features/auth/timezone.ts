@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { isTimeZone } from '@/lib/time';
 
 /**
@@ -14,9 +15,7 @@ export async function updateMyTimezone(zone: string): Promise<{ ok: boolean }> {
   const parsed = z.string().min(1).max(64).safeParse(zone);
   if (!parsed.success || !isTimeZone(parsed.data)) return { ok: false };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false };
   const { error } = await supabase
     .from('profiles')

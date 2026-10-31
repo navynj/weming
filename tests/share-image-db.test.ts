@@ -6,7 +6,17 @@ import { asAdmin, asUser } from './as-user';
 const as = vi.hoisted(() => ({ user: '' }));
 vi.mock('@/lib/supabase/server', async () => {
   const { asUser: client } = await import('./as-user');
-  return { createClient: async () => client(as.user) };
+  return {
+    createClient: async () => {
+      const supabase = client(as.user);
+      // A minted token has no session behind it; the action only needs its subject.
+      supabase.auth.getClaims = (async () => ({
+        data: { claims: { sub: as.user } },
+        error: null,
+      })) as unknown as typeof supabase.auth.getClaims;
+      return supabase;
+    },
+  };
 });
 
 import { signBoardPhotos, signExportMedia } from '@/lib/media';

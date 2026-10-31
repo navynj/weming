@@ -1,22 +1,32 @@
 import { cache } from 'react';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/database.types';
+import { tagSentryUser } from '@/lib/sentry-user';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type MyCategory = Database['public']['Tables']['my_categories']['Row'];
 export type DuringClient = SupabaseClient<Database>;
 
+/** Who is signed in: the token's subject, the one thing the server asks of it. */
+export type AuthUser = { id: string };
+
 /**
- * The signed-in user, asked of the auth server once per request and client
- * (the request's one client, lib/supabase/server.ts); every call after the
- * first in a render shares the answer.
+ * The signed-in user, read once per request and client (the request's one
+ * client, lib/supabase/server.ts); every call after the first in a render
+ * shares the answer. Every page, prefetch and action reads it, and every
+ * read asking the auth server (`getUser`) was 255 MB of Auth egress a day
+ * (2026-10-30). So it is `getClaims`, as the proxy reads it (2026-10-28):
+ * the token's signature checked here against the published key, trusted
+ * until it expires, as PostgREST trusts it for the data. An expired token is
+ * refreshed on the way. The sign-in callback, which needs the profile the
+ * provider sent, still asks the auth server for the whole user.
  */
-export const getAuthUser = cache(async (supabase: DuringClient): Promise<User | null> => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+export const getAuthUser = cache(async (supabase: DuringClient): Promise<AuthUser | null> => {
+  const { data } = await supabase.auth.getClaims();
+  const id = data?.claims.sub ?? null;
+  tagSentryUser(id);
+  return id ? { id } : null;
 });
 
 /** My profile row, read once per request and client like the user it belongs to. */

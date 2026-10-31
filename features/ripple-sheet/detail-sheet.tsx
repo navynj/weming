@@ -59,12 +59,14 @@ export function DetailSheet({
     // close, the full photo; boards and pages draw the display copy.
     signRippleMedia(ripple.id, 'full')
       .then((urls) => {
-        if (live) setMedia(urls);
+        if (live) setMedia(ripple.media.flatMap((path) => (urls[path] ? [urls[path]] : [])));
       })
       .catch((error: unknown) => console.error('[during] ripple media not signed', error));
     return () => {
       live = false;
     };
+    // Its paths travel with its id: a new id is a new list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ripple.id]);
 
   const annotation = draftFrom(ripple, timeZone).annotation;

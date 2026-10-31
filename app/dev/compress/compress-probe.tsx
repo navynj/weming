@@ -8,6 +8,7 @@ type Probed =
   | {
       full: { type: string; w: number; h: number; bytes: number[] };
       display: { type: string; w: number; h: number; bytes: number[] } | null;
+      thumb: { type: string; w: number; h: number; bytes: number[] } | null;
     };
 
 declare global {
@@ -27,6 +28,9 @@ async function probe(file: File): Promise<Probed> {
     full: { type: out.full.blob.type, ...out.full.size, bytes: await bytesOf(out.full.blob) },
     display: out.display
       ? { type: out.display.blob.type, ...out.display.size, bytes: await bytesOf(out.display.blob) }
+      : null,
+    thumb: out.thumb
+      ? { type: out.thumb.blob.type, ...out.thumb.size, bytes: await bytesOf(out.thumb.blob) }
       : null,
   };
 }

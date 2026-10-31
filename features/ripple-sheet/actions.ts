@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { CommitResult } from '@/features/input-sheet/commit';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { reported } from '@/lib/report-failure';
 import { MediaMetaInput, mediaMetaFor, mediaMetaOf } from '@/lib/ripple-media';
 import { splashPath } from '@/lib/routes';
@@ -51,9 +52,7 @@ async function updateRippleWork(input: Edit): Promise<CommitResult> {
   const edit = parsed.data;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, reason: 'error', message: 'Sign in again to save this.' };
 
   if (edit.occurredTime !== null && edit.occurredOn === null) {

@@ -27,11 +27,11 @@ vi.mock('@/lib/supabase/server', async () => {
   return {
     createClient: async () => {
       const supabase = client(as.user);
-      // A minted token has no GoTrue session behind it; the action only needs the id.
-      supabase.auth.getUser = (async () => ({
-        data: { user: { id: as.user } },
+      // A minted token has no GoTrue session behind it; the action only needs its subject.
+      supabase.auth.getClaims = (async () => ({
+        data: { claims: { sub: as.user } },
         error: null,
-      })) as unknown as typeof supabase.auth.getUser;
+      })) as unknown as typeof supabase.auth.getClaims;
       return supabase;
     },
   };

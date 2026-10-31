@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { removeRippleMedia } from '@/lib/media';
 import { MediaMetaInput, mediaMetaFor } from '@/lib/ripple-media';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 import { reported } from '@/lib/report-failure';
 
 import {
@@ -61,9 +62,7 @@ async function dropSplashWork(input: Drop): Promise<SplashResult> {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to drop this.' };
 
   const laneId = drop.declaredLaneId ?? (await residualLane(supabase));

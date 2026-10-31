@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/queries/profile';
 
 /** `id` is the lane written: the new one's, so a caller can link it at once (H23). */
 export type LaneResult = { ok: true; id?: string } | { ok: false; message: string };
@@ -24,9 +25,7 @@ export async function saveLane(input: Lane): Promise<LaneResult> {
   const lane = parsed.data;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return { ok: false, message: 'Sign in again to change this.' };
 
   if (lane.id) {
