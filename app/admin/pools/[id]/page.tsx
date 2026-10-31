@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ActivityTimeline } from '@/features/admin/activity-timeline';
 import { AdminFrame, Section, Table } from '@/features/admin/admin-frame';
 import { requireAdmin } from '@/lib/admin/access';
-import { memberRows } from '@/lib/admin/metrics';
+import { memberRows, withOwnersJoined } from '@/lib/admin/metrics';
 import * as read from '@/lib/admin/queries';
 import { formatAt, formatDuration, formatRate, zoneOf } from '@/lib/admin/zones';
 import { isUuid } from '@/lib/short-id';
@@ -14,7 +14,7 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
   const { id } = await params;
   const zone = zoneOf((await searchParams).tz);
   if (!isUuid(id)) notFound();
-  const [now, start, pools, people, events] = await Promise.all([
+  const [now, start, pools, readPeople, events] = await Promise.all([
     read.readAt(),
     read.trackingStart(db),
     read.pools(db),
@@ -23,6 +23,7 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
   ]);
   const pool = pools.find((p) => p.pool_id === id);
   if (!pool) notFound();
+  const people = withOwnersJoined(readPeople, pools);
   const opens = people.length
     ? await read.opens(
         db,
@@ -82,14 +83,15 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
           rows={rows.map((r) => {
             const splashes = r.photoSplashes + r.textSplashes;
             return [
-              r.person.display_name,
-              r.person.is_owner
-                ? 'owner'
-                : !r.person.joined_at
-                  ? 'opened invite'
-                  : r.person.left_at
-                    ? 'left'
-                    : 'member',
+              <span key="name">
+                {r.person.display_name}
+                {r.person.is_owner ? (
+                  <span className="border-pool-200 text-pool-500 ml-1.5 rounded border px-1 text-[10px]">
+                    owner
+                  </span>
+                ) : null}
+              </span>,
+              !r.person.joined_at ? 'opened invite' : r.person.left_at ? 'left' : 'member',
               formatAt(r.person.joined_at, zone),
               formatAt(r.lastSeen, zone),
               formatAt(r.lastWrite, zone),

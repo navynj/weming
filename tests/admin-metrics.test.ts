@@ -8,6 +8,7 @@ import {
   notifyStats,
   poolSummaries,
   returnedOn,
+  withOwnersJoined,
 } from '@/lib/admin/metrics';
 import type { EventRow, NotificationRow, OpenRow, PersonRow } from '@/lib/admin/queries';
 import { daysBetween, dayIn, formatDuration } from '@/lib/admin/zones';
@@ -66,7 +67,7 @@ describe('returning on day N', () => {
 });
 
 describe('the funnel', () => {
-  it('leaves the owner out, counts invite openers who never joined, and reads opens as returns', () => {
+  it('leaves the owner out of Invited, counts invite openers who never joined, and reads opens as returns', () => {
     const people = [
       person('owner', { is_owner: true }),
       person('ana'),
@@ -76,13 +77,33 @@ describe('the funnel', () => {
     const events = [event('ana', 'splash', at(1)), event('ben', 'reaction', at(8))];
     const opens = [open('ana', at(3, 2))];
     const f = funnelOf(people, events, activityOf(events, opens), T0 + 10 * DAY_MS);
+    // The owner joined (day 0) but did nothing after: in every step but Invited.
     expect(f.invited).toBe(3);
+    expect(f.joined).toBe(3);
+    expect(f.firstSplash).toBe(1);
+    expect(f.day3.strict).toEqual({ yes: 1, of: 3 });
+    expect(f.day3.retained).toEqual({ yes: 2, of: 3 });
+    expect(f.day7.strict).toEqual({ yes: 0, of: 3 });
+    expect(f.day7.retained).toEqual({ yes: 1, of: 3 });
+  });
+
+  it('counts the owner from Joined on, joined when the pool was made, though never invited', () => {
+    const pools = [{ pool_id: 'p', name: 'Crew', created_at: at(-2), owner_id: 'owner' }];
+    // The owner's member row says day 0; the pool was made on day -2.
+    const people = withOwnersJoined([person('owner', { is_owner: true }), person('ana')], pools);
+    expect(people[0].joined_at).toBe(at(-2));
+    expect(people[1].joined_at).toBe(at(0));
+    // Back on day 1 (day 3 from the pool's making), and splashing; Ana is quiet.
+    const events = [event('owner', 'splash', at(1, 2))];
+    const f = funnelOf(people, events, activityOf(events, []), T0 + 10 * DAY_MS);
+    expect(f.invited).toBe(1);
     expect(f.joined).toBe(2);
     expect(f.firstSplash).toBe(1);
     expect(f.day3.strict).toEqual({ yes: 1, of: 2 });
-    expect(f.day3.retained).toEqual({ yes: 2, of: 2 });
-    expect(f.day7.strict).toEqual({ yes: 0, of: 2 });
-    expect(f.day7.retained).toEqual({ yes: 1, of: 2 });
+    expect(f.day3.retained).toEqual({ yes: 1, of: 2 });
+    expect(f.day7.retained).toEqual({ yes: 0, of: 2 });
+    const [owner] = memberRows(people, events, []);
+    expect(owner.joinToFirstSplash).toBe(3 * DAY_MS + 2 * 3_600_000);
   });
 });
 

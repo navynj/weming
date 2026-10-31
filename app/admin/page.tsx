@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { AdminFrame, Section, Table } from '@/features/admin/admin-frame';
 import { FUNNEL_HEAD, FunnelTable, funnelCells } from '@/features/admin/funnel-table';
 import { requireAdmin } from '@/lib/admin/access';
-import { activityOf, funnelOf, poolSummaries } from '@/lib/admin/metrics';
+import { activityOf, funnelOf, poolSummaries, withOwnersJoined } from '@/lib/admin/metrics';
 import * as read from '@/lib/admin/queries';
 import { formatAt, zoneOf } from '@/lib/admin/zones';
 
@@ -11,7 +11,7 @@ import { formatAt, zoneOf } from '@/lib/admin/zones';
 export default async function AdminOverview({ searchParams }: PageProps<'/admin'>) {
   const { db, id } = await requireAdmin();
   const zone = zoneOf((await searchParams).tz);
-  const [now, start, pools, people, events, opens, visits] = await Promise.all([
+  const [now, start, pools, readPeople, events, opens, visits] = await Promise.all([
     read.readAt(),
     read.trackingStart(db),
     read.pools(db),
@@ -20,6 +20,7 @@ export default async function AdminOverview({ searchParams }: PageProps<'/admin'
     read.opens(db),
     read.linkVisits(db),
   ]);
+  const people = withOwnersJoined(readPeople, pools);
   const activity = activityOf(events, opens);
   const summaries = poolSummaries(pools, people, events, visits, id, now);
   const active = summaries.filter((s) => s.active);
@@ -34,7 +35,7 @@ export default async function AdminOverview({ searchParams }: PageProps<'/admin'
     <AdminFrame path="/admin" zone={zone} trackingStart={start}>
       <Section
         title="Funnel, all pools"
-        note="Each membership counted once per pool; pool owners left out. Day N strict: any write in the pool or app open in the 24 hours starting N days after joining. Retained: any at all from day N on. Shown as yes/eligible: a member counts once the window can be answered. Opens only exist from the tracking start, so earlier returns rely on writes."
+        note="Each membership counted once per pool. Owners are left out of Invited only, and count from Joined on, joined when they made the pool. Day N strict: any write in the pool or app open in the 24 hours starting N days after joining. Retained: any at all from day N on. Shown as yes/eligible: a member counts once the window can be answered. Opens only exist from the tracking start, so earlier returns rely on writes."
       >
         <FunnelTable funnel={funnelOf(people, events, activity, now)} />
       </Section>
