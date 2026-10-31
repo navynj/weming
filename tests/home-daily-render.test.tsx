@@ -42,6 +42,7 @@ function ripple(over: Partial<RippleWithSplash> = {}): RippleWithSplash {
     author_id: 'a1',
     thread_pool_id: null,
     video_previews: true,
+    is_welcome: false,
     media_meta: {},
     note: 'spec rewrite',
     media: [],

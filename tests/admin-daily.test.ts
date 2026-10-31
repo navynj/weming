@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { ADMIN_COLOR, PERSON_COLORS } from '@/features/admin/kinds';
-import { chartData } from '@/lib/admin/daily';
-import type { EventRow, OpenRow, PersonRow } from '@/lib/admin/queries';
+import { poolChart, userChart } from '@/lib/admin/daily';
+import type { EventRow, OpenRow, PersonRow, UserEventRow } from '@/lib/admin/queries';
 
 /** The pool page's per-day series (H71): counts, a name and a colour, no id. */
 const person = (user: string, joined: string | null, over: Partial<PersonRow> = {}): PersonRow => ({
@@ -32,8 +32,8 @@ const open = (user: string, at: string): OpenRow => ({
   notification_pool_id: null,
 });
 
-describe('chartData', () => {
-  const data = chartData({
+describe('poolChart', () => {
+  const data = poolChart({
     people: [
       person('ana', '2026-10-27T18:00:00Z'),
       person('me', '2026-10-25T18:00:00Z'),
@@ -67,17 +67,69 @@ describe('chartData', () => {
   });
 
   it('draws joined members in join order, the admin gray, with no id', () => {
-    expect(data.members.map((m) => [m.name, m.color, m.joinedIndex])).toEqual([
-      ['ME', ADMIN_COLOR, 0],
-      ['ANA', PERSON_COLORS[0], 2],
+    expect(data.series.map((m) => [m.name, m.color, m.style, m.startIndex])).toEqual([
+      ['ME', ADMIN_COLOR, 'mine', 0],
+      ['ANA', PERSON_COLORS[0], 'solid', 2],
     ]);
     expect(JSON.stringify(data)).not.toMatch(/"(ana|me|cy)"/);
   });
 
   it('counts each day in the kind order, opens last', () => {
-    const ana = data.members[1];
+    const ana = data.series[1];
     expect(ana.counts[2]).toEqual([1, 0, 0, 1, 0]);
     expect(ana.counts[3]).toEqual([1, 0, 0, 0, 1]);
-    expect(data.members[0].counts[1]).toEqual([0, 1, 0, 0, 0]);
+    expect(data.series[0].counts[1]).toEqual([0, 1, 0, 0, 0]);
+  });
+});
+
+describe('userChart', () => {
+  const ev = (pool: string | null, kind: string, at: string, item: string): UserEventRow => ({
+    user_id: 'ana',
+    pool_id: pool,
+    kind,
+    at,
+    splash_id: 's',
+    has_media: false,
+    item_key: item,
+  });
+  // One splash written at home and shown in two pools; a ripple in Crew only.
+  const data = userChart({
+    name: 'Ana',
+    signedUp: '2026-10-26T18:00:00Z',
+    events: [
+      ev(null, 'splash', '2026-10-27T18:00:00Z', 's1'),
+      ev('crew', 'splash', '2026-10-27T18:00:00Z', 's1'),
+      ev('club', 'splash', '2026-10-27T18:00:00Z', 's1'),
+      ev('crew', 'ripple', '2026-10-28T18:00:00Z', 'r1'),
+    ],
+    opens: [open('ana', '2026-10-28T19:00:00Z')],
+    pools: [
+      { poolId: 'crew', name: 'Crew', joinedAt: '2026-10-26T18:00:00Z' },
+      { poolId: 'club', name: 'Club', joinedAt: '2026-10-27T17:00:00Z' },
+    ],
+    trackingStart: '2026-10-26T00:00:00Z',
+    now: Date.parse('2026-10-29T18:00:00Z'),
+    zone: 'America/Vancouver',
+  });
+
+  it('draws Home, then each pool from its join, then the unique line last', () => {
+    expect(data.days[0]).toBe('2026-10-26');
+    expect(data.series.map((s) => [s.name, s.style, s.startIndex, s.hasOpens])).toEqual([
+      ['Home', 'solid', 0, false],
+      ['Crew', 'solid', 0, false],
+      ['Club', 'solid', 1, false],
+      ['Unique (Ana)', 'unique', 0, true],
+    ]);
+  });
+
+  it('counts a cross-posted splash once per place, and once in the unique line', () => {
+    const [home, crew, club, unique] = data.series;
+    expect([home, crew, club].map((s) => s.counts[1][0])).toEqual([1, 1, 1]);
+    expect(unique.counts[1]).toEqual([1, 0, 0, 0, 0]);
+    expect(unique.counts[2]).toEqual([0, 1, 0, 0, 1]);
+    expect(data.opensRows).toEqual([
+      { name: 'Ana', color: expect.any(String), startIndex: 0, counts: [0, 0, 1, 0] },
+    ]);
+    expect(JSON.stringify(data)).not.toMatch(/"(crew|club|ana)"/);
   });
 });

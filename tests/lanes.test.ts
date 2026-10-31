@@ -165,6 +165,7 @@ describe("the Trail groups by the author's own days", () => {
       author_id: 'a1',
       thread_pool_id: null,
       video_previews: true,
+      is_welcome: false,
       media_meta: {},
       note: 'fixture',
       media: [],

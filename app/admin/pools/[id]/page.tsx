@@ -1,23 +1,16 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { AdminFrame, Section, Table } from '@/features/admin/admin-frame';
-import { PoolActivityCharts } from '@/features/admin/pool-activity-charts';
-import { chartData } from '@/lib/admin/daily';
+import { LastWrite } from '@/features/admin/last-write';
+import { LOCKED_ON_POOL_PAGES } from '@/features/admin/notes';
+import { ActivityCharts } from '@/features/admin/activity-charts';
+import { poolChart } from '@/lib/admin/daily';
 import { requireAdmin } from '@/lib/admin/access';
 import { memberRows, withOwnersJoined } from '@/lib/admin/metrics';
 import * as read from '@/lib/admin/queries';
-import {
-  daysSince,
-  formatAgo,
-  formatAt,
-  formatDuration,
-  formatRate,
-  zoneOf,
-} from '@/lib/admin/zones';
+import { formatAt, formatDuration, formatRate, zoneOf } from '@/lib/admin/zones';
 import { isUuid } from '@/lib/short-id';
-
-/** A last write older than this is tinted. */
-const STALE_DAYS = 3;
 
 /** /admin/pools/[id]: one pool's people, day by day, and each one's numbers (H71). */
 export default async function AdminPool({ params, searchParams }: PageProps<'/admin/pools/[id]'>) {
@@ -49,7 +42,7 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
   );
   const rows = memberRows(ordered, events, opens);
   // Counts only reach the browser: names, colours and per-day numbers.
-  const chart = chartData({
+  const chart = poolChart({
     people: ordered,
     events,
     opens,
@@ -63,15 +56,16 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
   return (
     <AdminFrame path={`/admin/pools/${id}`} zone={zone} trackingStart={start}>
       <h1 className="mb-4 text-lg font-semibold">{pool.name}</h1>
-      <p className="text-pool-500 mb-6">
+      <p className="text-pool-500 mb-1">
         Created {formatAt(pool.created_at, zone)} · {pool.pool_id}
       </p>
+      <p className="text-pool-500 mb-6">{LOCKED_ON_POOL_PAGES}</p>
 
       <Section
         title="Activity"
         note="Each line is one member's actions in this pool per day: splashes, ripples, replies and reactions together. Days before someone joined are blank. App opens are not tied to a pool, so they sit in their own rows under the axis. Hover a day for the breakdown."
       >
-        <PoolActivityCharts data={chart} />
+        <ActivityCharts data={chart} />
       </Section>
 
       <Section
@@ -107,10 +101,11 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
           }
           rows={rows.map((r) => {
             const splashes = r.photoSplashes + r.textSplashes;
-            const stale = r.lastWrite !== null && daysSince(r.lastWrite, now) > STALE_DAYS;
             return [
               <span key="name">
-                {r.person.display_name}
+                <Link className="underline" href={`/admin/users/${r.person.user_id}?tz=${zone}`}>
+                  {r.person.display_name}
+                </Link>
                 {r.person.user_id === adminId ? ' (you)' : ''}
                 {r.person.is_owner ? (
                   <span className="border-pool-200 text-pool-500 ml-1.5 rounded border px-1 text-[10px]">
@@ -121,12 +116,7 @@ export default async function AdminPool({ params, searchParams }: PageProps<'/ad
               !r.person.joined_at ? 'opened invite' : r.person.left_at ? 'left' : 'member',
               formatAt(r.person.joined_at, zone),
               formatAt(r.lastSeen, zone),
-              <span
-                key="last-write"
-                className={stale ? 'rounded bg-amber-100 px-1 text-amber-900' : undefined}
-              >
-                {formatAgo(r.lastWrite, now, zone)}
-              </span>,
+              <LastWrite key="last-write" at={r.lastWrite} now={now} zone={zone} />,
               formatDuration(r.joinToFirstSplash),
               String(r.counts.splash),
               String(r.counts.ripple),

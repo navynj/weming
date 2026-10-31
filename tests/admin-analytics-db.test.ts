@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { anonymous, asAdmin, asUser } from './as-user';
+import { plantWelcomeSplash } from '@/features/auth/welcome-splash';
 
 /**
  * 0071 against the real schema (H71): opens and taps are written only as
@@ -279,5 +280,113 @@ describe('pool events', () => {
       (e) => e.kind === 'ripple',
     ).length;
     expect(after).toBe(before - 1);
+  });
+});
+
+describe('one person (0073)', () => {
+  it('lets no API role but the service role call the per-user functions', async () => {
+    for (const client of [anonymous(), asUser(ana)]) {
+      for (const fn of [
+        'admin_users',
+        'admin_user_events',
+        'admin_user_records',
+        'admin_push_status',
+        'admin_open_permissions',
+      ] as const) {
+        const { error } = await client.rpc(fn);
+        expect(error?.message).toMatch(/permission denied/);
+      }
+    }
+  });
+
+  it('logs the browser permission with an open, and reads back the newest', async () => {
+    await asUser(cy).rpc('record_app_open', {
+      p_source: 'direct',
+      p_platform: 'ios-pwa',
+      p_permission: 'default',
+    });
+    await asUser(cy).rpc('record_app_open', {
+      p_source: 'direct',
+      p_platform: 'ios-pwa',
+      p_permission: 'denied',
+    });
+    const latest = (await asAdmin().rpc('admin_open_permissions')).data!.find(
+      (p) => p.user_id === cy,
+    );
+    expect(latest!.permission).toBe('denied');
+    expect(Object.keys(latest!).sort()).toEqual(['at', 'permission', 'user_id']);
+  });
+
+  it('leaves the welcome splash and its planted block out, but counts what they write on it', async () => {
+    const admin = asAdmin();
+    const dee = await person('Dee');
+    await admin.from('profiles').update({ welcome_splash_created: false }).eq('id', dee);
+    await admin.from('my_categories').insert({ user_id: dee, name: 'Day' });
+    const welcome = await plantWelcomeSplash(asUser(dee), dee);
+    expect(welcome).not.toBeNull();
+    const flagged = await admin.from('splashes').select('is_welcome').eq('id', welcome!).single();
+    expect(flagged.data!.is_welcome).toBe(true);
+    const block = await admin
+      .from('ripples')
+      .select('is_welcome')
+      .eq('splash_id', welcome!)
+      .single();
+    expect(block.data!.is_welcome).toBe(true);
+
+    expect((await admin.rpc('admin_user_records', { p_user: dee })).data).toEqual([]);
+    expect((await admin.rpc('admin_user_events', { p_user: dee })).data).toEqual([]);
+
+    const wrote = await asUser(dee)
+      .from('ripples')
+      .insert({ author_id: dee, splash_id: welcome!, note: 'my first words' });
+    if (wrote.error) throw wrote.error;
+    const events = (await admin.rpc('admin_user_events', { p_user: dee })).data!;
+    expect(events.map((e) => [e.kind, e.pool_id])).toEqual([['ripple', null]]);
+    expect(JSON.stringify(events)).not.toContain('my first words');
+  });
+
+  it("counts a locked Home ripple as the person's write, never as pool activity", async () => {
+    const admin = asAdmin();
+    const homeLane = crypto.randomUUID();
+    await admin.from('my_categories').insert({ id: homeLane, user_id: ana, name: 'Notes' });
+    const splash = crypto.randomUUID();
+    const made = await admin.from('splashes').insert({
+      id: splash,
+      owner_id: ana,
+      created_by: ana,
+      title: 'Private',
+      declared_lane_id: homeLane,
+    });
+    if (made.error) throw made.error;
+    const ripple = crypto.randomUUID();
+    await admin
+      .from('ripples')
+      .insert({ id: ripple, author_id: ana, splash_id: splash, note: 'locked words' });
+    await admin.from('ripple_audience').insert({ ripple_id: ripple, target_type: 'lock' });
+    // Shared into the pool, so the record is in both places.
+    await admin
+      .from('splash_placements')
+      .insert({ splash_id: splash, pool_id: pool, pool_lane_id: lane });
+
+    const mine = (await admin.rpc('admin_user_events', { p_user: ana })).data!;
+    expect(mine.some((e) => e.item_key === ripple && e.pool_id === null)).toBe(true);
+    expect(mine.some((e) => e.item_key === ripple && e.pool_id === pool)).toBe(false);
+    const inPool = (await admin.rpc('admin_pool_events', { p_pool: pool })).data!;
+    expect(inPool.some((e) => e.splash_id === splash && e.kind === 'ripple')).toBe(false);
+
+    const record = (await admin.rpc('admin_user_records', { p_user: ana })).data!.find(
+      (r) => r.splash_id === splash,
+    );
+    expect(record).toMatchObject({ is_home: true, pool_count: 1 });
+    expect(Object.keys(record!).sort()).toEqual([
+      'created_at',
+      'has_media',
+      'is_home',
+      'pool_count',
+      'splash_id',
+      'user_id',
+    ]);
+    await admin.from('splashes').delete().eq('id', splash);
+    await admin.from('my_categories').delete().eq('id', homeLane);
   });
 });

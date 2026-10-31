@@ -65,6 +65,8 @@ async function writeWelcome(
       icon: WELCOME_SPLASH.icon,
       declared_start: todayIn(timezone),
       declared_lane_id: laneId,
+      // Planted, not written: the dashboard leaves it out of counts (H71).
+      is_welcome: true,
     })
     .select('id')
     .single();
@@ -78,6 +80,7 @@ async function writeWelcome(
     note: WELCOME_SPLASH.note,
     media: [WELCOME_SPLASH.photo],
     splash_id: splash.id,
+    is_welcome: true,
   });
   if (blockError) {
     // Half a welcome is not the one promised: take the splash back with it.

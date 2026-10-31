@@ -38,6 +38,7 @@ export type Database = {
         Row: {
           id: string
           notification_id: string | null
+          notification_permission: string | null
           platform: string
           source: string
           started_at: string
@@ -46,6 +47,7 @@ export type Database = {
         Insert: {
           id?: string
           notification_id?: string | null
+          notification_permission?: string | null
           platform: string
           source: string
           started_at?: string
@@ -54,6 +56,7 @@ export type Database = {
         Update: {
           id?: string
           notification_id?: string | null
+          notification_permission?: string | null
           platform?: string
           source?: string
           started_at?: string
@@ -1260,6 +1263,7 @@ export type Database = {
           created_at: string
           ended_at: string | null
           id: string
+          is_welcome: boolean
           media: string[]
           media_meta: Json
           note: string | null
@@ -1279,6 +1283,7 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           id?: string
+          is_welcome?: boolean
           media?: string[]
           media_meta?: Json
           note?: string | null
@@ -1298,6 +1303,7 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           id?: string
+          is_welcome?: boolean
           media?: string[]
           media_meta?: Json
           note?: string | null
@@ -1507,6 +1513,7 @@ export type Database = {
           ends_at: string | null
           icon: string | null
           id: string
+          is_welcome: boolean
           joint_invite_all: boolean
           own_pool_id: string | null
           owner_id: string | null
@@ -1529,6 +1536,7 @@ export type Database = {
           ends_at?: string | null
           icon?: string | null
           id?: string
+          is_welcome?: boolean
           joint_invite_all?: boolean
           own_pool_id?: string | null
           owner_id?: string | null
@@ -1551,6 +1559,7 @@ export type Database = {
           ends_at?: string | null
           icon?: string | null
           id?: string
+          is_welcome?: boolean
           joint_invite_all?: boolean
           own_pool_id?: string | null
           owner_id?: string | null
@@ -1745,6 +1754,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_open_permissions: {
+        Args: never
+        Returns: {
+          at: string
+          permission: string
+          user_id: string
+        }[]
+      }
       admin_pool_events: {
         Args: { p_pool?: string }
         Returns: {
@@ -1777,7 +1794,46 @@ export type Database = {
           pool_id: string
         }[]
       }
+      admin_push_status: {
+        Args: never
+        Returns: {
+          last_used_at: string
+          subscriptions: number
+          user_id: string
+        }[]
+      }
       admin_tracking_start: { Args: never; Returns: string }
+      admin_user_events: {
+        Args: { p_user?: string }
+        Returns: {
+          at: string
+          has_media: boolean
+          item_key: string
+          kind: string
+          pool_id: string
+          splash_id: string
+          user_id: string
+        }[]
+      }
+      admin_user_records: {
+        Args: { p_user?: string }
+        Returns: {
+          created_at: string
+          has_media: boolean
+          is_home: boolean
+          pool_count: number
+          splash_id: string
+          user_id: string
+        }[]
+      }
+      admin_users: {
+        Args: never
+        Returns: {
+          display_name: string
+          signed_up_at: string
+          user_id: string
+        }[]
+      }
       applied_migrations: { Args: never; Returns: string[] }
       board_layout_valid: { Args: { l: Json }; Returns: boolean }
       can_read_responses: { Args: { rid: string }; Returns: boolean }
@@ -1931,6 +1987,15 @@ export type Database = {
         }[]
       }
       pool_creator_is_me: { Args: { pid: string }; Returns: boolean }
+      record_app_open: {
+        Args: {
+          p_notification?: string
+          p_permission?: string
+          p_platform: string
+          p_source: string
+        }
+        Returns: undefined
+      }
       record_invite_open: { Args: { p_token: string }; Returns: undefined }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
       remove_pool_member: {

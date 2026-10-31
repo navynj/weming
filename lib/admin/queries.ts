@@ -23,6 +23,15 @@ export type NotificationRow = Nullable<
   'clicked_at' | 'influenced_open_at'
 >;
 export type LinkVisitRow = Fn['admin_invite_link_visits']['Returns'][number];
+export type UserRow = Fn['admin_users']['Returns'][number];
+/** A write by a person: `pool_id` null is Home. */
+export type UserEventRow = Nullable<
+  Fn['admin_user_events']['Returns'][number],
+  'pool_id' | 'splash_id'
+>;
+export type UserRecordRow = Fn['admin_user_records']['Returns'][number];
+export type PushStatusRow = Nullable<Fn['admin_push_status']['Returns'][number], 'last_used_at'>;
+export type PermissionRow = Fn['admin_open_permissions']['Returns'][number];
 
 /** PostgREST answers at most this many rows at once (config.toml max_rows). */
 const PAGE = 1000;
@@ -92,6 +101,41 @@ export function linkVisits(db: AdminDb): Promise<LinkVisitRow[]> {
   return everyRow((from, to) =>
     db.rpc('admin_invite_link_visits').order('opened_at').order('pool_id').range(from, to),
   );
+}
+
+export function users(db: AdminDb): Promise<UserRow[]> {
+  return everyRow((from, to) => db.rpc('admin_users').order('user_id').range(from, to));
+}
+
+export function userEvents(db: AdminDb, user: string | null = null): Promise<UserEventRow[]> {
+  // Every column in the order, so no row falls between two pages.
+  return everyRow((from, to) =>
+    db
+      .rpc('admin_user_events', user ? { p_user: user } : {})
+      .order('at')
+      .order('user_id')
+      .order('item_key')
+      .order('pool_id', { nullsFirst: true })
+      .order('kind')
+      .range(from, to),
+  );
+}
+
+export function userRecords(db: AdminDb, user: string | null = null): Promise<UserRecordRow[]> {
+  return everyRow((from, to) =>
+    db
+      .rpc('admin_user_records', user ? { p_user: user } : {})
+      .order('splash_id')
+      .range(from, to),
+  );
+}
+
+export function pushStatus(db: AdminDb): Promise<PushStatusRow[]> {
+  return everyRow((from, to) => db.rpc('admin_push_status').order('user_id').range(from, to));
+}
+
+export function permissions(db: AdminDb): Promise<PermissionRow[]> {
+  return everyRow((from, to) => db.rpc('admin_open_permissions').order('user_id').range(from, to));
 }
 
 /** The moment a page's rows were read: every "now" on the page is this one. */
