@@ -10,6 +10,11 @@
 #      notFound() check.
 #   3. No client component imports lib/admin, the dashboard's components, or
 #      the service-role key.
+#   4. Dashboard code renders on the server, with one kind of exception: a
+#      client component in features/admin that draws numbers it is handed
+#      (the pool page's charts). It may import react and ./kinds and nothing
+#      else, nor read the environment, so it can reach no data, client, key or
+#      other admin code.
 set -euo pipefail
 
 dirs=(app/admin features/admin lib/admin)
@@ -52,8 +57,13 @@ if [ -n "$clients" ]; then
   hits="$(grep -nE "@/lib/admin|@/features/admin|supabaseServiceRoleKey|SUPABASE_SERVICE_ROLE_KEY|lib/invite-visits" $clients || true)"
   [ -z "$hits" ] || report "A client component reaches admin code or the service role:" "$hits"
 fi
-hits="$(grep -rlE "^['\"]use client['\"]" "${dirs[@]}" || true)"
+hits="$(grep -rlE "^['\"]use client['\"]" "${dirs[@]}" | grep -v '^features/admin/' || true)"
 [ -z "$hits" ] || report "Dashboard code must render on the server only:" "$hits"
+for file in $(grep -rlE "^['\"]use client['\"]" features/admin || true); do
+  hits="$(grep -nE "^import|from '|require\(|import\(|process\.env" "$file" |
+    grep -vE "from 'react';?$|from '\./kinds';?$" || true)"
+  [ -z "$hits" ] || report "A dashboard client component imports more than react and ./kinds:" "$hits"
+done
 
 [ "$fail" -eq 0 ] || exit 1
 echo "✓ the admin dashboard reads metadata through admin_* functions only"

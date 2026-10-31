@@ -135,6 +135,9 @@ export type PoolSummary = {
   members: number;
   counts: Record<WriteKind, number>;
   lastActivity: number | null;
+  /** The newest write by anyone but the admin, who posts to every pool. */
+  lastOthersActivity: number | null;
+  /** By others' activity: the admin's own writes do not keep a pool alive. */
   active: boolean;
   adminIsMember: boolean;
   linkVisits: number;
@@ -156,6 +159,7 @@ export function poolSummaries(
         members: 0,
         counts: { splash: 0, ripple: 0, reply: 0, reaction: 0 },
         lastActivity: null,
+        lastOthersActivity: null,
         active: false,
         adminIsMember: false,
         linkVisits: 0,
@@ -173,17 +177,22 @@ export function poolSummaries(
     if (!s) continue;
     s.counts[e.kind as WriteKind] += 1;
     s.lastActivity = Math.max(s.lastActivity ?? 0, ms(e.at));
+    if (e.user_id !== adminId) {
+      s.lastOthersActivity = Math.max(s.lastOthersActivity ?? 0, ms(e.at));
+    }
   }
   for (const v of linkVisits) {
     const s = summaries.get(v.pool_id);
     if (s) s.linkVisits += 1;
   }
   for (const s of summaries.values()) {
-    s.active = s.lastActivity !== null && now - s.lastActivity < INACTIVE_AFTER_MS;
+    s.active = s.lastOthersActivity !== null && now - s.lastOthersActivity < INACTIVE_AFTER_MS;
   }
   return [...summaries.values()].sort(
     (a, b) =>
-      (b.lastActivity ?? 0) - (a.lastActivity ?? 0) || a.pool.name.localeCompare(b.pool.name),
+      (b.lastOthersActivity ?? 0) - (a.lastOthersActivity ?? 0) ||
+      (b.lastActivity ?? 0) - (a.lastActivity ?? 0) ||
+      a.pool.name.localeCompare(b.pool.name),
   );
 }
 

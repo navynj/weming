@@ -30,7 +30,10 @@ export default async function AdminPools({ searchParams }: PageProps<'/admin/poo
       trackingStart={start}
       query={notIn ? { notin: '1' } : {}}
     >
-      <Section title={`Pools (${shown.length} of ${all.length})`}>
+      <Section
+        title={`Pools (${shown.length} of ${all.length})`}
+        note="Sorted by last activity by others: anyone but you. Status is active when someone else wrote in the last 3 days."
+      >
         <p className="mb-3 flex gap-4">
           <Link
             href={`/admin/pools?tz=${zone}`}
@@ -54,7 +57,9 @@ export default async function AdminPools({ searchParams }: PageProps<'/admin/poo
             'Ripples',
             'Replies',
             'Reactions',
-            'Last activity',
+            'Status',
+            'Last activity by others',
+            'Last activity (all)',
             'I am a member',
           ]}
           rows={shown.map((s) => [
@@ -71,7 +76,11 @@ export default async function AdminPools({ searchParams }: PageProps<'/admin/poo
             String(s.counts.ripple),
             String(s.counts.reply),
             String(s.counts.reaction),
-            formatAt(s.lastActivity, zone),
+            s.active ? 'active' : 'inactive',
+            formatAt(s.lastOthersActivity, zone),
+            <span key="all" className="text-pool-500">
+              {formatAt(s.lastActivity, zone)}
+            </span>,
             s.adminIsMember ? 'yes' : 'no',
           ])}
         />

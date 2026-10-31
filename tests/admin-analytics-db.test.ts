@@ -196,6 +196,55 @@ describe('invites', () => {
   });
 });
 
+describe('a record shared into a pool', () => {
+  it('brings no ripple written before it entered; one written after counts (0072)', async () => {
+    const admin = asAdmin();
+    const splash = crypto.randomUUID();
+    const early = crypto.randomUUID();
+    const late = crypto.randomUUID();
+    const before = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    // A Home record lives on one of its owner's lanes.
+    const homeLane = crypto.randomUUID();
+    const laned = await admin
+      .from('my_categories')
+      .insert({ id: homeLane, user_id: ana, name: 'Home' });
+    if (laned.error) throw laned.error;
+    const made = await admin.from('splashes').insert({
+      id: splash,
+      owner_id: ana,
+      created_by: ana,
+      title: 'An old Home record',
+      declared_lane_id: homeLane,
+      created_at: before,
+    });
+    if (made.error) throw made.error;
+    const wrote = await admin.from('ripples').insert({
+      id: early,
+      author_id: ana,
+      splash_id: splash,
+      note: 'written at home',
+      created_at: before,
+    });
+    if (wrote.error) throw wrote.error;
+    const placed = await admin
+      .from('splash_placements')
+      .insert({ splash_id: splash, pool_id: pool, pool_lane_id: lane, shared: true });
+    if (placed.error) throw placed.error;
+    const after = await admin
+      .from('ripples')
+      .insert({ id: late, author_id: ana, splash_id: splash, note: 'written after' });
+    if (after.error) throw after.error;
+
+    const ripples = (await admin.rpc('admin_pool_events', { p_pool: pool })).data!.filter(
+      (e) => e.splash_id === splash && e.kind === 'ripple',
+    );
+    expect(ripples).toHaveLength(1);
+    expect(Date.parse(ripples[0].at)).toBeGreaterThan(Date.parse(before));
+    await admin.from('splashes').delete().eq('id', splash);
+    await admin.from('my_categories').delete().eq('id', homeLane);
+  });
+});
+
 describe('pool events', () => {
   it('carries ids, kinds, times and a photo flag, never content, and leaves locked ripples out', async () => {
     const record = await jointSplash('Title nobody should read');

@@ -67,16 +67,49 @@ export function AdminFrame({
   );
 }
 
-export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
+export type ColumnGroup = { label: string; span: number };
+
+/**
+ * A plain table. `groups` sets small headers over runs of columns (their
+ * spans add up to the columns); `rowClass` marks a row, the admin's own.
+ */
+export function Table({
+  head,
+  rows,
+  groups,
+  rowClass,
+}: {
+  head: string[];
+  rows: ReactNode[][];
+  groups?: ColumnGroup[];
+  rowClass?: (index: number) => string | undefined;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left">
         <thead>
+          {groups ? (
+            <tr>
+              {groups.map((g, i) => (
+                <th
+                  key={i}
+                  colSpan={g.span}
+                  className={`text-pool-500 px-2 pt-1 text-xs font-normal tracking-wide uppercase ${
+                    g.label ? 'border-pool-200 border-b' : ''
+                  } ${i > 0 ? 'border-pool-200 border-l' : ''}`}
+                >
+                  {g.label}
+                </th>
+              ))}
+            </tr>
+          ) : null}
           <tr>
-            {head.map((h) => (
+            {head.map((h, j) => (
               <th
                 key={h}
-                className="border-pool-200 border-b px-2 py-1 font-semibold whitespace-nowrap"
+                className={`border-pool-200 border-b px-2 py-1 font-semibold whitespace-nowrap ${
+                  groups && groupStarts(groups).has(j) ? 'border-l' : ''
+                }`}
               >
                 {h}
               </th>
@@ -85,9 +118,14 @@ export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="odd:bg-pool-100">
+            <tr key={i} className={rowClass?.(i) ?? 'odd:bg-pool-100'}>
               {row.map((cell, j) => (
-                <td key={j} className="px-2 py-1 whitespace-nowrap">
+                <td
+                  key={j}
+                  className={`px-2 py-1 whitespace-nowrap ${
+                    groups && groupStarts(groups).has(j) ? 'border-pool-200 border-l' : ''
+                  }`}
+                >
                   {cell}
                 </td>
               ))}
@@ -98,6 +136,17 @@ export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
       {rows.length === 0 ? <p className="text-pool-500 px-2 py-3">Nothing yet.</p> : null}
     </div>
   );
+}
+
+/** The first column of each group after the first: where a divider goes. */
+function groupStarts(groups: ColumnGroup[]): Set<number> {
+  const starts = new Set<number>();
+  let at = 0;
+  for (const [i, g] of groups.entries()) {
+    if (i > 0) starts.add(at);
+    at += g.span;
+  }
+  return starts;
 }
 
 export function Section({
