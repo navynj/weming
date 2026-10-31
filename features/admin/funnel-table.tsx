@@ -25,6 +25,12 @@ export function funnelCells(f: Funnel): string[] {
   ];
 }
 
-export function FunnelTable({ funnel }: { funnel: Funnel }) {
-  return <Table head={FUNNEL_HEAD} rows={[funnelCells(funnel)]} />;
+/** One funnel per row, each named: everyone, and without the admin's own memberships. */
+export function FunnelTable({ rows }: { rows: { label: string; funnel: Funnel }[] }) {
+  return (
+    <Table
+      head={['', ...FUNNEL_HEAD]}
+      rows={rows.map((r) => [r.label, ...funnelCells(r.funnel)])}
+    />
+  );
 }

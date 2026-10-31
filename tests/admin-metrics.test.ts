@@ -118,6 +118,15 @@ describe('the funnel', () => {
 });
 
 describe('pools and members', () => {
+  it("rates a pool by others' activity: the admin's own writes keep nothing alive", () => {
+    const pools = [{ pool_id: 'p', name: 'Crew', created_at: at(0), owner_id: 'admin' }];
+    const events = [event('ana', 'splash', at(2)), event('admin', 'splash', at(9))];
+    const [crew] = poolSummaries(pools, [person('admin')], events, [], 'admin', T0 + 10 * DAY_MS);
+    expect(crew.lastActivity).toBe(Date.parse(at(9)));
+    expect(crew.lastOthersActivity).toBe(Date.parse(at(2)));
+    expect(crew.active).toBe(false);
+  });
+
   it('marks a pool inactive after three quiet days and knows whether the admin is in it', () => {
     const pools = [
       { pool_id: 'p', name: 'Crew', created_at: at(0), owner_id: 'owner' },

@@ -66,3 +66,20 @@ export function formatRate(rate: number | null): string {
 export function formatRatio(r: { yes: number; of: number }): string {
   return r.of === 0 ? '—' : `${r.yes}/${r.of} (${Math.round((r.yes / r.of) * 100)}%)`;
 }
+
+/** Whole days from one moment to another. */
+export function daysSince(at: number, now: number): number {
+  return Math.max(0, Math.floor((now - at) / (24 * 60 * 60 * 1000)));
+}
+
+/** "Oct 27 · 3d ago", or "today": a date and how far back it is. */
+export function formatAgo(at: number | null, now: number, zone: Zone): string {
+  if (at === null) return '—';
+  const date = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    month: 'short',
+    day: 'numeric',
+  }).format(at);
+  const days = daysSince(at, now);
+  return `${date} · ${days === 0 ? 'today' : `${days}d ago`}`;
+}
